@@ -31,6 +31,7 @@ import { z } from 'zod';
 import { failure } from './errors';
 import { instructionsFor } from './instructions';
 import { invitationLink, namesOf, spaceFor } from './spaces';
+import { registerViews } from './views/register';
 
 export const MCP_FILE_MAX_BYTES = 5 * 1024 * 1024;
 
@@ -119,7 +120,14 @@ const spaceArg = z
  * each request: stateless, nothing kept between calls.
  */
 export async function mcpServerFor(
-  deps: { db: pg.Pool; blobs: Blobs; publicUrl: string; today?: () => string },
+  deps: {
+    db: pg.Pool;
+    blobs: Blobs;
+    publicUrl: string;
+    /** Signs upload links (spec 005). */
+    secret: string;
+    today?: () => string;
+  },
   who: McpPerson,
 ): Promise<McpServer> {
   const actor: Actor = {
@@ -132,7 +140,7 @@ export async function mcpServerFor(
   const at = (space?: string) => spaceFor(reach, space ?? null).id;
   const method = await act((tx) => methodOf(tx, reach));
   const server = new McpServer(
-    { name: 'jarvis-os', version: '0.4.0' },
+    { name: 'jarvis-os', version: '0.5.0' },
     {
       instructions: instructionsFor({
         name: who.name,
@@ -467,6 +475,16 @@ export async function mcpServerFor(
       return found;
     }),
   );
+
+  registerViews(server, {
+    db: deps.db,
+    person: who.person,
+    publicUrl: deps.publicUrl,
+    secret: deps.secret,
+    reach,
+    spaceOf: (space) => spaceFor(reach, space ?? null),
+    act,
+  });
 
   return server;
 }

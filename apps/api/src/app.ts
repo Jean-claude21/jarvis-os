@@ -1,15 +1,26 @@
 import { requireMcpAuth } from '@better-auth/mcp';
 import { verifyOAuthQueryParams } from '@better-auth/oauth-provider';
-import { asPerson, clientSpaces, pool, previewInvitation, spacesOf } from '@jarvis-os/core';
+import {
+  addFile,
+  asPerson,
+  clientSpaces,
+  FILE_MAX_BYTES,
+  pool,
+  previewInvitation,
+  spacesOf,
+} from '@jarvis-os/core';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
+import { cors } from 'hono/cors';
 import { CONSENT_PAGE, makeAuth, mcpResource, SIGN_IN_PAGE } from './auth';
 import { langOf, wordsOf } from './i18n';
 import { mcpServerFor } from './mcp';
-import { consentPage, invitationPage, signInPage } from './pages';
+import { consentPage, invitationPage, messagePage, signInPage } from './pages';
 import { apiRoutes } from './routes';
 import type { Settings } from './settings';
 import { objectStorage } from './storage';
+import { readUploadToken, uploadView } from './views/upload';
 
 /**
  * The Jarvis OS server: accounts and OAuth (`/auth`), the REST API (`/api`), the MCP server
@@ -74,6 +85,58 @@ export function makeApp(settings: Settings) {
     );
   });
 
+  // An upload link (spec 005): files go straight into her life, never through the model. The
+  // token is the credential, so the view, framed by any host, may post here.
+  app.get('/upload/:token', async (c) => {
+    const lang = langOf(c.req.header('accept-language'));
+    try {
+      const grant = readUploadToken(c.req.param('token'), settings.authSecret);
+      const spaces = await asPerson(db, grant.person, (tx) => spacesOf(tx));
+      const space = spaces.find((one) => one.id === grant.spaceId);
+      if (!space) throw new Error('This upload link is not valid.');
+      return c.html(
+        uploadView({
+          url: new URL(c.req.url).pathname,
+          expiresAt: new Date(grant.until).toISOString(),
+          space: space.name,
+        }),
+      );
+    } catch {
+      return c.html(messagePage(lang, wordsOf(lang).uploadExpired), 410);
+    }
+  });
+  app.use('/upload/:token', cors({ origin: '*', allowMethods: ['POST'] }));
+  app.post(
+    '/upload/:token',
+    bodyLimit({
+      maxSize: FILE_MAX_BYTES + 1024 * 1024,
+      onError: (c) =>
+        c.json({ error: `The file is larger than ${FILE_MAX_BYTES / 1024 / 1024} MB.` }, 400),
+    }),
+    async (c) => {
+      let grant;
+      try {
+        grant = readUploadToken(c.req.param('token'), settings.authSecret);
+      } catch (error) {
+        return c.json({ error: (error as Error).message }, 410);
+      }
+      const form = await c.req.parseBody();
+      const file = form.file;
+      if (!(file instanceof File))
+        return c.json({ error: 'Send the file in the field « file ».' }, 400);
+      const stored = await asPerson(db, grant.person, async (tx) =>
+        addFile(tx, { person: grant.person, door: 'upload' }, blobs, {
+          spaceId: grant.spaceId,
+          name: file.name,
+          mediaType: file.type || 'application/octet-stream',
+          bytes: new Uint8Array(await file.arrayBuffer()),
+          links: grant.links,
+        }),
+      );
+      return c.json(stored, 201);
+    },
+  );
+
   // An invitation into a shared space (spec 004): the page reads the secret from its fragment.
   app.get('/invitation', (c) => {
     const lang = langOf(c.req.header('accept-language'));
@@ -106,7 +169,7 @@ export function makeApp(settings: Settings) {
         return Response.json({ error: 'No such account.' }, { status: 401 });
       }
       const server = await mcpServerFor(
-        { db, blobs, publicUrl: settings.publicUrl },
+        { db, blobs, publicUrl: settings.publicUrl, secret: settings.authSecret },
         {
           person,
           name: rows[0].name,

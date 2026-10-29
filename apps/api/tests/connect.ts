@@ -2,6 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { Space } from '@jarvis-os/core';
 import { mcpServerFor } from '../src/mcp';
+import { settingsFor } from '../src/settings';
 import { PUBLIC_URL, server, type Account } from './client';
 
 export interface Connected {
@@ -20,7 +21,13 @@ export async function connect(account: Account, clientId = 'test'): Promise<Conn
   const me = await account.json<{ person: { id: string; name: string; email: string } }>('/api/me');
   const spaces = await account.json<Space[]>(`/api/clients/${clientId}/spaces`);
   const mcp = await mcpServerFor(
-    { db: server.db, blobs: server.blobs, publicUrl: PUBLIC_URL, today: () => '2026-10-29' },
+    {
+      db: server.db,
+      blobs: server.blobs,
+      publicUrl: PUBLIC_URL,
+      secret: settingsFor('test').authSecret,
+      today: () => '2026-10-29',
+    },
     {
       person: me.body.person.id,
       name: me.body.person.name,

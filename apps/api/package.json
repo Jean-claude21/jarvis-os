@@ -1,0 +1,31 @@
+{
+  "name": "@jarvis-os/api",
+  "private": true,
+  "type": "module",
+  "description": "Jarvis OS doors: accounts (/auth), the REST API (/api), and the MCP server (/mcp), over the core.",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "db:migrate": "tsx src/migrate.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1158.0",
+    "@aws-sdk/s3-request-presigner": "^3.1158.0",
+    "@hono/node-server": "^2.1.5",
+    "@jarvis-os/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "better-auth": "^1.7.14",
+    "hono": "^4.13.14",
+    "pg": "^8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12"
+  }
+}

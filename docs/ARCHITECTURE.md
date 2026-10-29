@@ -103,15 +103,19 @@ flowchart LR
 
 ## The doors
 
-| Door    | For                                                     | Authentication                       |
-| ------- | ------------------------------------------------------- | ------------------------------------ |
-| `/api`  | the Jarvis app, the portal, tests                       | a Better Auth session                |
-| `/mcp`  | Claude, ChatGPT and any MCP client                      | an OAuth access token for one person |
-| `/auth` | creating an account, signing in, consenting to a client | Better Auth                          |
-| links   | `/upload/:token`, `/document/:token`, `/invitation#…`   | a token signed by the server         |
-| watcher | her reminders, on Telegram                              | acts as each member                  |
+| Door    | For                                                             | Authentication                       |
+| ------- | --------------------------------------------------------------- | ------------------------------------ |
+| `/api`  | the Jarvis app, the portal, tests                               | a Better Auth session                |
+| `/mcp`  | Claude, ChatGPT and any MCP client                              | an OAuth access token for one person |
+| `/auth` | creating an account, signing in, consenting to a client         | Better Auth                          |
+| `/app`  | her web account (spec 009): her life, spaces, connections, data | her session                          |
+| links   | `/upload/:token`, `/document/:token`, `/invitation#…`           | a token signed by the server         |
+| watcher | her reminders, on Telegram                                      | acts as each member                  |
 
-The REST API and the MCP tools call the same core functions: what one does, the other does.
+The REST API and the MCP tools call the same core functions: what one does, the other does. Her
+web account at `/app` is one page that reads and acts through `/api` with her session; its
+dashboards and documents are the clients' views, framed. A client she disconnects there is refused
+by `/mcp` at once.
 
 `/auth` is also the OAuth server of the `/mcp` resource: an MCP client discovers it from the 401,
 registers itself, sends the person to sign in and consent, and gets a token for her alone. Each

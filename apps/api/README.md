@@ -78,6 +78,31 @@ server), shows the space, has her sign in or create her account, then accepts.
 Errors answer `{ error }` with 400 (what to fix), 401 (sign in), 404 (not in her space) or 500.
 An `x-jarvis-client` header names the client in the journal.
 
+## The platform (spec 009)
+
+`/` leads to `/app`, her web account, behind her session (else `/connexion`): one page, no build,
+in the Kete brand, drawing each part from `/api`.
+
+| Part             | What she does there                                                  | Through                                   |
+| ---------------- | -------------------------------------------------------------------- | ----------------------------------------- |
+| Accueil          | counts, the next seven days, the latest changes                      | `GET /api/overview`                       |
+| Ma vie           | her kinds, entries, search; an entry with origins, links, text, undo | `/api/kinds`, `/api/entries`, `/api/undo` |
+| Documents        | her long texts, read, printed, downloaded                            | `/app/frame/document/:id`                 |
+| Tableaux de bord | her saved dashboards, recomputed                                     | `/app/frame/dashboard/:id`                |
+| Rappels          | each reminder, its next time; her channel                            | `/api/entries?kind=Rappel`                |
+| Journal          | every change, undoable                                               | `/api/history`, `/api/undo`               |
+| Espaces          | members, rename, invite, withdraw, leave, create                     | `/api/spaces…`                            |
+| Connexions       | the clients she allowed, their spaces, disconnecting                 | `/api/connections`, `/api/clients/…`      |
+| Mes données      | her space as a zip of Markdown; a Markdown folder brought in         | `/api/export`, `/api/import`              |
+
+| Method | Path                       | What it does                                                   |
+| ------ | -------------------------- | -------------------------------------------------------------- |
+| GET    | `/api/overview`            | counts per space, the next seven days, changes, recent lines   |
+| GET    | `/api/documents/:id`       | a document as HTML, its outline and reading link               |
+| POST   | `/api/dashboard`           | a saved dashboard (`id`) or `widgets`, computed now            |
+| GET    | `/api/connections`         | the clients she consented to, since when, last used, spaces    |
+| DELETE | `/api/connections/:client` | disconnect: consent removed, tokens revoked, refused by `/mcp` |
+
 ## MCP
 
 `/mcp` is a stateless Streamable HTTP server. Each request carries an OAuth access token; the

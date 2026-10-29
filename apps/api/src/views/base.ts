@@ -9,7 +9,7 @@ export const VIEW_MIME = 'text/html;profile=mcp-app';
 /** Where the brand's fonts come from: declared in each view's content security policy. */
 export const FONT_DOMAINS = ['https://fonts.googleapis.com', 'https://fonts.gstatic.com'];
 
-const css = `
+export const brandCss = `
 :root {
   color-scheme: light;
   --paper: #fffdf9; --sand: #fbf6f0; --clay: #f4e6da; --rule: #d9c4b4; --rule-strong: #b9a294;
@@ -127,7 +127,8 @@ function start(render) {
   host.on('ui/notifications/host-context-changed', (ctx) => context(ctx));
   new ResizeObserver(() => host.notify('ui/notifications/size-changed', {
     width: Math.ceil(document.documentElement.scrollWidth), height: Math.ceil(document.documentElement.scrollHeight) })).observe(document.body);
-  if (!host.inside) { render(window.JARVIS_DATA || null); return; }
+  // A page given its data (outside a host, or framed by her web account) draws it at once.
+  if (!host.inside || window.JARVIS_DATA) { render(window.JARVIS_DATA || null); return; }
   host.request('ui/initialize', { protocolVersion: '2026-01-26', capabilities: {},
     clientInfo: { name: 'jarvis-os-view', version: '0.5.0' }, appCapabilities: { availableDisplayModes: ['inline'] } })
     .then((init) => { context(init && init.hostContext); host.notify('ui/notifications/initialized', {}); })
@@ -156,7 +157,7 @@ export function viewPage(input: {
 <title>${escape(input.title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Instrument+Sans:wght@400;600&family=JetBrains+Mono:wght@600&display=swap">
-<style>${css}</style></head>
+<style>${brandCss}</style></head>
 <body><main id="root"><p class="empty">…</p></main>
 <script>
 ${data}

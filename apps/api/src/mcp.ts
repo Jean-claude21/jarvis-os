@@ -18,6 +18,7 @@ import {
   save,
   saveInputSchema,
   undo,
+  upcoming,
   type Actor,
   type Blobs,
   type Space,
@@ -94,28 +95,14 @@ async function methodOf(tx: Tx, spaces: Space[]) {
       });
     }
   }
-  return { routines, charters, upcoming: await upcomingOf(tx, spaces) };
-}
-
-/**
- * What comes in the next three days (the anticipation): her reminders (`quand`) and anything with
- * an `echeance` or a future `date`; the next occurrence of a repeated reminder counts.
- */
-async function upcomingOf(tx: Tx, spaces: Space[]) {
-  const { rows } = await tx.query<{ when: string; kind: string; title: string; space: string }>(
-    `select coalesce(e.data->>'prochaine', e.data->>'quand', e.data->>'echeance', e.data->>'date') as when,
-            e.kind, e.title, s.name as space
-       from entry e join space s on s.id = e.space_id
-      where e.space_id = any($1) and e.archived_at is null
-        and coalesce(e.data->>'statut', '') not in ('fait', 'envoyé', 'annulé')
-        and coalesce(e.data->>'prochaine', e.data->>'quand', e.data->>'echeance', e.data->>'date')
-            ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
-        and left(coalesce(e.data->>'prochaine', e.data->>'quand', e.data->>'echeance', e.data->>'date'), 10)
-            between to_char(now(), 'YYYY-MM-DD') and to_char(now() + interval '3 days', 'YYYY-MM-DD')
-      order by 1 limit 30`,
-    [spaces.map((one) => one.id)],
-  );
-  return rows;
+  return {
+    routines,
+    charters,
+    upcoming: await upcoming(
+      tx,
+      spaces.map((one) => one.id),
+    ),
+  };
 }
 
 export interface McpPerson {

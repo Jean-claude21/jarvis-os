@@ -70,3 +70,4 @@ export {
 } from './spaces';
 export { DEFAULT_ZONE, inZone, nextTime, repetitionOf, timeOf } from './time';
 export { watchOnce, type Due, type PassReport } from './watcher';
+export { upcoming, type Upcoming } from './upcoming';

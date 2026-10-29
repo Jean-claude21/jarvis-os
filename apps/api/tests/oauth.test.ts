@@ -210,6 +210,29 @@ describe('connecting a client to her life (story 1)', () => {
     });
     await client.close();
 
+    // Spec 009: her account lists the connection; revoking it closes the door at once.
+    const connections = (await (
+      await browser.fetch(`${BASE}/api/connections`, { headers: { accept: 'application/json' } })
+    ).json()) as { clientId: string; name: string; spaces: string[] }[];
+    expect(connections).toEqual([
+      expect.objectContaining({ clientId, name: 'Claude (test)', spaces: [expect.any(String)] }),
+    ]);
+    const revoked = await browser.fetch(`${BASE}/api/connections/${clientId}`, {
+      method: 'DELETE',
+      headers: { origin: BASE, accept: 'application/json' },
+    });
+    expect(revoked.status).toBe(200);
+    const closed = await fetch(`${BASE}/mcp`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${tokens.access_token}`,
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    expect(closed.status).toBe(401);
+
     // Refusing gives the client no code.
     const location = await next(await browser.fetch(authorizeUrl()));
     if (location.pathname === '/consentement') {

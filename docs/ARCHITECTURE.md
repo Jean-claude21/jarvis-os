@@ -73,8 +73,9 @@ erDiagram
   let her reach only the spaces she is a member of.
 - **The journal** keeps every change with its `before` and `after`: `undo` writes the `before`
   back and journals that too.
-- **Query**: the model computes from the database, read-only, through views of her own rows only,
-  with a time limit — never on identity tables (decision 0004).
+- **Query**: the model computes from the database, read-only, over temporary copies of her own
+  rows (`my_entries`, `my_links`, `my_files`), with a time and a row limit — never on the real
+  tables, the accounts or the journal (decision 0004).
 
 ## The doors
 

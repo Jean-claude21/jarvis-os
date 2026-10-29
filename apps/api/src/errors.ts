@@ -11,7 +11,7 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     };
   }
   const message = error instanceof Error ? error.message : String(error);
-  if (/^No (entry|change|stored file)/.test(message)) return { status: 404, message };
+  if (/^No (entry|change|stored file|routine)/.test(message)) return { status: 404, message };
   if (
     /already undone|cannot be undone|needs a kind|is empty|larger than|to set aside/.test(message)
   ) {

@@ -1,13 +1,16 @@
 # @jarvis-os/api
 
-The doors of Jarvis OS over the core: accounts (`/auth`), the REST API (`/api`) and, from spec 003,
-the MCP server (`/mcp`). A Hono server; the routes parse, call `@jarvis-os/core` and answer.
+The doors of Jarvis OS over the core: accounts and OAuth (`/auth`), the REST API (`/api`) and the
+MCP server (`/mcp`). A Hono server; the routes parse, call `@jarvis-os/core` and answer.
 
 ```mermaid
 flowchart LR
   C[Client: app, tests] -->|Bearer token| API[/api/]
-  C -->|sign up, sign in| AUTH[/auth — Better Auth/]
+  M[MCP client: Claude, ChatGPT] -->|OAuth access token| MCP[/mcp/]
+  C -->|sign up, sign in| AUTH[/auth — Better Auth, OAuth server/]
+  M -->|register, sign in, consent| AUTH
   API -->|asPerson| CORE[@jarvis-os/core]
+  MCP -->|asPerson| CORE
   CORE --> PG[(Neon Postgres, RLS)]
   API -->|files| S3[(Neon Object Storage)]
 ```
@@ -45,3 +48,53 @@ pnpm --filter @jarvis-os/api test  # Neon test branch and its storage
 
 Errors answer `{ error }` with 400 (what to fix), 401 (sign in), 404 (not in her space) or 500.
 An `x-jarvis-client` header names the client in the journal.
+
+## MCP
+
+`/mcp` is a stateless Streamable HTTP server. Each request carries an OAuth access token; the
+server is built for that token's person, with Jarvis's instructions, the tools and her routines.
+
+| Tool        | Core function                                        |
+| ----------- | ---------------------------------------------------- |
+| `kinds`     | `kinds`                                              |
+| `find`      | `find`                                               |
+| `get`       | `get`                                                |
+| `save`      | `save`                                               |
+| `archive`   | `archive`                                            |
+| `query`     | `query`                                              |
+| `history`   | `history`                                            |
+| `undo`      | `undo`                                               |
+| `add_file`  | `addFile`                                            |
+| `file_link` | a link that opens a file without a token             |
+| `routine`   | one of her routines, or a base one (`src/routines/`) |
+
+A client finds everything from the 401 alone:
+
+```mermaid
+sequenceDiagram
+  participant C as MCP client
+  participant J as Jarvis OS
+  participant P as The person, in her browser
+  C->>J: POST /mcp
+  J-->>C: 401, resource_metadata
+  C->>J: /.well-known/oauth-protected-resource/mcp, then /.well-known/oauth-authorization-server
+  C->>J: POST /auth/oauth2/register (dynamic registration)
+  C->>P: opens /auth/oauth2/authorize (PKCE)
+  P->>J: /connexion: signs in or creates her account
+  P->>J: /consentement: allows the client, named
+  J-->>C: code, then POST /auth/oauth2/token
+  C->>J: POST /mcp with Bearer token: the tools over her life
+```
+
+### Connect Claude Code to the local server
+
+```bash
+pnpm --filter @jarvis-os/api dev
+```
+
+```bash
+claude mcp add --transport http jarvis-dev http://localhost:3700/mcp
+```
+
+Then, in Claude Code, `/mcp` → `jarvis-dev` → **Authenticate**: the browser opens the sign-in page
+(on the Neon `dev` branch), then the consent page; Claude Code then lists the tools.

@@ -34,16 +34,41 @@ await asPerson(db, personId, (tx) =>
 );
 ```
 
-| Function                  | What it does                                                                    |
-| ------------------------- | ------------------------------------------------------------------------------- |
-| `createSpace`, `spacesOf` | a person's life, and the spaces she belongs to                                  |
-| `save`                    | new entries and changes, links added and taken away — in one call, journaled    |
-| `get`                     | one entry with its links both ways                                              |
-| `find`                    | by words (accents and case aside), kind, creation day; archived only when asked |
-| `kinds`                   | the kinds she has, with their counts and fields — to reuse before creating      |
-| `archive`                 | set an entry aside, never erase it                                              |
-| `history`, `undo`         | the changes, and taking one back (journaled too)                                |
-| `query`                   | one `select` over `my_entries`, `my_links`, `my_files` (decision 0004)          |
+| Function                  | What it does                                                                                            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `createSpace`, `spacesOf` | a person's life, and the spaces she belongs to                                                          |
+| `save`                    | new entries and changes, links added and taken away — in one call, journaled                            |
+| `get`                     | one entry with its links both ways                                                                      |
+| `find`                    | by words (accents and case aside), kind, creation day; archived only when asked                         |
+| `kinds`                   | the kinds she has, with their counts and fields — to reuse before creating                              |
+| `archive`                 | set an entry aside, never erase it                                                                      |
+| `history`, `undo`         | the changes, and taking one back (journaled too)                                                        |
+| `query`                   | one `select` over `my_spaces`, `my_entries`, `my_links`, `my_files` of the spaces given (decision 0004) |
+
+## Spaces (spec 004)
+
+A space is a circle of people (decision 0005): each person has her own, private for good; a shared
+one is joined only by an invitation the invited address accepts.
+
+```mermaid
+flowchart LR
+  A[Ama] --> MA[« Ama » — private]
+  K[Kossi] --> MK[« Kossi » — private]
+  A -->|owner| N[« Nous » — shared]
+  K -->|member, by invitation| N
+  N --> C[Charte · Routines · Dépenses du foyer…]
+```
+
+| Function                                        | What it does                                                      |
+| ----------------------------------------------- | ----------------------------------------------------------------- |
+| `createSharedSpace`, `renameSpace`              | a shared space she owns; its name                                 |
+| `invite`, `invitationsOf`, `withdrawInvitation` | a link for one address, 14 days, used once; only its hash is kept |
+| `previewInvitation`, `acceptInvitation`         | what a link opens; joining with the invited address               |
+| `membersOf`, `leaveSpace`                       | who belongs; leaving or removing (an owner's space passes on)     |
+| `clientSpaces`, `allowSpaces`, `allowSpace`     | the spaces a client (Claude, ChatGPT…) may reach for her          |
+
+Kinds are one regardless of case and accents: a new entry takes the kind as first written in its
+space. Membership changes are journaled (`space.*`) and never undone through `undo`.
 
 ## Database
 

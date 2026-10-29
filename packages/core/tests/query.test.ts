@@ -25,7 +25,7 @@ beforeAll(async () => {
   );
 });
 
-const run = (who: Person, sql: string) => who.as((tx) => query(tx, { spaceId: who.space, sql }));
+const run = (who: Person, sql: string) => who.as((tx) => query(tx, { spaceIds: [who.space], sql }));
 
 describe('a read-only query (story 4)', () => {
   it('sums her expenses by post, exactly', async () => {

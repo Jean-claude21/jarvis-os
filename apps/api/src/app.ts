@@ -1,12 +1,12 @@
 import { requireMcpAuth } from '@better-auth/mcp';
 import { verifyOAuthQueryParams } from '@better-auth/oauth-provider';
-import { asPerson, pool, spacesOf } from '@jarvis-os/core';
+import { asPerson, clientSpaces, pool, previewInvitation, spacesOf } from '@jarvis-os/core';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { Hono } from 'hono';
 import { CONSENT_PAGE, makeAuth, mcpResource, SIGN_IN_PAGE } from './auth';
 import { langOf, wordsOf } from './i18n';
 import { mcpServerFor } from './mcp';
-import { consentPage, signInPage } from './pages';
+import { consentPage, invitationPage, signInPage } from './pages';
 import { apiRoutes } from './routes';
 import type { Settings } from './settings';
 import { objectStorage } from './storage';
@@ -36,7 +36,7 @@ export function makeApp(settings: Settings) {
     return auth.handler(new Request(url, c.req.raw));
   });
 
-  app.route('/api', apiRoutes({ auth, db, blobs }));
+  app.route('/api', apiRoutes({ auth, db, blobs, publicUrl: settings.publicUrl }));
 
   /** The name the client gave itself when it registered, for the pages. */
   const clientName = async (clientId: string | null) => {
@@ -60,13 +60,32 @@ export function makeApp(settings: Settings) {
     const words = wordsOf(lang);
     const query = new URL(c.req.url).search.slice(1);
     const valid = query.length > 0 && (await verifyOAuthQueryParams(query, settings.authSecret));
+    // Her spaces, to choose which this client reaches (spec 004).
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    const spaces = session ? await asPerson(db, session.user.id, (tx) => spacesOf(tx)) : [];
     return c.html(
       consentPage(lang, words, {
         valid,
         client: (await clientName(c.req.query('client_id') ?? null)) ?? words.aClient,
+        clientId: c.req.query('client_id') ?? '',
         scopes: c.req.query('scope') ?? '',
+        spaces: spaces.map((one) => ({ id: one.id, name: one.name, personal: one.personal })),
       }),
     );
+  });
+
+  // An invitation into a shared space (spec 004): the page reads the secret from its fragment.
+  app.get('/invitation', (c) => {
+    const lang = langOf(c.req.header('accept-language'));
+    return c.html(invitationPage(lang, wordsOf(lang)));
+  });
+  app.post('/invitation/preview', async (c) => {
+    const { token } = (await c.req.json().catch(() => ({}))) as { token?: unknown };
+    if (typeof token !== 'string' || token.length < 10 || token.length > 200) {
+      return c.json({ error: 'No invitation.' }, 400);
+    }
+    const preview = await asPerson(db, '', (tx) => previewInvitation(tx, token));
+    return preview ? c.json(preview) : c.json({ error: 'No invitation.' }, 404);
   });
 
   // MCP (spec 003): stateless Streamable HTTP; a server built for the token's person each time.
@@ -74,19 +93,26 @@ export function makeApp(settings: Settings) {
     auth,
     async (request, claims) => {
       const person = String(claims.sub ?? '');
-      const { rows } = await db.query<{ name: string }>('select name from "user" where id = $1', [
-        person,
-      ]);
-      const [space] = await asPerson(db, person, (tx) => spacesOf(tx));
-      if (!rows[0] || !space) return Response.json({ error: 'No such account.' }, { status: 401 });
-      const client = typeof claims.azp === 'string' ? claims.azp : undefined;
+      const { rows } = await db.query<{ name: string; email: string }>(
+        'select name, email from "user" where id = $1',
+        [person],
+      );
+      const clientId = typeof claims.azp === 'string' ? claims.azp : undefined;
+      // The spaces this client may reach for her; her own only, without a client.
+      const spaces = await asPerson(db, person, async (tx) =>
+        clientId ? clientSpaces(tx, clientId) : (await spacesOf(tx)).filter((one) => one.personal),
+      );
+      if (!rows[0] || spaces.length === 0) {
+        return Response.json({ error: 'No such account.' }, { status: 401 });
+      }
       const server = await mcpServerFor(
-        { db, blobs },
+        { db, blobs, publicUrl: settings.publicUrl },
         {
           person,
           name: rows[0].name,
-          spaceId: space.id,
-          ...(client ? { client: (await clientName(client)) ?? client } : {}),
+          email: rows[0].email,
+          spaces,
+          ...(clientId ? { clientId, client: (await clientName(clientId)) ?? clientId } : {}),
         },
       );
       // No session id generator: stateless, every request stands alone.

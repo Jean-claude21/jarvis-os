@@ -28,4 +28,23 @@ export {
   type Origin,
   type SaveInput,
 } from './schemas';
-export { createSpace, spacesOf, type Space } from './spaces';
+export {
+  acceptInvitation,
+  allowSpace,
+  allowSpaces,
+  clientSpaces,
+  createSharedSpace,
+  createSpace,
+  INVITATION_DAYS,
+  invitationsOf,
+  invite,
+  leaveSpace,
+  membersOf,
+  previewInvitation,
+  renameSpace,
+  spacesOf,
+  withdrawInvitation,
+  type Invitation,
+  type Member,
+  type Space,
+} from './spaces';

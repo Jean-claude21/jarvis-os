@@ -1,46 +1,9 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { mcpServerFor } from '../src/mcp';
-import { server, signUp, type Account } from './client';
+import { signUp } from './client';
+import { connect, type Connected } from './connect';
 
 // Spec 003, stories 2 and 3: every tool over the core, Jarvis's method on connection, and one
 // person's tools never reaching another's life. In memory: the OAuth flow has its own test.
-
-interface Connected {
-  client: Client;
-  call: <T = unknown>(
-    name: string,
-    args?: Record<string, unknown>,
-  ) => Promise<{ value: T; isError: boolean }>;
-}
-
-async function connect(account: Account): Promise<Connected> {
-  const me = await account.json<{ person: { id: string; name: string }; space: { id: string } }>(
-    '/api/me',
-  );
-  const mcp = await mcpServerFor(
-    { db: server.db, blobs: server.blobs, today: () => '2026-10-29' },
-    {
-      person: me.body.person.id,
-      name: me.body.person.name,
-      spaceId: me.body.space.id,
-      client: 'test',
-    },
-  );
-  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-  await mcp.connect(serverSide);
-  const client = new Client({ name: 'jarvis-test', version: '1.0.0' });
-  await client.connect(clientSide);
-  const call = async <T>(name: string, args: Record<string, unknown> = {}) => {
-    const result = (await client.callTool({ name, arguments: args })) as {
-      content: { text: string }[];
-      isError?: boolean;
-    };
-    return { value: JSON.parse(result.content[0]!.text) as T, isError: result.isError === true };
-  };
-  return { client, call };
-}
 
 let ama: Connected;
 let kossi: Connected;
@@ -70,7 +33,7 @@ describe('Jarvis’s method on connection (story 3)', () => {
     expect(instructions).toContain('Today is 2026-10-29');
     expect(instructions).toContain('« Ranger ce qui arrive »');
     expect(instructions).toContain('« Le temps »');
-    expect(instructions).toContain('« Dépenses » (hers)');
+    expect(instructions).toContain('« Dépenses » (in « Ama »)');
   });
 
   it('lists every tool, and reads a routine in full', async () => {
@@ -79,7 +42,10 @@ describe('Jarvis’s method on connection (story 3)', () => {
       [
         'add_file',
         'archive',
+        'create_space',
         'file_link',
+        'invite',
+        'spaces',
         'find',
         'get',
         'history',

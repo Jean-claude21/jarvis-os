@@ -30,6 +30,8 @@ its fields are free JSON. There is no table per kind and no migration for a new 
 ```mermaid
 erDiagram
   space ||--o{ member : has
+  space ||--o{ invitation : "opens to"
+  space ||--o{ client_space : "reached by a client"
   space ||--o{ entry : holds
   entry ||--o{ link : "from / to"
   entry ||--o| file : "a file entry has its blob"
@@ -65,8 +67,12 @@ erDiagram
   }
 ```
 
-- **Spaces and members**: a person's life is a space; the account that owns it is its member.
-  Identity tables (accounts, sessions, OAuth clients) are global by nature and reached only by the
+- **Spaces and members**: a space is a circle of people (decision 0005). Each account has its own
+  space, private for good; a shared one (« Nous » for a couple) is joined only by an invitation the
+  invited address accepts. A link never crosses spaces: themes are kinds and links, not spaces.
+  Each space may hold a charter (an entry « Charte »): its rules, given to every client. A client
+  (Claude, ChatGPT) reaches only the spaces she allowed it at consent (`client_space`). Identity
+  tables (accounts, sessions, OAuth clients) are global by nature and reached only by the
   application.
 - **Row-level security**: every table above carries `space_id` and its policy. The application
   connects as `jarvis_app` (`NOBYPASSRLS`); each request sets the acting person, and the policies

@@ -9,7 +9,14 @@ export function instructionsFor(input: {
   spaces: { name: string; personal: boolean }[];
   charters: { space: string; title: string; text: string }[];
   routines: { name: string; when: string; space?: string }[];
+  /** Reminders and dated things of the next days (the anticipation). */
+  upcoming?: { when: string; kind: string; title: string; space: string }[];
 }): string {
+  const upcoming = input.upcoming?.length
+    ? input.upcoming
+        .map((one) => `- ${one.when} — ${one.kind} « ${one.title} » (in « ${one.space} »)`)
+        .join('\n')
+    : '- (nothing dated)';
   const spaces = input.spaces
     .map((one) =>
       one.personal
@@ -42,7 +49,11 @@ Spaces this connection reaches (a space is a circle of people, never a theme):
 ${spaces}
 10. Every tool acts in her own space unless you give \`space\`. What concerns the people of a shared space (a household's expenses, rent, shopping, common papers, their plans) goes there; what is hers alone stays in her own. When unsure, ask her. \`query\` reads every space here at once: my_entries.space names each row's.
 11. A space's charter is its rules, always active there: follow them without being asked. It is an entry of kind « Charte » with \`data.texte\`; change a shared one only when she asks, and tell her the others will see it.
-12. Some entries come from her Markdown files (\`data.source\` is the path): their text is \`data.texte\`, their links « mentionne » and « fait partie de » follow her folders. Read the text before answering about them; when she changes one, change the entry — the file is hers, not yours to write.
+12. Some entries come from her Markdown files (\`data.source\` is the path): their text is \`data.texte\`, their links « mentionne » and « fait partie de » follow her folders. Read the text before answering about them; Jarvis is where her life is written now: when she changes one, change the entry.
+13. A routine or charter read from her files may name files (« vie/2026/…/journal/2026-09-01.md ») and scripts (« python scripts/… », « rebuild the index »): follow its intent with your tools — a file is the entry whose \`source\` is that path (\`query\`: data->>'source'), a script's figures come from \`query\`, a file to write is an entry to \`save\`. Never tell her to run a script.
+
+Coming soon (the next three days; say it when it matters to what she asks, and in the morning):
+${upcoming}
 
 Charters:
 ${charters}

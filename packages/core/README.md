@@ -92,6 +92,29 @@ flowchart TD
   R --> L2["fait partie de → Les 5 cercles (_cercles.md)"]
 ```
 
+## Documents (spec 008)
+
+A document is any entry whose Markdown is in `texte`: written whole, then changed one section at a
+time, so a model never sends it again; read by its outline and the sections asked.
+
+| Function        | What it does                                                                        |
+| --------------- | ----------------------------------------------------------------------------------- |
+| `outline`       | its headings, level and extent (never a heading inside code)                        |
+| `applyEdit`     | append (to the end or a section), replace a section, insert after one, replace text |
+| `writeDocument` | a new one, or one edit — journaled, so each change is a version, undoable           |
+| `readDocument`  | the outline; the whole text when short, else the opening or the sections asked      |
+
+## Time and the watcher (spec 006)
+
+| Function           | What it does                                                                     |
+| ------------------ | -------------------------------------------------------------------------------- |
+| `timeOf`, `inZone` | a time she wrote, on the clock of her zone (Paris by default)                    |
+| `nextTime`         | the next time of `repete`: « 45 20 \* \* 0-5 », « 30 19 L \* \* » (the last day) |
+| `watchOnce`        | one pass: what is due is told, a repetition moves on, a stale one is skipped     |
+
+`jarvis_due_reminders` (migration 0004) is the watcher's only look across spaces: ids and members,
+nothing else; it then reads and writes as a member, under row-level security.
+
 ## Database
 
 `db/migrations/` is applied in order by `pnpm db:migrate` (the `dev` branch, or the URL in

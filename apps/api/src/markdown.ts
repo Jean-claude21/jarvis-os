@@ -20,9 +20,15 @@ const CODE_MARKS = ['package.json', 'pyproject.toml', 'Cargo.toml', 'go.mod'];
 /**
  * The Markdown files of a folder: those git tracks when it is a repository (what she chose to keep),
  * else every one outside hidden folders and `node_modules`; never inside a code project, nor under
- * a path given to `skip`.
+ * a path given to `skip`. A hidden folder given to `include` is read too (`.claude/skills`).
  */
-export function markdownOf(root: string, skip: string[] = []): MarkdownDoc[] {
+export function markdownOf(
+  root: string,
+  skip: string[] = [],
+  include: string[] = [],
+): MarkdownDoc[] {
+  const under = (path: string, prefixes: string[]) =>
+    prefixes.some((prefix) => path === prefix || path.startsWith(`${prefix.replace(/\/$/, '')}/`));
   const listed = existsSync(join(root, '.git'))
     ? execFileSync('git', ['-c', 'core.quotepath=off', 'ls-files', '-z'], {
         cwd: root,
@@ -31,7 +37,12 @@ export function markdownOf(root: string, skip: string[] = []): MarkdownDoc[] {
       })
         .split('\0')
         .filter(Boolean)
-    : walk(root, root);
+    : [
+        ...walk(root, root),
+        ...include
+          .filter((folder) => existsSync(join(root, folder)))
+          .flatMap((folder) => walk(root, join(root, folder))),
+      ];
   const code = new Set(
     listed
       .filter((path) => CODE_MARKS.includes(path.split('/').at(-1)!))
@@ -40,8 +51,9 @@ export function markdownOf(root: string, skip: string[] = []): MarkdownDoc[] {
   const inCode = (path: string) =>
     [...code].some((folder) => folder === '' || path.startsWith(`${folder}/`));
   const skipped = (path: string) =>
-    path.split('/').some((part) => part.startsWith('.') || part === 'node_modules') ||
-    skip.some((prefix) => path === prefix || path.startsWith(`${prefix.replace(/\/$/, '')}/`));
+    (!under(path, include) &&
+      path.split('/').some((part) => part.startsWith('.') || part === 'node_modules')) ||
+    under(path, skip);
   return listed
     .filter((path) => /\.md$/i.test(path) && !skipped(path) && !inCode(path))
     .sort()
@@ -69,6 +81,7 @@ if (process.argv[1]?.endsWith('markdown.ts')) {
       space: { type: 'string' },
       kinds: { type: 'string' },
       skip: { type: 'string', multiple: true, default: [] },
+      include: { type: 'string', multiple: true, default: [] },
       branch: { type: 'string', default: 'dev' },
       dry: { type: 'boolean', default: false },
     },
@@ -91,7 +104,7 @@ if (process.argv[1]?.endsWith('markdown.ts')) {
     const actor = { person, door: 'cli' };
 
     if (command === 'import') {
-      const docs = markdownOf(folder, values.skip);
+      const docs = markdownOf(folder, values.skip, values.include);
       const kinds = values.kinds
         ? (JSON.parse(readFileSync(values.kinds, 'utf8')) as Record<string, string>)
         : {};

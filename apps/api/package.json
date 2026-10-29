@@ -8,6 +8,7 @@
     "start": "tsx src/server.ts",
     "db:migrate": "tsx src/migrate.ts",
     "markdown": "tsx src/markdown.ts",
+    "watcher": "tsx src/watcher.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

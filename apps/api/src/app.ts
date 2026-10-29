@@ -7,6 +7,8 @@ import {
   FILE_MAX_BYTES,
   pool,
   previewInvitation,
+  readDocument,
+  slugOf,
   spacesOf,
 } from '@jarvis-os/core';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
@@ -20,6 +22,7 @@ import { consentPage, invitationPage, messagePage, signInPage } from './pages';
 import { apiRoutes } from './routes';
 import type { Settings } from './settings';
 import { objectStorage } from './storage';
+import { documentShown, documentView, readDocumentToken } from './views/document';
 import { readUploadToken, uploadView } from './views/upload';
 
 /**
@@ -136,6 +139,41 @@ export function makeApp(settings: Settings) {
       return c.json(stored, 201);
     },
   );
+
+  // A reading link (spec 008): the document as a page to read and print, or its Markdown file.
+  app.get('/document/:token', async (c) => {
+    const lang = langOf(c.req.header('accept-language'));
+    let grant;
+    try {
+      grant = readDocumentToken(c.req.param('token'), settings.authSecret);
+    } catch {
+      return c.html(messagePage(lang, wordsOf(lang).documentExpired), 410);
+    }
+    const { id, spaceId } = grant;
+    const found = await asPerson(db, grant.person, async (tx) => {
+      const space = (await spacesOf(tx)).find((one) => one.id === spaceId);
+      return space ? { space, read: await readDocument(tx, spaceId, { id, whole: true }) } : null;
+    }).catch(() => null);
+    if (!found) return c.html(messagePage(lang, wordsOf(lang).documentExpired), 410);
+    const { read, space } = found;
+    if (c.req.query('format') === 'md') {
+      const text = /^#\s/.test(read.text.trimStart())
+        ? read.text
+        : `# ${read.title}\n\n${read.text}`;
+      return c.body(text, 200, {
+        'content-type': 'text/markdown; charset=utf-8',
+        'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(`${slugOf(read.title)}.md`)}`,
+      });
+    }
+    return c.html(
+      documentView(
+        documentShown(
+          { ...read, versions: [] },
+          { space: space.name, spaceId: space.id, link: '' },
+        ),
+      ),
+    );
+  });
 
   // An invitation into a shared space (spec 004): the page reads the secret from its fragment.
   app.get('/invitation', (c) => {

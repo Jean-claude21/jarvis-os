@@ -7,6 +7,8 @@ export type Command =
   | 'link.add'
   | 'link.remove'
   | 'journal.undo'
+  // A Markdown folder imported (spec 007): undone at once, each of its changes with it.
+  | 'import.run'
   // Who belongs to a space (spec 004): journaled, never undone through `undo`.
   | 'space.create'
   | 'space.rename'
@@ -57,6 +59,36 @@ export async function record(
   return Number(rows[0]!.id);
 }
 
+/** Many changes at once (an import): their journal ids, in no particular order. */
+export async function recordMany(
+  tx: Tx,
+  actor: Actor,
+  lines: { spaceId: string; command: Command; target: string; before: unknown; after: unknown }[],
+): Promise<number[]> {
+  if (lines.length === 0) return [];
+  const { rows } = await tx.query<{ id: string }>(
+    `insert into journal (space_id, command, target, before, after, actor, door, client)
+     select x.space_id, x.command, x.target, x.before, x.after, $2, $3, $4
+       from jsonb_to_recordset($1) as x(space_id text, command text, target text, before jsonb, after jsonb)
+     returning id`,
+    [
+      JSON.stringify(
+        lines.map((line) => ({
+          space_id: line.spaceId,
+          command: line.command,
+          target: line.target,
+          before: line.before,
+          after: line.after,
+        })),
+      ),
+      actor.person,
+      actor.door,
+      actor.client ?? null,
+    ],
+  );
+  return rows.map((row) => Number(row.id));
+}
+
 /** The latest changes of a space, or of one entry, newest first. */
 export async function history(
   tx: Tx,
@@ -102,6 +134,27 @@ export async function undo(
   if (line.command === 'journal.undo') throw new Error('An undo cannot be undone.');
   if (line.command.startsWith('space.')) {
     throw new Error('Who belongs to a space is not undone: invite, withdraw or leave instead.');
+  }
+  if (line.command === 'import.run') {
+    // Its changes, the latest first; those already undone stay as they are.
+    const done = ((line.after?.lines as number[] | undefined) ?? []).slice().sort((a, b) => b - a);
+    const { rows: open } = await tx.query<{ id: string }>(
+      'select id from journal where id = any($1) and space_id = $2 and undone_by is null',
+      [done, input.spaceId],
+    );
+    const still = new Set(open.map((row) => Number(row.id)));
+    for (const id of done) {
+      if (still.has(id)) await undo(tx, actor, { spaceId: input.spaceId, journalId: id });
+    }
+    const by = await record(tx, actor, {
+      spaceId: input.spaceId,
+      command: 'journal.undo',
+      target: line.target,
+      before: line.after,
+      after: { undoes: input.journalId },
+    });
+    await tx.query('update journal set undone_by = $2 where id = $1', [input.journalId, by]);
+    return { undone: input.journalId, by };
   }
   const current = async () =>
     (

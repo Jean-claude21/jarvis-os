@@ -6,7 +6,7 @@
  * git branches does not stop it; run this again to take a change.
  */
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -23,6 +23,33 @@ if (!domain) {
 const port = process.env.PORT ?? '3700';
 const publicUrl = `https://${domain}`;
 
+// One instance only: a second watcher would tell her everything twice. The previous one (and its
+// tree) is stopped first, even when it was closed without a signal.
+const pidFile = `${root}.local/serve.pid`;
+const killTree = (pid: number) =>
+  process.platform === 'win32'
+    ? spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' })
+    : spawnSync('pkill', ['-TERM', '-P', String(pid)], { stdio: 'ignore' });
+if (existsSync(pidFile)) {
+  const previous = Number(readFileSync(pidFile, 'utf8'));
+  // A number the system gave to another program since is left alone.
+  const isNode =
+    process.platform !== 'win32' ||
+    spawnSync('tasklist', ['/FI', `PID eq ${previous}`, '/FO', 'CSV', '/NH'], {
+      encoding: 'utf8',
+    }).stdout.includes('"node.exe"');
+  if (previous && previous !== process.pid && isNode) {
+    killTree(previous);
+    try {
+      process.kill(previous);
+    } catch {
+      // Already gone.
+    }
+  }
+}
+mkdirSync(`${root}.local`, { recursive: true });
+writeFileSync(pidFile, String(process.pid));
+
 const children = new Set<ChildProcess>();
 let stopping = false;
 
@@ -32,7 +59,7 @@ function stop() {
   for (const child of children) {
     if (!child.pid) continue;
     if (process.platform === 'win32') {
-      spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { stdio: 'ignore' });
+      killTree(child.pid);
     } else {
       child.kill('SIGTERM');
     }

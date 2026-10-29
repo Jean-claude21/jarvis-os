@@ -6,33 +6,43 @@ import { fill, type Lang, type Words } from './i18n';
 const escape = (text: string) => text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
 const style = `
-  :root { color-scheme: light dark; --ink: #1d1d1b; --soft: #6b6a66; --line: #d9d6cf; --bg: #faf8f4; --accent: #b4441f; }
-  @media (prefers-color-scheme: dark) { :root { --ink: #eceae4; --soft: #a5a29a; --line: #3b3a36; --bg: #1b1a18; } }
+  :root { color-scheme: light dark; --ink: #2a1610; --soft: #6b4e43; --line: #d9c4b4; --bg: #fbf6f0; --paper: #fffdf9;
+          --accent: #b83a1b; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #f4e6da; --soft: #bfa799; --line: #4a382e; --bg: #17100c;
+          --paper: #221813; --accent: #f08a63; } }
   * { box-sizing: border-box; }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--ink);
-         font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px; }
-  main { width: 100%; max-width: 400px; display: grid; gap: 16px; }
-  h1 { font-size: 22px; font-weight: 600; margin: 0; }
+         font: 16px/1.6 "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px; }
+  main { width: 100%; max-width: 420px; display: grid; gap: 16px; background: var(--paper); border: 1px solid var(--line);
+         border-radius: 2px; padding: 28px 24px; }
+  main::before { content: "J"; width: 32px; height: 32px; display: grid; place-items: center; background: var(--accent);
+         color: var(--paper); font: 700 17px/1 Archivo, system-ui, sans-serif; border-radius: 2px; }
+  h1 { font: 700 22px/1.25 Archivo, system-ui, sans-serif; margin: 0; letter-spacing: -0.01em; }
   p { margin: 0; color: var(--soft); }
   form { display: grid; gap: 12px; }
-  label { display: grid; gap: 4px; font-size: 14px; }
+  label { display: grid; gap: 4px; font-size: 14px; font-weight: 600; }
   [hidden] { display: none; }
-  input { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); }
-  button { font: inherit; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--ink); background: var(--ink); color: var(--bg); cursor: pointer; }
+  input { font: inherit; font-weight: 400; padding: 10px 12px; border: 1px solid var(--line); border-radius: 2px;
+          background: transparent; color: var(--ink); }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { font: 600 15px/1 "Instrument Sans", system-ui, sans-serif; padding: 12px 14px; border-radius: 2px;
+           border: 1px solid var(--ink); background: var(--ink); color: var(--paper); cursor: pointer; }
   button.quiet { background: transparent; color: var(--ink); }
   .row { display: flex; gap: 8px; } .row button { flex: 1; }
   .error { color: var(--accent); min-height: 1.6em; }
   .done { color: var(--ink); }
-  fieldset { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 0; display: grid; gap: 6px; }
+  fieldset { border: 1px solid var(--line); border-radius: 2px; padding: 8px 12px; margin: 0; display: grid; gap: 6px; }
   legend { font-size: 14px; padding: 0 4px; }
-  label.check { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+  label.check { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 400; }
   label.check input { width: 18px; height: 18px; accent-color: var(--accent); }
-  a { color: var(--ink); }
+  a { color: var(--accent); }
 `;
 
 const page = (lang: Lang, title: string, body: string, script: string) => `<!doctype html>
 <html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escape(title)}</title><style>${style}</style></head>
+<title>${escape(title)}</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@700&family=Instrument+Sans:wght@400;600&display=swap">
+<style>${style}</style></head>
 <body><main>${body}</main><script>${script}</script></body></html>`;
 
 /**

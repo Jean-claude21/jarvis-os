@@ -14,6 +14,8 @@ import {
   allowSpaces,
   clientSpaces,
   createSharedSpace,
+  readDocument,
+  upcoming,
   exportMarkdown,
   importMarkdown,
   invitationsOf,
@@ -39,6 +41,8 @@ import { z } from 'zod';
 import type { Auth } from './auth';
 import { failure } from './errors';
 import { invitationLink, namesOf, spaceFor } from './spaces';
+import { computeDashboard, widgetSchema, widgetsOf, type Widget } from './views/dashboard';
+import { DOCUMENT_HOURS, documentShown, documentToken } from './views/document';
 import { zip } from './zip';
 
 type Env = {
@@ -81,7 +85,13 @@ const IMPORT_MAX_BYTES = 40 * 1024 * 1024;
  * security. A route acts in the space named by `?space=` (an id or a name) or the `x-jarvis-space`
  * header, else in her own (spec 004). The routes parse, call the core and answer — nothing else.
  */
-export function apiRoutes(deps: { auth: Auth; db: pg.Pool; blobs: Blobs; publicUrl: string }) {
+export function apiRoutes(deps: {
+  auth: Auth;
+  db: pg.Pool;
+  blobs: Blobs;
+  publicUrl: string;
+  secret: string;
+}) {
   const api = new Hono<Env>();
 
   api.use('*', async (c, next) => {
@@ -362,6 +372,136 @@ export function apiRoutes(deps: { auth: Auth; db: pg.Pool; blobs: Blobs; publicU
       );
     },
   );
+
+  // The platform (spec 009): what her web account shows without a model.
+  api.get('/overview', async (c) => {
+    const spaces = c.get('spaces');
+    const ids = spaces.map((one) => one.id);
+    return c.json(
+      await as(c, async (tx) => {
+        const { rows: counts } = await tx.query<{
+          space_id: string;
+          entries: number;
+          documents: number;
+          reminders: number;
+        }>(
+          `select space_id, count(*)::int as entries,
+                  count(*) filter (where data ? 'texte' and length(data->>'texte') > 400)::int as documents,
+                  count(*) filter (where jarvis_fold(kind) = 'rappel'
+                    and coalesce(data->>'statut', '') not in ('fait', 'envoyé', 'annulé'))::int as reminders
+             from entry where space_id = any($1) and archived_at is null group by space_id`,
+          [ids],
+        );
+        const { rows: changes } = await tx.query<{ day: string; n: number }>(
+          `select to_char(at at time zone 'UTC', 'YYYY-MM-DD') as day, count(*)::int as n
+             from journal where space_id = any($1) and at > now() - interval '14 days'
+            group by 1 order by 1`,
+          [ids],
+        );
+        const recent = [];
+        for (const space of spaces) {
+          for (const line of await history(tx, space.id, { limit: 8 })) {
+            recent.push({ ...line, space: space.name, spaceId: space.id });
+          }
+        }
+        recent.sort((a, b) => (a.at < b.at ? 1 : -1));
+        return {
+          spaces: spaces.map((space) => ({
+            ...space,
+            ...(counts.find((one) => one.space_id === space.id) ?? {
+              entries: 0,
+              documents: 0,
+              reminders: 0,
+            }),
+          })),
+          upcoming: await upcoming(tx, ids, 7),
+          changes,
+          recent: recent.slice(0, 12),
+        };
+      }),
+    );
+  });
+
+  api.get('/documents/:id', async (c) => {
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    const id = c.req.param('id');
+    const read = await asPerson(deps.db, c.get('person'), (tx) =>
+      readDocument(tx, space.id, { id, whole: true }),
+    );
+    const link = `${deps.publicUrl.replace(/\/$/, '')}/document/${documentToken(
+      {
+        person: c.get('person'),
+        spaceId: space.id,
+        id,
+        until: Date.now() + DOCUMENT_HOURS * 3_600_000,
+      },
+      deps.secret,
+    )}`;
+    return c.json(documentShown(read, { space: space.name, spaceId: space.id, link }));
+  });
+
+  api.post('/dashboard', async (c) => {
+    const input = z
+      .object({
+        id: z.string().min(1).optional(),
+        widgets: z.array(widgetSchema).max(12).optional(),
+      })
+      .parse(await c.req.json());
+    const spaces = c.get('spaces');
+    let title = 'Tableau de bord';
+    let widgets: Widget[] = input.widgets ?? [];
+    if (input.id) {
+      const saved = await act(c, (tx, _a, space) => get(tx, space, input.id!));
+      if (!saved) return c.json({ error: `No entry ${input.id} in this space.` }, 404);
+      title = saved.title;
+      widgets = widgetsOf(saved.data);
+    }
+    return c.json(await computeDashboard(deps.db, c.get('person'), { title, widgets, spaces }));
+  });
+
+  // Her connections: the clients she allowed (Claude, ChatGPT…), the spaces each reaches; revoking.
+  api.get('/connections', async (c) => {
+    const { rows } = await deps.db.query<{
+      clientId: string;
+      name: string | null;
+      since: string;
+      used: string | null;
+    }>(
+      `select c."clientId", o.name, c."createdAt" as since,
+              (select max(t."createdAt") from "oauthAccessToken" t
+                where t."clientId" = c."clientId" and t."userId" = c."userId") as used
+         from "oauthConsent" c left join "oauthClient" o on o."clientId" = c."clientId"
+        where c."userId" = $1 order by c."createdAt" desc`,
+      [c.get('person')],
+    );
+    const reach = await as(c, async (tx) => {
+      const all: Record<string, string[]> = {};
+      for (const row of rows)
+        all[row.clientId] = (await clientSpaces(tx, row.clientId)).map((one) => one.id);
+      return all;
+    });
+    return c.json(rows.map((row) => ({ ...row, spaces: reach[row.clientId] ?? [] })));
+  });
+
+  api.delete('/connections/:client', async (c) => {
+    const client = c.req.param('client');
+    const person = c.get('person');
+    const { rowCount } = await deps.db.query(
+      'delete from "oauthConsent" where "userId" = $1 and "clientId" = $2',
+      [person, client],
+    );
+    if (!rowCount) return c.json({ error: `No connection ${client}.` }, 404);
+    await deps.db.query(
+      'update "oauthAccessToken" set revoked = now() where "userId" = $1 and "clientId" = $2 and revoked is null',
+      [person, client],
+    );
+    await deps.db.query(
+      'update "oauthRefreshToken" set revoked = now() where "userId" = $1 and "clientId" = $2 and revoked is null',
+      [person, client],
+    );
+    await as(c, (tx) => allowSpaces(tx, client, []));
+    return c.json({ revoked: client });
+  });
 
   return api;
 }

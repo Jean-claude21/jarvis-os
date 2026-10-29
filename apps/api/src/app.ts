@@ -5,6 +5,7 @@ import {
   asPerson,
   clientSpaces,
   FILE_MAX_BYTES,
+  get,
   pool,
   previewInvitation,
   readDocument,
@@ -22,7 +23,16 @@ import { consentPage, invitationPage, messagePage, signInPage } from './pages';
 import { apiRoutes } from './routes';
 import type { Settings } from './settings';
 import { objectStorage } from './storage';
-import { documentShown, documentView, readDocumentToken } from './views/document';
+import { appPage } from './platform/page';
+import { spaceFor } from './spaces';
+import { computeDashboard, dashboardView, widgetsOf } from './views/dashboard';
+import {
+  DOCUMENT_HOURS,
+  documentShown,
+  documentToken,
+  documentView,
+  readDocumentToken,
+} from './views/document';
 import { readUploadToken, uploadView } from './views/upload';
 
 /**
@@ -50,7 +60,10 @@ export function makeApp(settings: Settings) {
     return auth.handler(new Request(url, c.req.raw));
   });
 
-  app.route('/api', apiRoutes({ auth, db, blobs, publicUrl: settings.publicUrl }));
+  app.route(
+    '/api',
+    apiRoutes({ auth, db, blobs, publicUrl: settings.publicUrl, secret: settings.authSecret }),
+  );
 
   /** The name the client gave itself when it registered, for the pages. */
   const clientName = async (clientId: string | null) => {
@@ -140,6 +153,59 @@ export function makeApp(settings: Settings) {
     },
   );
 
+  // Her web account (spec 009): the app with her session, else the sign-in page; its frames
+  // reuse the clients' views for a dashboard and a document.
+  const sessionOf = (request: Request) => auth.api.getSession({ headers: request.headers });
+  app.get('/', (c) => c.redirect('/app'));
+  app.get('/app', async (c) => {
+    if (!(await sessionOf(c.req.raw))) return c.redirect(SIGN_IN_PAGE);
+    return c.html(appPage(langOf(c.req.header('accept-language'))));
+  });
+  app.get('/app/frame/:view/:id', async (c) => {
+    const session = await sessionOf(c.req.raw);
+    if (!session) return c.redirect(SIGN_IN_PAGE);
+    const person = session.user.id;
+    const id = c.req.param('id');
+    const spaces = await asPerson(db, person, (tx) => spacesOf(tx));
+    const space = spaceFor(spaces, c.req.query('space'));
+    try {
+      if (c.req.param('view') === 'dashboard') {
+        const saved = await asPerson(db, person, (tx) => get(tx, space.id, id));
+        if (!saved) return c.notFound();
+        return c.html(
+          dashboardView(
+            await computeDashboard(db, person, {
+              title: saved.title,
+              widgets: widgetsOf(saved.data),
+              spaces,
+            }),
+          ),
+        );
+      }
+      if (c.req.param('view') === 'document') {
+        const read = await asPerson(db, person, (tx) =>
+          readDocument(tx, space.id, { id, whole: true }),
+        );
+        const link = `${settings.publicUrl.replace(/\/$/, '')}/document/${documentToken(
+          { person, spaceId: space.id, id, until: Date.now() + DOCUMENT_HOURS * 3_600_000 },
+          settings.authSecret,
+        )}`;
+        return c.html(
+          documentView(
+            documentShown(
+              { ...read, versions: [] },
+              { space: space.name, spaceId: space.id, link },
+            ),
+          ),
+        );
+      }
+    } catch (error) {
+      const lang = langOf(c.req.header('accept-language'));
+      return c.html(messagePage(lang, (error as Error).message), 400);
+    }
+    return c.notFound();
+  });
+
   // A reading link (spec 008): the document as a page to read and print, or its Markdown file.
   app.get('/document/:token', async (c) => {
     const lang = langOf(c.req.header('accept-language'));
@@ -199,6 +265,16 @@ export function makeApp(settings: Settings) {
         [person],
       );
       const clientId = typeof claims.azp === 'string' ? claims.azp : undefined;
+      // A connection she revoked (spec 009) stops at once, before its token expires.
+      if (clientId) {
+        const consent = await db.query(
+          'select 1 from "oauthConsent" where "userId" = $1 and "clientId" = $2',
+          [person, clientId],
+        );
+        if (consent.rowCount === 0) {
+          return Response.json({ error: 'This connection was revoked.' }, { status: 401 });
+        }
+      }
       // The spaces this client may reach for her; her own only, without a client.
       const spaces = await asPerson(db, person, async (tx) =>
         clientId ? clientSpaces(tx, clientId) : (await spacesOf(tx)).filter((one) => one.personal),

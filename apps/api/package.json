@@ -13,11 +13,14 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1158.0",
     "@aws-sdk/s3-request-presigner": "^3.1158.0",
+    "@better-auth/mcp": "^1.7.14",
+    "@better-auth/oauth-provider": "^1.7.14",
     "@hono/node-server": "^2.1.5",
     "@jarvis-os/core": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "better-auth": "^1.7.14",
     "hono": "^4.13.14",
+    "jose": "^6.2.13",
     "pg": "^8.23.1",
     "zod": "^4.6.7"
   },

@@ -87,6 +87,11 @@ erDiagram
 
 The REST API and the MCP tools call the same core functions: what one does, the other does.
 
+`/auth` is also the OAuth server of the `/mcp` resource: an MCP client discovers it from the 401,
+registers itself, sends the person to sign in and consent, and gets a token for her alone. Each
+`/mcp` request builds a server for that person with Jarvis's instructions, the tools and her
+routines. The flow and the tools: [`apps/api/README.md`](../apps/api/README.md#mcp).
+
 ## Environments
 
 | Neon branch | Used by            |

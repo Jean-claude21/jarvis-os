@@ -41,4 +41,4 @@
 ## Phase 8: Polish
 
 - [x] T015 Documentation: package README, `docs/ARCHITECTURE.md` checked, roadmap state
-- [ ] T016 `pnpm check` green; CI green on the pull request to `dev`
+- [x] T016 `pnpm check` green; CI green on the pull request to `dev`

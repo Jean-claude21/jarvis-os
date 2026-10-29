@@ -224,7 +224,8 @@ export async function get(
 const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /**
- * Entries by words (in the title and the fields, accents and case aside, every word present), by
+ * Entries by words (in the title, the fields and a text file's words, accents and case aside,
+ * every word present), by
  * kind, by the day they were created; the latest first. Archived ones only when asked.
  */
 export async function find(tx: Tx, spaceId: string, raw: FindInput = {}): Promise<Entry[]> {
@@ -239,7 +240,8 @@ export async function find(tx: Tx, spaceId: string, raw: FindInput = {}): Promis
         and ($3::text is null or lower(kind) = lower($3))
         and ($4::date is null or created_at >= $4::date)
         and ($5::date is null or created_at < $5::date + 1)
-        and (select bool_and(jarvis_fold(title || ' ' || data::text) like '%' || word || '%')
+        and (select bool_and(jarvis_fold(title || ' ' || data::text || ' ' || jarvis_file_words(id))
+                             like '%' || word || '%')
                from unnest($6::text[]) as word) is not false
       order by updated_at desc limit $7`,
     [

@@ -5,9 +5,11 @@ when: elle veut voir, suivre ou comparer quelque chose dans le temps ; « montre
 
 # Tableau de bord
 
-1. Écris la requête qui donne les chiffres (routine « Répondre avec des chiffres ») et lance-la.
-2. Montre le résultat : un tableau, ou un graphe si ton interface sait en dessiner (barres pour
-   comparer, courbe pour une évolution).
+1. Écris les requêtes qui donnent les chiffres (routine « Répondre avec des chiffres ») ; vérifie-les
+   avec `query`.
+2. Montre-les avec `dashboard` et `widgets` : chaque widget a un `titre`, sa `requete` et son
+   `graphe` — « nombre » (un chiffre), « barres » (comparer), « courbe » (dans le temps, x trié),
+   « tableau ». Ton interface le dessine si elle sait ; sinon, présente les lignes reçues.
 3. Si elle veut le garder : `save` une entrée de kind « Tableau de bord », titre = son nom,
-   `data.requete` = la requête, `data.graphe` = « barres », « courbe » ou « tableau ».
-4. Pour le rouvrir : retrouve-le (`find` kind « Tableau de bord »), relance sa requête, redessine.
+   `data.widgets` = la liste des widgets. Jamais de chiffres enregistrés : seulement les requêtes.
+4. Pour le rouvrir : `dashboard` avec `name` ; tout est recalculé à l'ouverture.

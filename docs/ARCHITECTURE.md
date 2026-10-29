@@ -98,6 +98,10 @@ registers itself, sends the person to sign in and consent, and gets a token for 
 `/mcp` request builds a server for that person with Jarvis's instructions, the tools and her
 routines. The flow and the tools: [`apps/api/README.md`](../apps/api/README.md#mcp).
 
+Some tools carry a view (MCP Apps, decision 0006): a dashboard, an entry as a card, a drop zone for
+files. The host frames the view, which speaks to it over `postMessage` and calls the server's tools
+through it; files go straight to `/upload/:token`, never through the model.
+
 ## Environments
 
 | Neon branch | Used by            |

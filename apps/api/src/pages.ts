@@ -55,6 +55,10 @@ const follow = (words: Words, done = "location.href = '/';") => `
   }
 `;
 
+/** A page that only says one thing (an expired link). */
+export const messagePage = (lang: Lang, message: string) =>
+  page(lang, message, `<p class="error">${escape(message)}</p>`, '');
+
 /** Signing in, or creating an account: the same form on every page that needs her. */
 const accountForm = (words: Words) => `
      <form id="form">

@@ -37,6 +37,7 @@ const words = {
     inviteExpired: 'Cette invitation a expiré : demande-en une nouvelle.',
     inviteWithdrawn: 'Cette invitation a été retirée.',
     inviteMissing: 'Ce lien d’invitation n’est pas valide.',
+    uploadExpired: 'Ce lien d’envoi a expiré ou n’est pas valide : demande-en un nouveau.',
   },
   en: {
     signInTitle: 'Sign in to Jarvis',
@@ -73,6 +74,7 @@ const words = {
     inviteExpired: 'This invitation has expired: ask for a new one.',
     inviteWithdrawn: 'This invitation was withdrawn.',
     inviteMissing: 'This invitation link is not valid.',
+    uploadExpired: 'This upload link has expired or is not valid: ask for a new one.',
   },
 } as const;
 

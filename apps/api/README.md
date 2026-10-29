@@ -76,22 +76,34 @@ own only, for a client connected before spec 004), with Jarvis's instructions, t
 routines of each of those spaces, and the tools. Every tool takes an optional `space` (a name or an
 id); `query` reads all of them, `my_entries.space` naming each row's.
 
-| Tool           | Core function                                        |
-| -------------- | ---------------------------------------------------- |
-| `kinds`        | `kinds`                                              |
-| `find`         | `find`                                               |
-| `get`          | `get`                                                |
-| `save`         | `save`                                               |
-| `archive`      | `archive`                                            |
-| `query`        | `query`                                              |
-| `history`      | `history`                                            |
-| `undo`         | `undo`                                               |
-| `add_file`     | `addFile`                                            |
-| `file_link`    | a link that opens a file without a token             |
-| `routine`      | one of her routines, or a base one (`src/routines/`) |
-| `spaces`       | the spaces this connection reaches, with who belongs |
-| `create_space` | a shared space she owns, reached by this client      |
-| `invite`       | an invitation link into a shared space she owns      |
+| Tool           | Core function                                                        |
+| -------------- | -------------------------------------------------------------------- |
+| `kinds`        | `kinds`                                                              |
+| `find`         | `find`                                                               |
+| `get`          | `get`                                                                |
+| `save`         | `save`                                                               |
+| `archive`      | `archive`                                                            |
+| `query`        | `query`                                                              |
+| `history`      | `history`                                                            |
+| `undo`         | `undo`                                                               |
+| `add_file`     | `addFile`                                                            |
+| `file_link`    | a link that opens a file without a token                             |
+| `routine`      | one of her routines, or a base one (`src/routines/`)                 |
+| `spaces`       | the spaces this connection reaches, with who belongs                 |
+| `create_space` | a shared space she owns, reached by this client                      |
+| `invite`       | an invitation link into a shared space she owns                      |
+| `dashboard`    | widgets (query + chart) recomputed now; view `ui://jarvis/dashboard` |
+| `show_entry`   | one entry as a card, undoable; view `ui://jarvis/entry`              |
+| `upload_link`  | a link where files go straight in; view `ui://jarvis/upload`         |
+
+### Views (MCP Apps, spec 005)
+
+`src/views/` holds Jarvis's views: plain HTML in the Kete brand (light, dark, phone width) with a
+small bridge speaking the MCP Apps protocol (`ui/initialize`, the tool's result, the host's theme
+and language, `tools/call`). Hosts that render MCP Apps (Claude, ChatGPT…) show them; every tool
+still answers in words for the others. Files go to `POST /upload/:token` — a token signed with the
+server's secret, 30 minutes, one person, one space — never through the model; `GET` on the same
+link is a page with the drop zone.
 
 A client finds everything from the 401 alone:
 

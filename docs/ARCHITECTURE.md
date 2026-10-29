@@ -95,6 +95,12 @@ flowchart LR
   Z -. read back .-> I
 ```
 
+- **Documents** (spec 008): any entry whose Markdown is in `texte`, written and read section by
+  section; each change journaled, so each version can be taken back.
+- **The watcher** (spec 006): a pass each minute finds the reminders due through one function that
+  returns ids and members only, tells each person through her « Canal » (Telegram), and writes what
+  it did as a member, under row-level security.
+
 ## The doors
 
 | Door    | For                                                     | Authentication                       |
@@ -102,6 +108,8 @@ flowchart LR
 | `/api`  | the Jarvis app, the portal, tests                       | a Better Auth session                |
 | `/mcp`  | Claude, ChatGPT and any MCP client                      | an OAuth access token for one person |
 | `/auth` | creating an account, signing in, consenting to a client | Better Auth                          |
+| links   | `/upload/:token`, `/document/:token`, `/invitation#…`   | a token signed by the server         |
+| watcher | her reminders, on Telegram                              | acts as each member                  |
 
 The REST API and the MCP tools call the same core functions: what one does, the other does.
 

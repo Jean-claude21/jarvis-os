@@ -80,8 +80,9 @@ async function methodOf(tx: Tx, spaces: Space[]) {
     for (const entry of await find(tx, space.id, { kind: 'Routine', limit: 100 })) {
       routines.push({
         name: entry.title,
-        when: String(entry.data.quand ?? entry.data.when ?? ''),
-        text: textOf(entry.data, 'consigne', 'text'),
+        // A routine she said (quand, consigne) or one read from her files (description, texte).
+        when: String(entry.data.quand ?? entry.data.when ?? entry.data.description ?? ''),
+        text: textOf(entry.data, 'consigne', 'texte', 'text'),
         space: space.name,
       });
     }
@@ -93,7 +94,28 @@ async function methodOf(tx: Tx, spaces: Space[]) {
       });
     }
   }
-  return { routines, charters };
+  return { routines, charters, upcoming: await upcomingOf(tx, spaces) };
+}
+
+/**
+ * What comes in the next three days (the anticipation): her reminders (`quand`) and anything with
+ * an `echeance` or a future `date`; the next occurrence of a repeated reminder counts.
+ */
+async function upcomingOf(tx: Tx, spaces: Space[]) {
+  const { rows } = await tx.query<{ when: string; kind: string; title: string; space: string }>(
+    `select coalesce(e.data->>'prochaine', e.data->>'quand', e.data->>'echeance', e.data->>'date') as when,
+            e.kind, e.title, s.name as space
+       from entry e join space s on s.id = e.space_id
+      where e.space_id = any($1) and e.archived_at is null
+        and coalesce(e.data->>'statut', '') not in ('fait', 'envoyé', 'annulé')
+        and coalesce(e.data->>'prochaine', e.data->>'quand', e.data->>'echeance', e.data->>'date')
+            ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+        and left(coalesce(e.data->>'prochaine', e.data->>'quand', e.data->>'echeance', e.data->>'date'), 10)
+            between to_char(now(), 'YYYY-MM-DD') and to_char(now() + interval '3 days', 'YYYY-MM-DD')
+      order by 1 limit 30`,
+    [spaces.map((one) => one.id)],
+  );
+  return rows;
 }
 
 export interface McpPerson {
@@ -147,6 +169,7 @@ export async function mcpServerFor(
         today: deps.today?.() ?? new Date().toISOString().slice(0, 10),
         spaces: reach.map((one) => ({ name: one.name, personal: one.personal })),
         charters: method.charters,
+        upcoming: method.upcoming,
         routines: [
           ...baseRoutines.map((one) => ({ name: one.name, when: one.when })),
           ...method.routines.map((one) => ({
@@ -465,8 +488,10 @@ export async function mcpServerFor(
     },
     tool(async ({ name }: { name: string }) => {
       const wanted = name.trim().toLowerCase();
+      // « matin », « Matin » or « /matin »: the name she uses.
+      const bare = wanted.replace(/^\//, '');
       const all = [...method.routines, ...baseRoutines];
-      const found = all.find((one) => one.name.toLowerCase() === wanted);
+      const found = all.find((one) => [wanted, bare].includes(one.name.toLowerCase()));
       if (!found) {
         throw new Error(
           `No routine « ${name} ». Routines: ${all.map((one) => one.name).join(', ')}.`,
@@ -484,6 +509,7 @@ export async function mcpServerFor(
     reach,
     spaceOf: (space) => spaceFor(reach, space ?? null),
     act,
+    actor,
   });
 
   return server;

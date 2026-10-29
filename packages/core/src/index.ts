@@ -14,6 +14,16 @@ export { required } from './env';
 export { addFile, FILE_MAX_BYTES, fileOf, type Blobs, type StoredFile } from './files';
 export { history, undo, type Command, type JournalLine } from './journal';
 export {
+  applyEdit,
+  DOCUMENT_WHOLE_CHARS,
+  outline,
+  readDocument,
+  writeDocument,
+  type DocumentEdit,
+  type DocumentRead,
+  type Section,
+} from './documents';
+export {
   exportMarkdown,
   importMarkdown,
   readMarkdown,
@@ -58,3 +68,5 @@ export {
   type Member,
   type Space,
 } from './spaces';
+export { DEFAULT_ZONE, inZone, nextTime, repetitionOf, timeOf } from './time';
+export { watchOnce, type Due, type PassReport } from './watcher';

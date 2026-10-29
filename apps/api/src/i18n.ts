@@ -38,6 +38,9 @@ const words = {
     inviteWithdrawn: 'Cette invitation a été retirée.',
     inviteMissing: 'Ce lien d’invitation n’est pas valide.',
     uploadExpired: 'Ce lien d’envoi a expiré ou n’est pas valide : demande-en un nouveau.',
+    documentExpired: 'Ce lien de lecture a expiré ou n’est pas valide : demande-en un nouveau.',
+    reminderDone: 'Dis à Claude quand c’est fait.',
+    channelLinked: 'Jarvis OS te préviendra ici : tes rappels arriveront dans cette conversation.',
   },
   en: {
     signInTitle: 'Sign in to Jarvis',
@@ -75,6 +78,9 @@ const words = {
     inviteWithdrawn: 'This invitation was withdrawn.',
     inviteMissing: 'This invitation link is not valid.',
     uploadExpired: 'This upload link has expired or is not valid: ask for a new one.',
+    documentExpired: 'This reading link has expired or is not valid: ask for a new one.',
+    reminderDone: 'Tell Claude when it is done.',
+    channelLinked: 'Jarvis OS will tell you here: your reminders will arrive in this chat.',
   },
 } as const;
 

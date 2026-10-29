@@ -25,5 +25,5 @@ render in a sandboxed frame; the frame calls the server's tools through the host
 
 ## Consequences
 
-- One renderer serves the clients now and the web platform later (spec 008).
+- One renderer serves the clients now and the web platform later (spec 009).
 - The views are tested in a browser against a small host stand-in, and in Claude by the author.

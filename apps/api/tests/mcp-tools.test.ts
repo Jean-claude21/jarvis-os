@@ -44,6 +44,7 @@ describe('Jarvis’s method on connection (story 3)', () => {
         'archive',
         'create_space',
         'dashboard',
+        'edit_document',
         'file_link',
         'invite',
         'spaces',
@@ -52,11 +53,13 @@ describe('Jarvis’s method on connection (story 3)', () => {
         'history',
         'kinds',
         'query',
+        'read_document',
         'routine',
         'save',
         'show_entry',
         'undo',
         'upload_link',
+        'write_document',
       ].sort(),
     );
     const base = await ama.call<{ text: string }>('routine', { name: 'Le temps' });

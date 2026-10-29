@@ -21,7 +21,12 @@ flowchart LR
 pnpm db:migrate             # core and accounts tables on the dev branch
 pnpm --filter @jarvis-os/api dev   # http://localhost:3700, dev branch
 pnpm --filter @jarvis-os/api test  # Neon test branch and its storage
+pnpm serve                         # API + watcher + tunnel at https://<JARVIS_TUNNEL_DOMAIN>
 ```
+
+`pnpm serve` keeps one address for the clients: the API on the `dev` branch, the watcher, and an
+ngrok tunnel on the fixed domain of `.env`; each restarts when it stops, and closing it stops them
+all. Run it again to take a change.
 
 ## Accounts
 
@@ -81,25 +86,31 @@ own only, for a client connected before spec 004), with Jarvis's instructions, t
 routines of each of those spaces, and the tools. Every tool takes an optional `space` (a name or an
 id); `query` reads all of them, `my_entries.space` naming each row's.
 
-| Tool           | Core function                                                        |
-| -------------- | -------------------------------------------------------------------- |
-| `kinds`        | `kinds`                                                              |
-| `find`         | `find`                                                               |
-| `get`          | `get`                                                                |
-| `save`         | `save`                                                               |
-| `archive`      | `archive`                                                            |
-| `query`        | `query`                                                              |
-| `history`      | `history`                                                            |
-| `undo`         | `undo`                                                               |
-| `add_file`     | `addFile`                                                            |
-| `file_link`    | a link that opens a file without a token                             |
-| `routine`      | one of her routines, or a base one (`src/routines/`)                 |
-| `spaces`       | the spaces this connection reaches, with who belongs                 |
-| `create_space` | a shared space she owns, reached by this client                      |
-| `invite`       | an invitation link into a shared space she owns                      |
-| `dashboard`    | widgets (query + chart) recomputed now; view `ui://jarvis/dashboard` |
-| `show_entry`   | one entry as a card, undoable; view `ui://jarvis/entry`              |
-| `upload_link`  | a link where files go straight in; view `ui://jarvis/upload`         |
+| Tool             | Core function                                                        |
+| ---------------- | -------------------------------------------------------------------- |
+| `kinds`          | `kinds`                                                              |
+| `find`           | `find`                                                               |
+| `get`            | `get`                                                                |
+| `save`           | `save`                                                               |
+| `archive`        | `archive`                                                            |
+| `query`          | `query`                                                              |
+| `history`        | `history`                                                            |
+| `undo`           | `undo`                                                               |
+| `add_file`       | `addFile`                                                            |
+| `file_link`      | a link that opens a file without a token                             |
+| `routine`        | one of her routines, or a base one (`src/routines/`)                 |
+| `spaces`         | the spaces this connection reaches, with who belongs                 |
+| `create_space`   | a shared space she owns, reached by this client                      |
+| `invite`         | an invitation link into a shared space she owns                      |
+| `dashboard`      | widgets (query + chart) recomputed now; view `ui://jarvis/dashboard` |
+| `show_entry`     | one entry as a card, undoable; view `ui://jarvis/entry`              |
+| `upload_link`    | a link where files go straight in; view `ui://jarvis/upload`         |
+| `write_document` | a new document: Markdown in `texte`, a kind in her words (spec 008)  |
+| `edit_document`  | one change by section (append, replace, insert after) or passage     |
+| `read_document`  | outline, then text or sections; view `ui://jarvis/document`          |
+
+A document's reading link, `/document/:token` (a day, one document), is a page to read and print as
+PDF; `?format=md` gives its Markdown file.
 
 ### Views (MCP Apps, spec 005)
 
@@ -154,4 +165,25 @@ pnpm --filter @jarvis-os/api markdown import ../lifeos_docs --email <address> --
   (`package.json`, `pyproject.toml`…) are left out, and each `--skip` path too.
 - `--kinds` maps folder names (and kinds) to the kinds she uses: `{ "resolutions": "Résolution" }`.
 - `--dry` counts the kinds without writing; `--space` names another space than her own.
+- `--include .claude/skills` reads a hidden folder too: each `SKILL.md` (its `name`, its
+  `description`) becomes a « Routine » when `--kinds` maps `skills` to it; a file is named by its
+  path to become the charter (`{ "SYSTEME.md": "Charte" }`).
 - `markdown export <folder> --email <address>` writes the space back as files.
+
+## The watcher (spec 006)
+
+A pass each minute (`pnpm --filter @jarvis-os/api watcher`, or within `pnpm serve`): the reminders
+due (« Rappel » with `quand`, or `repete` in five fields on the clock of `fuseau`) are told to each
+person of their space through her « Canal » — Telegram, by the bot of `JARVIS_TELEGRAM_BOT_TOKEN`.
+`watcher link --email <address>` makes the chat of `JARVIS_TELEGRAM_CHAT_ID` her channel.
+
+```mermaid
+sequenceDiagram
+  participant W as Watcher
+  participant DB as Postgres
+  participant T as Telegram
+  W->>DB: jarvis_due_reminders(horizon) — ids and members only
+  W->>DB: as each member: the reminder, her « Canal »
+  W->>T: sendMessage(chat, « ⏰ title »)
+  W->>DB: as a member: prochaine / statut « envoyé » (journaled, door watcher)
+```

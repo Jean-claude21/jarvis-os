@@ -84,11 +84,13 @@ function splitFrontMatter(text: string): { front: Record<string, unknown>; body:
 }
 
 /**
- * Reads one Markdown file: the kind from its front matter (`kind`), else from its folders (`kinds`
- * names some folders, nearest first, and may rename a kind; else the parent folder); the title from its first heading; the front
+ * Reads one Markdown file: the kind `kinds` gives its path, else its front matter's (`kind`), else
+ * its folders' (`kinds` names some folders, nearest first, and may rename a kind; else the parent
+ * folder); the title from its first heading; the front
  * matter as fields; the text below the title; links to other files of the folder.
  */
-export function readMarkdown(doc: MarkdownDoc, kinds: Record<string, string> = {}): ReadDoc {
+export function readMarkdown(doc: MarkdownDoc, named: Record<string, string> = {}): ReadDoc {
+  const kinds = Object.fromEntries(Object.entries(named).map(([key, kind]) => [fold(key), kind]));
   const { front, body } = splitFrontMatter(
     doc.text.charCodeAt(0) === 0xfeff ? doc.text.slice(1) : doc.text,
   );
@@ -97,16 +99,21 @@ export function readMarkdown(doc: MarkdownDoc, kinds: Record<string, string> = {
   // `_carte.md`, `README.md`, `index.md` speak for their folder.
   const describesFolder = describes(doc.path);
   const folders = parts.slice(0, describesFolder ? -2 : -1);
-  const named = [...folders].reverse().find((folder) => kinds[fold(folder)]);
+  const nearest = [...folders].reverse().find((folder) => kinds[fold(folder)]);
   const parent = folders.at(-1);
   const given = typeof front.kind === 'string' && front.kind.trim() ? front.kind.trim() : null;
   const kind =
+    kinds[fold(doc.path)] ||
     (given && (kinds[fold(given)] ?? given)) ||
-    (named && kinds[fold(named)]) ||
+    (nearest && kinds[fold(nearest)]) ||
     (parent && !/^\d{4}(-\d{2})?$/.test(parent) ? kindOfFolder(parent) : 'Note');
 
   const heading = /^#[ \t]+(.+?)[ \t#]*$/m.exec(body);
-  const titled = typeof front.title === 'string' && front.title.trim() ? front.title.trim() : null;
+  // A title, else a name (a skill's), in the front matter wins over the heading.
+  const titled =
+    [front.title, front.name]
+      .find((one): one is string => typeof one === 'string' && one.trim() !== '')
+      ?.trim() ?? null;
   const title = (
     titled ??
     heading?.[1]?.trim() ??
@@ -160,7 +167,7 @@ export function readMarkdown(doc: MarkdownDoc, kinds: Record<string, string> = {
  * `_mois.md`); not `_a-ecrire.md`, which is a file like any other.
  */
 const describes = (path: string) =>
-  path.includes('/') && /(^|\/)(readme|index|_[\p{L}\d]+)\.md$/iu.test(path);
+  path.includes('/') && /(^|\/)(readme|index|skill|_[\p{L}\d]+)\.md$/iu.test(path);
 
 const safeDecode = (text: string) => {
   try {
@@ -194,10 +201,7 @@ export async function importMarkdown(
   spaceId: string,
   input: { docs: MarkdownDoc[]; kinds?: Record<string, string>; name?: string },
 ): Promise<ImportReport> {
-  const kinds = Object.fromEntries(
-    Object.entries(input.kinds ?? {}).map(([folder, kind]) => [fold(folder), kind]),
-  );
-  const read = input.docs.map((doc) => readMarkdown(doc, kinds));
+  const read = input.docs.map((doc) => readMarkdown(doc, input.kinds));
   const report: ImportReport = {
     journalId: null,
     created: 0,

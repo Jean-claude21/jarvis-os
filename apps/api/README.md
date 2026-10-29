@@ -62,6 +62,11 @@ else in her own; `/api/query` reads all her spaces unless one is named (spec 004
 | GET    | `/api/clients/:client/spaces`              | the spaces an OAuth client may reach for her         |
 | PUT    | `/api/clients/:client/spaces` `{ spaces }` | set them                                             |
 
+| Method | Path                                                      | What it does                                                    |
+| ------ | --------------------------------------------------------- | --------------------------------------------------------------- |
+| GET    | `/api/export`                                             | the space as a zip of Markdown and her files (spec 007)         |
+| POST   | `/api/import` `{ docs: [{ path, text }], kinds?, name? }` | a Markdown folder into the space; the report and its journal id |
+
 The invitation page, `/invitation#<secret>`, reads the secret from its fragment (never sent to a
 server), shows the space, has her sign in or create her account, then accepts.
 
@@ -135,3 +140,18 @@ claude mcp add --transport http jarvis-dev http://localhost:3700/mcp
 
 Then, in Claude Code, `/mcp` → `jarvis-dev` → **Authenticate**: the browser opens the sign-in page
 (on the Neon `dev` branch), then the consent page; Claude Code then lists the tools.
+
+## Markdown from the command line
+
+The author's tool for a folder on his disk (spec 007): it acts as the account named, on the branch
+named (`dev` by default), under row-level security.
+
+```bash
+pnpm --filter @jarvis-os/api markdown import ../lifeos_docs --email <address> --kinds kinds.json --skip _archive --dry
+```
+
+- Under git, only tracked files are read; hidden folders, `node_modules` and code projects
+  (`package.json`, `pyproject.toml`…) are left out, and each `--skip` path too.
+- `--kinds` maps folder names (and kinds) to the kinds she uses: `{ "resolutions": "Résolution" }`.
+- `--dry` counts the kinds without writing; `--space` names another space than her own.
+- `markdown export <folder> --email <address>` writes the space back as files.

@@ -70,6 +70,28 @@ flowchart LR
 Kinds are one regardless of case and accents: a new entry takes the kind as first written in its
 space. Membership changes are journaled (`space.*`) and never undone through `undo`.
 
+## Markdown (spec 007)
+
+Her life leaves and enters as Markdown (decision 0007).
+
+| Function         | What it does                                                                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `readMarkdown`   | one file: kind (front matter `kind`, else the nearest folder `kinds` names, else the parent folder), title (first heading), fields, `texte`, `source`, links |
+| `importMarkdown` | a folder into a space: entries and links in batches; again, only what changed; journaled as one `import.run` that `undo` takes back                          |
+| `exportMarkdown` | a space as files: one per entry (an imported one at its path, else `<kind>/<title>.md`), links under « Liens », the bytes of her files beside                |
+
+Links come from relative Markdown links and `[[wiki]]` names (« mentionne »), and from the file that
+describes a folder — `README.md`, `index.md` or `_<word>.md` — to which every file of that folder
+belongs (« fait partie de »).
+
+```mermaid
+flowchart TD
+  M["---<br/>cercle: 2<br/>---<br/># Christian<br/>Mon frère. [[Toujours s'associer]]"] --> R[readMarkdown]
+  R --> E["Personne « Christian »<br/>cercle: 2 · texte · source (read)"]
+  R --> L1["mentionne → Toujours s'associer"]
+  R --> L2["fait partie de → Les 5 cercles (_cercles.md)"]
+```
+
 ## Database
 
 `db/migrations/` is applied in order by `pnpm db:migrate` (the `dev` branch, or the URL in

@@ -14,6 +14,8 @@ import {
   allowSpaces,
   clientSpaces,
   createSharedSpace,
+  exportMarkdown,
+  importMarkdown,
   invitationsOf,
   invite,
   leaveSpace,
@@ -37,6 +39,7 @@ import { z } from 'zod';
 import type { Auth } from './auth';
 import { failure } from './errors';
 import { invitationLink, namesOf, spaceFor } from './spaces';
+import { zip } from './zip';
 
 type Env = {
   Variables: {
@@ -49,6 +52,29 @@ type Env = {
 };
 
 const linksSchema = z.array(linkInputSchema.omit({ from: true })).max(20);
+
+/** A Markdown folder sent to be imported (spec 007). */
+const importSchema = z.object({
+  docs: z
+    .array(
+      z.object({
+        path: z
+          .string()
+          .min(1)
+          .max(500)
+          .regex(/\.md$/i)
+          .refine((path) => !path.startsWith('/') && !path.split('/').includes('..'), {
+            message: 'A path stays inside the folder.',
+          }),
+        text: z.string().max(2_000_000),
+      }),
+    )
+    .min(1)
+    .max(5000),
+  kinds: z.record(z.string(), z.string().min(1).max(80)).optional(),
+  name: z.string().max(200).optional(),
+});
+const IMPORT_MAX_BYTES = 40 * 1024 * 1024;
 
 /**
  * `/api` (spec 002): every function of the core, for the signed-in person, under row-level
@@ -301,6 +327,41 @@ export function apiRoutes(deps: { auth: Auth; db: pg.Pool; blobs: Blobs; publicU
     if (!stored) return c.json({ error: `No stored file for entry ${c.req.param('id')}.` }, 404);
     return c.json({ url: await deps.blobs.link(stored.storageKey, seconds), seconds });
   });
+
+  // Her data, hers (spec 007, decision 0007): a space as a Markdown folder, out and in.
+  api.get('/export', async (c) => {
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    const files = await asPerson(deps.db, c.get('person'), (tx) =>
+      exportMarkdown(tx, space.id, deps.blobs),
+    );
+    const day = new Date().toISOString().slice(0, 10);
+    return c.body(zip(files) as Uint8Array<ArrayBuffer>, 200, {
+      'content-type': 'application/zip',
+      'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(`${space.name} ${day}.zip`)}`,
+    });
+  });
+
+  api.post(
+    '/import',
+    bodyLimit({
+      maxSize: IMPORT_MAX_BYTES,
+      onError: (c) =>
+        c.json({ error: `The folder is larger than ${IMPORT_MAX_BYTES / 1024 / 1024} MB.` }, 400),
+    }),
+    async (c) => {
+      const input = importSchema.parse(await c.req.json());
+      return c.json(
+        await act(c, (tx, actor, space) =>
+          importMarkdown(tx, actor, space, {
+            docs: input.docs,
+            ...(input.kinds ? { kinds: input.kinds } : {}),
+            ...(input.name ? { name: input.name } : {}),
+          }),
+        ),
+        201,
+      );
+    },
+  );
 
   return api;
 }

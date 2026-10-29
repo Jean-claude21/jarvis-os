@@ -82,6 +82,18 @@ erDiagram
 - **Query**: the model computes from the database, read-only, over temporary copies of her own
   rows (`my_entries`, `my_links`, `my_files`), with a time and a row limit — never on the real
   tables, the accounts or the journal (decision 0004).
+- **Her data, hers** (decision 0007): a space leaves as a folder of Markdown (one file per entry,
+  its kind and fields in the front matter, its links under « Liens », her files beside) and a
+  Markdown folder enters the same way, origin « read », its path kept in `source`. An import is
+  journaled as one `import.run`, undone at once; importing a folder again adds nothing twice.
+
+```mermaid
+flowchart LR
+  F[Markdown folder] -->|POST /api/import · CLI| I[importMarkdown]
+  I --> DB[(entries · links · journal)]
+  DB --> X[exportMarkdown] -->|GET /api/export| Z[zip of Markdown + files]
+  Z -. read back .-> I
+```
 
 ## The doors
 

@@ -13,6 +13,16 @@ export {
 export { required } from './env';
 export { addFile, FILE_MAX_BYTES, fileOf, type Blobs, type StoredFile } from './files';
 export { history, undo, type Command, type JournalLine } from './journal';
+export {
+  exportMarkdown,
+  importMarkdown,
+  readMarkdown,
+  slugOf,
+  type ExportedFile,
+  type ImportReport,
+  type MarkdownDoc,
+  type ReadDoc,
+} from './markdown';
 export { migrate } from './migrate';
 export { query, QUERY_ROW_LIMIT, type QueryResult } from './query';
 export {

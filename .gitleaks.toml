@@ -1,0 +1,11 @@
+# gitleaks: the default rules, plus the fixtures that exist only in tests and the documented
+# placeholders of .env.example. This repository is public: no secret ever enters it.
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test fixtures and documented placeholders"
+paths = [
+  '''(^|/)tests/''',
+  '''\.env\.example$''',
+]

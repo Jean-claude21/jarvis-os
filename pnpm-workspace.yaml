@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Build scripts run only when approved here.
+allowBuilds:
+  esbuild: true

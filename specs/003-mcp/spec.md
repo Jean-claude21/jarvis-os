@@ -4,7 +4,7 @@
 
 **Created**: 2026-10-29
 
-**Status**: Built (Claude Code test pending)
+**Status**: Proven (Claude connected through OAuth over a public tunnel, saving a life)
 
 **Input**: User description: "The MCP server and OAuth: tools over the core, sign-in and consent pages, server instructions and base routines"
 

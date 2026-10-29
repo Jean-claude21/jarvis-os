@@ -9,4 +9,4 @@
 - [x] T006 Tests: every tool in memory, and isolation
 - [x] T007 Tests: the OAuth flow over HTTP (401 challenge, discovery, registration, sign-in,
       consent, refusal, token), then the tools through the SDK client
-- [ ] T008 Claude Code connected to the local server; docs and roadmap
+- [x] T008 Claude Code connected to the local server; docs and roadmap

@@ -57,6 +57,19 @@ export interface Saved {
 }
 
 /**
+ * A kind as it was first written in this space: « dépense » and « Dépense » are one kind, case and
+ * accents aside (decision 0005). A new kind is kept as given.
+ */
+async function kindAsWritten(tx: Tx, spaceId: string, kind: string): Promise<string> {
+  const { rows } = await tx.query<{ kind: string }>(
+    `select kind from entry where space_id = $1 and jarvis_fold(kind) = jarvis_fold($2)
+      order by created_at limit 1`,
+    [spaceId, kind],
+  );
+  return rows[0]?.kind ?? kind;
+}
+
+/**
  * One save of what she said: new entries and changes to existing ones, the links among them, the
  * links taken away — every change journaled. A field given `null` is removed.
  */
@@ -70,18 +83,12 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
     const kept = Object.keys(given).filter((field) => given[field] !== null);
     if (!one.id) {
       if (!one.kind || !one.title) throw new Error('A new entry needs a kind and a title.');
+      const kind = await kindAsWritten(tx, spaceId, one.kind);
       const id = prefixedId('ent');
       const data = Object.fromEntries(kept.map((field) => [field, given[field]]));
       await tx.query(
         'insert into entry (id, space_id, kind, title, data, origin) values ($1, $2, $3, $4, $5, $6)',
-        [
-          id,
-          spaceId,
-          one.kind,
-          one.title,
-          JSON.stringify(data),
-          JSON.stringify(originsFor(one, kept)),
-        ],
+        [id, spaceId, kind, one.title, JSON.stringify(data), JSON.stringify(originsFor(one, kept))],
       );
       await record(tx, actor, {
         spaceId,
@@ -94,7 +101,7 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
       saved.entries.push({
         ref: one.ref ?? null,
         id,
-        kind: one.kind,
+        kind,
         title: one.title,
         created: true,
       });
@@ -122,7 +129,7 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
         data[field] = value;
       }
     }
-    const kind = one.kind ?? current.kind;
+    const kind = one.kind ? await kindAsWritten(tx, spaceId, one.kind) : current.kind;
     const title = one.title ?? current.title;
     await tx.query(
       `update entry set kind = $2, title = $3, data = $4, origin = $5, updated_at = now()
@@ -237,7 +244,7 @@ export async function find(tx: Tx, spaceId: string, raw: FindInput = {}): Promis
     `select ${columns} from entry
       where space_id = $1
         and ($2::boolean or archived_at is null)
-        and ($3::text is null or lower(kind) = lower($3))
+        and ($3::text is null or jarvis_fold(kind) = jarvis_fold($3))
         and ($4::date is null or created_at >= $4::date)
         and ($5::date is null or created_at < $5::date + 1)
         and (select bool_and(jarvis_fold(title || ' ' || data::text || ' ' || jarvis_file_words(id))

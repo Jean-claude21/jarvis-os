@@ -6,6 +6,17 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@jarvis-os/api", "dev"],
       "port": 3700
+    },
+    {
+      "name": "api-test",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@jarvis-os/api", "dev"],
+      "env": {
+        "JARVIS_BRANCH": "test",
+        "PORT": "3701",
+        "JARVIS_PUBLIC_URL": "http://localhost:3701"
+      },
+      "port": 3701
     }
   ]
 }

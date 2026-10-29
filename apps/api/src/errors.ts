@@ -11,9 +11,17 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     };
   }
   const message = error instanceof Error ? error.message : String(error);
-  if (/^No (entry|change|stored file|routine)/.test(message)) return { status: 404, message };
+  if (/^No (entry|change|stored file|routine|open invitation|member)/.test(message)) {
+    return { status: 404, message };
+  }
   if (
-    /already undone|cannot be undone|needs a kind|is empty|larger than|to set aside/.test(message)
+    /already undone|cannot be undone|needs a kind|is empty|larger than|to set aside/.test(
+      message,
+    ) ||
+    // Spaces (spec 004): what she may not do, said so she can do otherwise.
+    /^No space|not hers|stays private|^Only an owner|last member|cannot be left|is not undone|no e-mail address|needs a name|^A space needs/.test(
+      message,
+    )
   ) {
     return { status: 400, message };
   }

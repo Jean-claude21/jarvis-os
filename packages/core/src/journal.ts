@@ -1,7 +1,19 @@
 import type { Actor, Tx } from './db';
 
 export type Command =
-  'entry.create' | 'entry.update' | 'entry.archive' | 'link.add' | 'link.remove' | 'journal.undo';
+  | 'entry.create'
+  | 'entry.update'
+  | 'entry.archive'
+  | 'link.add'
+  | 'link.remove'
+  | 'journal.undo'
+  // Who belongs to a space (spec 004): journaled, never undone through `undo`.
+  | 'space.create'
+  | 'space.rename'
+  | 'space.invite'
+  | 'space.withdraw'
+  | 'space.join'
+  | 'space.leave';
 
 export interface JournalLine {
   id: number;
@@ -88,6 +100,9 @@ export async function undo(
   if (!line) throw new Error(`No change ${input.journalId} in this space.`);
   if (line.undone_by !== null) throw new Error(`Change ${input.journalId} is already undone.`);
   if (line.command === 'journal.undo') throw new Error('An undo cannot be undone.');
+  if (line.command.startsWith('space.')) {
+    throw new Error('Who belongs to a space is not undone: invite, withdraw or leave instead.');
+  }
   const current = async () =>
     (
       await tx.query<Record<string, unknown>>(

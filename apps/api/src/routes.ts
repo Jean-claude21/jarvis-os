@@ -10,13 +10,24 @@ import {
   history,
   kinds,
   linkInputSchema,
+  acceptInvitation,
+  allowSpaces,
+  clientSpaces,
+  createSharedSpace,
+  invitationsOf,
+  invite,
+  leaveSpace,
+  membersOf,
   query,
   querySchema,
+  renameSpace,
   save,
   spacesOf,
   undo,
+  withdrawInvitation,
   type Actor,
   type Blobs,
+  type Space,
   type Tx,
 } from '@jarvis-os/core';
 import { Hono, type Context } from 'hono';
@@ -25,26 +36,38 @@ import type pg from 'pg';
 import { z } from 'zod';
 import type { Auth } from './auth';
 import { failure } from './errors';
+import { invitationLink, namesOf, spaceFor } from './spaces';
 
-type Env = { Variables: { person: string; spaceId: string; client: string | undefined } };
+type Env = {
+  Variables: {
+    person: string;
+    email: string;
+    name: string;
+    spaces: Space[];
+    client: string | undefined;
+  };
+};
 
 const linksSchema = z.array(linkInputSchema.omit({ from: true })).max(20);
 
 /**
- * `/api` (spec 002): every function of the core, for the signed-in person, in her space, under
- * row-level security. The routes parse, call the core and answer — nothing else.
+ * `/api` (spec 002): every function of the core, for the signed-in person, under row-level
+ * security. A route acts in the space named by `?space=` (an id or a name) or the `x-jarvis-space`
+ * header, else in her own (spec 004). The routes parse, call the core and answer — nothing else.
  */
-export function apiRoutes(deps: { auth: Auth; db: pg.Pool; blobs: Blobs }) {
+export function apiRoutes(deps: { auth: Auth; db: pg.Pool; blobs: Blobs; publicUrl: string }) {
   const api = new Hono<Env>();
 
   api.use('*', async (c, next) => {
     const session = await deps.auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: 'Sign in first.' }, 401);
     const person = session.user.id;
-    const [space] = await asPerson(deps.db, person, (tx) => spacesOf(tx));
-    if (!space) return c.json({ error: 'This account has no space.' }, 500);
+    const spaces = await asPerson(deps.db, person, (tx) => spacesOf(tx));
+    if (spaces.length === 0) return c.json({ error: 'This account has no space.' }, 500);
     c.set('person', person);
-    c.set('spaceId', space.id);
+    c.set('email', session.user.email);
+    c.set('name', session.user.name);
+    c.set('spaces', spaces);
     c.set('client', c.req.header('x-jarvis-client') ?? undefined);
     await next();
   });
@@ -55,19 +78,117 @@ export function apiRoutes(deps: { auth: Auth; db: pg.Pool; blobs: Blobs }) {
     return c.json({ error: message }, status);
   });
 
-  const act = <T>(c: Context<Env>, work: (tx: Tx, actor: Actor, spaceId: string) => Promise<T>) => {
+  const actorOf = (c: Context<Env>): Actor => {
     const client = c.get('client');
-    const actor: Actor = { person: c.get('person'), door: 'api', ...(client ? { client } : {}) };
-    return asPerson(deps.db, c.get('person'), (tx) => work(tx, actor, c.get('spaceId')));
+    return { person: c.get('person'), door: 'api', ...(client ? { client } : {}) };
   };
+  /** The work of a route, in the space it names (else her own). */
+  const act = <T>(c: Context<Env>, work: (tx: Tx, actor: Actor, spaceId: string) => Promise<T>) => {
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    return asPerson(deps.db, c.get('person'), (tx) => work(tx, actorOf(c), space.id));
+  };
+  /** The work of a route about spaces themselves. */
+  const as = <T>(c: Context<Env>, work: (tx: Tx, actor: Actor) => Promise<T>) =>
+    asPerson(deps.db, c.get('person'), (tx) => work(tx, actorOf(c)));
 
-  api.get('/me', async (c) => {
-    const session = await deps.auth.api.getSession({ headers: c.req.raw.headers });
-    const spaces = await act(c, (tx) => spacesOf(tx));
-    return c.json({
-      person: { id: session!.user.id, name: session!.user.name, email: session!.user.email },
-      space: spaces.find((one) => one.id === c.get('spaceId')),
+  api.get('/me', async (c) =>
+    c.json({
+      person: { id: c.get('person'), name: c.get('name'), email: c.get('email') },
+      space: spaceFor(c.get('spaces')),
+      spaces: c.get('spaces'),
+    }),
+  );
+
+  // Spaces (spec 004): hers, who belongs, invitations, leaving.
+  api.get('/spaces', async (c) => {
+    const spaces = await as(c, async (tx) => {
+      const all = [];
+      for (const space of await spacesOf(tx)) {
+        all.push({ ...space, members: await membersOf(tx, space.id) });
+      }
+      return all;
     });
+    const names = await namesOf(
+      deps.db,
+      spaces.flatMap((space) => space.members.map((one) => one.person)),
+    );
+    return c.json(
+      spaces.map((space) => ({
+        ...space,
+        members: space.members.map((one) => ({ ...one, name: names.get(one.person) ?? null })),
+      })),
+    );
+  });
+
+  api.post('/spaces', async (c) => {
+    const { name } = z.object({ name: z.string().min(1).max(120) }).parse(await c.req.json());
+    return c.json(await as(c, (tx, actor) => createSharedSpace(tx, actor, { name })), 201);
+  });
+
+  api.patch('/spaces/:id', async (c) => {
+    const { name } = z.object({ name: z.string().min(1).max(120) }).parse(await c.req.json());
+    await as(c, (tx, actor) => renameSpace(tx, actor, { spaceId: c.req.param('id'), name }));
+    return c.json({ renamed: c.req.param('id'), name });
+  });
+
+  api.post('/spaces/:id/invitations', async (c) => {
+    const { email } = z.object({ email: z.string().min(3).max(320) }).parse(await c.req.json());
+    const made = await as(c, (tx, actor) =>
+      invite(tx, actor, { spaceId: c.req.param('id'), email }),
+    );
+    return c.json(
+      {
+        invitationId: made.invitationId,
+        link: invitationLink(deps.publicUrl, made.token),
+        expiresAt: made.expiresAt,
+      },
+      201,
+    );
+  });
+
+  api.get('/spaces/:id/invitations', async (c) =>
+    c.json(await as(c, (tx) => invitationsOf(tx, c.req.param('id')))),
+  );
+
+  api.delete('/spaces/:id/invitations/:invitation', async (c) => {
+    await as(c, (tx, actor) =>
+      withdrawInvitation(tx, actor, {
+        spaceId: c.req.param('id'),
+        invitationId: c.req.param('invitation'),
+      }),
+    );
+    return c.json({ withdrawn: c.req.param('invitation') });
+  });
+
+  // `me` to leave; another member's id, for an owner, to remove them.
+  api.delete('/spaces/:id/members/:person', async (c) => {
+    const who = c.req.param('person');
+    await as(c, (tx, actor) =>
+      leaveSpace(tx, actor, {
+        spaceId: c.req.param('id'),
+        ...(who === 'me' ? {} : { person: who }),
+      }),
+    );
+    return c.json({ left: c.req.param('id') });
+  });
+
+  api.post('/invitations/accept', async (c) => {
+    const { token } = z.object({ token: z.string().min(10).max(200) }).parse(await c.req.json());
+    return c.json(
+      await as(c, (tx, actor) => acceptInvitation(tx, actor, { token, email: c.get('email') })),
+    );
+  });
+
+  // The spaces a client (Claude, ChatGPT…) may reach for her: set at consent, or from her account.
+  api.get('/clients/:client/spaces', async (c) =>
+    c.json(await as(c, (tx) => clientSpaces(tx, c.req.param('client')))),
+  );
+
+  api.put('/clients/:client/spaces', async (c) => {
+    const { spaces } = z
+      .object({ spaces: z.array(z.string().min(1)).max(50) })
+      .parse(await c.req.json());
+    return c.json(await as(c, (tx) => allowSpaces(tx, c.req.param('client'), spaces)));
   });
 
   api.get('/kinds', async (c) => c.json(await act(c, (tx, _a, space) => kinds(tx, space))));
@@ -102,9 +223,14 @@ export function apiRoutes(deps: { auth: Auth; db: pg.Pool; blobs: Blobs }) {
     return c.json({ archived: c.req.param('id') });
   });
 
+  // A query reads every space of hers, unless one is named.
   api.post('/query', async (c) => {
     const { sql } = querySchema.parse(await c.req.json());
-    return c.json(await act(c, (tx, _a, space) => query(tx, { spaceId: space, sql })));
+    const named = c.req.query('space') ?? c.req.header('x-jarvis-space');
+    const spaceIds = named
+      ? [spaceFor(c.get('spaces'), named).id]
+      : c.get('spaces').map((one) => one.id);
+    return c.json(await as(c, (tx) => query(tx, { spaceIds, sql })));
   });
 
   api.get('/history', async (c) => {

@@ -33,7 +33,7 @@ pnpm --filter @jarvis-os/api test  # Neon test branch and its storage
 
 | Method | Path                                                         | Core function                        |
 | ------ | ------------------------------------------------------------ | ------------------------------------ |
-| GET    | `/api/me`                                                    | her account and her space            |
+| GET    | `/api/me`                                                    | her account, her own space, all hers |
 | GET    | `/api/kinds`                                                 | `kinds`                              |
 | GET    | `/api/entries?text&kind&from&to&archived&limit`              | `find`                               |
 | GET    | `/api/entries/:id`                                           | `get`                                |
@@ -46,27 +46,52 @@ pnpm --filter @jarvis-os/api test  # Neon test branch and its storage
 | GET    | `/api/files/:id`                                             | the file's bytes                     |
 | GET    | `/api/files/:id/link?seconds`                                | a link that opens it without a token |
 
+Every route acts in the space named by `?space=` (an id or a name) or the `x-jarvis-space` header,
+else in her own; `/api/query` reads all her spaces unless one is named (spec 004).
+
+| Method | Path                                       | What it does                                         |
+| ------ | ------------------------------------------ | ---------------------------------------------------- |
+| GET    | `/api/spaces`                              | her spaces, with who belongs                         |
+| POST   | `/api/spaces` `{ name }`                   | a shared space she owns                              |
+| PATCH  | `/api/spaces/:id` `{ name }`               | rename (owner)                                       |
+| POST   | `/api/spaces/:id/invitations` `{ email }`  | an invitation link, 14 days (owner)                  |
+| GET    | `/api/spaces/:id/invitations`              | the invitations and their state                      |
+| DELETE | `/api/spaces/:id/invitations/:invitation`  | withdraw (owner)                                     |
+| DELETE | `/api/spaces/:id/members/:person`          | `me` to leave; another member, for an owner, removes |
+| POST   | `/api/invitations/accept` `{ token }`      | join, signed in with the invited address             |
+| GET    | `/api/clients/:client/spaces`              | the spaces an OAuth client may reach for her         |
+| PUT    | `/api/clients/:client/spaces` `{ spaces }` | set them                                             |
+
+The invitation page, `/invitation#<secret>`, reads the secret from its fragment (never sent to a
+server), shows the space, has her sign in or create her account, then accepts.
+
 Errors answer `{ error }` with 400 (what to fix), 401 (sign in), 404 (not in her space) or 500.
 An `x-jarvis-client` header names the client in the journal.
 
 ## MCP
 
 `/mcp` is a stateless Streamable HTTP server. Each request carries an OAuth access token; the
-server is built for that token's person, with Jarvis's instructions, the tools and her routines.
+server is built for that token's person and the spaces she allowed that client at consent (her
+own only, for a client connected before spec 004), with Jarvis's instructions, the charter and the
+routines of each of those spaces, and the tools. Every tool takes an optional `space` (a name or an
+id); `query` reads all of them, `my_entries.space` naming each row's.
 
-| Tool        | Core function                                        |
-| ----------- | ---------------------------------------------------- |
-| `kinds`     | `kinds`                                              |
-| `find`      | `find`                                               |
-| `get`       | `get`                                                |
-| `save`      | `save`                                               |
-| `archive`   | `archive`                                            |
-| `query`     | `query`                                              |
-| `history`   | `history`                                            |
-| `undo`      | `undo`                                               |
-| `add_file`  | `addFile`                                            |
-| `file_link` | a link that opens a file without a token             |
-| `routine`   | one of her routines, or a base one (`src/routines/`) |
+| Tool           | Core function                                        |
+| -------------- | ---------------------------------------------------- |
+| `kinds`        | `kinds`                                              |
+| `find`         | `find`                                               |
+| `get`          | `get`                                                |
+| `save`         | `save`                                               |
+| `archive`      | `archive`                                            |
+| `query`        | `query`                                              |
+| `history`      | `history`                                            |
+| `undo`         | `undo`                                               |
+| `add_file`     | `addFile`                                            |
+| `file_link`    | a link that opens a file without a token             |
+| `routine`      | one of her routines, or a base one (`src/routines/`) |
+| `spaces`       | the spaces this connection reaches, with who belongs |
+| `create_space` | a shared space she owns, reached by this client      |
+| `invite`       | an invitation link into a shared space she owns      |
 
 A client finds everything from the 401 alone:
 

@@ -7,6 +7,7 @@ import { viewWords } from './words';
 // and framed in her web account (it calls the REST API with her session).
 
 const css = `
+a { color: var(--primary); text-decoration: none; } a:hover { text-decoration: underline; }
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
 .filters label { display: flex; gap: 6px; align-items: center; }
 input, select { font: inherit; padding: 6px 8px; border: 1px solid var(--rule-strong); border-radius: 2px; background: var(--paper); color: var(--ink); }
@@ -103,7 +104,9 @@ const draw = {
         : '<input name="' + esc(f.name) + '" placeholder="' + esc(f.type === 'link' ? words.linkHint : '') + '" type="' + (f.type === 'date' ? 'date' : f.type === 'datetime' ? 'datetime-local' : ['number', 'amount'].includes(f.type) ? 'number' : 'text') + '" step="any">') + '</label>').join('') +
     '</div><p class="error-text" data-error></p><button>' + esc(words.add) + '</button></form>', true),
   record: (b) => { const r = b.record; if (!r) return card(b, '<p class="empty">' + esc(words.empty) + '</p>', true);
-    return card(Object.assign({}, b, { title: b.title || r.title }), r.fields.map((f) => '<div class="field-row"><span class="caps">' + esc(f.name) + '</span><span class="' + (numeric(f.value) ? 'num' : '') + '">' + fmt(f.value) + '</span><span>' + (f.computed ? '<span class="badge">' + esc(words.computed) + '</span>' : '') + '</span></div>').join('') +
+    // Under the entry's own page, its fields are already shown: only what belongs to it.
+    const own = String(current.id).startsWith('record:') ? [] : r.fields;
+    return card(b, own.map((f) => '<div class="field-row"><span class="caps">' + esc(f.name) + '</span><span class="' + (numeric(f.value) ? 'num' : '') + '">' + fmt(f.value) + '</span><span>' + (f.computed ? '<span class="badge">' + esc(words.computed) + '</span>' : '') + '</span></div>').join('') +
       r.relations.map((rel) => '<h2 style="margin-top:14px">' + esc(rel.name) + ' · ' + rel.rows.length + '</h2>' + table(rel.columns, rel.rows)).join(''), true); },
 };
 function render(data) {
@@ -114,7 +117,9 @@ function render(data) {
     (f.type === 'month' ? '<input type="month" data-filter="' + esc(f.name) + '" value="' + esc(f.value) + '">'
       : f.type === 'choice' ? '<select data-filter="' + esc(f.name) + '">' + (f.options || []).map((o) => '<option' + (o === f.value ? ' selected' : '') + '>' + esc(o) + '</option>').join('') + '</select>'
       : '<input data-filter="' + esc(f.name) + '" value="' + esc(f.value) + '">') + '</label>').join('') + '</div>' : '';
-  root.innerHTML = '<header class="head"><div>' + (data.app ? '<div class="caps">' + esc(data.app) + '</div>' : '') + '<h1>' + esc(data.title) + '</h1></div></header>' + filters +
+  // A record page is framed under the entry's own title: no second one.
+  const head = String(data.id).startsWith('record:') ? '' : '<header class="head"><div>' + (data.app ? '<div class="caps">' + esc(data.app) + '</div>' : '') + '<h1>' + esc(data.title) + '</h1></div></header>';
+  root.innerHTML = head + filters +
     '<section class="grid">' + data.blocks.map((b) => b.error ? card(b, '<p class="error-text">' + esc(say(words.failed, { reason: b.error })) + '</p>') : (draw[b.block] ? draw[b.block](b) : '')).join('') + '</section>';
   root.querySelectorAll('[data-filter]').forEach((el) => el.addEventListener('change', () => reload({ [el.dataset.filter]: el.value }).catch((e) => alert(e.message))));
   root.querySelectorAll('[data-open]').forEach((el) => el.addEventListener('click', (event) => { event.preventDefault(); open(el.dataset.open); }));

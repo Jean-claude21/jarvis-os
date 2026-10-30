@@ -130,7 +130,8 @@ flowchart LR
 | watcher | her reminders, on Telegram                                      | acts as each member                  |
 
 The REST API and the MCP tools call the same core functions: what one does, the other does. Her
-web account at `/app` is one page that reads and acts through `/api` with her session; its
+web account at `/app` (specs 009, 013) opens on « Maintenant » — what needs her, from `attention` —
+lists her apps from her models and her files; it is one page that reads and acts through `/api` with her session; its
 dashboards and documents are the clients' views, framed. A client she disconnects there is refused
 by `/mcp` at once.
 

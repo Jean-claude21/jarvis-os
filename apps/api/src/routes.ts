@@ -2,6 +2,8 @@ import {
   addFile,
   agenda,
   archive,
+  attention,
+  filesOf,
   asPerson,
   FILE_MAX_BYTES,
   fileOf,
@@ -335,13 +337,16 @@ export function apiRoutes(deps: {
     },
   );
 
+  // Her files, listed (spec 013): what each is, when, what it is linked to.
+  api.get('/files', async (c) => c.json(await act(c, (tx, _a, space) => filesOf(tx, space))));
+
   api.get('/files/:id', async (c) => {
     const stored = await act(c, (tx, _a, space) => fileOf(tx, space, c.req.param('id')));
     if (!stored) return c.json({ error: `No stored file for entry ${c.req.param('id')}.` }, 404);
     const bytes = await deps.blobs.get(stored.storageKey);
     return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
       'content-type': stored.mediaType,
-      'content-disposition': `inline; filename*=UTF-8''${encodeURIComponent(stored.name)}`,
+      'content-disposition': `${c.req.query('download') ? 'attachment' : 'inline'}; filename*=UTF-8''${encodeURIComponent(stored.name)}`,
     });
   });
 
@@ -435,6 +440,18 @@ export function apiRoutes(deps: {
       }),
     );
   });
+
+  // What needs her now (spec 013), across her spaces: to fix, late, proposed, today, this week.
+  api.get('/now', async (c) =>
+    c.json(
+      await as(c, (tx) =>
+        attention(
+          tx,
+          c.get('spaces').map((one) => one.id),
+        ),
+      ),
+    ),
+  );
 
   // Her calendar (spec 011): everything dated in her spaces, for a window (this week by default).
   api.get('/agenda', async (c) => {

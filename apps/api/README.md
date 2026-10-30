@@ -36,22 +36,24 @@ all. Run it again to take a change.
 
 ## Routes
 
-| Method | Path                                                         | Core function                                                     |
-| ------ | ------------------------------------------------------------ | ----------------------------------------------------------------- |
-| GET    | `/api/me`                                                    | her account, her own space, all hers                              |
-| GET    | `/api/kinds`                                                 | `kinds`                                                           |
-| GET    | `/api/entries?text&kind&from&to&archived&limit`              | `find`                                                            |
-| GET    | `/api/entries/:id`                                           | `get`                                                             |
-| POST   | `/api/save`                                                  | `save`                                                            |
-| POST   | `/api/entries/:id/archive`                                   | `archive`                                                         |
-| POST   | `/api/query` `{ sql }`                                       | `query`                                                           |
-| GET    | `/api/history?target&limit`                                  | `history`                                                         |
-| POST   | `/api/undo` `{ journalId }`                                  | `undo`                                                            |
-| POST   | `/api/files` (multipart `file`, `title?`, `data?`, `links?`) | `addFile`                                                         |
-| GET    | `/api/files/:id`                                             | the file's bytes                                                  |
-| GET    | `/api/files/:id/link?seconds`                                | a link that opens it without a token                              |
-| GET    | `/api/agenda?from&to`                                        | `agenda` over all her spaces (spec 011), this week by default     |
-| POST   | `/api/agenda/address`                                        | a new private address for her phone's calendar; the old one stops |
+| Method | Path                                                         | Core function                                                                           |
+| ------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| GET    | `/api/me`                                                    | her account, her own space, all hers                                                    |
+| GET    | `/api/kinds`                                                 | `kinds`                                                                                 |
+| GET    | `/api/entries?text&kind&from&to&archived&limit`              | `find`                                                                                  |
+| GET    | `/api/entries/:id`                                           | `get`                                                                                   |
+| POST   | `/api/save`                                                  | `save`                                                                                  |
+| POST   | `/api/entries/:id/archive`                                   | `archive`                                                                               |
+| POST   | `/api/query` `{ sql }`                                       | `query`                                                                                 |
+| GET    | `/api/history?target&limit`                                  | `history`                                                                               |
+| POST   | `/api/undo` `{ journalId }`                                  | `undo`                                                                                  |
+| POST   | `/api/files` (multipart `file`, `title?`, `data?`, `links?`) | `addFile`                                                                               |
+| GET    | `/api/files/:id`                                             | the file's bytes                                                                        |
+| GET    | `/api/files/:id/link?seconds`                                | a link that opens it without a token                                                    |
+| GET    | `/api/now`                                                   | `attention`: to fix, late, proposed, today, this week; her day (spec 013)               |
+| GET    | `/api/files`                                                 | `filesOf`: her files with their links (spec 013); `/api/files/:id?download=1` downloads |
+| GET    | `/api/agenda?from&to`                                        | `agenda` over all her spaces (spec 011), this week by default                           |
+| POST   | `/api/agenda/address`                                        | a new private address for her phone's calendar; the old one stops                       |
 
 Every route acts in the space named by `?space=` (an id or a name) or the `x-jarvis-space` header,
 else in her own; `/api/query` reads all her spaces unless one is named (spec 004).
@@ -80,7 +82,12 @@ server), shows the space, has her sign in or create her account, then accepts.
 Errors answer `{ error }` with 400 (what to fix), 401 (sign in), 404 (not in her space) or 500.
 An `x-jarvis-client` header names the client in the journal.
 
-## The platform (spec 009)
+## The platform (specs 009, 013)
+
+Spec 013 reorganised it around her day: « Maintenant » (what needs her, the gestures that settle
+it, undoable), « Agenda », her apps (the `app` of her models: a tab per kind, the model's columns,
+groups and totals, a form drawn from the model), « Fichiers » (preview, download), then the pages
+of spec 009 under « Ma vie » and her profile.
 
 `/` leads to `/app`, her web account, behind her session (else `/connexion`): one page, no build,
 in the Kete brand, drawing each part from `/api`.

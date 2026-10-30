@@ -136,6 +136,13 @@ Time is a field any entry may carry; the calendar is computed from them, never s
 
 `jarvis_calendar_owner` (migration 0005) finds whose key a fingerprint is, and nothing else.
 
+## What needs her (spec 013)
+
+| Function                     | What it does                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `attention(tx, spaces, now)` | to fix (`statut` « à corriger », « non envoyé »), late, proposed, today, week |
+| `filesOf(tx, space)`         | her files, latest first, with what each is linked to                          |
+
 ## Type models (spec 012)
 
 A kind's shape, said once: an entry of kind « Modèle » whose title is the kind and whose data is

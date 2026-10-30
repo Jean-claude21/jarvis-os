@@ -96,3 +96,33 @@ describe('what the app reads', () => {
     expect((await ama.json('/api/connections/nobody', undefined, 'DELETE')).status).toBe(404);
   });
 });
+
+describe('the new platform (spec 013)', () => {
+  it('says what needs her now, across her spaces', async () => {
+    const { body } = await ama.json<{
+      items: { title: string; group: string }[];
+      day: unknown[];
+    }>('/api/now');
+    expect(body.items.find((one) => one.title === 'Bientôt')?.group).toMatch(/today|week/);
+  });
+
+  it('lists her files, and gives one to download', async () => {
+    const form = new FormData();
+    const csv = 'date;montant\n2026-10-29;-2500\n';
+    form.append('file', new Blob([csv], { type: 'text/csv' }), 'releve.csv');
+    const up = await ama.call('/api/files', { method: 'POST', body: form });
+    expect(up.status).toBe(201);
+    const { body: files } =
+      await ama.json<{ entryId: string; name: string; read: boolean }[]>('/api/files');
+    expect(files[0]).toMatchObject({ name: 'releve.csv', read: true });
+    const down = await ama.call(`/api/files/${files[0]!.entryId}?download=1`);
+    expect(down.headers.get('content-disposition')).toMatch(/^attachment/);
+  });
+
+  it('draws the new shell: now, the apps, the files', async () => {
+    const html = await (await ama.call('/app', { headers: { 'accept-language': 'fr' } })).text();
+    expect(html).toContain('Maintenant');
+    expect(html).toContain('Fichiers');
+    expect(html).toContain('id="apps"');
+  });
+});

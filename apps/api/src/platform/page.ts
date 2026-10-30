@@ -91,11 +91,116 @@ const css2 = `
 @media (max-width: 860px) { .week { display: none; } .days { display: grid; gap: 12px; } }
 `;
 
+const css3 = `
+body { background: var(--clay); }
+.shell { display: grid; grid-template-columns: 252px 1fr; min-height: 100vh; padding: 12px; gap: 12px; }
+.sidebar { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 12px; height: calc(100vh - 24px); overflow-y: auto; padding: 2px 4px 2px 2px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 8px 10px; background: var(--paper); border: 1px solid var(--rule); border-radius: 2px; }
+.brand i { width: 30px; height: 30px; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font: 700 15px/1 Archivo, sans-serif; font-style: normal; border-radius: 2px; flex: none; }
+.brand select { flex: 1; min-width: 0; border: 0; background: transparent; font: 600 13px/1.2 Archivo, sans-serif; color: var(--ink); padding: 2px 0; }
+.sidebar .search-box { width: 100%; font: 13px "Instrument Sans", sans-serif; padding: 8px 10px; border: 1px solid var(--rule); border-radius: 2px; background: var(--paper); color: var(--ink); }
+.navg { display: grid; gap: 2px; }
+.navg > .caps { padding: 6px 8px 4px; font: 500 10.5px/1.4 "JetBrains Mono", monospace; letter-spacing: .06em; color: var(--rule-strong); display: flex; justify-content: space-between; }
+.navi { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 2px; color: var(--ink); text-decoration: none; font-size: 14px; border: 1px solid transparent; }
+.navi:hover { background: rgba(255, 253, 249, .5); }
+.navi.on { background: var(--paper); border-color: var(--rule); font-weight: 600; box-shadow: 0 1px 2px rgba(42, 22, 16, .06); }
+.navi svg { width: 16px; height: 16px; flex: none; }
+.navi .n { margin-left: auto; font: 500 11px/1 "JetBrains Mono", monospace; color: var(--bark); }
+.navi .n.hot { background: var(--primary); color: var(--on-primary); padding: 3px 6px; border-radius: 2px; }
+.navi .app-dot { width: 18px; height: 18px; border-radius: 2px; background: var(--primary); color: var(--on-primary); display: grid; place-items: center; font: 700 10px/1 Archivo, sans-serif; flex: none; }
+.navi.ghost { color: var(--bark); border: 1px dashed var(--rule-strong); }
+.profile { margin-top: auto; display: grid; gap: 6px; }
+.profile .who { border: 1px solid var(--rule); background: var(--paper); border-radius: 2px; padding: 9px 10px; font-size: 13px; margin: 0; }
+.profile details summary { list-style: none; cursor: pointer; }
+.profile details summary::-webkit-details-marker { display: none; }
+.profile .more { display: grid; gap: 2px; padding: 4px; background: var(--paper); border: 1px solid var(--rule); border-radius: 2px; margin-bottom: 6px; }
+.frame { background: var(--paper); border: 1px solid var(--rule); border-radius: 2px; min-width: 0; display: flex; flex-direction: column; }
+.topbar { display: flex; align-items: center; gap: 10px; padding: 10px 18px; border-bottom: 1px solid var(--rule); position: sticky; top: 0; background: var(--paper); z-index: 2; }
+.topbar h1 { flex: 1; font-size: 17px; }
+.chip-now { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border: 1px solid var(--rule); border-radius: 999px; background: var(--sand); font: 500 12px "JetBrains Mono", monospace; white-space: nowrap; }
+.chip-now::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--success); }
+.page { max-width: none; padding: 20px 24px 40px; }
+.board { display: grid; grid-template-columns: minmax(280px, 340px) 1fr; gap: 16px; align-items: start; }
+.pane { background: var(--sand); border: 1px solid var(--rule); border-radius: 2px; min-width: 0; }
+.pane > .ph { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 9px 12px; font: 500 11px/1.4 "JetBrains Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--bark); }
+.pane > .pb { background: var(--paper); border-top: 1px solid var(--rule); padding: 6px; }
+.pane > .pb.pad { padding: 14px 16px; }
+.gt { padding: 12px 8px 6px; font: 500 10.5px/1.4 "JetBrains Mono", monospace; letter-spacing: .06em; text-transform: uppercase; color: var(--bark); }
+.row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 8px; border: 1px solid transparent; border-radius: 2px; background: none; color: var(--ink); cursor: pointer; font: inherit; }
+.row:hover { background: var(--sand); }
+.row.on { border-color: var(--ink); box-shadow: 0 1px 2px rgba(42, 22, 16, .08); }
+.row .t { font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .s { color: var(--bark); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row > span { min-width: 0; }
+.tag { display: inline-flex; align-items: center; gap: 6px; padding: 2px 7px; border-radius: 2px; font: 500 11.5px/1.4 "JetBrains Mono", monospace; white-space: nowrap; background: var(--clay); color: var(--bark); }
+.tag.fix { background: var(--error-surface); color: var(--error); }
+.tag.late { background: var(--verify-surface); color: var(--verify); }
+.tag.proposed { background: var(--info-surface); color: var(--info); }
+.detail { display: grid; gap: 16px; min-width: 0; }
+.subject h2 { font-size: 19px; margin: 2px 0 4px; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { display: inline-flex; gap: 6px; align-items: center; padding: 3px 8px; border: 1px solid var(--rule); border-radius: 2px; font-size: 12.5px; text-decoration: none; color: var(--ink); background: var(--paper); }
+.chip small { color: var(--bark); font: 500 11px "JetBrains Mono", monospace; }
+.dayband { position: relative; height: 70px; margin: 6px 4px 4px; }
+.dayband .hrs { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(17, 1fr); }
+.dayband .hrs span { border-left: 1px dotted var(--rule); font: 500 10px "JetBrains Mono", monospace; color: var(--bark); padding-left: 3px; }
+.dayband .blk { position: absolute; top: 18px; height: 44px; border-radius: 2px; padding: 4px 6px; overflow: hidden; font-size: 11.5px; line-height: 1.2; border: 1px solid var(--rule-strong); background: var(--sand); color: var(--ink); text-decoration: none; }
+.dayband .blk.ev { background: var(--paper); border-color: var(--ink); }
+.dayband .blk.proposed { background: var(--info-surface); border: 1px dashed var(--info); color: var(--info); }
+.dayband .blk.focus { box-shadow: 0 0 0 2px var(--primary); }
+.dayband .nowl { position: absolute; top: 10px; bottom: 0; width: 2px; background: var(--primary); }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.choice { border: 1px solid var(--rule); border-radius: 2px; padding: 12px 14px; display: grid; gap: 8px; background: var(--paper); align-content: start; }
+.choice.main { border: 1.5px solid var(--ink); }
+.choice p { margin: 0; color: var(--bark); font-size: 13px; }
+.drawer { position: fixed; top: 12px; right: 12px; bottom: 12px; width: min(440px, calc(100vw - 24px)); background: var(--paper); border: 1px solid var(--rule); border-radius: 2px; z-index: 20; transform: translateX(calc(100% + 24px)); transition: transform .2s; display: flex; flex-direction: column; box-shadow: 0 4px 24px rgba(0, 0, 0, .15); }
+.drawer.open { transform: none; }
+.drawer .dh { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--rule); }
+.drawer .db { padding: 16px; overflow-y: auto; display: grid; gap: 12px; align-content: start; flex: 1; }
+.drawer .df { padding: 12px 16px; border-top: 1px solid var(--rule); display: flex; gap: 8px; }
+.drawer img, .drawer iframe { width: 100%; border: 1px solid var(--rule); border-radius: 2px; background: var(--sand); }
+.drawer iframe { height: 60vh; }
+.drawer pre { background: var(--sand); border: 1px solid var(--rule); padding: 10px; max-height: 50vh; overflow: auto; font-size: 12px; }
+.form-field { display: grid; gap: 4px; }
+.form-field label { font: 500 11px "JetBrains Mono", monospace; letter-spacing: .05em; text-transform: uppercase; color: var(--bark); }
+.form-field input, .form-field select { font: 14px "Instrument Sans", sans-serif; padding: 8px 10px; border: 1px solid var(--rule-strong); border-radius: 2px; background: var(--paper); color: var(--ink); }
+.toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 120px); opacity: 0; transition: .2s; background: var(--ink); color: var(--paper); padding: 10px 14px; border-radius: 2px; display: flex; gap: 14px; align-items: center; z-index: 30; font-size: 13px; max-width: calc(100vw - 32px); }
+.toast.show { transform: translate(-50%, 0); opacity: 1; }
+.toast button { background: none; border: 0; color: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; padding: 0; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--rule); overflow-x: auto; margin-bottom: 14px; }
+.tabs a { padding: 8px 12px; text-decoration: none; color: var(--bark); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; font-size: 13.5px; }
+.tabs a.on { color: var(--ink); border-color: var(--primary); font-weight: 600; }
+tr.group td { background: var(--sand); font: 500 11px "JetBrains Mono", monospace; text-transform: uppercase; color: var(--bark); }
+tr.total td { border-top: 1px solid var(--rule-strong); font-weight: 600; background: var(--sand); }
+.neg { color: var(--error); } .pos { color: var(--success); }
+.ficon { display: inline-grid; place-items: center; width: 34px; height: 40px; border: 1px solid var(--rule-strong); border-radius: 2px; font: 600 9px "JetBrains Mono", monospace; color: var(--bark); flex: none; }
+.fname { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.back { display: none; }
+@media (max-width: 980px) {
+  .board { grid-template-columns: 1fr; }
+  .board.reading > .pane { display: none; }
+  .board:not(.reading) > .detail { display: none; }
+  .back { display: inline-flex; }
+}
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; padding: 0; gap: 0; }
+  .frame { border: 0; border-radius: 0; }
+  .sidebar { position: fixed; inset: 0 auto 0 0; width: 270px; height: 100vh; z-index: 15; transform: translateX(-100%); transition: transform .2s; background: var(--clay); padding: 12px; top: 0; }
+  .shell.open .sidebar { transform: none; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, .35); }
+  .page { padding: 16px; }
+  .chip-now { display: none; }
+}
+`;
+
 const icon = (path: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 
 const ICONS = {
   home: icon('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'),
+  now: icon('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+  files: icon('<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/>'),
+  plus: icon('<path d="M12 5v14M5 12h14"/>'),
+  more: icon('<path d="M6 12h.01M12 12h.01M18 12h.01"/>'),
   agenda: icon(
     '<rect x="3" y="5" width="18" height="16" rx="1"/><path d="M3 10h18M8 3v4M16 3v4"/>',
   ),
@@ -154,9 +259,168 @@ function frame(src) {
   return '<iframe class="view" id="' + id + '" src="' + esc(src) + '"></iframe>';
 }
 
+
+// The drawer, the toast and an undo for what was just done (spec 013).
+const drawer = () => document.getElementById('drawer');
+function openDrawer(title, body, foot) {
+  drawer().innerHTML = '<div class="dh"><h2>' + esc(title) + '</h2><button class="quiet" data-close>✕</button></div><div class="db">' + body + '</div>' + (foot ? '<div class="df">' + foot + '</div>' : '');
+  drawer().classList.add('open');
+  drawer().querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', closeDrawer));
+}
+function closeDrawer() { drawer().classList.remove('open'); }
+let toastTimer; let lastDone = null;
+function toast(text, undoable) {
+  document.getElementById('toast-text').textContent = text;
+  document.getElementById('toast-undo').style.display = undoable ? '' : 'none';
+  lastDone = undoable || null;
+  const t = document.getElementById('toast'); t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 6000);
+}
+document.getElementById('toast-undo').addEventListener('click', async () => {
+  if (!lastDone) return;
+  const { id, spaceId } = lastDone; lastDone = null;
+  const hist = await api('/history?limit=1&target=' + encodeURIComponent(id) + '&space=' + encodeURIComponent(spaceId));
+  if (hist[0]) await api('/undo?space=' + encodeURIComponent(spaceId), { method: 'POST', body: { journalId: hist[0].id } });
+  toast(W.undoneToast, null); show();
+});
+// « 2026-10-29 » or « 2026-10-29T14:00 », a day later, as she wrote it.
+function dayLater(text) {
+  const d = String(text).slice(0, 10).split('-').map(Number);
+  const next = new Date(Date.UTC(d[0], d[1] - 1, d[2] + 1)).toISOString().slice(0, 10);
+  return next + String(text).slice(10);
+}
+const clock = () => { const el = document.getElementById('clock'); if (el) el.textContent = new Date().toLocaleString(locale, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase(); };
+setInterval(clock, 30000);
+let pick = null;
+let reading = false;
+async function drawApps() {
+  const kinds = await api(inSpace('/kinds'));
+  const apps = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app))];
+  document.getElementById('apps').innerHTML = '<div class="caps">' + esc(W.navApps) + '</div>' +
+    apps.map((a) => '<a class="navi" data-app="' + esc(encodeURIComponent(a)) + '" href="#/app/' + esc(encodeURIComponent(a)) + '"><span class="app-dot">' + esc(a.slice(0, 1).toUpperCase()) + '</span><span>' + esc(a) + '</span></a>').join('') +
+    '<a class="navi ghost" href="#/app">' + ICON_PLUS + '<span>' + esc(W.newApp) + '</span></a>';
+}
+
+// Her day in one band, 6:00 to 23:00: the template, the events, the proposals; now marked.
+function dayBand(occ, focus) {
+  const from = 6, to = 23;
+  const at = (iso) => { const d = new Date(iso); return d.getHours() + d.getMinutes() / 60; };
+  const pct = (h) => Math.max(0, Math.min(100, (h - from) / (to - from) * 100));
+  const blocks = occ.filter((o) => !o.allDay).map((o) => {
+    const a = at(o.start); const b = o.end ? at(o.end) || 24 : a + 0.5;
+    return '<a class="blk' + (o.proposed ? ' proposed' : o.repeated ? '' : ' ev') + (o.id === focus ? ' focus' : '') + '" href="#/entree/' + esc(o.id) + '" title="' + esc(o.title) + '" style="left:' + pct(a) + '%;width:calc(' + (pct(b) - pct(a)) + '% - 2px)">' + esc(o.title) + '</a>';
+  }).join('');
+  const n = at(new Date().toISOString());
+  return '<section class="pane"><div class="ph"><span>' + esc(W.yourDay) + '</span><a class="link" href="#/agenda">' + esc(W.navAgenda) + ' →</a></div><div class="pb"><div class="dayband"><div class="hrs">' +
+    Array.from({ length: to - from }, (_, i) => '<span>' + (i % 2 ? '' : String(from + i).padStart(2, '0')) + '</span>').join('') + '</div>' + blocks +
+    (n >= from && n <= to ? '<div class="nowl" style="left:' + pct(n) + '%"></div>' : '') + '</div></div></section>';
+}
+
 // Pages, by the hash: #/vie?kind=…, #/entree/<id>, …
 const pages = {
+  // « Maintenant » (spec 013): what needs her, the chosen thing, her day, what she can do.
   async '' () {
+    const now = await api('/now');
+    const groups = ['fix', 'late', 'proposed', 'today', 'week'];
+    const items = now.items;
+    const sel = items.find((i) => i.id === pick) || items[0];
+    const when = (i) => i.when ? (i.allDay ? day(i.when) : time(i.when)) : '';
+    const list = items.length ? groups.map((g) => {
+      const rows = items.filter((i) => i.group === g);
+      return rows.length ? '<div class="gt">' + esc(W['g_' + g]) + ' · ' + rows.length + '</div>' + rows.map((i) =>
+        '<button class="row' + (sel && i.id === sel.id ? ' on' : '') + '" data-pick="' + esc(i.id) + '"><span><div class="t">' + esc(i.title) + '</div><div class="s">' + esc(i.kind + ' · ' + i.space + (i.when ? ' · ' + when(i) : '')) + '</div></span><span class="tag ' + esc(g) + '">' + esc(W['r_' + i.reason] || i.reason) + '</span></button>').join('') : '';
+    }).join('') : '<p class="empty">' + esc(W.allClear) + '</p>';
+    let detail = '<div class="pane"><div class="pb pad"><p class="empty">' + esc(W.allClear) + '</p></div></div>';
+    if (sel) {
+      const e = await api('/entries/' + encodeURIComponent(sel.id) + '?space=' + encodeURIComponent(sel.spaceId));
+      const fields = Object.keys(e.data).filter((f) => !['texte', 'source'].includes(f)).slice(0, 8);
+      const value = (v) => v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v);
+      const links = e.links.out.concat(e.links.in);
+      const acts = [];
+      if (sel.group === 'proposed') acts.push(['accept', W.a_accept, W.a_acceptWhy, true], ['refuse', W.a_refuse, W.a_refuseWhy]);
+      else if (sel.group === 'fix') acts.push(['retry', W.a_retry, W.a_retryWhy, true], ['done', W.a_done, W.a_doneWhy]);
+      else {
+        acts.push(['done', W.a_done, W.a_doneWhy, sel.group === 'late']);
+        if (e.data.quand || e.data.echeance || e.data.debut) acts.push(['later', W.a_later, W.a_laterWhy, sel.group !== 'late']);
+        acts.push(['cancel', W.a_cancel, W.a_cancelWhy]);
+      }
+      detail = '<button class="quiet back" data-back>← ' + esc(W.back) + '</button>' +
+        '<section class="pane"><div class="ph"><span>' + esc(sel.kind + ' · ' + W['g_' + sel.group]) + '</span><span class="tag ' + esc(sel.group) + '">' + esc(W['r_' + sel.reason] || sel.reason) + '</span></div><div class="pb pad subject">' +
+        '<div class="caps">' + esc(sel.space) + '</div><h2>' + esc(e.title) + '</h2>' + (sel.when ? '<p class="muted" style="margin:0 0 10px">' + esc(when(sel)) + '</p>' : '') +
+        (typeof e.data.texte === 'string' ? '<p style="margin:0 0 10px">' + esc(e.data.texte.slice(0, 400)) + (e.data.texte.length > 400 ? '…' : '') + '</p>' : '') +
+        fields.map((f) => '<div class="field-row"><span class="caps">' + esc(f) + '</span><span>' + esc(value(e.data[f])) + '</span>' + originBadge(e.origin[f] || 'said') + '</div>').join('') +
+        (links.length ? '<div class="chips" style="margin-top:12px">' + links.map((l) => '<a class="chip" href="#/entree/' + esc(l.entry.id) + '">' + esc(l.entry.title) + '<small>' + esc(l.role) + '</small></a>').join('') + '</div>' : '') +
+        '<div class="actions" style="margin-top:12px"><a class="link" href="#/entree/' + esc(e.id) + '">' + esc(W.fullEntry) + ' →</a></div></div></section>' +
+        dayBand(now.day, sel.id) +
+        '<div class="choices">' + acts.map((a) => '<div class="choice' + (a[3] ? ' main' : '') + '"><b>' + esc(a[1]) + '</b><p>' + esc(a[2]) + '</p><button class="' + (a[3] ? '' : 'quiet') + '" data-act="' + a[0] + '" data-id="' + esc(sel.id) + '" data-space="' + esc(sel.spaceId) + '">' + esc(a[1]) + '</button></div>').join('') + '</div>';
+    }
+    const counts = groups.map((g) => items.filter((i) => i.group === g).length);
+    return '<p class="lead">' + esc(say(W.nowLead, { fix: counts[0], late: counts[1], proposed: counts[2], today: counts[3] })) + '</p>' +
+      '<div class="board' + (reading ? ' reading' : '') + '"><section class="pane"><div class="ph"><span>' + esc(W.navNow) + '</span><span>' + items.length + '</span></div><div class="pb">' + list + '</div></section>' +
+      '<div class="detail">' + detail + '</div></div>';
+  },
+
+  // An app (spec 013): the kinds whose model names it, each a table with its columns and total.
+  async app (params, name) {
+    const kinds = await api(inSpace('/kinds'));
+    if (!name) {
+      const apps = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app))];
+      return '<p class="lead">' + esc(W.appsLead) + '</p>' + card(W.newApp, '<p class="muted">' + esc(W.newAppHow) + '</p>', true) +
+        (apps.length ? '<section class="grid">' + apps.map((a) => card(a, '<a class="link" href="#/app/' + esc(encodeURIComponent(a)) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>' : '');
+    }
+    const models = kinds.filter((k) => k.model && k.model.app === name);
+    if (!models.length) return empty(W.noApp);
+    const current = models.find((k) => k.kind === params.get('kind')) || models[0];
+    const model = current.model;
+    const champs = model.champs.filter((c) => c.nature !== 'lien');
+    const cols = (model.colonnes && model.colonnes.length ? model.colonnes : champs.slice(0, 5).map((c) => c.nom)).filter((c) => c !== 'titre');
+    const natureOf = (n) => (model.champs.find((c) => c.nom === n) || {}).nature;
+    const list = await api(inSpace('/entries?limit=200&kind=' + encodeURIComponent(current.kind)));
+    const fmt = (n, v) => {
+      if (v === undefined || v === null) return '<span class="muted">—</span>';
+      if (natureOf(n) === 'montant' || natureOf(n) === 'nombre') return '<span class="num ' + (natureOf(n) === 'montant' && v < 0 ? 'neg' : '') + '">' + esc(num(v)) + '</span>';
+      if (natureOf(n) === 'oui-non') return v ? '✓' : '—';
+      return esc(typeof v === 'object' ? JSON.stringify(v) : v);
+    };
+    const groupOf = (e) => {
+      if (!model.regroupement) return '';
+      const v = e.data[model.regroupement];
+      if (typeof v === 'string' && v.length >= 7 && v.charAt(4) === '-') return v.slice(0, 7);
+      return v === undefined ? '—' : String(v);
+    };
+    const groups = [...new Set(list.map(groupOf))].sort().reverse();
+    const sum = (rows) => rows.reduce((t, e) => t + (typeof e.data[model.total] === 'number' ? e.data[model.total] : 0), 0);
+    const totalRow = (rows, label) => model.total ? '<tr class="total"><td>' + esc(label) + '</td>' + cols.map((c) => '<td class="' + (c === model.total ? 'n num' : '') + '">' + (c === model.total ? esc(num(sum(rows))) : '') + '</td>').join('') + '</tr>' : '';
+    const body = groups.map((g) => {
+      const rows = list.filter((e) => groupOf(e) === g);
+      return (g ? '<tr class="group"><td colspan="' + (cols.length + 1) + '">' + esc(g) + '</td></tr>' : '') +
+        rows.map((e) => '<tr data-go="#/entree/' + esc(e.id) + '"><td>' + esc(e.title) + '</td>' + cols.map((c) => '<td class="' + (['montant', 'nombre'].includes(natureOf(c)) ? 'n' : '') + '">' + fmt(c, e.data[c]) + '</td>').join('') + '</tr>').join('') +
+        (g && model.total ? totalRow(rows, say(W.subtotal, { group: g })) : '');
+    }).join('') + totalRow(list, W.total);
+    const tabs = '<nav class="tabs">' + models.map((k) => '<a class="' + (k.kind === current.kind ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '">' + esc(k.kind) + ' <span class="muted num">' + k.count + '</span></a>').join('') + '</nav>';
+    return '<div class="head"><div><p class="lead" style="margin:0">' + esc(say(W.appLead, { n: models.length })) + '</p></div><div class="actions"><button class="quiet" data-model="' + esc(current.kind) + '">' + esc(W.seeModel) + '</button><button data-add="' + esc(current.kind) + '">' + esc(say(W.addOne, { kind: current.kind })) + '</button></div></div>' + tabs +
+      card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th>' + cols.map((c) => '<th class="' + (['montant', 'nombre'].includes(natureOf(c)) ? 'n' : '') + '">' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>' : empty(), true);
+  },
+
+  // Her files (spec 013): what each is, what Jarvis read of it, what it is linked to.
+  async fichiers (params) {
+    const files = await api(inSpace('/files'));
+    const typeOf = (f) => f.mediaType.startsWith('image/') ? 'img' : f.mediaType === 'application/pdf' ? 'pdf' : f.mediaType.startsWith('text/') || f.mediaType.includes('json') || f.mediaType.includes('csv') ? 'text' : 'other';
+    const t = params.get('t') || '';
+    const shown = files.filter((f) => !t || typeOf(f) === t);
+    const size = (n) => n > 1048576 ? (n / 1048576).toFixed(1) + ' Mo' : Math.max(1, Math.round(n / 1024)) + ' Ko';
+    const filters = ['', 'pdf', 'img', 'text', 'other'].map((k) => '<a class="badge' + (k === t ? ' primary' : '') + '" href="#/fichiers' + (k ? '?t=' + k : '') + '">' + esc(W['ft_' + (k || 'all')]) + ' ' + files.filter((f) => !k || typeOf(f) === k).length + '</a>').join(' ');
+    return '<p class="lead">' + esc(say(W.filesLead, { n: files.length, size: size(files.reduce((a, f) => a + f.size, 0)) })) + '</p><div class="actions" style="margin-bottom:12px">' + filters + '</div>' +
+      card('', shown.length ? '<div class="scroll"><table><thead><tr><th>' + esc(W.fileName) + '</th><th>' + esc(W.links) + '</th><th>' + esc(W.added) + '</th><th class="n">' + esc(W.size) + '</th><th></th></tr></thead><tbody>' +
+        shown.map((f) => '<tr><td><div class="fname"><span class="ficon">' + esc(typeOf(f).toUpperCase()) + '</span><span style="min-width:0"><a class="link" href="#" data-file="' + esc(f.entryId) + '" style="overflow-wrap:anywhere">' + esc(f.name) + '</a><div class="muted" style="font-size:12px">' + esc(f.title !== f.name ? f.title : f.mediaType) + (f.read ? ' · ' + esc(W.fileRead) : '') + '</div></span></div></td>' +
+          '<td><div class="chips">' + f.links.map((l) => '<a class="chip" href="#/entree/' + esc(l.id) + '">' + esc(l.title) + '<small>' + esc(l.role) + '</small></a>').join('') + '</div></td><td class="muted">' + esc(day(f.createdAt)) + '</td><td class="n num">' + esc(size(f.size)) + '</td>' +
+          '<td style="text-align:right;white-space:nowrap"><button class="quiet" data-file="' + esc(f.entryId) + '">' + esc(W.preview) + '</button> <a class="badge primary" href="/api/files/' + esc(f.entryId) + '?download=1&space=' + esc(encodeURIComponent(space)) + '">' + esc(W.download) + '</a></td></tr>').join('') +
+        '</tbody></table></div>' : empty(W.noFiles), true);
+  },
+
+  async accueil () { return pages.__home(); },
+
+  async __home () {
     const o = await api('/overview');
     const here = o.spaces.find((s) => s.id === space) || o.spaces[0];
     const max = Math.max(1, ...o.changes.map((c) => c.n));
@@ -343,7 +607,7 @@ const pages = {
   },
 };
 
-const titles = { '': 'navHome', agenda: 'navAgenda', vie: 'navLife', entree: 'navLife', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
+const titles = { '': 'navNow', accueil: 'navHome', fichiers: 'navFiles', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
   rappels: 'navReminders', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
 
 let drawing = 0;
@@ -352,9 +616,10 @@ async function show() {
   const [name, id] = path.split('/');
   const params = new URLSearchParams(query || '');
   const key = pages[name] ? name : '';
-  document.getElementById('title').textContent = key === '' ? say(W.hello, { name: me.person.name }) : W[titles[key]];
-  document.querySelectorAll('.nav a[data-page]').forEach((a) => a.classList.toggle('on', a.dataset.page === (titles[key] || 'navHome')));
-  document.querySelector('.app').classList.remove('open');
+  document.getElementById('title').textContent = key === 'app' && id ? decodeURIComponent(id) : W[titles[key]];
+  document.querySelectorAll('a[data-page]').forEach((a) => a.classList.toggle('on', a.dataset.page === (titles[key] || 'navNow')));
+  document.querySelectorAll('a[data-app]').forEach((a) => a.classList.toggle('on', key === 'app' && a.dataset.app === id));
+  document.querySelector('.shell').classList.remove('open'); closeDrawer();
   page().innerHTML = '<p class="empty">' + esc(W.loading) + '</p>';
   // Only the latest navigation is drawn: a slower earlier one never overwrites it.
   const ticket = ++drawing;
@@ -436,6 +701,78 @@ function bind() {
       } catch (error) { report.innerHTML = '<p class="error-text">' + esc(say(W.failed, { reason: error.message })) + '</p>'; event.target.disabled = false; }
     });
   }
+  root.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => { pick = b.dataset.pick; reading = true; show(); }));
+  root.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { reading = false; show(); }));
+  root.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', async () => {
+    const id = b.dataset.id; const spaceId = b.dataset.space;
+    try {
+      const e = await api('/entries/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(spaceId));
+      const data = {};
+      const act = b.dataset.act;
+      if (act === 'done') data.statut = 'fait';
+      if (act === 'cancel' || act === 'refuse') data.statut = 'annulé';
+      if (act === 'accept' || act === 'retry') data.statut = 'à venir';
+      if (act === 'retry' && e.data.erreur !== undefined) data.erreur = null;
+      if (act === 'later') {
+        for (const f of ['quand', 'echeance', 'debut', 'fin']) if (typeof e.data[f] === 'string') data[f] = dayLater(e.data[f]);
+      }
+      await api('/save?space=' + encodeURIComponent(spaceId), { method: 'POST', body: { entries: [{ id, data }] } });
+      pick = null; reading = false;
+      toast(say(W.doneToast, { title: e.title, what: W['t_' + act] }), { id, spaceId });
+      show();
+    } catch (error) { alert(error.message); }
+  }));
+  root.querySelectorAll('[data-file]').forEach((b) => b.addEventListener('click', async (event) => {
+    event.preventDefault();
+    const id = b.dataset.file;
+    const files = await api(inSpace('/files'));
+    const f = files.find((one) => one.entryId === id); if (!f) return;
+    const src = '/api/files/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(space);
+    let view = '';
+    if (f.mediaType.startsWith('image/')) view = '<img alt="" src="' + esc(src) + '">';
+    else if (f.mediaType === 'application/pdf') view = '<iframe src="' + esc(src) + '"></iframe>';
+    else if (f.read) view = '<pre>' + esc((await (await fetch(src, { credentials: 'same-origin' })).text()).slice(0, 20000)) + '</pre>';
+    else view = '<p class="muted">' + esc(W.noPreview) + '</p>';
+    openDrawer(f.name, view + '<div class="field-row"><span class="caps">' + esc(W.added) + '</span><span>' + esc(time(f.createdAt)) + '</span><span></span></div>' +
+      '<div class="field-row"><span class="caps">' + esc(W.kind) + '</span><span>' + esc(f.mediaType) + '</span><span></span></div>' +
+      (f.links.length ? '<div class="chips">' + f.links.map((l) => '<a class="chip" href="#/entree/' + esc(l.id) + '">' + esc(l.title) + '<small>' + esc(l.role) + '</small></a>').join('') + '</div>' : ''),
+      '<a class="badge" href="#/entree/' + esc(id) + '">' + esc(W.fullEntry) + '</a><a class="badge primary" href="' + esc(src) + '&download=1">' + esc(W.download) + '</a>');
+  }));
+  root.querySelectorAll('[data-model]').forEach((b) => b.addEventListener('click', async () => {
+    const k = (await api(inSpace('/kinds'))).find((one) => one.kind === b.dataset.model);
+    if (!k || !k.model) return;
+    openDrawer(say(W.modelOf, { kind: k.kind }), '<p class="muted">' + esc(W.modelLead) + '</p>' + k.model.champs.map((c) =>
+      '<div class="field-row"><span class="caps">' + esc(c.nom) + '</span><span>' + esc(c.nature + (c.choix ? ' : ' + c.choix.join(', ') : '') + (c.vers ? ' → ' + c.vers : '') + (c.unite ? ' (' + c.unite + ')' : '')) + '</span><span class="badge">' + esc(c.obligatoire ? W.required : W.optional) + '</span></div>').join('') +
+      (k.model.rangement ? '<p><span class="caps">' + esc(W.rangement) + '</span><br><code class="url">' + esc(k.model.rangement) + '</code></p>' : ''),
+      '<a class="badge" href="#/entree/' + esc(k.model.id) + '">' + esc(W.fullEntry) + '</a>');
+  }));
+  root.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', async () => {
+    const k = (await api(inSpace('/kinds'))).find((one) => one.kind === b.dataset.add);
+    if (!k || !k.model) return;
+    const input = (c) => {
+      const id = 'f_' + c.nom;
+      if (c.nature === 'choix') return '<select id="' + id + '"><option value=""></option>' + c.choix.map((o) => '<option>' + esc(o) + '</option>').join('') + '</select>';
+      if (c.nature === 'oui-non') return '<select id="' + id + '"><option value=""></option><option value="true">✓</option><option value="false">—</option></select>';
+      const type = c.nature === 'date' ? 'date' : c.nature === 'moment' ? 'datetime-local' : ['nombre', 'montant'].includes(c.nature) ? 'number' : 'text';
+      return '<input id="' + id + '" type="' + type + '"' + (type === 'number' ? ' step="any"' : '') + '>';
+    };
+    const fields = k.model.champs.filter((c) => !['lien', 'liste'].includes(c.nature));
+    openDrawer(say(W.addOne, { kind: k.kind }), '<div class="form-field"><label>' + esc(W.title) + ' *</label><input id="f__title"></div>' +
+      fields.map((c) => '<div class="form-field"><label>' + esc(c.nom + (c.obligatoire ? ' *' : '') + (c.unite ? ' · ' + c.unite : '')) + '</label>' + input(c) + '</div>').join('') + '<p class="error-text" id="f__error"></p>',
+      '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button id="f__save">' + esc(W.save) + '</button>');
+    document.getElementById('f__save').addEventListener('click', async () => {
+      const data = {};
+      for (const c of fields) {
+        const v = document.getElementById('f_' + c.nom).value;
+        if (v === '') continue;
+        data[c.nom] = ['nombre', 'montant'].includes(c.nature) ? Number(v) : c.nature === 'oui-non' ? v === 'true' : v;
+      }
+      try {
+        await api(inSpace('/save'), { method: 'POST', body: { entries: [{ kind: k.kind, title: document.getElementById('f__title').value.trim(), data }] } });
+        closeDrawer(); toast(say(W.added1, { kind: k.kind }), null); show();
+      } catch (error) { document.getElementById('f__error').textContent = error.message; }
+    });
+  }));
   const sub = document.getElementById('subscribe');
   if (sub) sub.addEventListener('click', async () => {
     if (sub.dataset.done && !confirm(W.subscribeAsk)) return;
@@ -455,6 +792,7 @@ function bind() {
 
 function choose(id, again) {
   space = id; try { localStorage.setItem('jarvis.space', id); } catch {}
+  drawApps().catch(() => undefined);
   document.getElementById('space').value = id;
   if (again !== false) show();
 }
@@ -472,9 +810,9 @@ document.getElementById('space').addEventListener('change', (event) => choose(ev
 document.getElementById('search').addEventListener('keydown', (event) => {
   if (event.key === 'Enter') location.hash = '#/vie?q=' + encodeURIComponent(event.target.value.trim());
 });
-document.getElementById('menu').addEventListener('click', () => document.querySelector('.app').classList.toggle('open'));
+document.getElementById('menu').addEventListener('click', () => document.querySelector('.shell').classList.toggle('open'));
 window.addEventListener('hashchange', show);
-load().then(show).catch(fail);
+load().then(() => { clock(); return drawApps(); }).then(show).catch(fail);
 `;
 
 const escape = (text: string) => text.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
@@ -483,45 +821,57 @@ const escape = (text: string) => text.replace(/[&<>"']/g, (char) => `&#${char.ch
 export function appPage(lang: Lang): string {
   const words = appWords[lang];
   const link = (hash: string, key: keyof typeof words, icon: string) =>
-    `<a href="#/${hash}" data-page="${key}">${icon}<span>${escape(words[key])}</span></a>`;
+    `<a class="navi" href="#/${hash}" data-page="${key}">${icon}<span>${escape(words[key])}</span></a>`;
   return `<!doctype html>
 <html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(words.brand)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Instrument+Sans:wght@400;600&family=JetBrains+Mono:wght@600&display=swap">
-<style>${brandCss}${css}${css2}</style></head>
-<body><div class="app">
-<aside class="side">
-  <a class="logo" href="#/"><i>J</i>${escape(words.brand)}</a>
-  <label class="caps">${escape(words.space)}<select id="space"></select></label>
-  <nav class="nav">
-    ${link('', 'navHome', ICONS.home)}
+<style>${brandCss}${css}${css2}${css3}</style></head>
+<body><div class="shell">
+<aside class="sidebar">
+  <div class="brand"><i>J</i><select id="space" aria-label="${escape(words.space)}"></select></div>
+  <input class="search-box" id="search" type="search" placeholder="${escape(words.search)}">
+  <nav class="navg"><div class="caps">${escape(words.navDaily)}</div>
+    ${link('', 'navNow', ICONS.now)}
     ${link('agenda', 'navAgenda', ICONS.agenda)}
-    ${link('vie', 'navLife', ICONS.life)}
-    ${link('documents', 'navDocuments', ICONS.documents)}
-    ${link('tableaux', 'navDashboards', ICONS.dashboards)}
     ${link('rappels', 'navReminders', ICONS.reminders)}
-    ${link('journal', 'navJournal', ICONS.journal)}
-    <div class="caps">${escape(words.navSettings)}</div>
-    ${link('espaces', 'navSpaces', ICONS.spaces)}
-    ${link('connexions', 'navConnections', ICONS.connections)}
-    ${link('donnees', 'navData', ICONS.data)}
-    ${link('compte', 'navAccount', ICONS.account)}
   </nav>
-  <div class="who" id="who"></div>
+  <nav class="navg" id="apps"></nav>
+  <nav class="navg"><div class="caps">${escape(words.navLife)}</div>
+    ${link('vie', 'navEntries', ICONS.life)}
+    ${link('documents', 'navDocuments', ICONS.documents)}
+    ${link('fichiers', 'navFiles', ICONS.files)}
+    ${link('tableaux', 'navDashboards', ICONS.dashboards)}
+  </nav>
+  <div class="profile">
+    <details><summary class="navi">${ICONS.more}<span>${escape(words.navSettings)}</span></summary>
+      <div class="more">
+        ${link('journal', 'navJournal', ICONS.journal)}
+        ${link('espaces', 'navSpaces', ICONS.spaces)}
+        ${link('connexions', 'navConnections', ICONS.connections)}
+        ${link('donnees', 'navData', ICONS.data)}
+        ${link('compte', 'navAccount', ICONS.account)}
+      </div>
+    </details>
+    <div class="who" id="who"></div>
+  </div>
 </aside>
-<div class="main">
-  <header class="top">
+<div class="frame">
+  <header class="topbar">
     <button class="quiet" id="menu" aria-label="${escape(words.menu)}">☰</button>
     <h1 id="title"></h1>
-    <input id="search" type="search" placeholder="${escape(words.search)}">
+    <span class="chip-now" id="clock"></span>
   </header>
   <main class="page" id="page"><p class="empty">${escape(words.loading)}</p></main>
 </div>
 </div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true"></aside>
+<div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo">${escape(words.undo)}</button></div>
 <script>
 const LANG = ${JSON.stringify(lang)};
 const WORDS = ${JSON.stringify(words)};
+const ICON_PLUS = ${JSON.stringify(ICONS.plus)};
 ${script}
 </script></body></html>`;
 }

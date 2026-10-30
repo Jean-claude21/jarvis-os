@@ -11,7 +11,15 @@ export {
   type Saved,
 } from './entries';
 export { required } from './env';
-export { addFile, FILE_MAX_BYTES, fileOf, type Blobs, type StoredFile } from './files';
+export {
+  addFile,
+  FILE_MAX_BYTES,
+  fileOf,
+  filesOf,
+  type Blobs,
+  type FileRow,
+  type StoredFile,
+} from './files';
 export { history, undo, type Command, type JournalLine } from './journal';
 export {
   applyEdit,
@@ -97,3 +105,4 @@ export {
   type ModelData,
   type ModelField,
 } from './models';
+export { attention, type Attention, type AttentionGroup, type AttentionItem } from './attention';

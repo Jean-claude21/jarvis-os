@@ -39,5 +39,5 @@
 
 - [x] T018 Tests: core (formulas, models, pages, engine: rules, scripts, migrations, bundles), API
       (the Finances app installed, used, drawn, imported, migrated through MCP and REST)
-- [ ] T019 Checked in a browser: the app gallery, Finances installed, its page and a record page
+- [x] T019 Checked in a browser: the app gallery, Finances installed, its page and a record page
 - [ ] T020 The author's own Finances from his Life OS, installed and adjusted with Claude

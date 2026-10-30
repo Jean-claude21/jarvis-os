@@ -119,14 +119,14 @@ nothing else; it then reads and writes as a member, under row-level security.
 
 Time is a field any entry may carry; the calendar is computed from them, never stored.
 
-| Field                     | In the calendar                                                      |
-| ------------------------- | -------------------------------------------------------------------- |
-| `debut`, `fin` or `duree` | a span; a day alone is the whole day                                 |
-| `quand`                   | a moment                                                             |
-| `echeance`                | a deadline                                                           |
-| `date`                    | a day, from today on (a past one is her journal)                     |
-| `repete`, `duree`, `sauf` | again and again, minus the days off; `debut` and `jusqu` bound it    |
-| `statut`                  | « annulé » out; « proposé » marked; « fait » kept, out of what comes |
+| Field                          | In the calendar                                                    |
+| ------------------------------ | ------------------------------------------------------------------ |
+| `start`, `end` or `duration`   | a span; a day alone is the whole day                               |
+| `at`                           | a moment                                                           |
+| `due`                          | a deadline                                                         |
+| `date`                         | a day, from today on (a past one is her journal)                   |
+| `repeat`, `duration`, `except` | again and again, minus the days off; `start` and `until` bound it  |
+| `status`                       | `cancelled` out; `proposed` marked; `done` kept, out of what comes |
 
 | Function                            | What it does                                                   |
 | ----------------------------------- | -------------------------------------------------------------- |
@@ -138,26 +138,45 @@ Time is a field any entry may carry; the calendar is computed from them, never s
 
 ## What needs her (spec 013)
 
-| Function                     | What it does                                                                  |
-| ---------------------------- | ----------------------------------------------------------------------------- |
-| `attention(tx, spaces, now)` | to fix (`statut` « à corriger », « non envoyé »), late, proposed, today, week |
-| `filesOf(tx, space)`         | her files, latest first, with what each is linked to                          |
+| Function                     | What it does                                                      |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `attention(tx, spaces, now)` | to fix (`status` `to_fix`, `failed`), late, proposed, today, week |
+| `filesOf(tx, space)`         | her files, latest first, with what each is linked to              |
 
-## Type models (spec 012)
+## Type models (specs 012, 014)
 
-A kind's shape, said once: an entry of kind « Modèle » whose title is the kind and whose data is
-`{ champs: [{ nom, nature, obligatoire?, choix?, vers?, unite?, aide? }], rangement?, colonnes?,
-total?, regroupement?, app?, ouvert? }`. Natures: texte, nombre, montant, date, moment, duree,
-choix, oui-non, liste, lien (a link whose role is the field's name).
+A kind's shape, said once: an entry of kind « Model » whose title is the kind and whose data is
+`{ fields: [{ name, type, required?, options?, target?, cardinality?, inverse?, formula?, fields?,
+unit?, help? }], path?, columns?, total?, groupBy?, app?, open?, workflow? }`. Types: text,
+number, amount, date, datetime, duration, choice, boolean, list, link, formula, lines.
 
-| Function              | What it does                                                                |
-| --------------------- | --------------------------------------------------------------------------- |
-| `modelOf`, `modelsOf` | the model of a kind, every model of a space                                 |
-| `checkAgainst`        | what is wrong with a save: unknown field, wrong nature, required missing    |
-| `placeOf`             | where the export puts an entry: `{année}`, `{mois}`, `{jour}`, `{titre}`, … |
+| Function              | What it does                                                                     |
+| --------------------- | -------------------------------------------------------------------------------- |
+| `modelOf`, `modelsOf` | the model of a kind, every model of a space                                      |
+| `checkAgainst`        | what is wrong with a save: unknown field, wrong type, a formula written, lines   |
+| `placeOf`             | where the export puts an entry: `{year}`, `{month}`, `{day}`, `{title}`, a field |
 
-`save` follows the model of each entry's kind and refuses with a sentence that names the fields;
-time fields, `texte`, `source` and `statut` are allowed everywhere. `kinds` returns the models.
+`save` follows the model of each entry's kind: a `link` field given in `data` (an id or a ref)
+becomes a link of that role, checked against its `target`; a `workflow` allows only its
+transitions. Engine keywords are English (`keywords.ts`): old French ones are still accepted,
+stored in English and reported in `notes`; migration 0006 renamed what was stored.
+
+## The app engine (spec 014)
+
+| Function                                  | What it does                                                                     |
+| ----------------------------------------- | -------------------------------------------------------------------------------- |
+| `parse`, `evaluate`, `formulaValue`       | the formula language: no `eval`, sentences that say where it goes wrong          |
+| `readerOf`, `computedOf`, `withComputed`  | entries read through their models: relations both ways, lines, formulas computed |
+| `runRequest`                              | a declarative query: `kind`, `where`, `groupBy`, `aggregate`, `fields`, `sort`   |
+| `checkPage`, `renderPage`, `renderRecord` | a page's shape, its blocks computed for her filters, an entry's record page      |
+| `pagesOf`                                 | the pages of a space, of one app                                                 |
+| `checkRule`, `testRule`, `runDueRules`    | a rule's shape, tried on an entry, the scheduled ones (the watcher)              |
+| `useScriptRunner`, `runScript`            | the engine scripts run in (a port), a script run or tried                        |
+| `migrateKind`                             | rename, set, remove a field across a kind; one `migration.run`, undone at once   |
+| `exportApp`, `installApp`                 | an app as a bundle, installed elsewhere                                          |
+| `trial`                                   | work done in a savepoint, its journal read, rolled back                          |
+
+`jarvis_due_rules` (migration 0007) finds the rules that may be due, and nothing else.
 
 ## Database
 

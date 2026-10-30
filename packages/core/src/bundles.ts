@@ -11,7 +11,10 @@ import { trial, type Trial } from './trial';
 // Apps as bundles (spec 014): the models, pages, rules and scripts of one app, exported at once and
 // installed at once — Finances or Routines in one sentence, then adjusted in conversation.
 
-const piece = z.object({ title: z.string().trim().min(1).max(120), data: z.record(z.string(), z.unknown()) });
+const piece = z.object({
+  title: z.string().trim().min(1).max(120),
+  data: z.record(z.string(), z.unknown()),
+});
 
 export const bundleSchema = z.object({
   app: z.string().trim().min(1).max(60),
@@ -27,8 +30,14 @@ export type Bundle = z.input<typeof bundleSchema>;
 const fold = (one: string) => one.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
 /** Every piece of an app in a space: its models, and the pages, rules, scripts that name it. */
-export async function exportApp(tx: Tx, spaceId: string, app: string): Promise<z.infer<typeof bundleSchema>> {
-  const models = (await modelsOf(tx, spaceId)).filter((model) => model.app && fold(model.app) === fold(app));
+export async function exportApp(
+  tx: Tx,
+  spaceId: string,
+  app: string,
+): Promise<z.infer<typeof bundleSchema>> {
+  const models = (await modelsOf(tx, spaceId)).filter(
+    (model) => model.app && fold(model.app) === fold(app),
+  );
   const named = async (kind: string) => {
     const { rows } = await tx.query<{ title: string; data: Record<string, unknown> }>(
       `select title, data from entry
@@ -38,16 +47,23 @@ export async function exportApp(tx: Tx, spaceId: string, app: string): Promise<z
       [spaceId, kind, app],
     );
     // What Jarvis keeps for itself (a rule's next run, its last error) does not travel.
-    return rows.map((row) => {
-      const { next: _next, last_run: _last, error: _error, ...data } = row.data;
-      return { title: row.title, data };
-    });
+    const kept = (data: Record<string, unknown>) =>
+      Object.fromEntries(
+        Object.entries(data).filter(([key]) => !['next', 'last_run', 'error'].includes(key)),
+      );
+    return rows.map((row) => ({ title: row.title, data: kept(row.data) }));
   };
-  if (!models.length && !(await named(PAGE_KIND)).length) throw new Error(`No app « ${app} » in this space.`);
+  if (!models.length && !(await named(PAGE_KIND)).length)
+    throw new Error(`No app « ${app} » in this space.`);
   return {
     app,
     version: 1,
-    models: models.map(({ id: _id, kind, ...data }) => ({ title: kind, data })),
+    models: models.map((model) => ({
+      title: model.kind,
+      data: Object.fromEntries(
+        Object.entries(model).filter(([key]) => key !== 'id' && key !== 'kind'),
+      ),
+    })),
     pages: await named(PAGE_KIND),
     rules: await named(RULE_KIND),
     scripts: await named(SCRIPT_KIND),
@@ -74,11 +90,16 @@ export async function installApp(
   const groups: [string, { title: string; data: Record<string, unknown> }[]][] = [
     [MODEL_KIND, bundle.models.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } }))],
     [PAGE_KIND, bundle.pages.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } }))],
-    [SCRIPT_KIND, bundle.scripts.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } }))],
+    [
+      SCRIPT_KIND,
+      bundle.scripts.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } })),
+    ],
     [RULE_KIND, bundle.rules.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } }))],
   ];
   return trial(tx, dryRun, async () => {
-    const { rows: before } = await tx.query<{ id: string | null }>('select max(id)::text as id from journal');
+    const { rows: before } = await tx.query<{ id: string | null }>(
+      'select max(id)::text as id from journal',
+    );
     for (const [kind, pieces] of groups) {
       for (const one of pieces) {
         const { rows } = await tx.query(
@@ -90,7 +111,9 @@ export async function installApp(
           report.kept.push(`${kind} « ${one.title} »`);
           continue;
         }
-        await save(tx, actor, spaceId, { entries: [{ kind, title: one.title, data: one.data, origin: 'inferred' }] });
+        await save(tx, actor, spaceId, {
+          entries: [{ kind, title: one.title, data: one.data, origin: 'inferred' }],
+        });
         report.created.push(`${kind} « ${one.title} »`);
       }
     }
@@ -99,7 +122,13 @@ export async function installApp(
       [before[0]?.id ?? '0', spaceId],
     );
     if (lines.length) {
-      await record(tx, actor, { spaceId, command: 'app.install', target: bundle.app, before: null, after: { lines: lines.map((line) => Number(line.id)) } });
+      await record(tx, actor, {
+        spaceId,
+        command: 'app.install',
+        target: bundle.app,
+        before: null,
+        after: { lines: lines.map((line) => Number(line.id)) },
+      });
     }
     return report;
   });

@@ -26,7 +26,13 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     /must come after its start|covers at most|are ISO days|follows its model|^A « Model » is/.test(
       message,
     ) ||
-    /cannot go from|cannot go to|starts as|» links (a|one)|»: no entry|^Formula «|^A « (Page|Rule|Script) » is|is not a filter of this page|^No page/.test(message)
+    /cannot go from|cannot go to|starts as|» links (a|one)|»: no entry|^Formula «|^A « (Page|Rule|Script) » is|is not a filter of this page|^No page/.test(
+      message,
+    ) ||
+    // Rules, scripts, apps (spec 014).
+    /^The script|^Script «|^Scripts cannot run|^Rule «|may not (write|change)|^No (rule|script|app) «|ships with Jarvis|needs an entry|^Give /.test(
+      message,
+    )
   ) {
     return { status: 400, message };
   }

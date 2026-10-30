@@ -17,15 +17,48 @@ const kind = z.string().trim().min(1).max(80);
 
 export const blockSchema = z.discriminatedUnion('block', [
   /** One figure: a query's first row, `value` its column (the first one by default). */
-  z.object({ block: z.literal('stat'), title, query: requestSchema, value: z.string().optional(), unit: z.string().max(20).optional() }),
+  z.object({
+    block: z.literal('stat'),
+    title,
+    query: requestSchema,
+    value: z.string().optional(),
+    unit: z.string().max(20).optional(),
+  }),
   /** One figure and how it moved since the previous month (the query uses `{month}`). */
-  z.object({ block: z.literal('stat_delta'), title, query: requestSchema, value: z.string().optional(), unit: z.string().max(20).optional() }),
+  z.object({
+    block: z.literal('stat_delta'),
+    title,
+    query: requestSchema,
+    value: z.string().optional(),
+    unit: z.string().max(20).optional(),
+  }),
   /** One gauge per entry: `value` against `max`, each a formula of the entry. */
-  z.object({ block: z.literal('gauge'), title, kind, where: formula.optional(), value: formula, max: formula, label: formula.optional() }),
+  z.object({
+    block: z.literal('gauge'),
+    title,
+    kind,
+    where: formula.optional(),
+    value: formula,
+    max: formula,
+    label: formula.optional(),
+  }),
   /** Bars, a line over time, or the share of each: a grouped query. */
-  z.object({ block: z.enum(['bar', 'line', 'breakdown']), title, query: requestSchema, label: z.string().optional(), value: z.string().optional() }),
+  z.object({
+    block: z.enum(['bar', 'line', 'breakdown']),
+    title,
+    query: requestSchema,
+    label: z.string().optional(),
+    value: z.string().optional(),
+  }),
   /** The days something was done, the last `days` days. */
-  z.object({ block: z.literal('heatmap'), title, kind, where: formula.optional(), date: formula.default('date'), days: z.number().int().min(7).max(366).default(35) }),
+  z.object({
+    block: z.literal('heatmap'),
+    title,
+    kind,
+    where: formula.optional(),
+    date: formula.default('date'),
+    days: z.number().int().min(7).max(366).default(35),
+  }),
   /** Entries in a table; `total` a column to add up. */
   z.object({
     block: z.literal('table'),
@@ -40,16 +73,34 @@ export const blockSchema = z.discriminatedUnion('block', [
     kind,
     where: formula.optional(),
     detail: formula.optional(),
-    action: z.object({ label: z.string().trim().min(1).max(40), set: z.record(z.string(), z.unknown()) }),
+    action: z.object({
+      label: z.string().trim().min(1).max(40),
+      set: z.record(z.string(), z.unknown()),
+    }),
   }),
   /** Entries in columns by a choice field. */
-  z.object({ block: z.literal('kanban'), title, kind, by: z.string().trim().min(1).max(60), where: formula.optional() }),
+  z.object({
+    block: z.literal('kanban'),
+    title,
+    kind,
+    by: z.string().trim().min(1).max(60),
+    where: formula.optional(),
+  }),
   /** The days ahead of her calendar. */
-  z.object({ block: z.literal('calendar'), title, days: z.number().int().min(1).max(31).default(7) }),
+  z.object({
+    block: z.literal('calendar'),
+    title,
+    days: z.number().int().min(1).max(31).default(7),
+  }),
   /** A form to add an entry of a kind, from its model. */
   z.object({ block: z.literal('form'), title, kind }),
   /** One entry with its fields, formulas and relations (a record page: `{record}` is its id). */
-  z.object({ block: z.literal('record'), title, kind, relations: z.array(z.string().min(1).max(60)).max(10).optional() }),
+  z.object({
+    block: z.literal('record'),
+    title,
+    kind,
+    relations: z.array(z.string().min(1).max(60)).max(10).optional(),
+  }),
 ]);
 export type Block = z.infer<typeof blockSchema>;
 
@@ -78,7 +129,9 @@ export type PageData = z.infer<typeof pageDataSchema>;
 export function checkPage(data: unknown): PageData {
   const parsed = pageDataSchema.safeParse(data);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((issue) => `${issue.path.join('.') || 'page'}: ${issue.message}`).join('; ');
+    const issues = parsed.error.issues
+      .map((issue) => `${issue.path.join('.') || 'page'}: ${issue.message}`)
+      .join('; ');
     throw new Error(
       `A « ${PAGE_KIND} » is { app?, filters?: [{ name, type: month|choice|text|record, options?, default? }], blocks: [{ block: stat|stat_delta|gauge|bar|line|breakdown|heatmap|table|task_list|kanban|calendar|form|record, … }] } — ${issues}.`,
     );
@@ -104,7 +157,11 @@ const previousMonth = (month: string) => {
 };
 
 /** A block, computed: what the renderer draws. */
-export type DrawnBlock = Record<string, unknown> & { block: string; title: string | null; error?: string };
+export type DrawnBlock = Record<string, unknown> & {
+  block: string;
+  title: string | null;
+  error?: string;
+};
 
 export interface DrawnPage {
   id: string;
@@ -123,7 +180,12 @@ const plain = (value: unknown): unknown => {
   return value ?? null;
 };
 
-async function drawBlock(reader: Reader, tx: Tx, block: Block, params: Record<string, string>): Promise<DrawnBlock> {
+async function drawBlock(
+  reader: Reader,
+  tx: Tx,
+  block: Block,
+  params: Record<string, string>,
+): Promise<DrawnBlock> {
   const base = { block: block.block, title: block.title ?? null };
   const filtered = async (kindName: string, where?: string) => {
     const tree = where ? parse(withParams(where, params)) : null;
@@ -139,13 +201,17 @@ async function drawBlock(reader: Reader, tx: Tx, block: Block, params: Record<st
   switch (block.block) {
     case 'stat': {
       const result = await runRequest(reader, block.query, params);
-      const column = block.value ?? result.columns.find((one) => one !== 'group') ?? result.columns[0]!;
+      const column =
+        block.value ?? result.columns.find((one) => one !== 'group') ?? result.columns[0]!;
       return { ...base, value: result.rows[0]?.[column] ?? null, unit: block.unit ?? null };
     }
     case 'stat_delta': {
       const month = params.month ?? monthOf(todayOf(reader.clock));
       const now = await runRequest(reader, block.query, { ...params, month });
-      const before = await runRequest(reader, block.query, { ...params, month: previousMonth(month) });
+      const before = await runRequest(reader, block.query, {
+        ...params,
+        month: previousMonth(month),
+      });
       const column = block.value ?? now.columns.find((one) => one !== 'group') ?? now.columns[0]!;
       const value = now.rows[0]?.[column] ?? null;
       const previous = before.rows[0]?.[column] ?? null;
@@ -179,7 +245,10 @@ async function drawBlock(reader: Reader, tx: Tx, block: Block, params: Record<st
       const value = block.value ?? result.columns.find((one) => one !== label) ?? label;
       return {
         ...base,
-        points: result.rows.map((row) => ({ label: row[label] ?? '—', value: typeof row[value] === 'number' ? row[value] : Number(row[value]) || 0 })),
+        points: result.rows.map((row) => ({
+          label: row[label] ?? '—',
+          value: typeof row[value] === 'number' ? row[value] : Number(row[value]) || 0,
+        })),
       };
     }
     case 'heatmap': {
@@ -193,7 +262,9 @@ async function drawBlock(reader: Reader, tx: Tx, block: Block, params: Record<st
       const today = todayOf(reader.clock);
       const end = Date.UTC(+today.slice(0, 4), +today.slice(5, 7) - 1, +today.slice(8, 10));
       const cells = Array.from({ length: block.days }, (_, index) => {
-        const day = new Date(end - (block.days - 1 - index) * 86_400_000).toISOString().slice(0, 10);
+        const day = new Date(end - (block.days - 1 - index) * 86_400_000)
+          .toISOString()
+          .slice(0, 10);
         return { day, done: days.has(day) };
       });
       return { ...base, cells, done: cells.filter((cell) => cell.done).length };
@@ -202,16 +273,31 @@ async function drawBlock(reader: Reader, tx: Tx, block: Block, params: Record<st
       const result = await runRequest(reader, block.query, params);
       const total =
         block.total && result.columns.includes(block.total)
-          ? result.rows.reduce((sum, row) => sum + (typeof row[block.total!] === 'number' ? (row[block.total!] as number) : 0), 0)
+          ? result.rows.reduce(
+              (sum, row) =>
+                sum + (typeof row[block.total!] === 'number' ? (row[block.total!] as number) : 0),
+              0,
+            )
           : null;
-      return { ...base, columns: result.columns, rows: result.rows, truncated: result.truncated, total: block.total ?? null, totalValue: total };
+      return {
+        ...base,
+        columns: result.columns,
+        rows: result.rows,
+        truncated: result.truncated,
+        total: block.total ?? null,
+        totalValue: total,
+      };
     }
     case 'task_list': {
       const views = await filtered(block.kind, block.where);
       const detail = block.detail ? parse(block.detail) : null;
       const items = [];
       for (const view of views.slice(0, 50)) {
-        items.push({ id: view.row.id, title: view.row.title, detail: detail ? plain(await evaluate(detail, view, reader.clock)) : null });
+        items.push({
+          id: view.row.id,
+          title: view.row.title,
+          detail: detail ? plain(await evaluate(detail, view, reader.clock)) : null,
+        });
       }
       return { ...base, items, action: block.action };
     }
@@ -224,7 +310,11 @@ async function drawBlock(reader: Reader, tx: Tx, block: Block, params: Record<st
         const value = String((await view.get(block.by)) ?? '—');
         (columns[value] ??= []).push({ id: view.row.id, title: view.row.title });
       }
-      return { ...base, by: block.by, columns: Object.entries(columns).map(([name, items]) => ({ name, items })) };
+      return {
+        ...base,
+        by: block.by,
+        columns: Object.entries(columns).map(([name, items]) => ({ name, items })),
+      };
     }
     case 'calendar': {
       const from = new Date(reader.clock.now.getTime());
@@ -235,7 +325,12 @@ async function drawBlock(reader: Reader, tx: Tx, block: Block, params: Record<st
     }
     case 'form': {
       const model = reader.model(block.kind);
-      return { ...base, kind: block.kind, fields: model?.fields.filter((one) => !['formula', 'lines', 'list'].includes(one.type)) ?? [] };
+      return {
+        ...base,
+        kind: block.kind,
+        fields:
+          model?.fields.filter((one) => !['formula', 'lines', 'list'].includes(one.type)) ?? [],
+      };
     }
     case 'record': {
       const id = params.record;
@@ -248,14 +343,24 @@ async function drawBlock(reader: Reader, tx: Tx, block: Block, params: Record<st
       const fields: { name: string; value: unknown; computed: boolean }[] = [];
       for (const field of model?.fields ?? []) {
         if (['lines'].includes(field.type)) continue;
-        fields.push({ name: field.name, value: plain(await view.get(field.name)), computed: field.type === 'formula' });
+        fields.push({
+          name: field.name,
+          value: plain(await view.get(field.name)),
+          computed: field.type === 'formula',
+        });
       }
       const relations = [];
       for (const name of block.relations ?? []) {
         const value = await view.get(name);
         const list = [value].flat().filter(isScope) as unknown as EntryView[];
         const relatedModel = list[0] ? reader.model(list[0].row.kind) : undefined;
-        const columns = relatedModel?.columns ?? relatedModel?.fields.filter((one) => !['link', 'lines', 'list'].includes(one.type)).slice(0, 4).map((one) => one.name) ?? [];
+        const columns =
+          relatedModel?.columns ??
+          relatedModel?.fields
+            .filter((one) => !['link', 'lines', 'list'].includes(one.type))
+            .slice(0, 4)
+            .map((one) => one.name) ??
+          [];
         const rows = [];
         for (const one of list.slice(0, 200)) {
           const line: Record<string, unknown> = { id: one.row.id, title: one.row.title };
@@ -264,7 +369,10 @@ async function drawBlock(reader: Reader, tx: Tx, block: Block, params: Record<st
         }
         relations.push({ name, columns: ['title', ...columns], rows });
       }
-      return { ...base, record: { id: row.id, kind: row.kind, title: row.title, fields, relations } };
+      return {
+        ...base,
+        record: { id: row.id, kind: row.kind, title: row.title, fields, relations },
+      };
     }
   }
 }
@@ -284,17 +392,30 @@ export async function renderPage(
     const value =
       given[filter.name] ??
       filter.default ??
-      (filter.type === 'month' ? monthOf(today) : filter.type === 'choice' ? (filter.options?.[0] ?? '') : '');
-    return { ...filter, value: filter.type === 'month' && value === 'current' ? monthOf(today) : value };
+      (filter.type === 'month'
+        ? monthOf(today)
+        : filter.type === 'choice'
+          ? (filter.options?.[0] ?? '')
+          : '');
+    return {
+      ...filter,
+      value: filter.type === 'month' && value === 'current' ? monthOf(today) : value,
+    };
   });
-  const params: Record<string, string> = Object.fromEntries(filters.map((filter) => [filter.name, filter.value]));
+  const params: Record<string, string> = Object.fromEntries(
+    filters.map((filter) => [filter.name, filter.value]),
+  );
   if (given.record) params.record = given.record;
   const blocks: DrawnBlock[] = [];
   for (const block of data.blocks) {
     try {
       blocks.push(await drawBlock(reader, tx, block, params));
     } catch (error) {
-      blocks.push({ block: block.block, title: block.title ?? null, error: (error as Error).message });
+      blocks.push({
+        block: block.block,
+        title: block.title ?? null,
+        error: (error as Error).message,
+      });
     }
   }
   return {
@@ -310,7 +431,11 @@ export async function renderPage(
 }
 
 /** The pages of a space (of one app if given), in their order. */
-export async function pagesOf(tx: Tx, spaceId: string, app?: string): Promise<{ id: string; title: string; app: string | null; order: number }[]> {
+export async function pagesOf(
+  tx: Tx,
+  spaceId: string,
+  app?: string,
+): Promise<{ id: string; title: string; app: string | null; order: number }[]> {
   const { rows } = await tx.query<{ id: string; title: string; data: Record<string, unknown> }>(
     `select id, title, data from entry
       where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
@@ -338,19 +463,36 @@ export async function renderRecord(
   const reader = await readerOf(tx, spaceId, clock);
   const [row] = await reader.rowsOf([id]);
   if (!row) return null;
-  const fold = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const fold = (text: string) =>
+    text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
   const relations = [
-    ...(reader.model(row.kind)?.fields.filter((field) => field.type === 'link').map((field) => field.name) ?? []),
+    ...(reader
+      .model(row.kind)
+      ?.fields.filter((field) => field.type === 'link')
+      .map((field) => field.name) ?? []),
     ...reader
       .allModels()
       .flatMap((model) => model.fields)
-      .filter((field) => field.type === 'link' && field.inverse && field.target && fold(field.target) === fold(row.kind))
+      .filter(
+        (field) =>
+          field.type === 'link' &&
+          field.inverse &&
+          field.target &&
+          fold(field.target) === fold(row.kind),
+      )
       .map((field) => field.inverse!),
   ].slice(0, 10);
   return renderPage(
     tx,
     spaceId,
-    { id: `record:${id}`, title: row.title, data: { blocks: [{ block: 'record', kind: row.kind, relations }] } },
+    {
+      id: `record:${id}`,
+      title: row.title,
+      data: { blocks: [{ block: 'record', kind: row.kind, relations }] },
+    },
     { record: id },
     clock,
   );

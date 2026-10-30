@@ -16,7 +16,11 @@ export const SCRIPT_KIND = 'Script';
 
 /** Runs a script's code: `run(input)` in an isolated engine, with a time and memory limit. */
 export interface ScriptRunner {
-  run(code: string, input: unknown, limits: { ms: number; memoryMb: number }): Promise<{ output: unknown; logs: string[] }>;
+  run(
+    code: string,
+    input: unknown,
+    limits: { ms: number; memoryMb: number },
+  ): Promise<{ output: unknown; logs: string[] }>;
 }
 
 let runner: ScriptRunner | null = null;
@@ -44,10 +48,31 @@ export type ScriptData = z.infer<typeof scriptDataSchema>;
 
 /** What a script may return: changes Jarvis will check and save. */
 const changeSchema = z.union([
-  z.object({ create: z.object({ ref: z.string().max(40).optional(), kind: z.string().min(1).max(80), title: z.string().min(1).max(300), data: z.record(z.string(), z.unknown()).optional() }) }),
-  z.object({ update: z.object({ id: z.string().min(1).max(64), title: z.string().min(1).max(300).optional(), data: z.record(z.string(), z.unknown()).optional() }) }),
-  z.object({ link: z.object({ from: z.string().min(1).max(64), to: z.string().min(1).max(64), role: z.string().min(1).max(80) }) }),
-  z.object({ remind: z.object({ text: z.string().min(1).max(500), at: z.string().max(40).optional() }) }),
+  z.object({
+    create: z.object({
+      ref: z.string().max(40).optional(),
+      kind: z.string().min(1).max(80),
+      title: z.string().min(1).max(300),
+      data: z.record(z.string(), z.unknown()).optional(),
+    }),
+  }),
+  z.object({
+    update: z.object({
+      id: z.string().min(1).max(64),
+      title: z.string().min(1).max(300).optional(),
+      data: z.record(z.string(), z.unknown()).optional(),
+    }),
+  }),
+  z.object({
+    link: z.object({
+      from: z.string().min(1).max(64),
+      to: z.string().min(1).max(64),
+      role: z.string().min(1).max(80),
+    }),
+  }),
+  z.object({
+    remind: z.object({ text: z.string().min(1).max(500), at: z.string().max(40).optional() }),
+  }),
 ]);
 export const scriptOutputSchema = z.array(changeSchema).max(500);
 
@@ -55,11 +80,17 @@ export const scriptOutputSchema = z.array(changeSchema).max(500);
 export function checkScript(data: unknown): ScriptData {
   const parsed = scriptDataSchema.safeParse(data);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((issue) => `${issue.path.join('.') || 'script'}: ${issue.message}`).join('; ');
-    throw new Error(`A « ${SCRIPT_KIND} » is { reads?: [kinds], writes: [kinds], code: "function run(input) { … return [changes] }", description? } — ${issues}.`);
+    const issues = parsed.error.issues
+      .map((issue) => `${issue.path.join('.') || 'script'}: ${issue.message}`)
+      .join('; ');
+    throw new Error(
+      `A « ${SCRIPT_KIND} » is { reads?: [kinds], writes: [kinds], code: "function run(input) { … return [changes] }", description? } — ${issues}.`,
+    );
   }
   if (!/function\s+run\s*\(|run\s*=\s*(\(|function|async)/.test(parsed.data.code)) {
-    throw new Error(`A « ${SCRIPT_KIND} »'s code defines \`function run(input)\` and returns its changes.`);
+    throw new Error(
+      `A « ${SCRIPT_KIND} »'s code defines \`function run(input)\` and returns its changes.`,
+    );
   }
   return parsed.data;
 }
@@ -81,7 +112,13 @@ export async function runScript(
   tx: Tx,
   actor: Actor,
   spaceId: string,
-  input: { script: string; params?: Record<string, string>; fileId?: string | undefined; entryId?: string | undefined; dryRun?: boolean },
+  input: {
+    script: string;
+    params?: Record<string, string>;
+    fileId?: string | undefined;
+    entryId?: string | undefined;
+    dryRun?: boolean;
+  },
 ): Promise<Trial<ScriptRun>> {
   if (!runner) throw new Error('Scripts cannot run here: no engine was given.');
   const { rows } = await tx.query<{ id: string; title: string; data: unknown }>(
@@ -97,24 +134,43 @@ export async function runScript(
 
   const entries: Record<string, unknown[]> = {};
   for (const kind of script.reads) {
-    const { rows: found } = await tx.query<{ id: string; kind: string; title: string; data: Record<string, unknown>; createdAt: string; updatedAt: string }>(
+    const { rows: found } = await tx.query<{
+      id: string;
+      kind: string;
+      title: string;
+      data: Record<string, unknown>;
+      createdAt: string;
+      updatedAt: string;
+    }>(
       `select id, kind, title, data, to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
               to_char(updated_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "updatedAt"
          from entry where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
         order by created_at limit 2000`,
       [spaceId, kind],
     );
-    entries[kind] = (await withComputed(tx, spaceId, found)).map((one) => ({ id: one.id, title: one.title, data: one.data, computed: one.computed ?? {}, created: one.createdAt }));
+    entries[kind] = (await withComputed(tx, spaceId, found)).map((one) => ({
+      id: one.id,
+      title: one.title,
+      data: one.data,
+      computed: one.computed ?? {},
+      created: one.createdAt,
+    }));
   }
   let file: { name: string; text: string | null } | null = null;
   if (input.fileId) {
-    const { rows: files } = await tx.query<{ name: string; text: string | null }>('select name, text from file where entry_id = $1 and space_id = $2', [input.fileId, spaceId]);
+    const { rows: files } = await tx.query<{ name: string; text: string | null }>(
+      'select name, text from file where entry_id = $1 and space_id = $2',
+      [input.fileId, spaceId],
+    );
     if (!files[0]) throw new Error(`No file ${input.fileId} in this space.`);
     file = files[0];
   }
   let entry: unknown = null;
   if (input.entryId) {
-    const { rows: one } = await tx.query('select id, kind, title, data from entry where id = $1 and space_id = $2', [input.entryId, spaceId]);
+    const { rows: one } = await tx.query(
+      'select id, kind, title, data from entry where id = $1 and space_id = $2',
+      [input.entryId, spaceId],
+    );
     entry = one[0] ?? null;
   }
 
@@ -125,29 +181,65 @@ export async function runScript(
   );
   const parsed = scriptOutputSchema.safeParse(output);
   if (!parsed.success) {
-    throw new Error(`Script « ${row.title} » must return a list of { create } | { update } | { link } | { remind }: ${parsed.error.issues[0]?.message ?? ''}`);
+    throw new Error(
+      `Script « ${row.title} » must return a list of { create } | { update } | { link } | { remind }: ${parsed.error.issues[0]?.message ?? ''}`,
+    );
   }
   const allowed = new Set(script.writes.map(fold));
   const toSave: EntryInput[] = [];
   const links: LinkInput[] = [];
   for (const [index, change] of parsed.data.entries()) {
     if ('create' in change) {
-      if (!allowed.has(fold(change.create.kind))) throw new Error(`Script « ${row.title} » may not write a « ${change.create.kind} » (it writes ${script.writes.join(', ')}).`);
-      toSave.push({ ref: change.create.ref ?? `c${index}`, kind: change.create.kind, title: change.create.title, data: change.create.data ?? {}, origin: 'inferred' });
+      if (!allowed.has(fold(change.create.kind)))
+        throw new Error(
+          `Script « ${row.title} » may not write a « ${change.create.kind} » (it writes ${script.writes.join(', ')}).`,
+        );
+      toSave.push({
+        ref: change.create.ref ?? `c${index}`,
+        kind: change.create.kind,
+        title: change.create.title,
+        data: change.create.data ?? {},
+        origin: 'inferred',
+      });
     } else if ('update' in change) {
-      const { rows: kindRows } = await tx.query<{ kind: string }>('select kind from entry where id = $1 and space_id = $2', [change.update.id, spaceId]);
+      const { rows: kindRows } = await tx.query<{ kind: string }>(
+        'select kind from entry where id = $1 and space_id = $2',
+        [change.update.id, spaceId],
+      );
       const kind = kindRows[0]?.kind;
-      if (!kind) throw new Error(`Script « ${row.title} »: no entry ${change.update.id} in this space.`);
-      if (!allowed.has(fold(kind))) throw new Error(`Script « ${row.title} » may not change a « ${kind} » (it writes ${script.writes.join(', ')}).`);
-      toSave.push({ id: change.update.id, ...(change.update.title ? { title: change.update.title } : {}), data: change.update.data ?? {}, origin: 'inferred' });
+      if (!kind)
+        throw new Error(`Script « ${row.title} »: no entry ${change.update.id} in this space.`);
+      if (!allowed.has(fold(kind)))
+        throw new Error(
+          `Script « ${row.title} » may not change a « ${kind} » (it writes ${script.writes.join(', ')}).`,
+        );
+      toSave.push({
+        id: change.update.id,
+        ...(change.update.title ? { title: change.update.title } : {}),
+        data: change.update.data ?? {},
+        origin: 'inferred',
+      });
     } else if ('link' in change) {
       links.push(change.link);
     } else {
-      if (!allowed.has('rappel')) throw new Error(`Script « ${row.title} » may not write a « Rappel » (it writes ${script.writes.join(', ')}).`);
-      toSave.push({ kind: 'Rappel', title: change.remind.text, data: { at: change.remind.at ?? new Date().toISOString(), status: 'planned' }, origin: 'inferred' });
+      if (!allowed.has('rappel'))
+        throw new Error(
+          `Script « ${row.title} » may not write a « Rappel » (it writes ${script.writes.join(', ')}).`,
+        );
+      toSave.push({
+        kind: 'Rappel',
+        title: change.remind.text,
+        data: { at: change.remind.at ?? new Date().toISOString(), status: 'planned' },
+        origin: 'inferred',
+      });
     }
   }
-  const by: Actor = { ...actor, door: 'script', client: `script:${row.title}`, depth: (actor.depth ?? 0) + 1 };
+  const by: Actor = {
+    ...actor,
+    door: 'script',
+    client: `script:${row.title}`,
+    depth: (actor.depth ?? 0) + 1,
+  };
   return trial(tx, input.dryRun ?? false, async () => {
     const saved = { created: 0, updated: 0, links: 0 };
     // In batches (a save holds 50 entries, 100 links); refs are kept across them.
@@ -160,9 +252,15 @@ export async function runScript(
         else saved.updated += 1;
       }
     }
-    const resolved = links.map((one) => ({ ...one, from: ids.get(one.from) ?? one.from, to: ids.get(one.to) ?? one.to }));
+    const resolved = links.map((one) => ({
+      ...one,
+      from: ids.get(one.from) ?? one.from,
+      to: ids.get(one.to) ?? one.to,
+    }));
     for (let i = 0; i < resolved.length; i += 100) {
-      saved.links += (await save(tx, by, spaceId, { links: resolved.slice(i, i + 100) })).links.length;
+      saved.links += (
+        await save(tx, by, spaceId, { links: resolved.slice(i, i + 100) })
+      ).links.length;
     }
     return { script: row.title, changes: parsed.data.length, logs, saved };
   });

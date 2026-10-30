@@ -96,7 +96,8 @@ const SYSTEM_CHECKS: Record<string, (data: Record<string, unknown>) => unknown> 
   rule: checkRule,
   script: checkScript,
 };
-const checkSystem = (kind: string, data: Record<string, unknown>) => SYSTEM_CHECKS[foldKind(kind)]?.(data);
+const checkSystem = (kind: string, data: Record<string, unknown>) =>
+  SYSTEM_CHECKS[foldKind(kind)]?.(data);
 
 /** A model's shape, checked; throws the sentence that says what to fix. */
 function checkModel(data: Record<string, unknown>): void {

@@ -17,6 +17,7 @@ import {
   spacesOf,
   renderPage,
   renderRecord,
+  useScriptRunner,
 } from '@jarvis-os/core';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { Hono } from 'hono';
@@ -28,6 +29,7 @@ import { fill, langOf, wordsOf } from './i18n';
 import { mcpServerFor } from './mcp';
 import { consentPage, invitationPage, messagePage, signInPage } from './pages';
 import { apiRoutes } from './routes';
+import { quickjsRunner } from './scripts';
 import type { Settings } from './settings';
 import { objectStorage } from './storage';
 import { appPage } from './platform/page';
@@ -49,6 +51,8 @@ import { readUploadToken, uploadView } from './views/upload';
  */
 export function makeApp(settings: Settings) {
   const db = pool(settings.appUrl);
+  // Her scripts (spec 014) run in QuickJS, whichever door starts them.
+  useScriptRunner(quickjsRunner);
   const blobs = objectStorage(settings.storage);
   const auth = makeAuth({ db, secret: settings.authSecret, publicUrl: settings.publicUrl });
   const resource = mcpResource(settings.publicUrl);
@@ -191,7 +195,8 @@ export function makeApp(settings: Settings) {
         );
       }
       if (c.req.param('view') === 'page') {
-        const { space: _space, ...params } = c.req.query();
+        const params = { ...c.req.query() };
+        delete params.space;
         const drawn = await asPerson(db, person, async (tx) => {
           const entry = await get(tx, space.id, id);
           return entry && entry.kind.toLowerCase() === 'page'

@@ -5,12 +5,15 @@ import {
   save,
   spacesOf,
   watchOnce,
+  runDueRules,
+  useScriptRunner,
   type Due,
   type PassReport,
 } from '@jarvis-os/core';
 import { parseArgs } from 'node:util';
 import type pg from 'pg';
 import { wordsOf } from './i18n';
+import { quickjsRunner } from './scripts';
 import { settingsFor, type Branch } from './settings';
 
 /** How often the watcher looks: once a minute, the precision of a reminder. */
@@ -66,12 +69,17 @@ export function watch(
   signal?: AbortSignal,
 ) {
   const tell = tellerFor(db, telegramToken);
+  useScriptRunner(quickjsRunner);
   let running = false;
   const pass = async () => {
     if (running || signal?.aborted) return;
     running = true;
     try {
-      onPass(await watchOnce(db, new Date(), tell));
+      const now = new Date();
+      onPass(await watchOnce(db, now, tell));
+      // Her scheduled rules and « before » rules (spec 014), on the same clock.
+      const rules = await runDueRules(db, now);
+      if (rules.failed) console.warn('[watcher] rules', rules);
     } catch (error) {
       console.error('[watcher]', (error as Error).message);
     } finally {

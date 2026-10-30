@@ -1,0 +1,258 @@
+{
+  "app": "Finances",
+  "version": 1,
+  "description": "Comptes, fonds (enveloppes de budget), mouvements, obligations et rapprochements : soldes et restes calculés, la vue du mois, une alerte quand un fonds est dépassé, un import de relevé CSV.",
+  "models": [
+    {
+      "title": "Compte",
+      "data": {
+        "fields": [
+          {
+            "name": "type",
+            "type": "choice",
+            "options": ["espèces", "banque", "mobile money", "épargne"]
+          },
+          {
+            "name": "solde_initial",
+            "type": "amount",
+            "help": "Le solde au jour où elle commence à suivre ce compte."
+          },
+          {
+            "name": "solde",
+            "type": "formula",
+            "formula": "solde_initial + sum(mouvements.montant where sens = 'entrée') - sum(mouvements.montant where sens = 'sortie')"
+          },
+          {
+            "name": "ecart",
+            "type": "formula",
+            "formula": "if(count(rapprochements) > 0, sum(rapprochements.solde_banque where date = max(rapprochements.date)) - solde, null)"
+          }
+        ],
+        "columns": ["type", "solde"],
+        "path": "finances/comptes/{title}.md"
+      }
+    },
+    {
+      "title": "Fonds",
+      "data": {
+        "fields": [
+          { "name": "budget_mensuel", "type": "amount" },
+          {
+            "name": "depense_du_mois",
+            "type": "formula",
+            "formula": "sum(affectations.montant where sens = 'sortie' and this_month(date))"
+          },
+          { "name": "reste", "type": "formula", "formula": "budget_mensuel - depense_du_mois" }
+        ],
+        "columns": ["budget_mensuel", "depense_du_mois", "reste"],
+        "path": "finances/fonds/{title}.md"
+      }
+    },
+    {
+      "title": "Mouvement",
+      "data": {
+        "fields": [
+          {
+            "name": "montant",
+            "type": "amount",
+            "required": true,
+            "help": "Toujours positif : le sens dit si l'argent entre ou sort."
+          },
+          { "name": "date", "type": "date", "required": true },
+          {
+            "name": "sens",
+            "type": "choice",
+            "options": ["entrée", "sortie", "réaffectation"],
+            "required": true
+          },
+          {
+            "name": "compte",
+            "type": "link",
+            "target": "Compte",
+            "inverse": "mouvements",
+            "required": true
+          },
+          { "name": "fonds", "type": "link", "target": "Fonds", "inverse": "affectations" },
+          { "name": "obligation", "type": "link", "target": "Obligation", "inverse": "paiements" },
+          { "name": "note", "type": "text" }
+        ],
+        "columns": ["date", "sens", "montant"],
+        "total": "montant",
+        "groupBy": "date",
+        "path": "finances/{year}/{month}/{title}.md"
+      }
+    },
+    {
+      "title": "Obligation",
+      "data": {
+        "fields": [
+          { "name": "montant", "type": "amount", "required": true },
+          { "name": "due", "type": "date" },
+          { "name": "etat", "type": "choice", "options": ["à payer", "payée", "annulée"] },
+          { "name": "paye", "type": "formula", "formula": "sum(paiements.montant)" },
+          { "name": "reste_a_payer", "type": "formula", "formula": "montant - paye" }
+        ],
+        "columns": ["due", "montant", "etat"],
+        "workflow": {
+          "field": "etat",
+          "initial": "à payer",
+          "transitions": [
+            { "from": "à payer", "to": "payée" },
+            { "from": "à payer", "to": "annulée" },
+            { "from": "payée", "to": "à payer" }
+          ]
+        },
+        "path": "finances/obligations/{title}.md"
+      }
+    },
+    {
+      "title": "Rapprochement",
+      "data": {
+        "fields": [
+          { "name": "date", "type": "date", "required": true },
+          {
+            "name": "solde_banque",
+            "type": "amount",
+            "required": true,
+            "help": "Le solde lu sur le relevé ou l'application de la banque."
+          },
+          {
+            "name": "compte",
+            "type": "link",
+            "target": "Compte",
+            "inverse": "rapprochements",
+            "required": true
+          }
+        ],
+        "columns": ["date", "solde_banque"]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "title": "Vue du mois",
+      "data": {
+        "order": 1,
+        "filters": [{ "name": "month", "type": "month", "label": "Mois" }],
+        "blocks": [
+          {
+            "block": "stat",
+            "title": "Solde de tous les comptes",
+            "query": { "kind": "Compte", "aggregate": { "total": "sum(solde)" } }
+          },
+          {
+            "block": "stat_delta",
+            "title": "Dépenses du mois",
+            "query": {
+              "kind": "Mouvement",
+              "where": "sens = 'sortie' and month(date) = {month}",
+              "aggregate": { "total": "sum(montant)" }
+            }
+          },
+          {
+            "block": "stat",
+            "title": "Entrées du mois",
+            "query": {
+              "kind": "Mouvement",
+              "where": "sens = 'entrée' and month(date) = {month}",
+              "aggregate": { "total": "sum(montant)" }
+            }
+          },
+          {
+            "block": "gauge",
+            "title": "Fonds",
+            "kind": "Fonds",
+            "value": "depense_du_mois",
+            "max": "budget_mensuel"
+          },
+          {
+            "block": "breakdown",
+            "title": "Dépenses par fonds",
+            "query": {
+              "kind": "Mouvement",
+              "where": "sens = 'sortie' and month(date) = {month}",
+              "groupBy": "fonds.title",
+              "aggregate": { "total": "sum(montant)" },
+              "sort": "-total"
+            }
+          },
+          {
+            "block": "line",
+            "title": "Dépenses mois par mois",
+            "query": {
+              "kind": "Mouvement",
+              "where": "sens = 'sortie'",
+              "groupBy": "month(date)",
+              "aggregate": { "total": "sum(montant)" }
+            }
+          },
+          {
+            "block": "task_list",
+            "title": "À payer",
+            "kind": "Obligation",
+            "where": "etat = 'à payer'",
+            "detail": "due",
+            "action": { "label": "Payée", "set": { "etat": "payée" } }
+          },
+          {
+            "block": "table",
+            "title": "Mouvements du mois",
+            "query": {
+              "kind": "Mouvement",
+              "where": "month(date) = {month}",
+              "fields": ["date", "sens", "montant", "compte", "fonds"],
+              "sort": "-date"
+            },
+            "total": "montant"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Comptes",
+      "data": {
+        "order": 2,
+        "blocks": [
+          {
+            "block": "table",
+            "title": "Comptes",
+            "query": { "kind": "Compte", "fields": ["type", "solde", "ecart"] },
+            "total": "solde"
+          },
+          {
+            "block": "bar",
+            "title": "Solde par compte",
+            "query": {
+              "kind": "Compte",
+              "groupBy": "title",
+              "aggregate": { "solde": "sum(solde)" },
+              "sort": "-solde"
+            }
+          },
+          { "block": "form", "title": "Noter un mouvement", "kind": "Mouvement" }
+        ]
+      }
+    }
+  ],
+  "rules": [
+    {
+      "title": "Fonds dépassé",
+      "data": {
+        "when": { "saved": "Mouvement" },
+        "if": "sens = 'sortie' and fonds.reste < 0",
+        "then": [{ "remind": { "text": "Le fonds {fonds.title} est dépassé de {-fonds.reste}" } }]
+      }
+    }
+  ],
+  "scripts": [
+    {
+      "title": "Import de relevé",
+      "data": {
+        "description": "Lit un relevé CSV (date;libellé;montant, une ligne d'en-tête) et crée un mouvement par ligne sur le compte donné en paramètre « compte » ; un montant négatif est une sortie.",
+        "reads": ["Compte"],
+        "writes": ["Mouvement"],
+        "code": "function run(input) {\n  if (!input.file || !input.file.text) throw new Error('Give the statement file.');\n  const compte = input.entries.Compte.find((one) => one.title === input.params.compte);\n  if (!compte) throw new Error('Give the account by its title in params.compte.');\n  const lines = input.file.text.trim().split(/\\r?\\n/).slice(1);\n  return lines.filter((line) => line.trim()).map((line, i) => {\n    const [date, label, amount] = line.split(';').map((part) => part.trim());\n    const value = Number(String(amount).replace(/\\s/g, '').replace(',', '.'));\n    return { create: { ref: 'm' + i, kind: 'Mouvement', title: label, data: { montant: Math.abs(value), date, sens: value < 0 ? 'sortie' : 'entrée', compte: compte.id } } };\n  });\n}"
+      }
+    }
+  ]
+}

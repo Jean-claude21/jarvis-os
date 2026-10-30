@@ -42,11 +42,13 @@ import {
   withComputed,
   pagesOf,
   renderPage,
+  installApp,
 } from '@jarvis-os/core';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type pg from 'pg';
 import { z } from 'zod';
+import { shippedApp, shippedApps } from './apps';
 import type { Auth } from './auth';
 import { failure } from './errors';
 import { invitationLink, namesOf, spaceFor } from './spaces';
@@ -263,13 +265,29 @@ export function apiRoutes(deps: {
     );
   });
 
+  // The apps Jarvis ships (spec 014), and installing one: tried first unless `dryRun` is false.
+  api.get('/apps', (c) =>
+    c.json(shippedApps.map((one) => ({ app: one.app, description: one.description ?? '' }))),
+  );
+
+  api.post('/apps/install', async (c) => {
+    const body = (await c.req.json()) as { name?: string; dryRun?: boolean };
+    const bundle = shippedApp(String(body.name ?? ''));
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        installApp(tx, actor, space, bundle, body.dryRun !== false),
+      ),
+    );
+  });
+
   // The pages of her apps (spec 014): the list, and one computed for her filters.
   api.get('/pages', async (c) =>
     c.json(await act(c, (tx, _a, space) => pagesOf(tx, space, c.req.query('app') || undefined))),
   );
 
   api.get('/pages/:id', async (c) => {
-    const { space: _space, ...params } = c.req.query();
+    const params = { ...c.req.query() };
+    delete params.space;
     const drawn = await act(c, async (tx, _a, space) => {
       const entry = await get(tx, space, c.req.param('id'));
       if (!entry || entry.kind.toLowerCase() !== 'page') return null;

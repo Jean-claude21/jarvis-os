@@ -373,8 +373,12 @@ const pages = {
     const kinds = await api(inSpace('/kinds'));
     if (!name) {
       const apps = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app))];
-      return '<p class="lead">' + esc(W.appsLead) + '</p>' + card(W.newApp, '<p class="muted">' + esc(W.newAppHow) + '</p>', true) +
-        (apps.length ? '<section class="grid">' + apps.map((a) => card(a, '<a class="link" href="#/app/' + esc(encodeURIComponent(a)) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>' : '');
+      const shipped = await api('/apps');
+      return '<p class="lead">' + esc(W.appsLead) + '</p>' +
+        (apps.length ? '<section class="grid">' + apps.map((a) => card(a, '<a class="link" href="#/app/' + esc(encodeURIComponent(a)) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>' : '') +
+        '<h2 style="margin:22px 0 10px">' + esc(W.shippedApps) + '</h2><section class="grid">' + shipped.map((a) => card(a.app, '<p class="muted">' + esc(a.description) + '</p><div class="actions">' +
+          (apps.includes(a.app) ? '<span class="badge said">' + esc(W.installed) + '</span>' : '<button data-install="' + esc(a.app) + '">' + esc(W.install) + '</button>') + '</div>')).join('') + '</section>' +
+        card(W.newApp, '<p class="muted">' + esc(W.newAppHow) + '</p>', true);
     }
     const models = kinds.filter((k) => k.model && k.model.app === name);
     const appPages = await api(inSpace('/pages?app=' + encodeURIComponent(name)));
@@ -755,6 +759,21 @@ function bind() {
       '<div class="field-row"><span class="caps">' + esc(W.kind) + '</span><span>' + esc(f.mediaType) + '</span><span></span></div>' +
       (f.links.length ? '<div class="chips">' + f.links.map((l) => '<a class="chip" href="#/entree/' + esc(l.id) + '">' + esc(l.title) + '<small>' + esc(l.role) + '</small></a>').join('') + '</div>' : ''),
       '<a class="badge" href="#/entree/' + esc(id) + '">' + esc(W.fullEntry) + '</a><a class="badge primary" href="' + esc(src) + '&download=1">' + esc(W.download) + '</a>');
+  }));
+  root.querySelectorAll('[data-install]').forEach((b) => b.addEventListener('click', async () => {
+    const name = b.dataset.install;
+    try {
+      const tried = await api(inSpace('/apps/install'), { method: 'POST', body: { name } });
+      openDrawer(say(W.installWhat, { app: name }), '<ul class="list">' + tried.result.created.map((one) => '<li>' + esc(one) + '</li>').join('') + '</ul>' +
+        (tried.result.kept.length ? '<p class="muted">' + esc(say(W.installKept, { n: tried.result.kept.length })) + '</p>' : '') + '<p class="error-text" id="i__error"></p>',
+        '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button id="i__go">' + esc(W.install) + '</button>');
+      document.getElementById('i__go').addEventListener('click', async () => {
+        try {
+          await api(inSpace('/apps/install'), { method: 'POST', body: { name, dryRun: false } });
+          closeDrawer(); toast(say(W.installedToast, { app: name }), null); await drawApps(); location.hash = '#/app/' + encodeURIComponent(name);
+        } catch (error) { document.getElementById('i__error').textContent = error.message; }
+      });
+    } catch (error) { alert(error.message); }
   }));
   root.querySelectorAll('[data-model]').forEach((b) => b.addEventListener('click', async () => {
     const k = (await api(inSpace('/kinds'))).find((one) => one.kind === b.dataset.model);

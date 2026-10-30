@@ -178,12 +178,16 @@ export function registerViews(server: McpServer, ctx: ViewContext): void {
           let id = args.id;
           if (!id && args.name) {
             const wanted = args.name.toLowerCase();
-            id = (await pagesOf(tx, where.id, args.app)).find((one) => one.title.toLowerCase() === wanted)?.id;
-            if (!id) throw new Error(`No page « ${args.name} » here: save one first (kind « Page »).`);
+            id = (await pagesOf(tx, where.id, args.app)).find(
+              (one) => one.title.toLowerCase() === wanted,
+            )?.id;
+            if (!id)
+              throw new Error(`No page « ${args.name} » here: save one first (kind « Page »).`);
           }
           if (!id) return { list: await pagesOf(tx, where.id, args.app) };
           const entry = await get(tx, where.id, id);
-          if (!entry || entry.kind.toLowerCase() !== 'page') throw new Error(`No page ${id} in this space.`);
+          if (!entry || entry.kind.toLowerCase() !== 'page')
+            throw new Error(`No page ${id} in this space.`);
           return { page: await renderPage(tx, where.id, entry, args.params ?? {}) };
         });
         if ('list' in drawn) return answer(JSON.stringify(drawn.list), { pages: drawn.list });

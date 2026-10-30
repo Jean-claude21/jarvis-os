@@ -22,20 +22,51 @@ const text = z.string().trim().min(1).max(2000);
 const value = z.union([z.string().max(2000), z.number(), z.boolean(), z.null()]);
 
 export const actionSchema = z.union([
-  z.object({ create: z.object({ kind: z.string().trim().min(1).max(80), title: text, data: z.record(z.string(), value).optional(), link: z.string().trim().min(1).max(80).optional() }) }),
+  z.object({
+    create: z.object({
+      kind: z.string().trim().min(1).max(80),
+      title: text,
+      data: z.record(z.string(), value).optional(),
+      link: z.string().trim().min(1).max(80).optional(),
+    }),
+  }),
   z.object({ update: z.object({ set: z.record(z.string(), value) }) }),
-  z.object({ link: z.object({ to: z.string().trim().min(1).max(64), role: z.string().trim().min(1).max(80) }) }),
+  z.object({
+    link: z.object({
+      to: z.string().trim().min(1).max(64),
+      role: z.string().trim().min(1).max(80),
+    }),
+  }),
   z.object({ remind: z.object({ text, at: z.string().max(200).optional() }) }),
-  z.object({ run_script: z.object({ script: z.string().trim().min(1).max(120), params: z.record(z.string(), z.string()).optional() }) }),
+  z.object({
+    run_script: z.object({
+      script: z.string().trim().min(1).max(120),
+      params: z.record(z.string(), z.string()).optional(),
+    }),
+  }),
 ]);
 export type Action = z.infer<typeof actionSchema>;
 
 export const ruleDataSchema = z.object({
   when: z.union([
     z.object({ saved: z.string().trim().min(1).max(80) }),
-    z.object({ changed: z.object({ kind: z.string().trim().min(1).max(80), field: z.string().trim().min(1).max(60) }) }),
-    z.object({ schedule: z.string().trim().min(9).max(60), timezone: z.string().max(60).optional() }),
-    z.object({ before: z.object({ kind: z.string().trim().min(1).max(80), field: z.string().trim().min(1).max(60), days: z.number().int().min(0).max(366) }) }),
+    z.object({
+      changed: z.object({
+        kind: z.string().trim().min(1).max(80),
+        field: z.string().trim().min(1).max(60),
+      }),
+    }),
+    z.object({
+      schedule: z.string().trim().min(9).max(60),
+      timezone: z.string().max(60).optional(),
+    }),
+    z.object({
+      before: z.object({
+        kind: z.string().trim().min(1).max(80),
+        field: z.string().trim().min(1).max(60),
+        days: z.number().int().min(0).max(366),
+      }),
+    }),
   ]),
   if: z.string().trim().min(1).max(2000).optional(),
   then: z.array(actionSchema).min(1).max(10),
@@ -52,7 +83,9 @@ export type RuleData = z.infer<typeof ruleDataSchema>;
 export function checkRule(data: unknown): RuleData {
   const parsed = ruleDataSchema.safeParse(data);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((issue) => `${issue.path.join('.') || 'rule'}: ${issue.message}`).join('; ');
+    const issues = parsed.error.issues
+      .map((issue) => `${issue.path.join('.') || 'rule'}: ${issue.message}`)
+      .join('; ');
     throw new Error(
       `A « ${RULE_KIND} » is { when: { saved: kind } | { changed: { kind, field } } | { schedule: "0 8 1 * *" } | { before: { kind, field, days } }, if?, then: [{ create: { kind, title, data? } } | { update: { set } } | { link: { to, role } } | { remind: { text, at? } } | { run_script: { script, params? } }] } — ${issues}.`,
     );
@@ -60,7 +93,8 @@ export function checkRule(data: unknown): RuleData {
   const rule = parsed.data;
   if (rule.if) parse(rule.if);
   for (const piece of templatesOf(rule)) for (const formula of formulasIn(piece)) parse(formula);
-  if ('schedule' in rule.when) nextTime(rule.when.schedule, new Date(), rule.when.timezone ?? DEFAULT_ZONE);
+  if ('schedule' in rule.when)
+    nextTime(rule.when.schedule, new Date(), rule.when.timezone ?? DEFAULT_ZONE);
   return rule;
 }
 
@@ -87,7 +121,11 @@ function formulasIn(template: string): string[] {
 const fold = (one: string) => one.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
 const plain = (one: unknown): unknown =>
-  Array.isArray(one) ? one.map(plain) : isScope(one) ? ((one as unknown as EntryView).row?.title ?? null) : (one ?? null);
+  Array.isArray(one)
+    ? one.map(plain)
+    : isScope(one)
+      ? ((one as unknown as EntryView).row?.title ?? null)
+      : (one ?? null);
 
 /** A value written by a rule, its formulas computed for the entry (or for nothing). */
 async function valueOf(raw: unknown, scope: EntryView | null, reader: Reader): Promise<unknown> {
@@ -97,7 +135,14 @@ async function valueOf(raw: unknown, scope: EntryView | null, reader: Reader): P
   let out = raw;
   for (const formula of formulasIn(raw)) {
     const computed = plain(await evaluate(parse(formula), at, reader.clock));
-    out = out.replace(`{${formula}}`, computed === null ? '' : typeof computed === 'number' ? new Intl.NumberFormat('fr').format(computed) : String(computed));
+    out = out.replace(
+      `{${formula}}`,
+      computed === null
+        ? ''
+        : typeof computed === 'number'
+          ? new Intl.NumberFormat('fr').format(computed)
+          : String(computed),
+    );
   }
   return out;
 }
@@ -124,7 +169,13 @@ export async function rulesOf(tx: Tx, spaceId: string): Promise<RuleRow[]> {
 }
 
 /** Runs a rule's actions for an entry (or none, for a schedule), if its condition holds. */
-async function act(tx: Tx, actor: Actor, spaceId: string, rule: RuleRow, entryId: string | null): Promise<boolean> {
+async function act(
+  tx: Tx,
+  actor: Actor,
+  spaceId: string,
+  rule: RuleRow,
+  entryId: string | null,
+): Promise<boolean> {
   const reader = await readerOf(tx, spaceId);
   let scope: EntryView | null = null;
   if (entryId) {
@@ -133,33 +184,75 @@ async function act(tx: Tx, actor: Actor, spaceId: string, rule: RuleRow, entryId
     await reader.around([entryId]);
     scope = reader.view(row);
   }
-  if (rule.data.if && !(await evaluate(parse(rule.data.if), scope ?? { get: () => null }, reader.clock))) return false;
-  const by: Actor = { ...actor, door: 'rule', client: `rule:${rule.title}`, depth: (actor.depth ?? 0) + 1 };
+  if (
+    rule.data.if &&
+    !(await evaluate(parse(rule.data.if), scope ?? { get: () => null }, reader.clock))
+  )
+    return false;
+  const by: Actor = {
+    ...actor,
+    door: 'rule',
+    client: `rule:${rule.title}`,
+    depth: (actor.depth ?? 0) + 1,
+  };
   const call = (input: SaveInput) => save(tx, by, spaceId, input);
   for (const action of rule.data.then) {
     if ('create' in action) {
       const data: Record<string, unknown> = {};
-      for (const [name, raw] of Object.entries(action.create.data ?? {})) data[name] = await valueOf(raw, scope, reader);
+      for (const [name, raw] of Object.entries(action.create.data ?? {}))
+        data[name] = await valueOf(raw, scope, reader);
       await call({
-        entries: [{ ref: 'new', kind: action.create.kind, title: String(await valueOf(action.create.title, scope, reader)), data, origin: 'inferred' }],
-        links: entryId && action.create.link ? [{ from: 'new', to: entryId, role: action.create.link }] : [],
+        entries: [
+          {
+            ref: 'new',
+            kind: action.create.kind,
+            title: String(await valueOf(action.create.title, scope, reader)),
+            data,
+            origin: 'inferred',
+          },
+        ],
+        links:
+          entryId && action.create.link
+            ? [{ from: 'new', to: entryId, role: action.create.link }]
+            : [],
       });
     } else if ('update' in action) {
-      if (!entryId) throw new Error(`Rule « ${rule.title} »: « update » needs an entry, and a schedule gives none.`);
+      if (!entryId)
+        throw new Error(
+          `Rule « ${rule.title} »: « update » needs an entry, and a schedule gives none.`,
+        );
       const data: Record<string, unknown> = {};
-      for (const [name, raw] of Object.entries(action.update.set)) data[name] = await valueOf(raw, scope, reader);
+      for (const [name, raw] of Object.entries(action.update.set))
+        data[name] = await valueOf(raw, scope, reader);
       await call({ entries: [{ id: entryId, data, origin: 'inferred' }] });
     } else if ('link' in action) {
-      if (!entryId) throw new Error(`Rule « ${rule.title} »: « link » needs an entry, and a schedule gives none.`);
+      if (!entryId)
+        throw new Error(
+          `Rule « ${rule.title} »: « link » needs an entry, and a schedule gives none.`,
+        );
       await call({ links: [{ from: entryId, to: action.link.to, role: action.link.role }] });
     } else if ('remind' in action) {
-      const at = action.remind.at ? String(await valueOf(action.remind.at, scope, reader)) : reader.clock.now.toISOString();
+      const at = action.remind.at
+        ? String(await valueOf(action.remind.at, scope, reader))
+        : reader.clock.now.toISOString();
       await call({
-        entries: [{ ref: 'r', kind: 'Rappel', title: String(await valueOf(action.remind.text, scope, reader)), data: { at, status: 'planned' }, origin: 'inferred' }],
+        entries: [
+          {
+            ref: 'r',
+            kind: 'Rappel',
+            title: String(await valueOf(action.remind.text, scope, reader)),
+            data: { at, status: 'planned' },
+            origin: 'inferred',
+          },
+        ],
         links: entryId ? [{ from: 'r', to: entryId, role: 'pour' }] : [],
       });
     } else if ('run_script' in action) {
-      await runScript(tx, by, spaceId, { script: action.run_script.script, params: action.run_script.params ?? {}, entryId: entryId ?? undefined });
+      await runScript(tx, by, spaceId, {
+        script: action.run_script.script,
+        params: action.run_script.params ?? {},
+        entryId: entryId ?? undefined,
+      });
     }
   }
   return true;
@@ -174,7 +267,12 @@ export interface Changed {
 }
 
 /** After a save: the rules of its kinds, for each entry it made or changed. */
-export async function runRulesAfterSave(tx: Tx, actor: Actor, spaceId: string, changed: Changed[]): Promise<void> {
+export async function runRulesAfterSave(
+  tx: Tx,
+  actor: Actor,
+  spaceId: string,
+  changed: Changed[],
+): Promise<void> {
   if ((actor.depth ?? 0) >= RULE_DEPTH || !changed.length) return;
   const rules = await rulesOf(tx, spaceId);
   if (!rules.length) return;
@@ -183,7 +281,9 @@ export async function runRulesAfterSave(tx: Tx, actor: Actor, spaceId: string, c
       const when = rule.data.when;
       const fires =
         ('saved' in when && fold(when.saved) === fold(one.kind)) ||
-        ('changed' in when && fold(when.changed.kind) === fold(one.kind) && one.fields.some((field) => fold(field) === fold(when.changed.field)));
+        ('changed' in when &&
+          fold(when.changed.kind) === fold(one.kind) &&
+          one.fields.some((field) => fold(field) === fold(when.changed.field)));
       // A rule does not fire again on its own change.
       if (!fires || actor.client === `rule:${rule.title}`) continue;
       try {
@@ -202,13 +302,20 @@ export async function testRule(
   spaceId: string,
   input: { rule: string; entryId?: string | undefined },
 ): Promise<Trial<{ matched: boolean }>> {
-  const rule = (await rulesOf(tx, spaceId)).find((one) => one.id === input.rule || fold(one.title) === fold(input.rule));
+  const rule = (await rulesOf(tx, spaceId)).find(
+    (one) => one.id === input.rule || fold(one.title) === fold(input.rule),
+  );
   if (!rule) throw new Error(`No rule « ${input.rule} » in this space.`);
-  return trial(tx, true, async () => ({ matched: await act(tx, actor, spaceId, rule, input.entryId ?? null) }));
+  return trial(tx, true, async () => ({
+    matched: await act(tx, actor, spaceId, rule, input.entryId ?? null),
+  }));
 }
 
 /** The rules that may be due, across spaces: who keeps each (the watcher, spec 006). */
-export async function runDueRules(db: pg.Pool, now: Date): Promise<{ ran: number; failed: number }> {
+export async function runDueRules(
+  db: pg.Pool,
+  now: Date,
+): Promise<{ ran: number; failed: number }> {
   const report = { ran: 0, failed: 0 };
   const { rows } = await db.query<{ entry_id: string; space_id: string; persons: string[] }>(
     'select entry_id, space_id, persons from jarvis_due_rules($1)',
@@ -228,24 +335,44 @@ export async function runDueRules(db: pg.Pool, now: Date): Promise<{ ran: number
         if ('schedule' in when) {
           const due = rule.data.next ? new Date(rule.data.next) : null;
           if (due && due <= now) await act(tx, actor, row.space_id, rule, null);
-          await save(tx, actor, row.space_id, { entries: [{ id: rule.id, data: { next: nextTime(when.schedule, now, zone).toISOString(), error: null }, origin: 'inferred' }] });
+          await save(tx, actor, row.space_id, {
+            entries: [
+              {
+                id: rule.id,
+                data: { next: nextTime(when.schedule, now, zone).toISOString(), error: null },
+                origin: 'inferred',
+              },
+            ],
+          });
         } else if ('before' in when) {
           if (rule.data.last_run === today) return;
-          const target = new Date(Date.parse(`${today}T00:00:00Z`) + when.before.days * 86_400_000).toISOString().slice(0, 10);
+          const target = new Date(Date.parse(`${today}T00:00:00Z`) + when.before.days * 86_400_000)
+            .toISOString()
+            .slice(0, 10);
           const { rows: entries } = await tx.query<{ id: string }>(
             `select id from entry where space_id = $1 and archived_at is null
                and jarvis_fold(kind) = jarvis_fold($2) and left(data->>$3, 10) = $4`,
             [row.space_id, when.before.kind, when.before.field, target],
           );
           for (const entry of entries) await act(tx, actor, row.space_id, rule, entry.id);
-          await save(tx, actor, row.space_id, { entries: [{ id: rule.id, data: { last_run: today, error: null }, origin: 'inferred' }] });
+          await save(tx, actor, row.space_id, {
+            entries: [{ id: rule.id, data: { last_run: today, error: null }, origin: 'inferred' }],
+          });
         }
       });
       report.ran += 1;
     } catch (error) {
       report.failed += 1;
       await asPerson(db, keeper, (tx) =>
-        save(tx, actor, row.space_id, { entries: [{ id: row.entry_id, data: { error: (error as Error).message.slice(0, 500) }, origin: 'inferred' }] }),
+        save(tx, actor, row.space_id, {
+          entries: [
+            {
+              id: row.entry_id,
+              data: { error: (error as Error).message.slice(0, 500) },
+              origin: 'inferred',
+            },
+          ],
+        }),
       ).catch(() => undefined);
     }
   }

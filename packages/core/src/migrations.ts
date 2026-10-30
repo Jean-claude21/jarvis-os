@@ -14,9 +14,13 @@ export const migrationSchema = z.object({
   steps: z
     .array(
       z.union([
-        z.object({ rename: z.object({ from: z.string().min(1).max(60), to: z.string().min(1).max(60) }) }),
+        z.object({
+          rename: z.object({ from: z.string().min(1).max(60), to: z.string().min(1).max(60) }),
+        }),
         /** A field set from a formula of the entry (before this step): « montant * -1 », « 'sortie' ». */
-        z.object({ set: z.object({ field: z.string().min(1).max(60), formula: z.string().min(1).max(1000) }) }),
+        z.object({
+          set: z.object({ field: z.string().min(1).max(60), formula: z.string().min(1).max(1000) }),
+        }),
         z.object({ remove: z.string().min(1).max(60) }),
       ]),
     )
@@ -34,19 +38,40 @@ export interface MigrationReport {
   changed: number;
   /** Entries that will not follow the model once changed, and why (the first ten). */
   problems: { id: string; title: string; problems: string[] }[];
-  sample: { id: string; title: string; before: Record<string, unknown>; after: Record<string, unknown> }[];
+  sample: {
+    id: string;
+    title: string;
+    before: Record<string, unknown>;
+    after: Record<string, unknown>;
+  }[];
 }
 
 /** Changes every entry of a kind by its steps; with `dryRun` (the default), only tried. */
-export async function migrateKind(tx: Tx, actor: Actor, spaceId: string, raw: Migration): Promise<Trial<MigrationReport>> {
+export async function migrateKind(
+  tx: Tx,
+  actor: Actor,
+  spaceId: string,
+  raw: Migration,
+): Promise<Trial<MigrationReport>> {
   const input = migrationSchema.parse(raw);
   const reader = await readerOf(tx, spaceId);
   const rows = await reader.kindRows(input.kind, 10_000);
   await reader.around(rows.map((row) => row.id));
   const where = input.where ? parse(input.where) : null;
   const model = await modelOf(tx, spaceId, input.kind);
-  const report: MigrationReport = { kind: input.kind, matched: 0, changed: 0, problems: [], sample: [] };
-  const updates: { id: string; title: string; before: Record<string, unknown>; after: Record<string, unknown> }[] = [];
+  const report: MigrationReport = {
+    kind: input.kind,
+    matched: 0,
+    changed: 0,
+    problems: [],
+    sample: [],
+  };
+  const updates: {
+    id: string;
+    title: string;
+    before: Record<string, unknown>;
+    after: Record<string, unknown>;
+  }[] = [];
   for (const row of rows) {
     const view = reader.view(row);
     if (where && !(await evaluate(where, view, reader.clock))) continue;
@@ -59,7 +84,9 @@ export async function migrateKind(tx: Tx, actor: Actor, spaceId: string, raw: Mi
           delete after[step.rename.from];
         }
       } else if ('set' in step) {
-        const scope = { get: async (name: string) => (name in after ? after[name] : view.get(name)) };
+        const scope = {
+          get: async (name: string) => (name in after ? after[name] : view.get(name)),
+        };
         const value = await evaluate(parse(step.set.formula), scope, reader.clock);
         const plain = isScope(value) ? null : value;
         if (plain === null || plain === undefined) delete after[step.set.field];
@@ -73,20 +100,44 @@ export async function migrateKind(tx: Tx, actor: Actor, spaceId: string, raw: Mi
     updates.push({ id: row.id, title: row.title, before: row.data, after });
     if (model) {
       const problems = checkAgainst(model, after, after, true);
-      if (problems.length && report.problems.length < 10) report.problems.push({ id: row.id, title: row.title, problems });
+      if (problems.length && report.problems.length < 10)
+        report.problems.push({ id: row.id, title: row.title, problems });
     }
   }
   report.sample = updates.slice(0, 5);
   return trial(tx, input.dryRun, async () => {
     const lines: number[] = [];
     for (const update of updates) {
-      const { rows: before } = await tx.query<Record<string, unknown>>('select kind, title, data, origin, archived_at from entry where id = $1', [update.id]);
-      await tx.query('update entry set data = $2, updated_at = now() where id = $1', [update.id, JSON.stringify(update.after)]);
-      const { rows: after } = await tx.query<Record<string, unknown>>('select kind, title, data, origin, archived_at from entry where id = $1', [update.id]);
-      lines.push(await record(tx, actor, { spaceId, command: 'entry.update', target: update.id, before: before[0], after: after[0] }));
+      const { rows: before } = await tx.query<Record<string, unknown>>(
+        'select kind, title, data, origin, archived_at from entry where id = $1',
+        [update.id],
+      );
+      await tx.query('update entry set data = $2, updated_at = now() where id = $1', [
+        update.id,
+        JSON.stringify(update.after),
+      ]);
+      const { rows: after } = await tx.query<Record<string, unknown>>(
+        'select kind, title, data, origin, archived_at from entry where id = $1',
+        [update.id],
+      );
+      lines.push(
+        await record(tx, actor, {
+          spaceId,
+          command: 'entry.update',
+          target: update.id,
+          before: before[0],
+          after: after[0],
+        }),
+      );
     }
     if (lines.length) {
-      await record(tx, actor, { spaceId, command: 'migration.run', target: input.kind, before: null, after: { steps: input.steps, lines } });
+      await record(tx, actor, {
+        spaceId,
+        command: 'migration.run',
+        target: input.kind,
+        before: null,
+        after: { steps: input.steps, lines },
+      });
     }
     return report;
   });

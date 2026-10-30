@@ -26,6 +26,13 @@ import {
   type Space,
   type Tx,
   withComputed,
+  bundleSchema,
+  exportApp,
+  installApp,
+  migrateKind,
+  migrationSchema,
+  runScript,
+  testRule,
 } from '@jarvis-os/core';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -34,6 +41,7 @@ import type pg from 'pg';
 import { z } from 'zod';
 import { failure } from './errors';
 import { instructionsFor } from './instructions';
+import { shippedApp, shippedApps } from './apps';
 import { invitationLink, namesOf, spaceFor } from './spaces';
 import { registerViews } from './views/register';
 
@@ -523,6 +531,144 @@ export async function mcpServerFor(
       }
       return found;
     }),
+  );
+
+  // The app engine (spec 014): try a rule, run a script, migrate a kind, export or install an app.
+  server.registerTool(
+    'rule_test',
+    {
+      description:
+        'Try one of her rules (an entry « Rule », by title or id) on an entry — or on nothing, for a schedule — and say what it would change; nothing is changed.',
+      inputSchema: {
+        rule: z.string().min(1),
+        entry: z.string().min(1).optional(),
+        space: spaceArg,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    tool(
+      async ({
+        rule,
+        entry,
+        space,
+      }: {
+        rule: string;
+        entry?: string | undefined;
+        space?: string | undefined;
+      }) => act((tx) => testRule(tx, actor, at(space), { rule, entryId: entry })),
+    ),
+  );
+
+  server.registerTool(
+    'run_script',
+    {
+      description: [
+        'Run one of her scripts (an entry « Script »: `run(input)` returns changes): `file` the entry of',
+        'a file it reads (a bank statement), `entry` an entry it works on, `params` her choices.',
+        '`dryRun` (default true) only tries and lists what would change: show her, then run with',
+        '`dryRun: false` after her yes. Its changes are checked against what it declared it writes,',
+        'journaled and undoable.',
+      ].join(' '),
+      inputSchema: {
+        script: z.string().min(1),
+        file: z.string().min(1).optional(),
+        entry: z.string().min(1).optional(),
+        params: z.record(z.string(), z.string()).optional(),
+        dryRun: z.boolean().default(true),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async (args: {
+        script: string;
+        file?: string | undefined;
+        entry?: string | undefined;
+        params?: Record<string, string> | undefined;
+        dryRun: boolean;
+        space?: string | undefined;
+      }) =>
+        act((tx) =>
+          runScript(tx, actor, at(args.space), {
+            script: args.script,
+            fileId: args.file,
+            entryId: args.entry,
+            params: args.params ?? {},
+            dryRun: args.dryRun,
+          }),
+        ),
+    ),
+  );
+
+  server.registerTool(
+    'migrate',
+    {
+      description: [
+        'Change every entry of a kind when its model changes: `steps` among { rename: { from, to } },',
+        '{ set: { field, formula } } (a formula of the entry), { remove: field }; `where` a formula to',
+        'choose some. `dryRun` (default true) counts, shows a sample and the entries that would not follow',
+        'the model; then run with `dryRun: false` after her yes — undone at once with `undo`.',
+      ].join(' '),
+      inputSchema: {
+        kind: z.string().min(1),
+        steps: migrationSchema.shape.steps,
+        where: z.string().min(1).optional(),
+        dryRun: z.boolean().default(true),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async ({
+        space,
+        ...input
+      }: z.input<typeof migrationSchema> & { space?: string | undefined }) =>
+        act((tx) => migrateKind(tx, actor, at(space), input)),
+    ),
+  );
+
+  server.registerTool(
+    'app_export',
+    {
+      description:
+        'One of her apps as a bundle: the models, pages, rules and scripts that name it — to keep, share or install in another space.',
+      inputSchema: { app: z.string().min(1), space: spaceArg },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async ({ app, space }: { app: string; space?: string | undefined }) =>
+      act((tx) => exportApp(tx, at(space), app)),
+    ),
+  );
+
+  server.registerTool(
+    'app_install',
+    {
+      description: [
+        `Install an app in a space: one that ships with Jarvis by \`name\` (${shippedApps.map((one) => `« ${one.app} »: ${one.description ?? ''}`).join(' ')})`,
+        'or a `bundle` (from `app_export`). `dryRun` (default true) lists what would be created; what',
+        'is already there (same kind and title) is kept. Show her, then install with `dryRun: false`.',
+      ].join(' '),
+      inputSchema: {
+        name: z.string().min(1).optional(),
+        bundle: z.record(z.string(), z.unknown()).optional(),
+        dryRun: z.boolean().default(true),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async (args: {
+        name?: string | undefined;
+        bundle?: Record<string, unknown> | undefined;
+        dryRun: boolean;
+        space?: string | undefined;
+      }) => {
+        const bundle = args.bundle
+          ? bundleSchema.parse(args.bundle)
+          : args.name
+            ? shippedApp(args.name)
+            : null;
+        if (!bundle) throw new Error('Give `name` (an app Jarvis ships) or `bundle`.');
+        return act((tx) => installApp(tx, actor, at(args.space), bundle, args.dryRun));
+      },
+    ),
   );
 
   registerViews(server, {

@@ -71,3 +71,15 @@ export {
 export { DEFAULT_ZONE, inZone, nextTime, repetitionOf, timeOf } from './time';
 export { watchOnce, type Due, type PassReport } from './watcher';
 export { upcoming, type Upcoming } from './upcoming';
+export {
+  agenda,
+  AGENDA_MAX_DAYS,
+  AGENDA_MAX_REPEATS,
+  calendarOwner,
+  fingerprintOf,
+  minutesOf,
+  occurrencesOf,
+  renewCalendarKey,
+  TIME_FIELDS,
+  type Occurrence,
+} from './agenda';

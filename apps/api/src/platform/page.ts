@@ -65,11 +65,40 @@ a.link { color: var(--primary); text-decoration: none; } a.link:hover { text-dec
 }
 `;
 
+const css2 = `
+.week-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+.week-bar h2 { flex: 1; font-size: 16px; min-width: 180px; }
+.week { display: grid; grid-template-columns: 46px repeat(7, minmax(0, 1fr)); border: 1px solid var(--rule); border-radius: 2px; background: var(--paper); }
+.week .wh { padding: 8px 4px; text-align: center; border-bottom: 1px solid var(--rule); border-left: 1px solid var(--rule); font: 600 11px/1.3 "JetBrains Mono", monospace; color: var(--bark); text-transform: uppercase; }
+.week .wh b { display: block; font-size: 16px; color: var(--ink); }
+.week .wh.today b { display: inline-block; padding: 0 6px; background: var(--primary); color: var(--on-primary); border-radius: 2px; }
+.week .allday { border-left: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 3px; display: grid; gap: 3px; align-content: start; min-height: 26px; min-width: 0; }
+.week .gut { position: relative; }
+.week .gut span { position: absolute; right: 6px; transform: translateY(-50%); font: 600 10px "JetBrains Mono", monospace; color: var(--bark); }
+.week .col { position: relative; border-left: 1px solid var(--rule); background-image: repeating-linear-gradient(to bottom, transparent 0 39px, var(--rule) 39px 40px); }
+.week .col.today { background-color: var(--sand); }
+.ev { position: absolute; left: 3px; right: 3px; overflow: hidden; border-radius: 2px; padding: 3px 5px; font-size: 12px; line-height: 1.2; border: 1px solid var(--ink); background: var(--paper); color: var(--ink); text-decoration: none; }
+.ev small { display: block; font: 600 10px "JetBrains Mono", monospace; color: var(--bark); }
+.ev.repeated { background: var(--clay); border-color: transparent; }
+.ev.moment { border-color: var(--rule-strong); }
+.ev.proposed, .chip-ev.proposed { background: var(--info-surface); border: 1px dashed var(--info); color: var(--info); }
+.chip-ev { display: block; border-radius: 2px; padding: 2px 5px; font-size: 11.5px; border: 1px solid var(--primary); color: var(--primary); background: var(--paper); text-decoration: none; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.chip-ev.day { border-color: var(--rule-strong); color: var(--ink); }
+.nowline { position: absolute; left: 0; right: 0; height: 2px; background: var(--primary); z-index: 1; }
+.days { display: none; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--bark); font-size: 12px; margin-top: 10px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; border: 1px solid var(--ink); }
+@media (max-width: 860px) { .week { display: none; } .days { display: grid; gap: 12px; } }
+`;
+
 const icon = (path: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 
 const ICONS = {
   home: icon('<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'),
+  agenda: icon(
+    '<rect x="3" y="5" width="18" height="16" rx="1"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  ),
   life: icon('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
   documents: icon('<path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h7"/>'),
   dashboards: icon('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
@@ -203,6 +232,50 @@ const pages = {
     return list.length ? '<section class="grid">' + list.map((d) => card(d.title, '<p class="muted">' + esc(day(d.updatedAt)) + '</p><a class="link" href="#/tableaux?id=' + esc(d.id) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>' : card('', empty(W.noDashboards));
   },
 
+  async agenda (params) {
+    // The week of the hash (?w=<Monday ISO>), else this one; the server says where Monday starts.
+    const from = params.get('w');
+    const data = await api('/agenda' + (from ? '?from=' + encodeURIComponent(from) : ''));
+    const start = new Date(data.from);
+    const days = Array.from({ length: 7 }, (_, i) => new Date(start.getTime() + i * 86400000 + 3600000));
+    const key = (d) => d.toLocaleDateString('en-CA');
+    const todayKey = key(new Date());
+    const hourOf = (iso) => { const d = new Date(iso); return d.getHours() + d.getMinutes() / 60; };
+    const timed = data.occurrences.filter((o) => !o.allDay);
+    const lo = Math.max(0, Math.min(7, ...timed.map((o) => Math.floor(hourOf(o.start)))));
+    const hi = Math.min(24, Math.max(22, ...timed.map((o) => Math.ceil(o.end ? (hourOf(o.end) || 24) : hourOf(o.start) + 1))));
+    const H = 40;
+    const hhmm = (iso) => new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    const href = (o) => '#/entree/' + esc(o.id);
+    const cls = (o) => (o.proposed ? ' proposed' : '') + (o.repeated ? ' repeated' : '') + (o.type === 'moment' ? ' moment' : '');
+    const label = (o) => (o.proposed ? W.proposed + ' · ' : '') + o.title;
+    const onDay = (d) => data.occurrences.filter((o) => key(new Date(o.start)) === key(d));
+    const shift = (n) => '#/agenda?w=' + encodeURIComponent(new Date(start.getTime() + n * 7 * 86400000).toISOString());
+    const bar = '<div class="week-bar"><h2>' + esc(say(W.weekOf, { day: day(days[0].toISOString()) })) + '</h2>' +
+      '<a class="badge" href="' + shift(-1) + '">‹ ' + esc(W.prevWeek) + '</a><a class="badge" href="#/agenda">' + esc(W.today) + '</a><a class="badge" href="' + shift(1) + '">' + esc(W.nextWeek) + ' ›</a></div>';
+    let grid = '<div class="week"><div></div>' + days.map((d) => '<div class="wh' + (key(d) === todayKey ? ' today' : '') + '">' + esc(d.toLocaleDateString(locale, { weekday: 'short' })) + '<b>' + d.getDate() + '</b></div>').join('');
+    grid += '<div class="gut"></div>' + days.map((d) => '<div class="allday">' + onDay(d).filter((o) => o.allDay).map((o) => '<a class="chip-ev' + (o.type === 'deadline' ? '' : ' day') + cls(o) + '" href="' + href(o) + '" title="' + esc(o.kind + ' · ' + o.space) + '">' + (o.type === 'deadline' ? '⚑ ' : '') + esc(label(o)) + '</a>').join('') + '</div>').join('');
+    grid += '<div class="gut" style="height:' + (hi - lo) * H + 'px">' + Array.from({ length: hi - lo }, (_, i) => '<span style="top:' + i * H + 'px">' + String(lo + i).padStart(2, '0') + '</span>').join('') + '</div>';
+    grid += days.map((d) => {
+      const evs = onDay(d).filter((o) => !o.allDay).map((o) => {
+        const a = hourOf(o.start);
+        const b = o.end ? (key(new Date(o.end)) === key(d) ? hourOf(o.end) : hi) : a + 0.5;
+        return '<a class="ev' + cls(o) + '" href="' + href(o) + '" title="' + esc(o.kind + ' · ' + o.space) + '" style="top:' + ((a - lo) * H + 1) + 'px;height:' + Math.max((Math.min(b, hi) - a) * H - 2, 20) + 'px"><b>' + esc(label(o)) + '</b><small>' + esc(hhmm(o.start) + (o.end ? '–' + hhmm(o.end) : '')) + '</small></a>';
+      }).join('');
+      const nowAt = hourOf(new Date().toISOString());
+      const now = key(d) === todayKey && nowAt >= lo && nowAt <= hi ? '<div class="nowline" style="top:' + (nowAt - lo) * H + 'px"></div>' : '';
+      return '<div class="col' + (key(d) === todayKey ? ' today' : '') + '" style="height:' + (hi - lo) * H + 'px">' + evs + now + '</div>';
+    }).join('') + '</div>';
+    const list = '<div class="days">' + days.map((d) => {
+      const items = onDay(d);
+      return card(d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' }), items.length ? '<ul class="list">' + items.map((o) =>
+        '<li><span><a class="link" href="' + href(o) + '">' + esc(label(o)) + '</a> <span class="muted">' + esc(o.kind + ' · ' + o.space) + '</span></span><span class="num">' + esc(o.allDay ? W.allDay : hhmm(o.start)) + '</span></li>').join('') + '</ul>' : empty(W.noEvents));
+    }).join('') + '</div>';
+    const legend = '<div class="legend"><span><i></i>' + esc(W.legendEvent) + '</span><span><i style="background:var(--clay);border-color:transparent"></i>' + esc(W.legendRepeated) + '</span><span><i style="border-color:var(--primary)"></i>' + esc(W.legendDeadline) + '</span><span><i style="background:var(--info-surface);border:1px dashed var(--info)"></i>' + esc(W.legendProposed) + '</span></div>';
+    const phone = card(W.subscribe, '<p class="muted">' + esc(W.subscribeLead) + '</p><p class="badge ' + (data.linked ? 'said' : '') + '" style="white-space:normal">' + esc(data.linked ? W.subscribeOn : W.subscribeOff) + '</p><div id="address"></div><div class="actions" style="margin-top:10px"><button id="subscribe"' + (data.linked ? ' data-done="1"' : '') + '>' + esc(data.linked ? W.subscribeRenew : W.subscribe) + '</button></div>', true);
+    return '<p class="lead">' + esc(W.agendaLead) + '</p>' + bar + grid + list + legend + '<div class="grid" style="margin-top:16px">' + phone + '</div>';
+  },
+
   async rappels () {
     const list = await api(inSpace('/entries?limit=200&kind=Rappel'));
     const canal = await api('/entries?kind=Canal&limit=1&space=' + encodeURIComponent(me.space.id));
@@ -270,7 +343,7 @@ const pages = {
   },
 };
 
-const titles = { '': 'navHome', vie: 'navLife', entree: 'navLife', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
+const titles = { '': 'navHome', agenda: 'navAgenda', vie: 'navLife', entree: 'navLife', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
   rappels: 'navReminders', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
 
 let drawing = 0;
@@ -363,6 +436,16 @@ function bind() {
       } catch (error) { report.innerHTML = '<p class="error-text">' + esc(say(W.failed, { reason: error.message })) + '</p>'; event.target.disabled = false; }
     });
   }
+  const sub = document.getElementById('subscribe');
+  if (sub) sub.addEventListener('click', async () => {
+    if (sub.dataset.done && !confirm(W.subscribeAsk)) return;
+    try {
+      const made = await api('/agenda/address', { method: 'POST', body: {} });
+      document.getElementById('address').innerHTML = '<p><code class="url">' + esc(made.url) + '</code></p><div class="actions"><button class="quiet" id="copy-address">' + esc(W.copy) + '</button><a class="badge primary" href="' + esc(made.webcal) + '">' + esc(W.openPhone) + '</a></div>';
+      document.getElementById('copy-address').addEventListener('click', async (e) => { await navigator.clipboard.writeText(made.url); e.target.textContent = W.copied; });
+      sub.textContent = W.subscribeRenew; sub.dataset.done = '1';
+    } catch (error) { alert(error.message); }
+  });
   const out = document.getElementById('sign-out');
   if (out) out.addEventListener('click', async () => {
     await fetch('/auth/sign-out', { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: '{}' });
@@ -406,13 +489,14 @@ export function appPage(lang: Lang): string {
 <title>${escape(words.brand)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Instrument+Sans:wght@400;600&family=JetBrains+Mono:wght@600&display=swap">
-<style>${brandCss}${css}</style></head>
+<style>${brandCss}${css}${css2}</style></head>
 <body><div class="app">
 <aside class="side">
   <a class="logo" href="#/"><i>J</i>${escape(words.brand)}</a>
   <label class="caps">${escape(words.space)}<select id="space"></select></label>
   <nav class="nav">
     ${link('', 'navHome', ICONS.home)}
+    ${link('agenda', 'navAgenda', ICONS.agenda)}
     ${link('vie', 'navLife', ICONS.life)}
     ${link('documents', 'navDocuments', ICONS.documents)}
     ${link('tableaux', 'navDashboards', ICONS.dashboards)}

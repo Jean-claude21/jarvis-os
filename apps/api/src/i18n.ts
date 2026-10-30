@@ -41,6 +41,9 @@ const words = {
     documentExpired: 'Ce lien de lecture a expiré ou n’est pas valide : demande-en un nouveau.',
     reminderDone: 'Dis à Claude quand c’est fait.',
     channelLinked: 'Jarvis OS te préviendra ici : tes rappels arriveront dans cette conversation.',
+    calendarName: 'Jarvis — {name}',
+    calendarProposed: 'Proposé',
+    calendarGone: 'Cette adresse d’agenda n’est plus valide : demande-en une nouvelle dans Jarvis.',
   },
   en: {
     signInTitle: 'Sign in to Jarvis',
@@ -81,6 +84,9 @@ const words = {
     documentExpired: 'This reading link has expired or is not valid: ask for a new one.',
     reminderDone: 'Tell Claude when it is done.',
     channelLinked: 'Jarvis OS will tell you here: your reminders will arrive in this chat.',
+    calendarName: 'Jarvis — {name}',
+    calendarProposed: 'Proposed',
+    calendarGone: 'This calendar address is no longer valid: ask Jarvis for a new one.',
   },
 } as const;
 

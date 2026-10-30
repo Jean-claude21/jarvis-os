@@ -19,6 +19,8 @@ import {
   saveInputSchema,
   undo,
   upcoming,
+  agenda,
+  timeOf,
   type Actor,
   type Blobs,
   type Space,
@@ -463,6 +465,34 @@ export async function mcpServerFor(
         };
       },
     ),
+  );
+
+  server.registerTool(
+    'agenda',
+    {
+      description: [
+        'Her calendar for a window: every entry of any kind that has a time — `debut`/`fin`/`duree`',
+        '(a span), `quand` (a moment), `echeance` (a deadline), `date` (a day, from today on),',
+        '`repete` (again and again, minus the days in `sauf`) — at its place, sorted. Answer « what do',
+        'I have Thursday? » from this, never from memory. `from`/`to`: ISO times or days',
+        '(« 2026-10-29 »); at most 366 days. Every space this client reaches unless `space` is given.',
+      ].join(' '),
+      inputSchema: {
+        from: z.string().min(10),
+        to: z.string().min(10),
+        space: spaceArg,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async ({ from, to, space }: { from: string; to: string; space?: string | undefined }) => {
+      const start = timeOf(from.length === 10 ? `${from}T00:00` : from);
+      const end = timeOf(to.length === 10 ? `${to}T00:00` : to);
+      if (!start || !end) throw new Error('from and to are ISO days or times (« 2026-10-29 »).');
+      // A day given as the end is included: « to 2026-10-29 » means through that day.
+      const until = to.length === 10 ? new Date(end.getTime() + 86_400_000) : end;
+      const ids = space ? [at(space)] : reach.map((one) => one.id);
+      return act((tx) => agenda(tx, ids, { from: start, to: until }));
+    }),
   );
 
   server.registerTool(

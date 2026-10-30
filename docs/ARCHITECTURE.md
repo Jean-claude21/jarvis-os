@@ -100,6 +100,18 @@ flowchart LR
 - **The watcher** (spec 006): a pass each minute finds the reminders due through one function that
   returns ids and members only, tells each person through her « Canal » (Telegram), and writes what
   it did as a member, under row-level security.
+- **The calendar** (spec 011): time is a field, not a kind. Any entry with `debut` (and `fin` or
+  `duree`), `quand`, `echeance`, `date` or `repete` is in her calendar; `agenda` places its
+  occurrences in a window, computed, never stored. Claude (`agenda`), the app (« Agenda »), the
+  anticipation (`upcoming`) and her phone (a private iCalendar address) read the same function.
+
+```mermaid
+flowchart LR
+  E[(entries of any kind with a time field)] --> A[agenda]
+  A --> C[Claude: the agenda tool, what comes]
+  A --> P[the app: her week]
+  A --> I[her phone: /agenda/:key.ics]
+```
 
 ## The doors
 
@@ -110,6 +122,7 @@ flowchart LR
 | `/auth` | creating an account, signing in, consenting to a client         | Better Auth                          |
 | `/app`  | her web account (spec 009): her life, spaces, connections, data | her session                          |
 | links   | `/upload/:token`, `/document/:token`, `/invitation#…`           | a token signed by the server         |
+| feed    | `/agenda/:key.ics`, her calendar for her phone                  | a key of hers, kept as its sha-256   |
 | watcher | her reminders, on Telegram                                      | acts as each member                  |
 
 The REST API and the MCP tools call the same core functions: what one does, the other does. Her

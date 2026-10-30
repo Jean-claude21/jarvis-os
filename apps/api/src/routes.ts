@@ -1,5 +1,6 @@
 import {
   addFile,
+  agenda,
   archive,
   asPerson,
   FILE_MAX_BYTES,
@@ -14,7 +15,10 @@ import {
   allowSpaces,
   clientSpaces,
   createSharedSpace,
+  DEFAULT_ZONE,
+  inZone,
   readDocument,
+  renewCalendarKey,
   upcoming,
   exportMarkdown,
   importMarkdown,
@@ -54,6 +58,16 @@ type Env = {
     client: string | undefined;
   };
 };
+
+/** Monday 00:00 of the week of `at`, on her clock (Paris unless she said otherwise). */
+export function weekStart(at: Date, zone = DEFAULT_ZONE): string {
+  const [year, month, day] = new Intl.DateTimeFormat('en-CA', { timeZone: zone })
+    .format(at)
+    .split('-')
+    .map(Number) as [number, number, number];
+  const weekday = (new Date(Date.UTC(year, month - 1, day)).getUTCDay() + 6) % 7;
+  return inZone({ year, month, day: day - weekday, hour: 0, minute: 0 }, zone).toISOString();
+}
 
 const linksSchema = z.array(linkInputSchema.omit({ from: true })).max(20);
 
@@ -420,6 +434,46 @@ export function apiRoutes(deps: {
         };
       }),
     );
+  });
+
+  // Her calendar (spec 011): everything dated in her spaces, for a window (this week by default).
+  api.get('/agenda', async (c) => {
+    const from = new Date(c.req.query('from') ?? weekStart(new Date()));
+    const to = c.req.query('to')
+      ? new Date(c.req.query('to')!)
+      : new Date(from.getTime() + 7 * 86_400_000);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      return c.json({ error: 'from and to are ISO times (« 2026-10-26T00:00:00+01:00 »).' }, 400);
+    }
+    const spaces = c.get('spaces');
+    const occurrences = await as(c, (tx) =>
+      agenda(
+        tx,
+        spaces.map((one) => one.id),
+        { from, to },
+      ),
+    );
+    const own = spaces.find((one) => one.personal);
+    const linked = own
+      ? await as(c, async (tx) =>
+          (await find(tx, own.id, { kind: 'Canal', limit: 1 })).some(
+            (one) => typeof one.data.agenda === 'string',
+          ),
+        )
+      : false;
+    return c.json({ from: from.toISOString(), to: to.toISOString(), occurrences, linked });
+  });
+
+  // A new private address for her phone's calendar; the previous one stops at once.
+  api.post('/agenda/address', async (c) => {
+    const own = c.get('spaces').find((one) => one.personal);
+    if (!own) return c.json({ error: 'Her own space is not reachable here.' }, 403);
+    const key = await as(c, (tx, actor) => renewCalendarKey(tx, actor, own.id));
+    const base = deps.publicUrl.replace(/\/$/, '');
+    return c.json({
+      url: `${base}/agenda/${key}.ics`,
+      webcal: `${base.replace(/^https?:/, 'webcal:')}/agenda/${key}.ics`,
+    });
   });
 
   api.get('/documents/:id', async (c) => {

@@ -41,6 +41,7 @@ describe('Jarvis’s method on connection (story 3)', () => {
     expect(tools.map((one) => one.name).sort()).toEqual(
       [
         'add_file',
+        'agenda',
         'archive',
         'create_space',
         'dashboard',

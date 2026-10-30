@@ -115,6 +115,27 @@ time, so a model never sends it again; read by its outline and the sections aske
 `jarvis_due_reminders` (migration 0004) is the watcher's only look across spaces: ids and members,
 nothing else; it then reads and writes as a member, under row-level security.
 
+## The calendar (spec 011)
+
+Time is a field any entry may carry; the calendar is computed from them, never stored.
+
+| Field                     | In the calendar                                                      |
+| ------------------------- | -------------------------------------------------------------------- |
+| `debut`, `fin` or `duree` | a span; a day alone is the whole day                                 |
+| `quand`                   | a moment                                                             |
+| `echeance`                | a deadline                                                           |
+| `date`                    | a day, from today on (a past one is her journal)                     |
+| `repete`, `duree`, `sauf` | again and again, minus the days off; `debut` and `jusqu` bound it    |
+| `statut`                  | « annulé » out; « proposé » marked; « fait » kept, out of what comes |
+
+| Function                            | What it does                                                   |
+| ----------------------------------- | -------------------------------------------------------------- |
+| `agenda(tx, spaces, { from, to })`  | every occurrence in the window (366 days, 200 repeats at most) |
+| `upcoming(tx, spaces, days)`        | the calendar of the next days, without what is done            |
+| `renewCalendarKey`, `calendarOwner` | her phone's private address: a new key, and whose a key is     |
+
+`jarvis_calendar_owner` (migration 0005) finds whose key a fingerprint is, and nothing else.
+
 ## Database
 
 `db/migrations/` is applied in order by `pnpm db:migrate` (the `dev` branch, or the URL in

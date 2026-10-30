@@ -2,10 +2,14 @@ import { requireMcpAuth } from '@better-auth/mcp';
 import { verifyOAuthQueryParams } from '@better-auth/oauth-provider';
 import {
   addFile,
+  agenda,
   asPerson,
+  calendarOwner,
+  DEFAULT_ZONE,
   clientSpaces,
   FILE_MAX_BYTES,
   get,
+  minutesOf,
   pool,
   previewInvitation,
   readDocument,
@@ -17,7 +21,8 @@ import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { CONSENT_PAGE, makeAuth, mcpResource, SIGN_IN_PAGE } from './auth';
-import { langOf, wordsOf } from './i18n';
+import { FEED_DAYS_AFTER, FEED_DAYS_BEFORE, icsOf, type Series } from './ics';
+import { fill, langOf, wordsOf } from './i18n';
 import { mcpServerFor } from './mcp';
 import { consentPage, invitationPage, messagePage, signInPage } from './pages';
 import { apiRoutes } from './routes';
@@ -238,6 +243,61 @@ export function makeApp(settings: Settings) {
           { space: space.name, spaceId: space.id, link: '' },
         ),
       ),
+    );
+  });
+
+  // Her calendar for the calendar of her phone (spec 011): the private address is the only key.
+  app.get('/agenda/:file', async (c) => {
+    const lang = langOf(c.req.header('accept-language'));
+    const key = c.req.param('file').replace(/\.ics$/, '');
+    const owner = await calendarOwner(db, key);
+    if (!owner) return c.text(wordsOf(lang).calendarGone, 404);
+    const now = new Date();
+    const { occurrences, name, series } = await asPerson(db, owner, async (tx) => {
+      const spaces = await spacesOf(tx);
+      const occurrences = await agenda(
+        tx,
+        spaces.map((one) => one.id),
+        {
+          from: new Date(now.getTime() - FEED_DAYS_BEFORE * 86_400_000),
+          to: new Date(now.getTime() + FEED_DAYS_AFTER * 86_400_000),
+        },
+      );
+      // A repeated entry goes to her phone once, with its rule, not a year of copies.
+      const series = new Map<string, Series>();
+      for (const one of occurrences) {
+        if (!one.repeated || series.has(one.id)) continue;
+        const data = (await get(tx, one.spaceId, one.id))?.data ?? {};
+        if (typeof data.repete !== 'string') continue;
+        const skipped: unknown[] = Array.isArray(data.sauf) ? data.sauf : [data.sauf];
+        series.set(one.id, {
+          repete: data.repete,
+          duree: minutesOf(data.duree),
+          sauf: skipped
+            .filter(
+              (day): day is string => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}/.test(day),
+            )
+            .map((day) => day.slice(0, 10)),
+          fuseau: typeof data.fuseau === 'string' && data.fuseau ? data.fuseau : DEFAULT_ZONE,
+          jusqu: typeof data.jusqu === 'string' ? data.jusqu : null,
+        });
+      }
+      return { name: spaces.find((one) => one.personal)?.name ?? '', occurrences, series };
+    });
+    const words = wordsOf(lang);
+    return c.body(
+      icsOf(occurrences, {
+        name: fill(words.calendarName, { name }),
+        now,
+        zone: DEFAULT_ZONE,
+        proposed: words.calendarProposed,
+        series,
+      }),
+      200,
+      {
+        'content-type': 'text/calendar; charset=utf-8',
+        'cache-control': 'private, max-age=300',
+      },
     );
   });
 

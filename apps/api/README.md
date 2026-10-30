@@ -36,20 +36,22 @@ all. Run it again to take a change.
 
 ## Routes
 
-| Method | Path                                                         | Core function                        |
-| ------ | ------------------------------------------------------------ | ------------------------------------ |
-| GET    | `/api/me`                                                    | her account, her own space, all hers |
-| GET    | `/api/kinds`                                                 | `kinds`                              |
-| GET    | `/api/entries?text&kind&from&to&archived&limit`              | `find`                               |
-| GET    | `/api/entries/:id`                                           | `get`                                |
-| POST   | `/api/save`                                                  | `save`                               |
-| POST   | `/api/entries/:id/archive`                                   | `archive`                            |
-| POST   | `/api/query` `{ sql }`                                       | `query`                              |
-| GET    | `/api/history?target&limit`                                  | `history`                            |
-| POST   | `/api/undo` `{ journalId }`                                  | `undo`                               |
-| POST   | `/api/files` (multipart `file`, `title?`, `data?`, `links?`) | `addFile`                            |
-| GET    | `/api/files/:id`                                             | the file's bytes                     |
-| GET    | `/api/files/:id/link?seconds`                                | a link that opens it without a token |
+| Method | Path                                                         | Core function                                                     |
+| ------ | ------------------------------------------------------------ | ----------------------------------------------------------------- |
+| GET    | `/api/me`                                                    | her account, her own space, all hers                              |
+| GET    | `/api/kinds`                                                 | `kinds`                                                           |
+| GET    | `/api/entries?text&kind&from&to&archived&limit`              | `find`                                                            |
+| GET    | `/api/entries/:id`                                           | `get`                                                             |
+| POST   | `/api/save`                                                  | `save`                                                            |
+| POST   | `/api/entries/:id/archive`                                   | `archive`                                                         |
+| POST   | `/api/query` `{ sql }`                                       | `query`                                                           |
+| GET    | `/api/history?target&limit`                                  | `history`                                                         |
+| POST   | `/api/undo` `{ journalId }`                                  | `undo`                                                            |
+| POST   | `/api/files` (multipart `file`, `title?`, `data?`, `links?`) | `addFile`                                                         |
+| GET    | `/api/files/:id`                                             | the file's bytes                                                  |
+| GET    | `/api/files/:id/link?seconds`                                | a link that opens it without a token                              |
+| GET    | `/api/agenda?from&to`                                        | `agenda` over all her spaces (spec 011), this week by default     |
+| POST   | `/api/agenda/address`                                        | a new private address for her phone's calendar; the old one stops |
 
 Every route acts in the space named by `?space=` (an id or a name) or the `x-jarvis-space` header,
 else in her own; `/api/query` reads all her spaces unless one is named (spec 004).
@@ -133,9 +135,14 @@ id); `query` reads all of them, `my_entries.space` naming each row's.
 | `write_document` | a new document: Markdown in `texte`, a kind in her words (spec 008)  |
 | `edit_document`  | one change by section (append, replace, insert after) or passage     |
 | `read_document`  | outline, then text or sections; view `ui://jarvis/document`          |
+| `agenda`         | her calendar for a window, every kind with a time field (spec 011)   |
 
 A document's reading link, `/document/:token` (a day, one document), is a page to read and print as
 PDF; `?format=md` gives its Markdown file.
+
+Her calendar for her phone, `/agenda/:key.ics` (spec 011), is iCalendar that Google Calendar or an
+iPhone subscribes to: a month back, eleven ahead; a repetition her phone can repeat goes once, as
+an RRULE. The key is random; only its sha-256 is kept. A new address answers, the old one is gone.
 
 ### Views (MCP Apps, spec 005)
 

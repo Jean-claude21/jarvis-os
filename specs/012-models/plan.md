@@ -35,12 +35,12 @@ Each layer ships when a real app needs it; Finances, from the author's Life OS, 
 
 ## Constitution Check
 
-| Principle                    | How this plan keeps it                                        |
-| ---------------------------- | ------------------------------------------------------------- |
-| I. Simple and working        | one module, one check in `save`; no table                     |
-| II. The model thinks         | Claude designs models with her; the system holds and enforces |
+| Principle                    | How this plan keeps it                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------------------ |
+| I. Simple and working        | one module, one check in `save`; no table                                                  |
+| II. The model thinks         | Claude designs models with her; the system holds and enforces                              |
 | III. One core, several doors | the check is in `save`: MCP and REST meet the same; an import keeps her files as they were |
-| V. Trust                     | refusals say why; a model is an entry, journaled and undoable |
+| V. Trust                     | refusals say why; a model is an entry, journaled and undoable                              |
 
 ## Complexity Tracking
 

@@ -24,6 +24,18 @@ export const TYPES = [
   'link',
   'formula',
   'lines',
+  // Spec 016: the types of every day.
+  'url',
+  'email',
+  'phone',
+  'multi_choice',
+  'file',
+  'location',
+  'rating',
+  'progress',
+  'button',
+  'time',
+  'long_text',
 ] as const;
 export type FieldType = (typeof TYPES)[number];
 
@@ -57,8 +69,23 @@ export const lineFieldSchema = z.object({
     'choice',
     'boolean',
     'list',
+    'url',
+    'email',
+    'phone',
+    'multi_choice',
+    'rating',
+    'progress',
+    'time',
+    'long_text',
   ]),
   required: z.boolean().optional(),
+  /** The value of a new entry when none is given: a value, or « =formula » (« =today() »). */
+  default: z.union([z.string().max(500), z.number(), z.boolean()]).optional(),
+  /** Bounds of a number, an amount, a rating, a progress, a date or a time. */
+  min: z.union([z.number(), z.string().max(40)]).optional(),
+  max: z.union([z.number(), z.string().max(40)]).optional(),
+  /** No two entries of the kind share this value (case and accents aside). */
+  unique: z.boolean().optional(),
   options: z.array(z.string().trim().min(1).max(80)).min(1).max(100).optional(),
   unit: z.string().trim().min(1).max(20).optional(),
   help: z.string().trim().max(300).optional(),
@@ -76,6 +103,17 @@ export const modelFieldSchema = lineFieldSchema.extend({
   formula: z.string().trim().min(1).max(2000).optional(),
   /** The fields of each line of a `lines`. */
   fields: z.array(lineFieldSchema).min(1).max(30).optional(),
+  /** What a `button` does when pressed: fields to set, a rule or a script to run, on its entry. */
+  action: z
+    .object({
+      set: z
+        .record(z.string(), z.union([z.string().max(2000), z.number(), z.boolean(), z.null()]))
+        .optional(),
+      rule: z.string().trim().min(1).max(120).optional(),
+      script: z.string().trim().min(1).max(120).optional(),
+      label: labelSchema.optional(),
+    })
+    .optional(),
 });
 export type ModelField = z.infer<typeof modelFieldSchema>;
 
@@ -148,6 +186,22 @@ export const modelDataSchema = z
         issue(`« ${field.name} » is a link: give its target kind.`);
       if (field.type === 'lines' && !field.fields)
         issue(`« ${field.name} » is lines: give the fields of a line.`);
+      if (field.type === 'multi_choice' && !field.options)
+        issue(`« ${field.name} » is a multi_choice: give its options.`);
+      if (
+        field.type === 'button' &&
+        !field.action?.set &&
+        !field.action?.rule &&
+        !field.action?.script
+      )
+        issue(`« ${field.name} » is a button: give its action { set } or { rule } or { script }.`);
+      if (typeof field.default === 'string' && field.default.startsWith('=')) {
+        try {
+          parse(field.default.slice(1));
+        } catch (error) {
+          issue((error as Error).message);
+        }
+      }
       if (field.type === 'formula') {
         if (!field.formula) issue(`« ${field.name} » is a formula: give its formula.`);
         else {
@@ -306,9 +360,78 @@ function problemOf(
       return 'computed, never written';
     case 'lines':
       return 'a list of lines';
+    case 'url':
+      return typeof value === 'string' && /^https?:\/\/[^\s]+\.[^\s]+$/i.test(value)
+        ? null
+        : 'a link (« https://… »)';
+    case 'email':
+      return typeof value === 'string' && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value)
+        ? null
+        : 'an address (« name@example.org »)';
+    case 'phone':
+      return typeof value === 'string' && /^\+?[\d\s().-]{6,24}$/.test(value)
+        ? null
+        : 'a number (« +225 07 00 00 00 »)';
+    case 'multi_choice':
+      return Array.isArray(value) &&
+        value.every(
+          (one) =>
+            typeof one === 'string' &&
+            (field.options ?? []).some((option) => fold(option) === fold(one)),
+        )
+        ? null
+        : `a list among: ${(field.options ?? []).join(', ')}`;
+    case 'file':
+      return typeof value === 'string' ||
+        (Array.isArray(value) && value.every((one) => typeof one === 'string'))
+        ? null
+        : 'the id of a file entry (or a list of them)';
+    case 'location':
+      return locationOf(value) ? null : '{ address?, lat, lng } (degrees)';
+    case 'rating': {
+      const top = typeof field.max === 'number' ? field.max : 5;
+      return Number.isInteger(value) && (value as number) >= 0 && (value as number) <= top
+        ? null
+        : `a whole number from 0 to ${top}`;
+    }
+    case 'progress':
+      return typeof value === 'number' && value >= 0 && value <= 100
+        ? null
+        : 'a percentage from 0 to 100';
+    case 'button':
+      return 'pressed, never written';
+    case 'time':
+      return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value)
+        ? null
+        : 'a time of day (« 07:15 »)';
     default:
       return typeof value === 'string' ? null : 'text';
   }
+}
+
+/** A place: `{ address?, lat, lng }`, or null when it is not one. */
+export function locationOf(value: unknown): { address?: string; lat: number; lng: number } | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const { lat, lng, address } = value as Record<string, unknown>;
+  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return { lat, lng, ...(typeof address === 'string' ? { address } : {}) };
+}
+
+/** What is wrong with a value against its field's bounds, or null. */
+function boundsOf(
+  field: { type: string; min?: number | string | undefined; max?: number | string | undefined },
+  value: unknown,
+): string | null {
+  if (field.min === undefined && field.max === undefined) return null;
+  if (field.type === 'rating') return null;
+  const comparable = typeof value === 'number' || typeof value === 'string' ? value : null;
+  if (comparable === null) return null;
+  if (field.min !== undefined && typeof field.min === typeof comparable && comparable < field.min)
+    return `at least ${field.min}`;
+  if (field.max !== undefined && typeof field.max === typeof comparable && comparable > field.max)
+    return `at most ${field.max}`;
+  return null;
 }
 
 /** The problems of the lines of a `lines` field. */
@@ -327,7 +450,7 @@ function linesProblems(field: ModelField, value: unknown): string[] {
       if (!sub) problems.push(`${at}: « ${name} » is not one of its fields`);
       else if (sub.name !== name) problems.push(`${at}: write « ${sub.name} », not « ${name} »`);
       else if (one !== null) {
-        const wrong = problemOf(sub, one);
+        const wrong = problemOf(sub, one) ?? boundsOf(sub, one);
         if (wrong) problems.push(`${at}: « ${name} » must be ${wrong}`);
       }
     }
@@ -371,14 +494,14 @@ export function checkAgainst(
       problems.push(...linesProblems(field, value));
       continue;
     }
-    const wrong = problemOf(field, value);
+    const wrong = problemOf(field, value) ?? boundsOf(field, value);
     if (wrong) problems.push(`« ${name} » must be ${wrong}`);
   }
   if (creating) {
     for (const field of model.fields) {
       if (
         field.required &&
-        !['link', 'formula'].includes(field.type) &&
+        !['link', 'formula', 'button'].includes(field.type) &&
         result[field.name] === undefined
       ) {
         problems.push(`« ${field.name} » is required`);

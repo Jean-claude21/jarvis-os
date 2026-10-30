@@ -6,14 +6,14 @@ import { record } from './journal';
 export interface Space {
   id: string;
   name: string;
-  role: 'owner' | 'member';
+  role: 'owner' | 'member' | 'viewer';
   /** Her own space: private for good, no one is ever invited into it. */
   personal: boolean;
 }
 
 export interface Member {
   person: string;
-  role: 'owner' | 'member';
+  role: 'owner' | 'member' | 'viewer';
   since: string;
 }
 
@@ -261,6 +261,42 @@ export async function leaveSpace(
     input.spaceId,
     person,
   ]);
+}
+
+/**
+ * What a member may do in a shared space (spec 016): `owner`, `member` (reads and writes) or
+ * `viewer` (reads only). Only an owner changes it; a space keeps at least one owner.
+ */
+export async function setRole(
+  tx: Tx,
+  actor: Actor,
+  input: { spaceId: string; person: string; role: 'owner' | 'member' | 'viewer' },
+): Promise<void> {
+  const space = await spaceOf(tx, input.spaceId);
+  if (space.personal) throw new Error('Her own space has her alone.');
+  if (space.role !== 'owner') throw new Error('Only an owner changes what a member may do.');
+  const members = await membersOf(tx, input.spaceId);
+  const one = members.find((member) => member.person === input.person);
+  if (!one) throw new Error(`No member ${input.person} in this space.`);
+  if (
+    one.role === 'owner' &&
+    input.role !== 'owner' &&
+    !members.some((member) => member.person !== input.person && member.role === 'owner')
+  ) {
+    throw new Error('A space keeps at least one owner.');
+  }
+  await tx.query('update member set role = $3 where space_id = $1 and person_id = $2', [
+    input.spaceId,
+    input.person,
+    input.role,
+  ]);
+  await record(tx, actor, {
+    spaceId: input.spaceId,
+    command: 'space.role',
+    target: input.person,
+    before: { person: input.person, role: one.role },
+    after: { person: input.person, role: input.role },
+  });
 }
 
 /**

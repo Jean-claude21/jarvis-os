@@ -157,4 +157,20 @@ export const viewWords = {
       opened: 'She opened entry {id} from the page.',
     },
   },
+  shared: {
+    fr: {
+      closed: 'Ce lien est fermé.',
+      name: 'Ton nom',
+      send: 'Envoyer',
+      thanks: 'Merci, c’est envoyé.',
+      title: 'Titre',
+    },
+    en: {
+      closed: 'This link is closed.',
+      name: 'Your name',
+      send: 'Send',
+      thanks: 'Thank you, it is sent.',
+      title: 'Title',
+    },
+  },
 } as const;

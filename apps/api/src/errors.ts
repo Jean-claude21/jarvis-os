@@ -34,7 +34,11 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
       message,
     ) ||
     // Views, her settings, her keys (spec 015).
-    /^A « View » is|^No view |is not a time zone|^Telegram |^A key needs/.test(message)
+    /^A « View » is|^No view |is not a time zone|^Telegram |^A key needs/.test(message) ||
+    // Collections, buttons, shares, viewers (spec 016).
+    /is unique, and|: no file |not a button|never written|^A « Share » is|not asked by this form|^A name is needed|^This link shows|^A form adds to|^Only an owner changes|keeps at least one owner|^No collection «|has her alone|row-level security/.test(
+      message,
+    )
   ) {
     return { status: 400, message };
   }
@@ -57,6 +61,8 @@ export function codeOf(message: string): string | null {
     [/^The script|^Script «|may not (write|change)/, 'script'],
     [/is not a time zone/, 'zone'],
     [/^Telegram /, 'telegram'],
+    [/row-level security/, 'readonly'],
+    [/is unique, and|: no file |never written/, 'model'],
     [/^No /, 'missing'],
   ];
   return kinds.find(([pattern]) => pattern.test(message))?.[1] ?? null;

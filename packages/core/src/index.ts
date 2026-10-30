@@ -70,6 +70,7 @@ export {
   membersOf,
   previewInvitation,
   renameSpace,
+  setRole,
   spacesOf,
   withdrawInvitation,
   type Invitation,
@@ -100,6 +101,7 @@ export {
   modelOf,
   modelsOf,
   fieldOf,
+  locationOf,
   TYPES,
   placeOf,
   workflowSchema,
@@ -124,6 +126,8 @@ export {
   evaluate,
   formulaValue,
   FUNCTIONS,
+  kilometres,
+  PEGGED,
   parse,
   todayOf,
   type Clock,
@@ -156,6 +160,7 @@ export {
   rulesOf,
   runDueRules,
   testRule,
+  press,
   type Action,
   type RuleData,
 } from './rules';
@@ -187,3 +192,20 @@ export {
 } from './views';
 export { isZone, setZone, zoneOf } from './zone';
 export { createKey, KEY_PREFIX, keyOwner, keysOf, revokeKey, type PersonalKey } from './keys';
+export {
+  collectionsOf,
+  collectionStats,
+  type Collection,
+  type CollectionStats,
+} from './collections';
+export {
+  checkShare,
+  createShare,
+  SHARE_KIND,
+  shareDataSchema,
+  sharedPage,
+  shareOf,
+  submitShare,
+  type ShareData,
+  type SharedPage,
+} from './shares';

@@ -4,9 +4,11 @@ import { record } from './journal';
 import { readerOf } from './compute';
 import { formulaValue } from './formula';
 import { checkPage } from './pages';
+import { zoneOf } from './zone';
 import { checkRule, runRulesAfterSave, type Changed } from './rules';
 import { checkScript } from './scripts';
 import { checkView } from './views';
+import { checkShare } from './shares';
 import { dataInNewWords, KIND_RENAMES, modelInNewWords, ROLE_RENAMES } from './keywords';
 import {
   checkAgainst,
@@ -97,6 +99,7 @@ const SYSTEM_CHECKS: Record<string, (data: Record<string, unknown>) => unknown> 
   rule: checkRule,
   script: checkScript,
   view: checkView,
+  share: checkShare,
 };
 const checkSystem = (kind: string, data: Record<string, unknown>) =>
   SYSTEM_CHECKS[foldKind(kind)]?.(data);
@@ -166,6 +169,62 @@ async function followWorkflow(
   throw new Error(
     `« ${model.kind} » cannot go to « ${String(to)} » yet: ${allowed.map((one) => one.if).join(' or ')} must hold.`,
   );
+}
+
+/** The defaults of a model's fields, put in a new entry's data where nothing was given (spec 016). */
+async function defaultsInto(tx: Tx, model: Model, data: Record<string, unknown>): Promise<void> {
+  const clock = { now: new Date(), zone: await zoneOf(tx) };
+  for (const field of model.fields) {
+    if (field.default === undefined || data[field.name] !== undefined) continue;
+    data[field.name] =
+      typeof field.default === 'string' && field.default.startsWith('=')
+        ? await formulaValue(field.default.slice(1), { get: (name) => data[name] ?? null }, clock)
+        : field.default;
+  }
+}
+
+/** A model's other promises (spec 016): unique values, files that exist. */
+async function followOptions(
+  tx: Tx,
+  spaceId: string,
+  model: Model,
+  id: string,
+  given: Record<string, unknown>,
+  data: Record<string, unknown>,
+): Promise<void> {
+  for (const field of model.fields) {
+    const value = data[field.name];
+    if (value === undefined || value === null || !(field.name in given)) continue;
+    if (field.unique) {
+      const { rows } = await tx.query<{ title: string }>(
+        typeof value === 'string'
+          ? `select title from entry where space_id = $1 and archived_at is null and id <> $2
+               and jarvis_fold(kind) = jarvis_fold($3) and jarvis_fold(data->>$4) = jarvis_fold($5) limit 1`
+          : `select title from entry where space_id = $1 and archived_at is null and id <> $2
+               and jarvis_fold(kind) = jarvis_fold($3) and data->$4 = $5::jsonb limit 1`,
+        [
+          spaceId,
+          id,
+          model.kind,
+          field.name,
+          typeof value === 'string' ? value : JSON.stringify(value),
+        ],
+      );
+      if (rows[0])
+        throw modelError(model, [
+          `« ${field.name} » is unique, and « ${rows[0].title} » already has it`,
+        ]);
+    }
+    if (field.type === 'file') {
+      const ids = [value].flat().map(String);
+      const { rows } = await tx.query<{ entry_id: string }>(
+        'select entry_id from file where space_id = $1 and entry_id = any($2)',
+        [spaceId, ids],
+      );
+      const missing = ids.find((one) => !rows.some((row) => row.entry_id === one));
+      if (missing) throw modelError(model, [`« ${field.name} »: no file ${missing} in this space`]);
+    }
+  }
 }
 
 /** A link field given in `data`: made a link once every entry of the save has its id. */
@@ -261,6 +320,7 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
     if (!current) {
       id = prefixedId('ent');
       const data = Object.fromEntries(kept.map((field) => [field, given[field]]));
+      if (model) await defaultsInto(tx, model, data);
       if (model?.workflow?.initial && data[model.workflow.field] === undefined) {
         data[model.workflow.field] = model.workflow.initial;
       }
@@ -270,6 +330,7 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
         const problems = checkAgainst(model, given, data, true);
         if (problems.length) throw modelError(model, problems);
         await followWorkflow(tx, spaceId, model, id, null, data);
+        await followOptions(tx, spaceId, model, id, data, data);
         created.push({ id, model });
       }
       await tx.query(
@@ -309,6 +370,7 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
             : checkAgainst(model, given, data, false);
         if (problems.length) throw modelError(model, problems);
         await followWorkflow(tx, spaceId, model, id, current.data, data);
+        await followOptions(tx, spaceId, model, id, given, data);
       }
       await tx.query(
         `update entry set kind = $2, title = $3, data = $4, origin = $5, updated_at = now()

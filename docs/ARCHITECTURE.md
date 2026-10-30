@@ -175,6 +175,31 @@ flowchart TB
 - **Technical names are English**; what she reads comes from `label` and `optionLabels` (`fr`,
   `en`) and the catalogs. A refusal carries a `code` the app says in her language.
 
+## Collections and the types of every day (spec 016)
+
+- **Types**: besides text, numbers, amounts, dates, choices, links, formulas and lines, a field may
+  be `url`, `email`, `phone`, `multi_choice`, `file`, `location`, `rating`, `progress`, `button`,
+  `time`, `long_text`; and carry `default`, `min`, `max`, `unique` — all checked in `save`.
+- **Formulas** gain `distance(a, b)` (km as the crow flies — no routing service) and
+  `convert(amount, from, to)` (XOF, XAF, EUR fixed; other rates from her « Rate » entries).
+- **Collections** (`collections.ts`): every kind with a model opens on its own, its statistics read
+  from its model (splits of its choices, weeks, sums and averages).
+- **Views** gain map (Leaflet over OpenStreetMap in the app), gallery, timeline and tree; a page
+  may hold a view; a line compares several series.
+- **Actions**: a `button` runs its action through `press`; a rule's `update.on` changes the entry
+  it links to (an order takes from a product's stock).
+- **Shares** (`shares.ts`, migration 0011): a public form (what it brings is « read » and
+  « proposed ») or a public view, at `/p/:key`; only the key's fingerprint is kept.
+- **Viewers** (migration 0011): reading needs membership; writing needs a member who is not a
+  viewer — in the policies themselves.
+
+```mermaid
+flowchart LR
+  M[(Model)] --> ST[statistics] & V[views: table · kanban · calendar · map · gallery · timeline · tree]
+  P[/p/:key/] -->|form: proposed| S[save]
+  BT[button · rule update.on] --> S
+```
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |

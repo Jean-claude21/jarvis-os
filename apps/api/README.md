@@ -59,6 +59,11 @@ all. Run it again to take a change.
 | POST   | `/api/apps/area` (`app`, `area`)                                        | files an app in an area (spec 015)                                                      |
 | GET    | `/api/views?kind&app`, POST `/api/views/run` (`id`, `view`)             | `viewsOf`; `runView` (spec 015)                                                         |
 | GET    | `/api/me/zone`, POST `/api/me/zone` (`zone`)                            | her time zone                                                                           |
+| GET    | `/api/collections`, `/api/collections/:kind/stats`                      | her collections and their statistics (spec 016)                                         |
+| POST   | `/api/entries/:id/press` (`field`)                                      | a button pressed                                                                        |
+| GET    | `/api/shares`, POST `/api/shares` (`name`, `data`)                      | her public links; a new one (its link, once)                                            |
+| POST   | `/api/spaces/:id/members/:person/role` (`role`)                         | owner, member or viewer                                                                 |
+| GET    | `/p/:key`, POST `/p/:key`                                               | a public form or view, without an account                                               |
 | POST   | `/api/me/telegram`                                                      | a link to the bot with a code made for her (`JARVIS_TELEGRAM_BOT_TOKEN`)                |
 | GET    | `/api/me/keys`, POST `/api/me/keys` (`name`), DELETE `/api/me/keys/:id` | personal keys; `Authorization: Bearer jos_…` then acts as her                           |
 | POST   | `/api/agenda/address`                                                   | a new private address for her phone's calendar; the old one stops                       |
@@ -128,36 +133,40 @@ own only, for a client connected before spec 004), with Jarvis's instructions, t
 routines of each of those spaces, and the tools. Every tool takes an optional `space` (a name or an
 id); `query` reads all of them, `my_entries.space` naming each row's.
 
-| Tool             | Core function                                                        |
-| ---------------- | -------------------------------------------------------------------- |
-| `kinds`          | `kinds`, with each kind's model (spec 012)                           |
-| `find`           | `find`                                                               |
-| `get`            | `get`                                                                |
-| `save`           | `save`                                                               |
-| `archive`        | `archive`                                                            |
-| `query`          | `query`                                                              |
-| `history`        | `history`                                                            |
-| `undo`           | `undo`                                                               |
-| `add_file`       | `addFile`                                                            |
-| `file_link`      | a link that opens a file without a token                             |
-| `routine`        | one of her routines, or a base one (`src/routines/`)                 |
-| `spaces`         | the spaces this connection reaches, with who belongs                 |
-| `create_space`   | a shared space she owns, reached by this client                      |
-| `invite`         | an invitation link into a shared space she owns                      |
-| `dashboard`      | widgets (query + chart) recomputed now; view `ui://jarvis/dashboard` |
-| `show_entry`     | one entry as a card, undoable; view `ui://jarvis/entry`              |
-| `upload_link`    | a link where files go straight in; view `ui://jarvis/upload`         |
-| `write_document` | a new document: Markdown in `texte`, a kind in her words (spec 008)  |
-| `edit_document`  | one change by section (append, replace, insert after) or passage     |
-| `read_document`  | outline, then text or sections; view `ui://jarvis/document`          |
-| `agenda`         | her calendar for a window, every kind with a time field (spec 011)   |
-| `page`           | a page of her app, computed for its filters; view `ui://jarvis/page` |
-| `rule_test`      | a rule tried on an entry: what it would change, nothing changed      |
-| `run_script`     | a script run in QuickJS (`src/scripts.ts`), tried by default         |
-| `migrate`        | rename, set, remove a field across a kind, tried by default          |
-| `app_export`     | an app as a bundle: models, pages, rules, scripts                    |
-| `app_install`    | a shipped app (Finances, Routines) or a bundle, tried by default     |
-| `view`           | a view run: filters (one link away), sort, columns, kanban, calendar |
+| Tool               | Core function                                                        |
+| ------------------ | -------------------------------------------------------------------- |
+| `kinds`            | `kinds`, with each kind's model (spec 012)                           |
+| `find`             | `find`                                                               |
+| `get`              | `get`                                                                |
+| `save`             | `save`                                                               |
+| `archive`          | `archive`                                                            |
+| `query`            | `query`                                                              |
+| `history`          | `history`                                                            |
+| `undo`             | `undo`                                                               |
+| `add_file`         | `addFile`                                                            |
+| `file_link`        | a link that opens a file without a token                             |
+| `routine`          | one of her routines, or a base one (`src/routines/`)                 |
+| `spaces`           | the spaces this connection reaches, with who belongs                 |
+| `create_space`     | a shared space she owns, reached by this client                      |
+| `invite`           | an invitation link into a shared space she owns                      |
+| `dashboard`        | widgets (query + chart) recomputed now; view `ui://jarvis/dashboard` |
+| `show_entry`       | one entry as a card, undoable; view `ui://jarvis/entry`              |
+| `upload_link`      | a link where files go straight in; view `ui://jarvis/upload`         |
+| `write_document`   | a new document: Markdown in `texte`, a kind in her words (spec 008)  |
+| `edit_document`    | one change by section (append, replace, insert after) or passage     |
+| `read_document`    | outline, then text or sections; view `ui://jarvis/document`          |
+| `agenda`           | her calendar for a window, every kind with a time field (spec 011)   |
+| `page`             | a page of her app, computed for its filters; view `ui://jarvis/page` |
+| `rule_test`        | a rule tried on an entry: what it would change, nothing changed      |
+| `run_script`       | a script run in QuickJS (`src/scripts.ts`), tried by default         |
+| `migrate`          | rename, set, remove a field across a kind, tried by default          |
+| `app_export`       | an app as a bundle: models, pages, rules, scripts                    |
+| `app_install`      | a shipped app (Finances, Routines) or a bundle, tried by default     |
+| `view`             | a view run: filters (one link away), sort, columns, kanban, calendar |
+| `collection_stats` | her collections, or one's statistics (spec 016)                      |
+| `press`            | a `button` field pressed                                             |
+| `share`            | a public form or view (after her yes); its link                      |
+| `set_role`         | owner, member or viewer in a shared space                            |
 
 A document's reading link, `/document/:token` (a day, one document), is a page to read and print as
 PDF; `?format=md` gives its Markdown file.

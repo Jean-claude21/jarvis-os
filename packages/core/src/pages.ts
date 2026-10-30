@@ -6,6 +6,7 @@ import { evaluate, isScope, parse, todayOf, type Clock } from './formula';
 import { labelSchema, type Label } from './models';
 import { query } from './query';
 import { requestSchema, runRequest, withParams } from './request';
+import { runView, viewDataSchema } from './views';
 
 // Pages (spec 014): what an app shows, declared — filters and blocks — computed by the core and
 // drawn by one renderer, in the app and inside Claude. A page is an entry of kind « Page »; its
@@ -111,6 +112,8 @@ export const blockSchema = z.discriminatedUnion('block', [
     kind,
     relations: z.array(z.string().min(1).max(60)).max(10).optional(),
   }),
+  /** A view of a kind inside the page (spec 016): table, kanban, calendar, map, gallery, timeline, tree. */
+  z.object({ block: z.literal('view'), title, view: viewDataSchema }),
 ]);
 export type Block = z.infer<typeof blockSchema>;
 
@@ -145,7 +148,7 @@ export function checkPage(data: unknown): PageData {
       .map((issue) => `${issue.path.join('.') || 'page'}: ${issue.message}`)
       .join('; ');
     throw new Error(
-      `A « ${PAGE_KIND} » is { app?, filters?: [{ name, type: month|choice|text|record, options?, default? }], blocks: [{ block: stat|stat_delta|gauge|bar|line|breakdown|heatmap|table|task_list|kanban|calendar|form|record|sql, … }] } — ${issues}.`,
+      `A « ${PAGE_KIND} » is { app?, filters?: [{ name, type: month|choice|text|record, options?, default? }], blocks: [{ block: stat|stat_delta|gauge|bar|line|breakdown|heatmap|table|task_list|kanban|calendar|form|record|sql|view, … }] } — ${issues}.`,
     );
   }
   for (const block of parsed.data.blocks) {
@@ -275,13 +278,26 @@ async function drawBlock(
       const result = await runRequest(reader, block.query, params);
       const label = block.label ?? result.columns[0]!;
       const value = block.value ?? result.columns.find((one) => one !== label) ?? label;
+      const number = (one: unknown) => (typeof one === 'number' ? one : Number(one) || 0);
+      // Every number column is a series (spec 016): a line can compare entrées and sorties.
+      const columns = result.columns.filter(
+        (one) => one !== label && result.rows.some((row) => typeof row[one] === 'number'),
+      );
       return {
         ...base,
-        points: result.rows.map((row) => ({
-          label: row[label] ?? '—',
-          value: typeof row[value] === 'number' ? row[value] : Number(row[value]) || 0,
+        points: result.rows.map((row) => ({ label: row[label] ?? '—', value: number(row[value]) })),
+        series: (block.value ? [value] : columns.length ? columns : [value]).map((name) => ({
+          name,
+          points: result.rows.map((row) => ({
+            label: row[label] ?? '—',
+            value: number(row[name]),
+          })),
         })),
       };
+    }
+    case 'view': {
+      const result = await runView(tx, reader.spaceId, block.view, reader.clock);
+      return { ...base, kind: block.view.kind, result: { ...result, fields: [] } };
     }
     case 'heatmap': {
       const views = await filtered(block.kind, block.where);

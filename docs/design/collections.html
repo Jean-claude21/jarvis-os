@@ -1,0 +1,1324 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jarvis — collections et types</title>
+    <!--
+  Maquette (proposition, pas encore le produit). Données fictives : ce dépôt est public.
+  1. Une collection ouverte directement : statistiques automatiques déduites du model, puis la même
+     collection en table, kanban, calendar, map ou gallery.
+  2. Le catalogue des types de field : ce qui existe, ce qui est proposé, comment chacun s'affiche,
+     se saisit et se filtre.
+  Les noms techniques sont en anglais ; ce qu'elle lit vient des labels (fr / en).
+-->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #efe6dc;
+        --paper: #fffdf9;
+        --sand: #fbf6f0;
+        --clay: #f4e6da;
+        --rule: #e6d6c8;
+        --rule-strong: #c9b3a4;
+        --ink: #2a1610;
+        --bark: #6b4e43;
+        --faint: #9a8276;
+        --primary: #b83a1b;
+        --ochre: #c98a2b;
+        --on-primary: #fffdf9;
+        --success: #2f7d4f;
+        --success-surface: #e3f1e8;
+        --verify: #7a4a0b;
+        --verify-surface: #fbebd0;
+        --error: #9b1c3c;
+        --error-surface: #f7e1e7;
+        --info: #2b5c8a;
+        --info-surface: #e2ecf5;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --canvas: #0f0a07;
+          --paper: #17100c;
+          --sand: #1d140f;
+          --clay: #2c2019;
+          --rule: #3a2b23;
+          --rule-strong: #5a4539;
+          --ink: #f4e6da;
+          --bark: #bfa799;
+          --faint: #8c766a;
+          --primary: #f08a63;
+          --ochre: #d9a04a;
+          --on-primary: #17100c;
+          --success: #4fa873;
+          --success-surface: #1c3025;
+          --verify: #f2cc8a;
+          --verify-surface: #3a2a12;
+          --error: #d0546f;
+          --error-surface: #3e1620;
+          --info: #5c8fc2;
+          --info-surface: #172a3d;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--canvas);
+        color: var(--ink);
+        font:
+          400 14px/1.5 'Instrument Sans',
+          system-ui,
+          sans-serif;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: Archivo, system-ui, sans-serif;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 24px 16px 60px;
+      }
+      .caps {
+        font:
+          600 11px/1.4 Archivo,
+          system-ui,
+          sans-serif;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--bark);
+      }
+      .muted {
+        color: var(--bark);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .num,
+      code {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-variant-numeric: tabular-nums;
+      }
+      code {
+        font-size: 12px;
+        background: var(--clay);
+        padding: 1px 5px;
+        border-radius: 2px;
+      }
+      .intro {
+        margin-bottom: 18px;
+      }
+      .intro h1 {
+        font-size: 24px;
+      }
+      .intro p {
+        margin: 6px 0 0;
+        max-width: 760px;
+      }
+      .section-title {
+        margin: 34px 0 10px;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .section-title h2 {
+        font-size: 18px;
+      }
+      .panel {
+        background: var(--sand);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        min-width: 0;
+      }
+      .panel > .ph {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+      }
+      .panel > .pb {
+        background: var(--paper);
+        border-top: 1px solid var(--rule);
+        padding: 14px 16px;
+        min-width: 0;
+      }
+      .head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+      }
+      .head h2 {
+        font-size: 20px;
+      }
+      button,
+      .btn {
+        font:
+          600 13px/1 'Instrument Sans',
+          system-ui,
+          sans-serif;
+        padding: 8px 12px;
+        border-radius: 2px;
+        cursor: pointer;
+        border: 1px solid var(--ink);
+        background: var(--ink);
+        color: var(--paper);
+        text-decoration: none;
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      button.quiet,
+      .btn.quiet {
+        background: transparent;
+        color: var(--ink);
+        border-color: var(--rule-strong);
+      }
+      button.mini {
+        padding: 4px 8px;
+        font-size: 12px;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .kpi {
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        padding: 12px 14px;
+        min-width: 0;
+      }
+      .kpi .v {
+        font:
+          600 26px/1.15 'JetBrains Mono',
+          monospace;
+        letter-spacing: -0.02em;
+        margin-top: 6px;
+      }
+      .kpi .v small {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--bark);
+        margin-left: 4px;
+      }
+      .kpi .s {
+        color: var(--bark);
+        font-size: 12.5px;
+        margin-top: 2px;
+      }
+      .stack {
+        display: flex;
+        height: 10px;
+        border-radius: 1px;
+        overflow: hidden;
+        gap: 2px;
+        margin-top: 10px;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--bark);
+      }
+      .legend i {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 1px;
+        margin-right: 4px;
+        vertical-align: -1px;
+      }
+      .spark {
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+        height: 36px;
+        margin-top: 8px;
+      }
+      .spark span {
+        flex: 1;
+        background: var(--ink);
+        opacity: 0.85;
+        border-radius: 1px 1px 0 0;
+      }
+      .auto {
+        font-size: 12px;
+        color: var(--faint);
+        margin: -4px 0 12px;
+      }
+      .vbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--rule-strong);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .seg button {
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        color: var(--ink);
+        padding: 7px 11px;
+      }
+      .seg button.on {
+        background: var(--ink);
+        color: var(--paper);
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 8px;
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        font-size: 12.5px;
+        background: var(--paper);
+      }
+      .chip small {
+        color: var(--bark);
+      }
+      .grow {
+        flex: 1;
+      }
+      .scroll {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 900px;
+      }
+      th {
+        text-align: left;
+        font:
+          600 11px/1.4 Archivo,
+          system-ui,
+          sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--bark);
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--rule-strong);
+        white-space: nowrap;
+      }
+      th .t {
+        font:
+          500 10px 'JetBrains Mono',
+          monospace;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--faint);
+        display: block;
+      }
+      td {
+        padding: 8px;
+        border-bottom: 1px dotted var(--rule);
+        vertical-align: middle;
+      }
+      td.n {
+        text-align: right;
+      }
+      a.url {
+        color: var(--primary);
+        text-decoration: none;
+      }
+      a.url:hover {
+        text-decoration: underline;
+      }
+      .tag {
+        display: inline-block;
+        padding: 1px 7px;
+        border-radius: 2px;
+        font-size: 12px;
+        margin: 1px 2px 1px 0;
+        background: var(--clay);
+      }
+      .state {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 8px;
+        border-radius: 2px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .s-applied {
+        background: var(--info-surface);
+        color: var(--info);
+      }
+      .s-interview {
+        background: var(--verify-surface);
+        color: var(--verify);
+      }
+      .s-offer {
+        background: var(--success-surface);
+        color: var(--success);
+      }
+      .s-rejected {
+        background: var(--error-surface);
+        color: var(--error);
+      }
+      .s-to_apply {
+        background: var(--clay);
+        color: var(--bark);
+      }
+      .stars {
+        color: var(--ochre);
+        letter-spacing: 1px;
+        white-space: nowrap;
+      }
+      .stars .off {
+        color: var(--rule-strong);
+      }
+      .bar {
+        height: 6px;
+        background: var(--clay);
+        border-radius: 1px;
+        overflow: hidden;
+        min-width: 70px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--ink);
+      }
+      .file {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        font-size: 12.5px;
+      }
+      .file b {
+        font:
+          600 10px 'JetBrains Mono',
+          monospace;
+        background: var(--clay);
+        padding: 2px 4px;
+        border-radius: 2px;
+      }
+      .icon {
+        display: inline-flex;
+        width: 26px;
+        height: 26px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 13px;
+        background: var(--paper);
+      }
+      .kanban {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(200px, 1fr);
+        gap: 10px;
+        overflow-x: auto;
+      }
+      .kcol {
+        background: var(--sand);
+        border: 1px solid var(--rule);
+        padding: 8px;
+        min-height: 160px;
+      }
+      .kcard {
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        padding: 9px 10px;
+        margin-top: 8px;
+        display: grid;
+        gap: 4px;
+      }
+      .kcard b {
+        font-weight: 600;
+      }
+      .cal {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 3px;
+      }
+      .cday {
+        min-height: 84px;
+        border: 1px solid var(--rule);
+        background: var(--paper);
+        padding: 4px;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .cday.off {
+        background: transparent;
+        border-color: transparent;
+      }
+      .cday.today {
+        outline: 2px solid var(--primary);
+      }
+      .cev {
+        font-size: 11.5px;
+        padding: 1px 4px;
+        border-radius: 2px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .mapbox {
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
+        gap: 10px;
+      }
+      .map {
+        position: relative;
+        aspect-ratio: 16 / 10;
+        background: var(--clay);
+        border: 1px solid var(--rule);
+        overflow: hidden;
+      }
+      .map svg {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .pin {
+        position: absolute;
+        transform: translate(-50%, -100%);
+        display: grid;
+        justify-items: center;
+      }
+      .pin b {
+        background: var(--primary);
+        color: var(--on-primary);
+        font:
+          600 11px 'JetBrains Mono',
+          monospace;
+        padding: 2px 6px;
+        border-radius: 2px;
+        white-space: nowrap;
+      }
+      .pin i {
+        width: 2px;
+        height: 10px;
+        background: var(--primary);
+      }
+      .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+        gap: 10px;
+      }
+      .gcard {
+        background: var(--paper);
+        border: 1px solid var(--rule);
+      }
+      .gcard .img {
+        aspect-ratio: 4 / 3;
+        display: grid;
+        place-items: center;
+        font:
+          700 28px Archivo,
+          sans-serif;
+        color: var(--paper);
+      }
+      .gcard .meta {
+        padding: 9px 10px;
+        display: grid;
+        gap: 3px;
+      }
+      .types {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 10px;
+      }
+      .type .ph .name {
+        font:
+          600 13px 'JetBrains Mono',
+          monospace;
+      }
+      .badge {
+        font-size: 11px;
+        padding: 1px 7px;
+        border-radius: 2px;
+        white-space: nowrap;
+      }
+      .badge.has {
+        background: var(--success-surface);
+        color: var(--success);
+      }
+      .badge.new {
+        background: var(--info-surface);
+        color: var(--info);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 74px 1fr;
+        gap: 8px;
+        padding: 5px 0;
+        border-bottom: 1px dotted var(--rule);
+        align-items: center;
+        font-size: 13px;
+      }
+      .row:last-child {
+        border-bottom: 0;
+      }
+      .row .caps {
+        font-size: 10px;
+      }
+      .field {
+        font: inherit;
+        padding: 5px 7px;
+        border: 1px solid var(--rule-strong);
+        border-radius: 2px;
+        background: var(--paper);
+        color: var(--ink);
+        width: 100%;
+      }
+      .note {
+        background: var(--paper);
+        border: 1px dashed var(--rule-strong);
+        padding: 10px 12px;
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--bark);
+      }
+      [hidden] {
+        display: none !important;
+      }
+      @media (max-width: 760px) {
+        .mapbox {
+          grid-template-columns: 1fr;
+        }
+        .cday {
+          min-height: 56px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="intro">
+        <div class="caps">Proposition · chiffres fictifs</div>
+        <h1>Une collection, ouverte directement</h1>
+        <p class="muted">
+          Pas besoin d'une app : tout kind qui a un model s'ouvre d'un clic. En tête, des
+          statistiques calculées à partir du model, sans configuration ; dessous, la même collection
+          en table, kanban, calendar, map ou gallery. Exemple : le suivi de candidatures de stage.
+        </p>
+      </header>
+
+      <section class="panel">
+        <div class="ph">
+          <span class="caps">Ma vie › Collections › Candidatures de stage</span>
+          <span class="faint num">kind <code>Application</code> · area Professionnel</span>
+        </div>
+        <div class="pb">
+          <div class="head">
+            <div>
+              <h2>Candidatures de stage</h2>
+              <div class="muted">18 entrées · mises à jour il y a 2 h</div>
+            </div>
+            <div class="actions">
+              <button class="quiet">Voir le model</button>
+              <button class="quiet">+ Page de stats</button>
+              <button>Ajouter : Candidature</button>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="kpi">
+              <div class="caps">Total</div>
+              <div class="v">18</div>
+              <div class="s">dont 6 ce mois-ci</div>
+            </div>
+            <div class="kpi">
+              <div class="caps">Par état · <code>state</code></div>
+              <div class="stack">
+                <span style="flex: 3; background: var(--rule-strong)"></span>
+                <span style="flex: 8; background: var(--info)"></span>
+                <span style="flex: 4; background: var(--ochre)"></span>
+                <span style="flex: 1; background: var(--success)"></span>
+                <span style="flex: 2; background: var(--error)"></span>
+              </div>
+              <div class="legend">
+                <span><i style="background: var(--rule-strong)"></i>à postuler 3</span>
+                <span><i style="background: var(--info)"></i>postulé 8</span>
+                <span><i style="background: var(--ochre)"></i>entretien 4</span>
+                <span><i style="background: var(--success)"></i>offre 1</span>
+                <span><i style="background: var(--error)"></i>refus 2</span>
+              </div>
+            </div>
+            <div class="kpi">
+              <div class="caps">Par semaine · <code>applied_on</code></div>
+              <div class="spark">
+                <span style="height: 30%"></span><span style="height: 55%"></span
+                ><span style="height: 20%"></span><span style="height: 80%"></span>
+                <span style="height: 45%"></span><span style="height: 100%"></span
+                ><span style="height: 65%"></span><span style="height: 35%"></span>
+              </div>
+              <div class="s">8 dernières semaines · pic : 5</div>
+            </div>
+            <div class="kpi">
+              <div class="caps">Taux de réponse · formula</div>
+              <div class="v">47<small>%</small></div>
+              <div class="s">7 réponses sur 15 envoyées</div>
+            </div>
+            <div class="kpi">
+              <div class="caps">Intérêt moyen · <code>rating</code></div>
+              <div class="v stars">★★★★<span class="off">★</span></div>
+              <div class="s">3,9 / 5</div>
+            </div>
+          </div>
+          <p class="auto">
+            Ces cartes sont déduites du model : un <code>choice</code> donne la répartition, une
+            <code>date</code> l'évolution, un <code>rating</code> ou un <code>amount</code> la
+            moyenne ou la somme, une <code>formula</code> son chiffre. Une page de stats reste
+            possible pour aller plus loin.
+          </p>
+
+          <div class="vbar">
+            <div class="seg" id="views">
+              <button class="on" data-v="table">Table</button>
+              <button data-v="kanban">Kanban</button>
+              <button data-v="calendar">Calendar</button>
+              <button data-v="map">Map</button>
+              <button data-v="gallery">Gallery</button>
+            </div>
+            <button class="quiet mini">+ Filtre</button>
+            <span class="chip">Tags <small>contient</small> remote ✕</span>
+            <span class="chip">Entreprise › Ville <small>est</small> Abidjan ✕</span>
+            <span class="grow"></span>
+            <button class="quiet mini">Trier : candidature ↓</button>
+            <button class="quiet mini">Colonnes</button>
+            <button class="quiet mini">Enregistrer la vue</button>
+          </div>
+
+          <div data-view="table" class="scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Poste<span class="t">title</span></th>
+                  <th>Entreprise<span class="t">link</span></th>
+                  <th>Offre<span class="t">url</span></th>
+                  <th>État<span class="t">choice · workflow</span></th>
+                  <th>Tags<span class="t">multi_choice</span></th>
+                  <th>Intérêt<span class="t">rating</span></th>
+                  <th>Dossier<span class="t">progress</span></th>
+                  <th>CV envoyé<span class="t">file</span></th>
+                  <th>Lieu<span class="t">location</span></th>
+                  <th>Contact<span class="t">email · phone</span></th>
+                  <th>Relance<span class="t">datetime</span></th>
+                  <th>Jours<span class="t">formula</span></th>
+                  <th><span class="t">button</span></th>
+                </tr>
+              </thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+
+          <div data-view="kanban" hidden>
+            <div class="kanban" id="kanban"></div>
+            <p class="faint" style="margin-top: 8px">
+              Glisser une carte change son <code>state</code>, dans les passages que le workflow
+              permet.
+            </p>
+          </div>
+
+          <div data-view="calendar" hidden>
+            <div class="vbar">
+              <button class="quiet mini">←</button><b>novembre 2026</b
+              ><button class="quiet mini">→</button
+              ><span class="faint">par <code>next_step</code></span>
+            </div>
+            <div class="cal" id="cal"></div>
+          </div>
+
+          <div data-view="map" hidden>
+            <div class="mapbox">
+              <div class="map" id="map">
+                <svg viewBox="0 0 100 62" preserveAspectRatio="none" aria-hidden="true">
+                  <path
+                    d="M0 40 C 15 35, 25 45, 40 38 S 70 30, 100 36 L100 62 L0 62 Z"
+                    fill="var(--sand)"
+                  />
+                  <path
+                    d="M10 0 L 18 62 M 55 0 L 48 62 M 0 22 L 100 18"
+                    stroke="var(--rule-strong)"
+                    stroke-width="0.4"
+                    fill="none"
+                  />
+                  <path
+                    d="M0 50 C 30 48, 60 55, 100 50"
+                    stroke="var(--info)"
+                    stroke-width="0.8"
+                    fill="none"
+                    opacity="0.5"
+                  />
+                </svg>
+              </div>
+              <div class="panel">
+                <div class="ph"><span class="caps">Dans la zone · 5</span></div>
+                <div class="pb" id="maplist" style="padding: 8px 12px"></div>
+              </div>
+            </div>
+            <p class="faint" style="margin-top: 8px">
+              Un field <code>location</code> garde l'adresse et ses coordonnées ; la map affiche les
+              entrées là où elles sont. Dans le produit : fond de carte OpenStreetMap, sans clé.
+            </p>
+          </div>
+
+          <div data-view="gallery" hidden>
+            <div class="gallery" id="gallery"></div>
+            <p class="faint" style="margin-top: 8px">
+              La gallery prend l'image d'un field <code>file</code> (logo, photo d'un reçu,
+              couverture d'un livre).
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <div class="section-title">
+        <h2>Le catalogue des types de field</h2>
+        <span class="badge has">12 existent</span>
+        <span class="badge new">11 proposés</span>
+      </div>
+      <p class="muted" style="margin-top: 0">
+        Chaque type dit comment il s'affiche dans une table, comment il se saisit, et comment on le
+        filtre.
+      </p>
+      <div class="types" id="types"></div>
+
+      <div class="note">
+        Les vues suivent les types : <b>kanban</b> dès qu'il y a un <code>choice</code>,
+        <b>calendar</b> dès qu'il y a une <code>date</code>, <b>map</b> dès qu'il y a une
+        <code>location</code>, <b>gallery</b> dès qu'il y a un <code>file</code> image. Le
+        <code>button</code> est une action dans la ligne : il pose des fields, lance une rule ou un
+        script — journalisé, annulable.
+      </div>
+    </div>
+
+    <script>
+      const STATES = {
+        to_apply: 'à postuler',
+        applied: 'postulé',
+        interview: 'entretien',
+        offer: 'offre',
+        rejected: 'refus',
+      };
+      const APPS = [
+        {
+          title: 'Stagiaire data',
+          company: 'Kora Labs',
+          url: 'kora-labs.example/jobs/42',
+          state: 'interview',
+          tags: ['data', 'remote'],
+          rating: 5,
+          progress: 80,
+          file: 'CV-data.pdf',
+          city: 'Abidjan',
+          x: 34,
+          y: 42,
+          email: true,
+          phone: true,
+          next: '2026-11-04',
+          days: 9,
+          color: '#2b5c8a',
+        },
+        {
+          title: 'Assistant produit',
+          company: 'Atelier Nova',
+          url: 'nova.example/careers',
+          state: 'applied',
+          tags: ['produit'],
+          rating: 4,
+          progress: 60,
+          file: 'CV-produit.pdf',
+          city: 'Abidjan',
+          x: 40,
+          y: 47,
+          email: true,
+          phone: false,
+          next: '2026-11-07',
+          days: 12,
+          color: '#b83a1b',
+        },
+        {
+          title: 'Analyste junior',
+          company: 'Banque Sahel',
+          url: 'sahel.example/stages',
+          state: 'applied',
+          tags: ['finance', 'urgent'],
+          rating: 3,
+          progress: 40,
+          file: 'CV-finance.pdf',
+          city: 'Dakar',
+          x: 14,
+          y: 30,
+          email: true,
+          phone: true,
+          next: '2026-11-10',
+          days: 15,
+          color: '#2f7d4f',
+        },
+        {
+          title: 'Dev web',
+          company: 'Lumen Studio',
+          url: 'lumen.example/join',
+          state: 'offer',
+          tags: ['dev', 'remote'],
+          rating: 5,
+          progress: 100,
+          file: 'CV-dev.pdf',
+          city: 'Paris',
+          x: 70,
+          y: 18,
+          email: true,
+          phone: false,
+          next: '2026-11-03',
+          days: 21,
+          color: '#c98a2b',
+        },
+        {
+          title: 'Chargé de marketing',
+          company: 'Baobab Média',
+          url: 'baobab.example/offres',
+          state: 'to_apply',
+          tags: ['marketing'],
+          rating: 3,
+          progress: 10,
+          file: null,
+          city: 'Abidjan',
+          x: 37,
+          y: 52,
+          email: false,
+          phone: true,
+          next: '2026-11-05',
+          days: 0,
+          color: '#6b4e43',
+        },
+        {
+          title: 'Stagiaire RH',
+          company: 'Groupe Ayo',
+          url: 'ayo.example/rh',
+          state: 'rejected',
+          tags: ['rh'],
+          rating: 2,
+          progress: 100,
+          file: 'CV-rh.pdf',
+          city: 'Lomé',
+          x: 52,
+          y: 44,
+          email: true,
+          phone: false,
+          next: null,
+          days: 30,
+          color: '#9b1c3c',
+        },
+      ];
+      const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';');
+      const stars = (n) =>
+        '<span class="stars">' +
+        '★'.repeat(n) +
+        '<span class="off">' +
+        '★'.repeat(5 - n) +
+        '</span></span>';
+      const state = (s) => '<span class="state s-' + s + '">' + STATES[s] + '</span>';
+      const day = (d) =>
+        d
+          ? new Date(d + 'T12:00:00Z').toLocaleDateString('fr', { day: 'numeric', month: 'short' })
+          : '—';
+
+      document.getElementById('rows').innerHTML = APPS.map(
+        (a) =>
+          '<tr><td><b>' +
+          esc(a.title) +
+          '</b></td><td>' +
+          esc(a.company) +
+          '</td>' +
+          '<td><a class="url" href="#">' +
+          esc(a.url.split('/')[0]) +
+          ' ↗</a></td>' +
+          '<td>' +
+          state(a.state) +
+          '</td>' +
+          '<td>' +
+          a.tags.map((t) => '<span class="tag">' + esc(t) + '</span>').join('') +
+          '</td>' +
+          '<td>' +
+          stars(a.rating) +
+          '</td>' +
+          '<td><div class="bar" title="' +
+          a.progress +
+          ' %"><i style="width:' +
+          a.progress +
+          '%"></i></div></td>' +
+          '<td>' +
+          (a.file
+            ? '<span class="file"><b>PDF</b>' + esc(a.file) + '</span>'
+            : '<span class="faint">—</span>') +
+          '</td>' +
+          '<td>' +
+          esc(a.city) +
+          '</td>' +
+          '<td>' +
+          (a.email ? '<a class="icon" href="#" title="Écrire">✉</a> ' : '') +
+          (a.phone ? '<a class="icon" href="#" title="Appeler">☎</a>' : '') +
+          '</td>' +
+          '<td class="num">' +
+          day(a.next) +
+          '</td>' +
+          '<td class="n num">' +
+          a.days +
+          '</td>' +
+          '<td><button class="quiet mini">' +
+          (a.state === 'applied' ? 'Relancer' : a.state === 'to_apply' ? 'Postuler' : 'Ouvrir') +
+          '</button></td></tr>',
+      ).join('');
+
+      document.getElementById('kanban').innerHTML = Object.keys(STATES)
+        .map((s) => {
+          const items = APPS.filter((a) => a.state === s);
+          return (
+            '<div class="kcol"><div class="caps">' +
+            STATES[s] +
+            ' · ' +
+            items.length +
+            '</div>' +
+            items
+              .map(
+                (a) =>
+                  '<div class="kcard"><b>' +
+                  esc(a.title) +
+                  '</b><span class="muted">' +
+                  esc(a.company) +
+                  ' · ' +
+                  esc(a.city) +
+                  '</span>' +
+                  '<span>' +
+                  stars(a.rating) +
+                  ' ' +
+                  a.tags.map((t) => '<span class="tag">' + esc(t) + '</span>').join('') +
+                  '</span></div>',
+              )
+              .join('') +
+            '</div>'
+          );
+        })
+        .join('');
+
+      const cells = [];
+      for (let i = 0; i < 6; i++) cells.push('<div class="cday off"></div>');
+      for (let d = 1; d <= 30; d++) {
+        const key = '2026-11-' + String(d).padStart(2, '0');
+        const items = APPS.filter((a) => a.next === key);
+        cells.push(
+          '<div class="cday' +
+            (d === 3 ? ' today' : '') +
+            '"><span class="num faint">' +
+            d +
+            '</span>' +
+            items
+              .map((a) => '<span class="cev state s-' + a.state + '">' + esc(a.company) + '</span>')
+              .join('') +
+            '</div>',
+        );
+      }
+      document.getElementById('cal').innerHTML =
+        ['lun', 'mar', 'mer', 'jeu', 'ven', 'sam', 'dim']
+          .map((w) => '<div class="caps">' + w + '</div>')
+          .join('') + cells.join('');
+
+      document
+        .getElementById('map')
+        .insertAdjacentHTML(
+          'beforeend',
+          APPS.map(
+            (a) =>
+              '<div class="pin" style="left:' +
+              a.x +
+              '%;top:' +
+              a.y +
+              '%"><b>' +
+              esc(a.company) +
+              '</b><i></i></div>',
+          ).join(''),
+        );
+      document.getElementById('maplist').innerHTML = APPS.filter((a) => a.state !== 'rejected')
+        .map(
+          (a) =>
+            '<div class="row" style="grid-template-columns: 1fr auto"><span><b>' +
+            esc(a.company) +
+            '</b><br><span class="muted">' +
+            esc(a.city) +
+            '</span></span>' +
+            state(a.state) +
+            '</div>',
+        )
+        .join('');
+
+      document.getElementById('gallery').innerHTML = APPS.map(
+        (a) =>
+          '<div class="gcard"><div class="img" style="background:' +
+          a.color +
+          '">' +
+          esc(
+            a.company
+              .split(' ')
+              .map((w) => w[0])
+              .join(''),
+          ) +
+          '</div><div class="meta"><b>' +
+          esc(a.title) +
+          '</b><span class="muted">' +
+          esc(a.company) +
+          '</span>' +
+          state(a.state) +
+          '</div></div>',
+      ).join('');
+
+      document.querySelectorAll('#views button').forEach((b) =>
+        b.addEventListener('click', () => {
+          document
+            .querySelectorAll('#views button')
+            .forEach((x) => x.classList.toggle('on', x === b));
+          document
+            .querySelectorAll('[data-view]')
+            .forEach((v) => (v.hidden = v.dataset.view !== b.dataset.v));
+        }),
+      );
+
+      const TYPES = [
+        [
+          'text',
+          'has',
+          'Un texte court',
+          'Atelier Nova',
+          '<input class="field" value="Atelier Nova">',
+          'contient, est, est vide',
+        ],
+        [
+          'number',
+          'has',
+          'Un nombre',
+          '<span class="num">12</span>',
+          '<input class="field" type="number" value="12">',
+          '=, >, <, est vide',
+        ],
+        [
+          'amount',
+          'has',
+          'Un montant et sa devise (unit)',
+          '<span class="num">150 000</span> <span class="faint">XOF</span>',
+          '<input class="field" type="number" value="150000">',
+          '=, >, <, somme',
+        ],
+        [
+          'date',
+          'has',
+          'Un jour',
+          '<span class="num">4 nov.</span>',
+          '<input class="field" type="date" value="2026-11-04">',
+          'avant, après, ce mois-ci, derniers jours',
+        ],
+        [
+          'datetime',
+          'has',
+          'Un moment, dans l’agenda',
+          '<span class="num">4 nov. 14:00</span>',
+          '<input class="field" type="datetime-local" value="2026-11-04T14:00">',
+          'avant, après, ce mois-ci',
+        ],
+        [
+          'duration',
+          'has',
+          'Une durée',
+          '<span class="num">1 h 30</span>',
+          '<input class="field" value="1h30">',
+          '=, >, <',
+        ],
+        [
+          'choice',
+          'has',
+          'Une valeur parmi des options, avec labels',
+          state('interview'),
+          '<select class="field"><option>entretien</option></select>',
+          'est, n’est pas',
+        ],
+        [
+          'boolean',
+          'has',
+          'Oui / non',
+          '✓',
+          '<select class="field"><option>✓</option></select>',
+          'est',
+        ],
+        [
+          'list',
+          'has',
+          'Une liste libre',
+          '<span class="tag">riz</span><span class="tag">huile</span>',
+          '<input class="field" value="riz, huile">',
+          'contient',
+        ],
+        [
+          'link',
+          'has',
+          'Une autre entrée (relation)',
+          '<a class="url" href="#">Kora Labs</a>',
+          '<select class="field"><option>Kora Labs</option></select>',
+          'via ses fields : Entreprise › Ville est…',
+        ],
+        [
+          'formula',
+          'has',
+          'Un calcul, jamais stocké',
+          '<span class="num">47 %</span>',
+          '<span class="faint">calculé</span>',
+          'comme son résultat',
+        ],
+        [
+          'lines',
+          'has',
+          'Des lignes dans l’entrée',
+          '<span class="faint">3 lignes · 2 000</span>',
+          '<span class="faint">tableau de lignes</span>',
+          'somme des lignes',
+        ],
+        [
+          'url',
+          'new',
+          'Un lien cliquable',
+          '<a class="url" href="#">kora-labs.example ↗</a>',
+          '<input class="field" type="url" value="https://kora-labs.example">',
+          'contient, est vide',
+        ],
+        [
+          'email',
+          'new',
+          'Une adresse, pour écrire',
+          '<a class="icon" href="#">✉</a> rh@kora.example',
+          '<input class="field" type="email" value="rh@kora.example">',
+          'contient, est vide',
+        ],
+        [
+          'phone',
+          'new',
+          'Un numéro, pour appeler',
+          '<a class="icon" href="#">☎</a> +225 07 00 00 00',
+          '<input class="field" type="tel" value="+225 07 00 00 00">',
+          'contient, est vide',
+        ],
+        [
+          'multi_choice',
+          'new',
+          'Plusieurs étiquettes parmi des options',
+          '<span class="tag">data</span><span class="tag">remote</span>',
+          '<select class="field" multiple size="2"><option selected>data</option><option selected>remote</option></select>',
+          'contient, ne contient pas',
+        ],
+        [
+          'file',
+          'new',
+          'Une pièce jointe (CV, reçu, photo)',
+          '<span class="file"><b>PDF</b>CV-data.pdf</span>',
+          '<button class="quiet mini">Choisir un fichier</button>',
+          'est vide, type',
+        ],
+        [
+          'location',
+          'new',
+          'Une adresse et ses coordonnées',
+          'Cocody, Abidjan <a class="url" href="#">↗ map</a>',
+          '<input class="field" value="Cocody, Abidjan">',
+          'dans un rayon, ville est',
+        ],
+        ['rating', 'new', 'Une note de 1 à 5', stars(4), stars(4), '≥, ='],
+        [
+          'progress',
+          'new',
+          'Un avancement en %',
+          '<div class="bar"><i style="width:60%"></i></div>',
+          '<input class="field" type="range" value="60">',
+          '≥, ≤',
+        ],
+        [
+          'button',
+          'new',
+          'Une action dans la ligne',
+          '<button class="quiet mini">Relancer</button>',
+          '<span class="faint">pose des fields, lance une rule ou un script</span>',
+          '—',
+        ],
+        [
+          'time',
+          'new',
+          'Une heure seule',
+          '<span class="num">07:15</span>',
+          '<input class="field" type="time" value="07:15">',
+          'avant, après',
+        ],
+        [
+          'long_text',
+          'new',
+          'Une note formatée (Markdown)',
+          '<span class="muted">« Entretien avec… »</span>',
+          '<textarea class="field" rows="2">Entretien avec…</textarea>',
+          'contient',
+        ],
+      ];
+      document.getElementById('types').innerHTML = TYPES.map(
+        ([name, status, what, cell, input, filter]) =>
+          '<div class="panel type"><div class="ph"><span class="name">' +
+          name +
+          '</span><span class="badge ' +
+          status +
+          '">' +
+          (status === 'has' ? 'existe' : 'proposé') +
+          '</span></div>' +
+          '<div class="pb"><div class="muted" style="margin-bottom:6px">' +
+          what +
+          '</div>' +
+          '<div class="row"><span class="caps">Table</span><span>' +
+          cell +
+          '</span></div>' +
+          '<div class="row"><span class="caps">Saisie</span><span>' +
+          input +
+          '</span></div>' +
+          '<div class="row"><span class="caps">Filtre</span><span class="muted">' +
+          filter +
+          '</span></div></div></div>',
+      ).join('');
+    </script>
+  </body>
+</html>

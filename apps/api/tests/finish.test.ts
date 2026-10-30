@@ -48,7 +48,7 @@ describe('views', () => {
     expect(table.status).toBe(200);
     expect(table.body.rows.map((row) => row.title)).toEqual(['Marché']);
     expect(table.body.totals).toEqual({ amount: 300 });
-    expect(table.body.types).toEqual(['table', 'kanban', 'calendar']);
+    expect(table.body.types).toEqual(['table', 'kanban', 'calendar', 'timeline']);
     const kanban = await claude.call<{ kanban: { by: string; columns: { name: string }[] } }>(
       'view',
       { view: { kind: 'Bill', type: 'kanban' } },

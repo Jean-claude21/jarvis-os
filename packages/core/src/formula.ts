@@ -48,6 +48,8 @@ export const FUNCTIONS = [
   'contains',
   'len',
   'streak',
+  'distance',
+  'convert',
 ] as const;
 const AGGREGATES = new Set(['sum', 'avg', 'count', 'min', 'max']);
 
@@ -282,6 +284,37 @@ const dayText = (n: number) => new Date(n * 86_400_000).toISOString().slice(0, 1
 export interface Clock {
   now: Date;
   zone?: string;
+  /** Units of each currency for one euro (spec 016): her « Rate » entries and the fixed pegs. */
+  rates?: Record<string, number>;
+}
+
+/** Currencies tied to the euro by a fixed rate: the CFA francs and their neighbours. */
+export const PEGGED: Readonly<Record<string, number>> = {
+  EUR: 1,
+  XOF: 655.957,
+  XAF: 655.957,
+  KMF: 491.96775,
+  CVE: 110.265,
+};
+
+const place = (value: unknown): { lat: number; lng: number } | null => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const { lat, lng } = value as Record<string, unknown>;
+  return typeof lat === 'number' && typeof lng === 'number' ? { lat, lng } : null;
+};
+
+/** Kilometres between two places, as the crow flies (haversine). */
+export function kilometres(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
+  const rad = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * rad;
+  const dLng = (b.lng - a.lng) * rad;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+  return Math.round(6371 * 2 * Math.asin(Math.sqrt(h)) * 10) / 10;
 }
 
 export function todayOf(clock: Clock): string {
@@ -541,6 +574,19 @@ async function call(
     case 'len': {
       const value = await arg(0);
       return Array.isArray(value) ? value.length : typeof value === 'string' ? value.length : 0;
+    }
+    case 'distance': {
+      const a = place(await arg(0));
+      const b = place(await arg(1));
+      return a && b ? kilometres(a, b) : null;
+    }
+    case 'convert': {
+      const amount = num(await arg(0));
+      const from = String((await arg(1)) ?? '').toUpperCase();
+      const to = String((await arg(2)) ?? '').toUpperCase();
+      const rates = { ...PEGGED, ...(clock.rates ?? {}) };
+      if (amount === null || !rates[from] || !rates[to]) return null;
+      return Math.round((amount / rates[from]!) * rates[to]! * 100) / 100;
     }
     case 'streak': {
       // Days in a row up to today (or yesterday, when today is not done yet).

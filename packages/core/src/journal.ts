@@ -18,7 +18,8 @@ export type Command =
   | 'space.invite'
   | 'space.withdraw'
   | 'space.join'
-  | 'space.leave';
+  | 'space.leave'
+  | 'space.role';
 
 export interface JournalLine {
   id: number;

@@ -40,6 +40,8 @@ import {
   type Space,
   type Tx,
   withComputed,
+  pagesOf,
+  renderPage,
 } from '@jarvis-os/core';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -259,6 +261,21 @@ export function apiRoutes(deps: {
     return c.json(
       await act(c, async (tx, _a, space) => withComputed(tx, space, await find(tx, space, input))),
     );
+  });
+
+  // The pages of her apps (spec 014): the list, and one computed for her filters.
+  api.get('/pages', async (c) =>
+    c.json(await act(c, (tx, _a, space) => pagesOf(tx, space, c.req.query('app') || undefined))),
+  );
+
+  api.get('/pages/:id', async (c) => {
+    const { space: _space, ...params } = c.req.query();
+    const drawn = await act(c, async (tx, _a, space) => {
+      const entry = await get(tx, space, c.req.param('id'));
+      if (!entry || entry.kind.toLowerCase() !== 'page') return null;
+      return renderPage(tx, space, entry, params);
+    });
+    return drawn ? c.json(drawn) : c.json({ error: `No page ${c.req.param('id')}.` }, 404);
   });
 
   api.get('/entries/:id', async (c) => {

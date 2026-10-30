@@ -3,6 +3,9 @@ import { prefixedId } from './ids';
 import { record } from './journal';
 import { readerOf } from './compute';
 import { formulaValue } from './formula';
+import { checkPage } from './pages';
+import { checkRule, runRulesAfterSave, type Changed } from './rules';
+import { checkScript } from './scripts';
 import { dataInNewWords, KIND_RENAMES, modelInNewWords } from './keywords';
 import {
   checkAgainst,
@@ -86,6 +89,14 @@ async function kindAsWritten(tx: Tx, spaceId: string, kind: string): Promise<str
 const foldKind = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
 const isModelKind = (kind: string) => foldKind(kind) === foldKind(MODEL_KIND);
+
+/** The engine's other kinds (spec 014) are checked by their own shape. */
+const SYSTEM_CHECKS: Record<string, (data: Record<string, unknown>) => unknown> = {
+  page: checkPage,
+  rule: checkRule,
+  script: checkScript,
+};
+const checkSystem = (kind: string, data: Record<string, unknown>) => SYSTEM_CHECKS[foldKind(kind)]?.(data);
 
 /** A model's shape, checked; throws the sentence that says what to fix. */
 function checkModel(data: Record<string, unknown>): void {
@@ -204,6 +215,7 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
   const saved: Saved = { entries: [], links: [], unlinked: 0, notes: [] };
   const pending: Pending[] = [];
   const created: { id: string; model: Model }[] = [];
+  const changed: Changed[] = [];
 
   for (const one of input.entries) {
     const notes: string[] = [];
@@ -250,7 +262,8 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
         data[model.workflow.field] = model.workflow.initial;
       }
       if (isModelKind(kind)) checkModel(data);
-      else if (model) {
+      else checkSystem(kind, data);
+      if (model) {
         const problems = checkAgainst(model, given, data, true);
         if (problems.length) throw modelError(model, problems);
         await followWorkflow(tx, spaceId, model, id, null, data);
@@ -268,6 +281,7 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
         after: await snapshotOf(tx, id),
       });
       saved.entries.push({ ref: one.ref ?? null, id, kind, title: one.title!, created: true });
+      changed.push({ id, kind, created: true, fields: Object.keys(data) });
     } else {
       id = one.id!;
       const before = await snapshotOf(tx, id);
@@ -283,7 +297,8 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
       }
       const title = one.title ?? current.title;
       if (isModelKind(kind)) checkModel(data);
-      else if (model) {
+      else checkSystem(kind, data);
+      if (model) {
         // A change of kind meets the new kind's model as a whole; a change of fields, the fields given.
         const problems =
           kind !== current.kind
@@ -300,6 +315,10 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
       const after = await snapshotOf(tx, id);
       if (JSON.stringify(before) !== JSON.stringify(after)) {
         await record(tx, actor, { spaceId, command: 'entry.update', target: id, before, after });
+        const fields = [...new Set([...Object.keys(current.data), ...Object.keys(data)])].filter(
+          (field) => JSON.stringify(current.data[field]) !== JSON.stringify(data[field]),
+        );
+        changed.push({ id, kind, created: false, fields });
       }
       saved.entries.push({ ref: one.ref ?? null, id, kind, title, created: false });
     }
@@ -414,6 +433,8 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
       if (!rows.length) throw modelError(model, [`« ${field.name} » is required`]);
     }
   }
+  // Her rules (spec 014) run on what this save made or changed, in the same transaction.
+  await runRulesAfterSave(tx, actor, spaceId, changed);
   return saved;
 }
 

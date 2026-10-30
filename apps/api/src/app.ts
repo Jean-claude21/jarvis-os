@@ -15,6 +15,8 @@ import {
   readDocument,
   slugOf,
   spacesOf,
+  renderPage,
+  renderRecord,
 } from '@jarvis-os/core';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { Hono } from 'hono';
@@ -31,6 +33,7 @@ import { objectStorage } from './storage';
 import { appPage } from './platform/page';
 import { spaceFor } from './spaces';
 import { computeDashboard, dashboardView, widgetsOf } from './views/dashboard';
+import { pageView } from './views/page';
 import {
   DOCUMENT_HOURS,
   documentShown,
@@ -186,6 +189,22 @@ export function makeApp(settings: Settings) {
             }),
           ),
         );
+      }
+      if (c.req.param('view') === 'page') {
+        const { space: _space, ...params } = c.req.query();
+        const drawn = await asPerson(db, person, async (tx) => {
+          const entry = await get(tx, space.id, id);
+          return entry && entry.kind.toLowerCase() === 'page'
+            ? renderPage(tx, space.id, entry, params)
+            : null;
+        });
+        if (!drawn) return c.notFound();
+        return c.html(pageView({ ...drawn, frame: true }));
+      }
+      if (c.req.param('view') === 'record') {
+        const drawn = await asPerson(db, person, (tx) => renderRecord(tx, space.id, id));
+        if (!drawn) return c.notFound();
+        return c.html(pageView({ ...drawn, frame: true }));
       }
       if (c.req.param('view') === 'document') {
         const read = await asPerson(db, person, (tx) =>

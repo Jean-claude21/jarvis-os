@@ -295,10 +295,18 @@ let pick = null;
 let reading = false;
 async function drawApps() {
   const kinds = await api(inSpace('/kinds'));
-  const apps = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app))];
+  const appPages = await api(inSpace('/pages'));
+  const apps = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app).concat(appPages.filter((p) => p.app).map((p) => p.app)))];
   document.getElementById('apps').innerHTML = '<div class="caps">' + esc(W.navApps) + '</div>' +
     apps.map((a) => '<a class="navi" data-app="' + esc(encodeURIComponent(a)) + '" href="#/app/' + esc(encodeURIComponent(a)) + '"><span class="app-dot">' + esc(a.slice(0, 1).toUpperCase()) + '</span><span>' + esc(a) + '</span></a>').join('') +
     '<a class="navi ghost" href="#/app">' + ICON_PLUS + '<span>' + esc(W.newApp) + '</span></a>';
+}
+
+// A kind whose model links it, or that other models link to (spec 014): its record page shows them.
+async function hasRelations(kind) {
+  const fold = (t) => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const models = (await api(inSpace('/kinds'))).filter((k) => k.model);
+  return models.some((k) => k.model.fields.some((f) => f.type === 'link' && (fold(k.kind) === fold(kind) || (f.inverse && f.target && fold(f.target) === fold(kind)))));
 }
 
 // Her day in one band, 6:00 to 23:00: the template, the events, the proposals; now marked.
@@ -369,7 +377,15 @@ const pages = {
         (apps.length ? '<section class="grid">' + apps.map((a) => card(a, '<a class="link" href="#/app/' + esc(encodeURIComponent(a)) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>' : '');
     }
     const models = kinds.filter((k) => k.model && k.model.app === name);
-    if (!models.length) return empty(W.noApp);
+    const appPages = await api(inSpace('/pages?app=' + encodeURIComponent(name)));
+    if (!models.length && !appPages.length) return empty(W.noApp);
+    const pageTabs = appPages.map((p) => '<a class="' + (p.id === params.get('page') || (!params.get('page') && !params.get('kind') && p === appPages[0]) ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?page=' + esc(encodeURIComponent(p.id)) + '">' + esc(p.title) + '</a>').join('');
+    const kindTabs = (on) => models.map((k) => '<a class="' + (k.kind === on ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '">' + esc(k.kind) + ' <span class="muted num">' + k.count + '</span></a>').join('');
+    const shownPage = params.get('page') ? appPages.find((p) => p.id === params.get('page')) : !params.get('kind') ? appPages[0] : null;
+    if (shownPage) {
+      const q = new URLSearchParams(params); q.delete('page'); q.set('space', space);
+      return '<nav class="tabs">' + pageTabs + kindTabs(null) + '</nav>' + frame('/app/frame/page/' + encodeURIComponent(shownPage.id) + '?' + q.toString());
+    }
     const current = models.find((k) => k.kind === params.get('kind')) || models[0];
     const model = current.model;
     const shown = model.fields.filter((c) => !['link', 'lines', 'list'].includes(c.type));
@@ -398,7 +414,7 @@ const pages = {
         rows.map((e) => '<tr data-go="#/entree/' + esc(e.id) + '"><td>' + esc(e.title) + '</td>' + cols.map((c) => '<td class="' + (['amount', 'number'].includes(natureOf(c)) ? 'n' : '') + '">' + fmt(c, valueOf(e, c)) + '</td>').join('') + '</tr>').join('') +
         (g && model.total ? totalRow(rows, say(W.subtotal, { group: g })) : '');
     }).join('') + totalRow(list, W.total);
-    const tabs = '<nav class="tabs">' + models.map((k) => '<a class="' + (k.kind === current.kind ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '">' + esc(k.kind) + ' <span class="muted num">' + k.count + '</span></a>').join('') + '</nav>';
+    const tabs = '<nav class="tabs">' + pageTabs + kindTabs(current.kind) + '</nav>';
     return '<div class="head"><div><p class="lead" style="margin:0">' + esc(say(W.appLead, { n: models.length })) + '</p></div><div class="actions"><button class="quiet" data-model="' + esc(current.kind) + '">' + esc(W.seeModel) + '</button><button data-add="' + esc(current.kind) + '">' + esc(say(W.addOne, { kind: current.kind })) + '</button></div></div>' + tabs +
       card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th>' + cols.map((c) => '<th class="' + (['amount', 'number'].includes(natureOf(c)) ? 'n' : '') + '">' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>' : empty(), true);
   },
@@ -477,7 +493,7 @@ const pages = {
       text +
       card(W.history, '<ul class="list">' + hist.map((h) => '<li><span>' + esc(said(h.command)) + ' <span class="muted">' + esc(say(W.by, { who: h.client || h.actor === me.person.id && me.person.name || h.actor, door: h.door })) + ' · ' + esc(time(h.at)) + '</span></span>' +
         (h.undoneBy ? '<span class="badge">' + esc(W.undone) + '</span>' : h.command === 'journal.undo' ? '' : '<button class="quiet" data-undo="' + h.id + '">' + esc(W.undo) + '</button>') + '</li>').join('') + '</ul>', true) +
-      '</section>';
+      '</section>' + (await hasRelations(e.kind) ? '<h2 style="margin:20px 0 8px">' + esc(W.relations) + '</h2>' + frame('/app/frame/record/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(space)) : '');
   },
 
   async documents () {

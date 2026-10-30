@@ -26,7 +26,7 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     /must come after its start|covers at most|are ISO days|follows its model|^A « Model » is/.test(
       message,
     ) ||
-    /cannot go from|cannot go to|starts as|» links (a|one)|»: no entry|^Formula «/.test(message)
+    /cannot go from|cannot go to|starts as|» links (a|one)|»: no entry|^Formula «|^A « (Page|Rule|Script) » is|is not a filter of this page|^No page/.test(message)
   ) {
     return { status: 400, message };
   }

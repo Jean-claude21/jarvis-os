@@ -9,6 +9,9 @@ export type Command =
   | 'journal.undo'
   // A Markdown folder imported (spec 007): undone at once, each of its changes with it.
   | 'import.run'
+  // A migration of a kind's entries, an app installed (spec 014): undone at once, like an import.
+  | 'migration.run'
+  | 'app.install'
   // Who belongs to a space (spec 004): journaled, never undone through `undo`.
   | 'space.create'
   | 'space.rename'
@@ -135,7 +138,7 @@ export async function undo(
   if (line.command.startsWith('space.')) {
     throw new Error('Who belongs to a space is not undone: invite, withdraw or leave instead.');
   }
-  if (line.command === 'import.run') {
+  if (line.command === 'import.run' || line.command === 'migration.run' || line.command === 'app.install') {
     // Its changes, the latest first; those already undone stay as they are.
     const done = ((line.after?.lines as number[] | undefined) ?? []).slice().sort((a, b) => b - a);
     const { rows: open } = await tx.query<{ id: string }>(

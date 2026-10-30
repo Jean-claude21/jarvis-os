@@ -1,6 +1,8 @@
 import {
   find,
   get,
+  pagesOf,
+  renderPage,
   history,
   readDocument,
   save,
@@ -23,10 +25,12 @@ import {
 } from './dashboard';
 import { DOCUMENT_HOURS, documentShown, documentToken, documentView } from './document';
 import { entryView } from './entry';
+import { pageText, pageView } from './page';
 import { UPLOAD_MINUTES, uploadToken, uploadView } from './upload';
 
 const VIEWS = {
   dashboard: 'ui://jarvis/dashboard',
+  page: 'ui://jarvis/page',
   entry: 'ui://jarvis/entry',
   upload: 'ui://jarvis/upload',
   document: 'ui://jarvis/document',
@@ -79,6 +83,7 @@ export function registerViews(server: McpServer, ctx: ViewContext): void {
       ],
     }));
   resource('Tableau de bord', VIEWS.dashboard, () => dashboardView());
+  resource('Page', VIEWS.page, () => pageView());
   resource('Entrée', VIEWS.entry, () => entryView());
   resource('Envoyer un fichier', VIEWS.upload, () => uploadView(), [new URL(ctx.publicUrl).origin]);
   resource('Document', VIEWS.document, () => documentView());
@@ -135,6 +140,54 @@ export function registerViews(server: McpServer, ctx: ViewContext): void {
           spaces: ctx.reach,
         });
         return answer(dashboardText(drawn), drawn as unknown as Record<string, unknown>);
+      } catch (error) {
+        return failed(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    'page',
+    {
+      description: [
+        'Show a page of one of her apps, computed now: an entry of kind « Page » by `id` or `name`',
+        '(`app` lists them), with `params` for its filters (`{ month: "2026-09" }`) and `record` for a',
+        'record page. Hosts that show views draw it (filters and gestures work there); the blocks come',
+        'back in words too. Without `id` or `name`: the pages of `app` (or of every app).',
+      ].join(' '),
+      inputSchema: {
+        id: z.string().min(1).optional(),
+        name: z.string().min(1).optional(),
+        app: z.string().min(1).optional(),
+        params: z.record(z.string(), z.string()).optional(),
+        space: z.string().min(1).optional(),
+      },
+      annotations: { readOnlyHint: true },
+      _meta: { ui: { resourceUri: VIEWS.page } },
+    },
+    async (args: {
+      id?: string | undefined;
+      name?: string | undefined;
+      app?: string | undefined;
+      params?: Record<string, string> | undefined;
+      space?: string | undefined;
+    }) => {
+      try {
+        const where = ctx.spaceOf(args.space);
+        const drawn = await ctx.act(async (tx) => {
+          let id = args.id;
+          if (!id && args.name) {
+            const wanted = args.name.toLowerCase();
+            id = (await pagesOf(tx, where.id, args.app)).find((one) => one.title.toLowerCase() === wanted)?.id;
+            if (!id) throw new Error(`No page « ${args.name} » here: save one first (kind « Page »).`);
+          }
+          if (!id) return { list: await pagesOf(tx, where.id, args.app) };
+          const entry = await get(tx, where.id, id);
+          if (!entry || entry.kind.toLowerCase() !== 'page') throw new Error(`No page ${id} in this space.`);
+          return { page: await renderPage(tx, where.id, entry, args.params ?? {}) };
+        });
+        if ('list' in drawn) return answer(JSON.stringify(drawn.list), { pages: drawn.list });
+        return answer(pageText(drawn.page), drawn.page as unknown as Record<string, unknown>);
       } catch (error) {
         return failed(error);
       }

@@ -99,3 +99,36 @@ export async function fileOf(tx: Tx, spaceId: string, entryId: string): Promise<
   const row = rows[0];
   return row ? { ...row, size: Number(row.size) } : null;
 }
+
+/** One of her files as the platform lists it (spec 013): what it is, when, by whom, what it is for. */
+export interface FileRow {
+  entryId: string;
+  name: string;
+  mediaType: string;
+  size: number;
+  title: string;
+  createdAt: string;
+  /** The entries it is linked to, either way, with the role. */
+  links: { id: string; title: string; kind: string; role: string }[];
+  /** Whether its words were kept (text files), so `find` reaches them. */
+  read: boolean;
+}
+
+/** Every file of a space, the latest first. */
+export async function filesOf(tx: Tx, spaceId: string, limit = 500): Promise<FileRow[]> {
+  const { rows } = await tx.query<FileRow & { size: string }>(
+    `select f.entry_id as "entryId", f.name, f.media_type as "mediaType", f.size, e.title,
+            to_char(f.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
+            f.text is not null as read,
+            coalesce((
+              select json_agg(json_build_object('id', o.id, 'title', o.title, 'kind', o.kind, 'role', l.role))
+                from link l join entry o on o.id = case when l.from_id = f.entry_id then l.to_id else l.from_id end
+               where (l.from_id = f.entry_id or l.to_id = f.entry_id) and o.archived_at is null
+            ), '[]'::json) as links
+       from file f join entry e on e.id = f.entry_id
+      where f.space_id = $1 and e.archived_at is null
+      order by f.created_at desc limit $2`,
+    [spaceId, limit],
+  );
+  return rows.map((row) => ({ ...row, size: Number(row.size) }));
+}

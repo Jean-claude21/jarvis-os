@@ -3,6 +3,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import type { Actor, Tx } from './db';
 import type { Blobs } from './files';
 import { prefixedId } from './ids';
+import { modelsOf, placeOf } from './models';
 import { record, recordMany } from './journal';
 import type { Origin } from './schemas';
 
@@ -435,8 +436,9 @@ export async function exportMarkdown(
     title: string;
     data: Record<string, unknown>;
     origin: Record<string, Origin>;
+    createdAt: string;
   }>(
-    `select id, kind, title, data, origin from entry
+    `select id, kind, title, data, origin, to_char(created_at, 'YYYY-MM-DD') as "createdAt" from entry
       where space_id = $1 and archived_at is null order by created_at, id`,
     [spaceId],
   );
@@ -453,7 +455,11 @@ export async function exportMarkdown(
   );
   const fileOf = new Map(stored.map((row) => [row.entry_id, row]));
 
-  // An imported entry goes back where it came from; any other into its kind's folder.
+  // An imported entry goes back where it came from; any other where its kind's model says
+  // (spec 012), else into its kind's folder.
+  const rangementOf = new Map(
+    (await modelsOf(tx, spaceId)).map((model) => [fold(model.kind), model.rangement]),
+  );
   const taken = new Set<string>();
   const pathOf = new Map<string, string>();
   for (const entry of entries) {
@@ -464,7 +470,8 @@ export async function exportMarkdown(
       !source.startsWith('/') &&
       !source.includes('..')
         ? source
-        : `${slugOf(entry.kind)}/${slugOf(entry.title)}.md`;
+        : (placeOf(rangementOf.get(fold(entry.kind)), entry, slugOf) ??
+          `${slugOf(entry.kind)}/${slugOf(entry.title)}.md`);
     for (let n = 2; taken.has(path.toLowerCase()); n += 1) {
       path = path.replace(/(?:-\d+)?\.md$/i, `-${n}.md`);
     }

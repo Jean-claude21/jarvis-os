@@ -100,6 +100,10 @@ flowchart LR
 - **The watcher** (spec 006): a pass each minute finds the reminders due through one function that
   returns ids and members only, tells each person through her « Canal » (Telegram), and writes what
   it did as a member, under row-level security.
+- **Type models** (spec 012): a kind's shape is an entry « Modèle » (fields, natures, required,
+  choices, rangement, display). The core's `save` makes every door follow it; the export places
+  entries by its rangement. The first layer of the apps Claude builds with her (Finances, Routines):
+  models, then relations and computations, pages, rules — data, never code.
 - **The calendar** (spec 011): time is a field, not a kind. Any entry with `debut` (and `fin` or
   `duree`), `quand`, `echeance`, `date` or `repete` is in her calendar; `agenda` places its
   occurrences in a window, computed, never stored. Claude (`agenda`), the app (« Agenda »), the

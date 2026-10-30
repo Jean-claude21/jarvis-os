@@ -248,7 +248,7 @@ export async function mcpServerFor(
     'kinds',
     {
       description:
-        'The kinds of things she already has in a space, with their counts and field names. Call it before creating a kind, and reuse.',
+        'The kinds of things she already has in a space, with their counts and field names — and the `model` of a kind that has one: every save of it must follow its fields. Call it before creating a kind, and reuse.',
       inputSchema: { space: spaceArg },
       annotations: { readOnlyHint: true },
     },

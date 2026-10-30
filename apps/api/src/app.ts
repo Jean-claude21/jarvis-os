@@ -268,18 +268,19 @@ export function makeApp(settings: Settings) {
       for (const one of occurrences) {
         if (!one.repeated || series.has(one.id)) continue;
         const data = (await get(tx, one.spaceId, one.id))?.data ?? {};
-        if (typeof data.repete !== 'string') continue;
-        const skipped: unknown[] = Array.isArray(data.sauf) ? data.sauf : [data.sauf];
+        if (typeof data.repeat !== 'string') continue;
+        const skipped: unknown[] = Array.isArray(data.except) ? data.except : [data.except];
         series.set(one.id, {
-          repete: data.repete,
-          duree: minutesOf(data.duree),
-          sauf: skipped
+          repeat: data.repeat,
+          duration: minutesOf(data.duration),
+          except: skipped
             .filter(
               (day): day is string => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}/.test(day),
             )
             .map((day) => day.slice(0, 10)),
-          fuseau: typeof data.fuseau === 'string' && data.fuseau ? data.fuseau : DEFAULT_ZONE,
-          jusqu: typeof data.jusqu === 'string' ? data.jusqu : null,
+          timezone:
+            typeof data.timezone === 'string' && data.timezone ? data.timezone : DEFAULT_ZONE,
+          until: typeof data.until === 'string' ? data.until : null,
         });
       }
       return { name: spaces.find((one) => one.personal)?.name ?? '', occurrences, series };

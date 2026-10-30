@@ -34,15 +34,15 @@ function fold(line: string): string {
 
 /** What a repeated entry says of itself, for one event that repeats in her phone. */
 export interface Series {
-  repete: string;
+  repeat: string;
   /** Minutes; none for a moment. */
-  duree: number | null;
+  duration: number | null;
   /** Days she skips (« 2026-11-04 »). */
-  sauf: string[];
+  except: string[];
   /** Its zone. */
-  fuseau: string;
+  timezone: string;
   /** The last day it repeats, if she said one. */
-  jusqu: string | null;
+  until: string | null;
 }
 
 const DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
@@ -66,8 +66,8 @@ function numbers(field: string, low: number, high: number): number[] | null {
  * every day, some weekdays, some days of the month (L, the last), or one day a year. Null for
  * anything else — the occurrences are then given one by one.
  */
-export function rruleOf(repete: string): { rule: string; hour: number; minute: number } | null {
-  const parts = repete.trim().split(/\s+/);
+export function rruleOf(repeat: string): { rule: string; hour: number; minute: number } | null {
+  const parts = repeat.trim().split(/\s+/);
   if (parts.length !== 5) return null;
   const [minuteField, hourField, day, month, weekday] = parts as [
     string,
@@ -153,24 +153,24 @@ export function icsOf(
   const repeated = new Set<string>();
   for (const one of occurrences) {
     const series = one.repeated ? options.series?.get(one.id) : undefined;
-    const rule = series ? rruleOf(series.repete) : null;
+    const rule = series ? rruleOf(series.repeat) : null;
     if (series && rule) {
       // One event from its first time in the window; her phone repeats it.
       if (repeated.has(one.id)) continue;
       repeated.add(one.id);
-      const until = series.jusqu
-        ? `;UNTIL=${series.jusqu.replace(/-/g, '').slice(0, 8)}T235959Z`
+      const until = series.until
+        ? `;UNTIL=${series.until.replace(/-/g, '').slice(0, 8)}T235959Z`
         : '';
       lines.push(
         'BEGIN:VEVENT',
         `UID:${one.id}@jarvis-os`,
         `DTSTAMP:${now}`,
-        `DTSTART;TZID=${series.fuseau}:${local(one.start, series.fuseau)}`,
-        ...(series.duree ? [`DURATION:PT${Math.round(series.duree)}M`] : []),
+        `DTSTART;TZID=${series.timezone}:${local(one.start, series.timezone)}`,
+        ...(series.duration ? [`DURATION:PT${Math.round(series.duration)}M`] : []),
         `RRULE:${rule.rule}${until}`,
-        ...series.sauf.map(
+        ...series.except.map(
           (day) =>
-            `EXDATE;TZID=${series.fuseau}:${day.replace(/-/g, '')}T${pad(rule.hour)}${pad(rule.minute)}00`,
+            `EXDATE;TZID=${series.timezone}:${day.replace(/-/g, '')}T${pad(rule.hour)}${pad(rule.minute)}00`,
         ),
       );
       describe(one);

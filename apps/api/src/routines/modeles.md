@@ -6,33 +6,48 @@ when: elle veut suivre quelque chose de façon structurée (ses finances, ses ha
 # Les modèles
 
 Un modèle dit une fois pour toutes ce que contient un type. Une fois posé, chaque `save` de ce type
-le suit : Jarvis refuse un champ inconnu, une valeur de la mauvaise nature, un champ obligatoire
-manquant — et dit quoi corriger.
+le suit : Jarvis refuse un champ inconnu, une valeur du mauvais type, un champ obligatoire
+manquant, un lien vers le mauvais type, un changement d'état non prévu — et dit quoi corriger.
+Les mots-clés sont en anglais ; ses types, ses champs et ses choix restent dans ses mots.
 
 1. Avant de proposer un modèle, appelle `kinds` : pars des types et des champs qu'elle a déjà, et
    de ses mots. Un type par nature de chose, au singulier (« Mouvement », « Habitude », « Compte »).
-2. Propose-lui le modèle en clair (les champs, ce qui est obligatoire, les choix) et attends son
-   accord. Puis un `save` : une entrée de kind « Modèle », titre = le type, `data` =
-   - `champs` : `[{ nom, nature, obligatoire?, choix?, vers?, unite?, aide? }]` ; `nature` parmi
-     texte, nombre, montant, date, moment, duree, choix, oui-non, liste, lien ;
-   - `rangement` (facultatif) : où l'export range chaque entrée, avec `{année}`, `{mois}`, `{jour}`,
-     `{date}`, `{titre}`, `{id}` ou un champ (« finances/{année}/{mois}/{titre}.md ») ;
-   - `colonnes`, `total`, `regroupement` : comment l'app montre ce type (« total » = le champ qu'elle
-     additionne) ; `app` : l'app à laquelle il appartient (« Finances ») ;
-   - `ouvert` : true seulement si elle veut pouvoir ajouter des champs libres.
-3. Un `montant` est un nombre (négatif pour une sortie si c'est sa convention) avec sa devise dans
-   `unite` ; une `date` est « 2026-10-30 » ; un `moment` « 2026-10-30T14:00 » ; une `duree` des
-   minutes. Le temps reste dans les champs de l'agenda (`debut`, `quand`, `echeance`, `repete`) :
-   ils sont admis par tout modèle.
-4. Un champ de nature `lien` n'est pas une valeur : c'est un lien dont le rôle est le nom du champ
-   (« compte ») vers une entrée du type `vers` (« Compte »). Crée les deux et le lien dans le même
-   `save`.
-5. Une app, c'est plusieurs modèles reliés (Finances : Compte, Fonds, Mouvement, Obligation,
-   Rapprochement ; Routines : Habitude, Exécution, Gabarit), plus ses tableaux de bord (routine
-   « Un tableau de bord ») et ses règles dans la charte de l'espace. Construis-la pas à pas avec
-   elle : un modèle, quelques entrées réelles, puis le suivant.
-6. Changer un modèle, c'est changer son entrée « Modèle » (après lui avoir demandé) : ajouter un
-   champ, un choix, renommer — puis corriger les entrées existantes si un nom change. Tout est
-   journalisé et s'annule.
-7. Si `save` refuse une entrée, ne contourne pas : lis la phrase, corrige le nom ou la valeur, ou
-   demande-lui s'il faut changer le modèle.
+2. Propose-lui le modèle en clair (les champs, ce qui est obligatoire, les choix, les liens, les
+   calculs) et attends son accord. Puis un `save` : une entrée de kind « Model », titre = le type,
+   `data` =
+   - `fields` : `[{ name, type, required?, options?, target?, cardinality?, inverse?, formula?,
+fields?, unit?, help? }]` ; `type` parmi text, number, amount, date, datetime, duration,
+     choice, boolean, list, link, formula, lines ;
+   - `path` (facultatif) : où l'export range chaque entrée, avec `{year}`, `{month}`, `{day}`,
+     `{date}`, `{title}`, `{id}` ou un champ (« finances/{year}/{month}/{title}.md ») ;
+   - `columns`, `total`, `groupBy` : comment l'app montre ce type ; `app` : l'app à laquelle il
+     appartient (« Finances ») ; `open` : true seulement si elle veut des champs libres ;
+   - `workflow` (facultatif) : `{ field, initial?, transitions: [{ from, to, if? }] }`.
+3. Un `amount` est un nombre avec sa devise dans `unit` ; une `date` est « 2026-10-30 » ; un
+   `datetime` « 2026-10-30T14:00 » ; une `duration` des minutes. Le temps reste dans les champs de
+   l'agenda (`start`, `at`, `due`, `repeat`…) : ils sont admis par tout modèle.
+4. **Relations.** Un champ `link` (`target` : le type visé, `cardinality` : `one` par défaut ou
+   `many`, `inverse` : le nom par lequel l'autre côté le lit) n'est pas une valeur : dans `save`,
+   donne l'id de l'entrée visée (ou le `ref` d'une entrée du même `save`), une liste pour `many`,
+   `null` pour défaire ; Jarvis en fait un lien dont le rôle est le nom du champ. Exemple :
+   `Mouvement.compte` `{ type: link, target: Compte, inverse: mouvements }` — un compte lit alors
+   ses `mouvements`.
+5. **Calculs.** Un champ `formula` n'est jamais écrit : il est calculé à chaque lecture.
+   `solde_initial + sum(mouvements.montant where nature = 'entrée') - sum(mouvements.montant where
+nature = 'sortie')`. Fonctions : sum, avg, count, min, max (avec `where`), if, coalesce, round,
+   abs, today, month, year, this_month, last_days, days_between, date_add, since, lower, contains,
+   len, streak. Un nom avec des espaces s'écrit entre `` ` ``. Les chiffres viennent de là ou de
+   `query` — jamais de ta tête.
+6. **Lignes.** Un champ `lines` (`fields` : les champs d'une ligne) garde le détail d'une facture,
+   d'une liste de courses : `[{ article: 'Riz', montant: 1200 }]` ; `sum(lignes.montant)` les totalise.
+7. **États.** Un `workflow` sur un champ `choice` dit l'état de départ et les passages permis
+   (« brouillon → validée si total > 0 », « validée → payée ») ; Jarvis refuse les autres.
+8. Une app, c'est plusieurs modèles reliés (Finances : Compte, Fonds, Mouvement, Obligation,
+   Rapprochement ; Routines : Habitude, Pointage) avec ses pages et ses règles (routine « Les
+   apps »). Construis-la pas à pas avec elle : un modèle, quelques entrées réelles, puis le suivant.
+9. Changer un modèle, c'est changer son entrée « Model » (après lui avoir demandé). Si un nom de
+   champ change, corrige les entrées avec `migrate` (routine « Les apps »). Tout est journalisé et
+   s'annule.
+10. Si `save` refuse une entrée, ne contourne pas : lis la phrase, corrige le nom ou la valeur, ou
+    demande-lui s'il faut changer le modèle. Si `save` répond des `notes` (anciens mots-clés
+    renommés), écris désormais les nouveaux.

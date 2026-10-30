@@ -128,8 +128,8 @@ export function repetitionOf(text: string) {
 }
 
 /** The next time after `after` that a repetition names, on the clock of `zone`. */
-export function nextTime(repete: string, after: Date, zone = DEFAULT_ZONE): Date {
-  const rule = repetitionOf(repete);
+export function nextTime(repeat: string, after: Date, zone = DEFAULT_ZONE): Date {
+  const rule = repetitionOf(repeat);
   const start = wall(after, zone);
   const hours = [...rule.hour.values].sort((a, b) => a - b);
   const minutes = [...rule.minute.values].sort((a, b) => a - b);
@@ -152,13 +152,13 @@ export function nextTime(repete: string, after: Date, zone = DEFAULT_ZONE): Date
       }
     }
   }
-  throw new Error(`« ${repete} » names no time in the next two years.`);
+  throw new Error(`« ${repeat} » names no time in the next two years.`);
 }
 
 /** The fields that put an entry in time. */
-export const TIME_FIELDS = ['debut', 'quand', 'repete', 'echeance', 'date'] as const;
+export const TIME_FIELDS = ['start', 'at', 'repeat', 'due', 'date'] as const;
 
-/** Minutes she gave as `duree`: a number, or « 90 », « 1h30 », « 45 min ». */
+/** Minutes she gave as `duration`: a number, or « 90 », « 1h30 », « 45 min ». */
 export function minutesOf(value: unknown): number | null {
   if (typeof value === 'number' && value > 0) return value;
   if (typeof value !== 'string') return null;

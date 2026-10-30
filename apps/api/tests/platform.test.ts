@@ -20,7 +20,7 @@ beforeAll(async () => {
       {
         kind: 'Rappel',
         title: 'Bientôt',
-        data: { quand: new Date(Date.now() + 86_400_000).toISOString() },
+        data: { at: new Date(Date.now() + 86_400_000).toISOString() },
       },
       {
         kind: 'Tableau de bord',

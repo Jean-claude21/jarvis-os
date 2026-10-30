@@ -39,6 +39,7 @@ import {
   type Blobs,
   type Space,
   type Tx,
+  withComputed,
 } from '@jarvis-os/core';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
@@ -255,11 +256,16 @@ export function apiRoutes(deps: {
       archived: q.archived === 'true',
       ...(q.limit ? { limit: Number(q.limit) } : {}),
     });
-    return c.json(await act(c, (tx, _a, space) => find(tx, space, input)));
+    return c.json(
+      await act(c, async (tx, _a, space) => withComputed(tx, space, await find(tx, space, input))),
+    );
   });
 
   api.get('/entries/:id', async (c) => {
-    const entry = await act(c, (tx, _a, space) => get(tx, space, c.req.param('id')));
+    const entry = await act(c, async (tx, _a, space) => {
+      const one = await get(tx, space, c.req.param('id'));
+      return one ? (await withComputed(tx, space, [one]))[0] : null;
+    });
     return entry ? c.json(entry) : c.json({ error: `No entry ${c.req.param('id')}.` }, 404);
   });
 
@@ -407,7 +413,7 @@ export function apiRoutes(deps: {
           `select space_id, count(*)::int as entries,
                   count(*) filter (where data ? 'texte' and length(data->>'texte') > 400)::int as documents,
                   count(*) filter (where jarvis_fold(kind) = 'rappel'
-                    and coalesce(data->>'statut', '') not in ('fait', 'envoyé', 'annulé'))::int as reminders
+                    and coalesce(data->>'status', '') not in ('done', 'sent', 'cancelled'))::int as reminders
              from entry where space_id = any($1) and archived_at is null group by space_id`,
           [ids],
         );

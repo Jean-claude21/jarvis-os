@@ -457,8 +457,8 @@ export async function exportMarkdown(
 
   // An imported entry goes back where it came from; any other where its kind's model says
   // (spec 012), else into its kind's folder.
-  const rangementOf = new Map(
-    (await modelsOf(tx, spaceId)).map((model) => [fold(model.kind), model.rangement]),
+  const modelPathOf = new Map(
+    (await modelsOf(tx, spaceId)).map((model) => [fold(model.kind), model.path]),
   );
   const taken = new Set<string>();
   const pathOf = new Map<string, string>();
@@ -470,7 +470,7 @@ export async function exportMarkdown(
       !source.startsWith('/') &&
       !source.includes('..')
         ? source
-        : (placeOf(rangementOf.get(fold(entry.kind)), entry, slugOf) ??
+        : (placeOf(modelPathOf.get(fold(entry.kind)), entry, slugOf) ??
           `${slugOf(entry.kind)}/${slugOf(entry.title)}.md`);
     for (let n = 2; taken.has(path.toLowerCase()); n += 1) {
       path = path.replace(/(?:-\d+)?\.md$/i, `-${n}.md`);

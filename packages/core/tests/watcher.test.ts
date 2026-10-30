@@ -52,15 +52,15 @@ describe('a pass of the watcher', () => {
           {
             kind: 'Rappel',
             title: 'Renouveler le passeport',
-            data: { quand: '2026-11-03T09:00', statut: 'à venir' },
+            data: { at: '2026-11-03T09:00', status: 'planned' },
           },
           {
             kind: 'Rappel',
             title: 'Dépôt du jour',
-            data: { repete: '45 20 * * 0-5', message: 'Va devant Dieu, puis #soir.' },
+            data: { repeat: '45 20 * * 0-5', message: 'Va devant Dieu, puis #soir.' },
           },
-          { kind: 'Rappel', title: 'Plus tard', data: { quand: '2026-12-25T09:00' } },
-          { kind: 'Rappel', title: 'Mal écrit', data: { repete: 'chaque soir' } },
+          { kind: 'Rappel', title: 'Plus tard', data: { at: '2026-12-25T09:00' } },
+          { kind: 'Rappel', title: 'Mal écrit', data: { repeat: 'chaque soir' } },
         ],
       }),
     );
@@ -79,8 +79,8 @@ describe('a pass of the watcher', () => {
     await watchOnce(db, new Date('2026-11-01T12:00:00Z'), tell);
     expect(mine()).toEqual([]);
     const now = await reminders();
-    expect(now['Dépôt du jour']).toMatchObject({ prochaine: '2026-11-01T19:45:00.000Z' });
-    expect(now['Mal écrit']).toMatchObject({ statut: 'à corriger' });
+    expect(now['Dépôt du jour']).toMatchObject({ next: '2026-11-01T19:45:00.000Z' });
+    expect(now['Mal écrit']).toMatchObject({ status: 'to_fix' });
   });
 
   it('tells what is due, once; a repetition moves to its next time', async () => {
@@ -88,15 +88,15 @@ describe('a pass of the watcher', () => {
     expect(mine()).toEqual(['Renouveler le passeport']);
     // The Sunday 20:45 was missed while nothing ran: skipped to its next time, not sent late.
     const now = await reminders();
-    expect(now['Renouveler le passeport']).toMatchObject({ statut: 'envoyé' });
-    expect(now['Dépôt du jour']).toMatchObject({ prochaine: '2026-11-03T19:45:00.000Z' });
+    expect(now['Renouveler le passeport']).toMatchObject({ status: 'sent' });
+    expect(now['Dépôt du jour']).toMatchObject({ next: '2026-11-03T19:45:00.000Z' });
 
     await watchOnce(db, new Date('2026-11-03T19:46:00Z'), tell);
     expect(mine()).toEqual(['Renouveler le passeport', 'Dépôt du jour']);
     expect(told.at(-1)).toMatchObject({ message: 'Va devant Dieu, puis #soir.', repeated: true });
     expect((await reminders())['Dépôt du jour']).toMatchObject({
-      prochaine: '2026-11-04T19:45:00.000Z',
-      dernier_envoi: '2026-11-03T19:46:00.000Z',
+      next: '2026-11-04T19:45:00.000Z',
+      last_sent: '2026-11-03T19:46:00.000Z',
     });
     await watchOnce(db, new Date('2026-11-03T19:47:00Z'), tell);
     expect(mine()).toHaveLength(2);

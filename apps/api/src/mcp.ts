@@ -25,6 +25,7 @@ import {
   type Blobs,
   type Space,
   type Tx,
+  withComputed,
 } from '@jarvis-os/core';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -83,9 +84,11 @@ async function methodOf(tx: Tx, spaces: Space[]) {
     for (const entry of await find(tx, space.id, { kind: 'Routine', limit: 100 })) {
       routines.push({
         name: entry.title,
-        // A routine she said (quand, consigne) or one read from her files (description, texte).
-        when: String(entry.data.quand ?? entry.data.when ?? entry.data.description ?? ''),
-        text: textOf(entry.data, 'consigne', 'texte', 'text'),
+        // A routine she said (when, instruction) or one read from her files (description, texte).
+        when: String(
+          entry.data.when ?? entry.data.at ?? entry.data.quand ?? entry.data.description ?? '',
+        ),
+        text: textOf(entry.data, 'instruction', 'consigne', 'texte', 'text'),
         space: space.name,
       });
     }
@@ -268,19 +271,23 @@ export async function mcpServerFor(
         space,
         ...args
       }: z.input<typeof findInputSchema> & { space?: string | undefined }) =>
-        act((tx) => find(tx, at(space), args)),
+        act(async (tx) => withComputed(tx, at(space), await find(tx, at(space), args))),
     ),
   );
 
   server.registerTool(
     'get',
     {
-      description: 'One entry with its fields, their origins and its links both ways.',
+      description:
+        'One entry with its fields, their origins, its links both ways and its formulas computed (`computed`).',
       inputSchema: { id: z.string().min(1), space: spaceArg },
       annotations: { readOnlyHint: true },
     },
     tool(async ({ id, space }: { id: string; space?: string | undefined }) => {
-      const entry = await act((tx) => get(tx, at(space), id));
+      const entry = await act(async (tx) => {
+        const one = await get(tx, at(space), id);
+        return one ? (await withComputed(tx, at(space), [one]))[0] : null;
+      });
       if (!entry) throw new Error(`No entry ${id} in this space.`);
       return entry;
     }),
@@ -471,9 +478,9 @@ export async function mcpServerFor(
     'agenda',
     {
       description: [
-        'Her calendar for a window: every entry of any kind that has a time — `debut`/`fin`/`duree`',
-        '(a span), `quand` (a moment), `echeance` (a deadline), `date` (a day, from today on),',
-        '`repete` (again and again, minus the days in `sauf`) — at its place, sorted. Answer « what do',
+        'Her calendar for a window: every entry of any kind that has a time — `start`/`end`/`duration`',
+        '(a span), `at` (a moment), `due` (a deadline), `date` (a day, from today on),',
+        '`repeat` (again and again, minus the days in `except`) — at its place, sorted. Answer « what do',
         'I have Thursday? » from this, never from memory. `from`/`to`: ISO times or days',
         '(« 2026-10-29 »); at most 366 days. Every space this client reaches unless `space` is given.',
       ].join(' '),

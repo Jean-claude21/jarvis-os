@@ -1,5 +1,6 @@
 import { agenda } from './agenda';
 import type { Tx } from './db';
+import { CLOSED } from './keywords';
 import { DEFAULT_ZONE, inZone } from './time';
 
 /** Something dated that comes soon: a reminder, an event, a deadline, a day. */
@@ -11,8 +12,6 @@ export interface Upcoming {
   title: string;
   space: string;
 }
-
-const DONE = new Set(['fait', 'envoyé', 'envoye', 'non envoyé']);
 
 /** « 2026-11-03 09:00 » on her clock, or « 2026-11-03 » for a whole day. */
 function shown(iso: string, allDay: boolean, zone: string): string {
@@ -50,7 +49,7 @@ export async function upcoming(
   const to = new Date(from.getTime() + (days + 1) * 86_400_000);
   const seen = await agenda(tx, spaceIds, { from, to, today: now });
   return seen
-    .filter((one) => !one.status || !DONE.has(one.status.toLowerCase()))
+    .filter((one) => !one.status || !CLOSED.has(one.status))
     .slice(0, 50)
     .map((one) => ({
       id: one.id,

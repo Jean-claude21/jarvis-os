@@ -341,7 +341,7 @@ const pages = {
       else if (sel.group === 'fix') acts.push(['retry', W.a_retry, W.a_retryWhy, true], ['done', W.a_done, W.a_doneWhy]);
       else {
         acts.push(['done', W.a_done, W.a_doneWhy, sel.group === 'late']);
-        if (e.data.quand || e.data.echeance || e.data.debut) acts.push(['later', W.a_later, W.a_laterWhy, sel.group !== 'late']);
+        if (e.data.at || e.data.due || e.data.start) acts.push(['later', W.a_later, W.a_laterWhy, sel.group !== 'late']);
         acts.push(['cancel', W.a_cancel, W.a_cancelWhy]);
       }
       detail = '<button class="quiet back" data-back>← ' + esc(W.back) + '</button>' +
@@ -372,34 +372,35 @@ const pages = {
     if (!models.length) return empty(W.noApp);
     const current = models.find((k) => k.kind === params.get('kind')) || models[0];
     const model = current.model;
-    const champs = model.champs.filter((c) => c.nature !== 'lien');
-    const cols = (model.colonnes && model.colonnes.length ? model.colonnes : champs.slice(0, 5).map((c) => c.nom)).filter((c) => c !== 'titre');
-    const natureOf = (n) => (model.champs.find((c) => c.nom === n) || {}).nature;
+    const shown = model.fields.filter((c) => !['link', 'lines', 'list'].includes(c.type));
+    const cols = (model.columns && model.columns.length ? model.columns : shown.slice(0, 5).map((c) => c.name)).filter((c) => c !== 'title');
+    const natureOf = (n) => { const f = model.fields.find((c) => c.name === n) || {}; return f.type === 'formula' ? 'number' : f.type; };
+    const valueOf = (e, n) => e.computed && n in e.computed ? e.computed[n] : e.data[n];
     const list = await api(inSpace('/entries?limit=200&kind=' + encodeURIComponent(current.kind)));
     const fmt = (n, v) => {
       if (v === undefined || v === null) return '<span class="muted">—</span>';
-      if (natureOf(n) === 'montant' || natureOf(n) === 'nombre') return '<span class="num ' + (natureOf(n) === 'montant' && v < 0 ? 'neg' : '') + '">' + esc(num(v)) + '</span>';
-      if (natureOf(n) === 'oui-non') return v ? '✓' : '—';
+      if (typeof v === 'number' || natureOf(n) === 'amount' || natureOf(n) === 'number') return '<span class="num ' + (v < 0 ? 'neg' : '') + '">' + esc(num(v)) + '</span>';
+      if (natureOf(n) === 'boolean' || typeof v === 'boolean') return v ? '✓' : '—';
       return esc(typeof v === 'object' ? JSON.stringify(v) : v);
     };
     const groupOf = (e) => {
-      if (!model.regroupement) return '';
-      const v = e.data[model.regroupement];
+      if (!model.groupBy) return '';
+      const v = valueOf(e, model.groupBy);
       if (typeof v === 'string' && v.length >= 7 && v.charAt(4) === '-') return v.slice(0, 7);
       return v === undefined ? '—' : String(v);
     };
     const groups = [...new Set(list.map(groupOf))].sort().reverse();
-    const sum = (rows) => rows.reduce((t, e) => t + (typeof e.data[model.total] === 'number' ? e.data[model.total] : 0), 0);
+    const sum = (rows) => rows.reduce((t, e) => t + (typeof valueOf(e, model.total) === 'number' ? valueOf(e, model.total) : 0), 0);
     const totalRow = (rows, label) => model.total ? '<tr class="total"><td>' + esc(label) + '</td>' + cols.map((c) => '<td class="' + (c === model.total ? 'n num' : '') + '">' + (c === model.total ? esc(num(sum(rows))) : '') + '</td>').join('') + '</tr>' : '';
     const body = groups.map((g) => {
       const rows = list.filter((e) => groupOf(e) === g);
       return (g ? '<tr class="group"><td colspan="' + (cols.length + 1) + '">' + esc(g) + '</td></tr>' : '') +
-        rows.map((e) => '<tr data-go="#/entree/' + esc(e.id) + '"><td>' + esc(e.title) + '</td>' + cols.map((c) => '<td class="' + (['montant', 'nombre'].includes(natureOf(c)) ? 'n' : '') + '">' + fmt(c, e.data[c]) + '</td>').join('') + '</tr>').join('') +
+        rows.map((e) => '<tr data-go="#/entree/' + esc(e.id) + '"><td>' + esc(e.title) + '</td>' + cols.map((c) => '<td class="' + (['amount', 'number'].includes(natureOf(c)) ? 'n' : '') + '">' + fmt(c, valueOf(e, c)) + '</td>').join('') + '</tr>').join('') +
         (g && model.total ? totalRow(rows, say(W.subtotal, { group: g })) : '');
     }).join('') + totalRow(list, W.total);
     const tabs = '<nav class="tabs">' + models.map((k) => '<a class="' + (k.kind === current.kind ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '">' + esc(k.kind) + ' <span class="muted num">' + k.count + '</span></a>').join('') + '</nav>';
     return '<div class="head"><div><p class="lead" style="margin:0">' + esc(say(W.appLead, { n: models.length })) + '</p></div><div class="actions"><button class="quiet" data-model="' + esc(current.kind) + '">' + esc(W.seeModel) + '</button><button data-add="' + esc(current.kind) + '">' + esc(say(W.addOne, { kind: current.kind })) + '</button></div></div>' + tabs +
-      card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th>' + cols.map((c) => '<th class="' + (['montant', 'nombre'].includes(natureOf(c)) ? 'n' : '') + '">' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>' : empty(), true);
+      card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th>' + cols.map((c) => '<th class="' + (['amount', 'number'].includes(natureOf(c)) ? 'n' : '') + '">' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>' : empty(), true);
   },
 
   // Her files (spec 013): what each is, what Jarvis read of it, what it is linked to.
@@ -470,7 +471,8 @@ const pages = {
       (e.data.source ? '<div class="meta muted">' + esc(say(W.source, { path: e.data.source })) + '</div>' : '') + '</div>' +
       '<div class="actions">' + (e.archivedAt ? '' : '<button class="quiet" id="aside">' + esc(W.setAside) + '</button>') + '</div></div>' +
       '<section class="grid">' +
-      card(W.fields, fields.length ? fields.map((f) => '<div class="field-row"><span class="caps">' + esc(f) + '</span><span>' + value(e.data[f]) + '</span>' + originBadge(e.origin[f] || 'said') + '</div>').join('') : empty()) +
+      card(W.fields, fields.length || e.computed ? fields.map((f) => '<div class="field-row"><span class="caps">' + esc(f) + '</span><span>' + (f === 'status' ? esc(W['st_' + e.data[f]] || e.data[f]) : value(e.data[f])) + '</span>' + originBadge(e.origin[f] || 'said') + '</div>').join('') +
+        Object.entries(e.computed || {}).map(([f, v]) => '<div class="field-row"><span class="caps">' + esc(f) + '</span><span class="num">' + esc(typeof v === 'number' ? num(v) : v === null ? '—' : String(v)) + '</span><span class="badge">' + esc(W.computedBadge) + '</span></div>').join('') : empty()) +
       card(W.links, links.length ? '<ul class="list">' + links.join('') + '</ul>' : empty()) +
       text +
       card(W.history, '<ul class="list">' + hist.map((h) => '<li><span>' + esc(said(h.command)) + ' <span class="muted">' + esc(say(W.by, { who: h.client || h.actor === me.person.id && me.person.name || h.actor, door: h.door })) + ' · ' + esc(time(h.at)) + '</span></span>' +
@@ -545,7 +547,7 @@ const pages = {
     const canal = await api('/entries?kind=Canal&limit=1&space=' + encodeURIComponent(me.space.id));
     return '<p class="badge ' + (canal.length ? 'said' : 'error') + '" style="white-space:normal;margin-bottom:14px">' + esc(canal.length ? W.channelOn : W.channelOff) + '</p>' +
       card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th><th>' + esc(W.when) + '</th><th>' + esc(W.repeats) + '</th><th>' + esc(W.status) + '</th></tr></thead><tbody>' +
-        list.map((r) => '<tr data-go="#/entree/' + esc(r.id) + '"><td>' + esc(r.title) + (r.data.message ? '<div class="muted">' + esc(r.data.message) + '</div>' : '') + '</td><td class="num">' + esc(time(r.data.prochaine || r.data.quand)) + '</td><td class="num">' + esc(r.data.repete || '') + '</td><td><span class="badge">' + esc(r.data.statut || '—') + '</span></td></tr>').join('') +
+        list.map((r) => '<tr data-go="#/entree/' + esc(r.id) + '"><td>' + esc(r.title) + (r.data.message ? '<div class="muted">' + esc(r.data.message) + '</div>' : '') + '</td><td class="num">' + esc(time(r.data.next || r.data.at)) + '</td><td class="num">' + esc(r.data.repeat || '') + '</td><td><span class="badge">' + esc(r.data.status ? W['st_' + r.data.status] || r.data.status : '—') + '</span></td></tr>').join('') +
         '</tbody></table></div>' : empty(), true);
   },
 
@@ -709,12 +711,12 @@ function bind() {
       const e = await api('/entries/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(spaceId));
       const data = {};
       const act = b.dataset.act;
-      if (act === 'done') data.statut = 'fait';
-      if (act === 'cancel' || act === 'refuse') data.statut = 'annulé';
-      if (act === 'accept' || act === 'retry') data.statut = 'à venir';
-      if (act === 'retry' && e.data.erreur !== undefined) data.erreur = null;
+      if (act === 'done') data.status = 'done';
+      if (act === 'cancel' || act === 'refuse') data.status = 'cancelled';
+      if (act === 'accept' || act === 'retry') data.status = 'planned';
+      if (act === 'retry' && e.data.error !== undefined) data.error = null;
       if (act === 'later') {
-        for (const f of ['quand', 'echeance', 'debut', 'fin']) if (typeof e.data[f] === 'string') data[f] = dayLater(e.data[f]);
+        for (const f of ['at', 'due', 'start', 'end']) if (typeof e.data[f] === 'string') data[f] = dayLater(e.data[f]);
       }
       await api('/save?space=' + encodeURIComponent(spaceId), { method: 'POST', body: { entries: [{ id, data }] } });
       pick = null; reading = false;
@@ -741,31 +743,41 @@ function bind() {
   root.querySelectorAll('[data-model]').forEach((b) => b.addEventListener('click', async () => {
     const k = (await api(inSpace('/kinds'))).find((one) => one.kind === b.dataset.model);
     if (!k || !k.model) return;
-    openDrawer(say(W.modelOf, { kind: k.kind }), '<p class="muted">' + esc(W.modelLead) + '</p>' + k.model.champs.map((c) =>
-      '<div class="field-row"><span class="caps">' + esc(c.nom) + '</span><span>' + esc(c.nature + (c.choix ? ' : ' + c.choix.join(', ') : '') + (c.vers ? ' → ' + c.vers : '') + (c.unite ? ' (' + c.unite + ')' : '')) + '</span><span class="badge">' + esc(c.obligatoire ? W.required : W.optional) + '</span></div>').join('') +
-      (k.model.rangement ? '<p><span class="caps">' + esc(W.rangement) + '</span><br><code class="url">' + esc(k.model.rangement) + '</code></p>' : ''),
+    openDrawer(say(W.modelOf, { kind: k.kind }), '<p class="muted">' + esc(W.modelLead) + '</p>' + k.model.fields.map((c) =>
+      '<div class="field-row"><span class="caps">' + esc(c.name) + '</span><span>' + esc((W['ty_' + c.type] || c.type) + (c.options ? ' : ' + c.options.join(', ') : '') + (c.target ? ' → ' + c.target : '') + (c.formula ? ' = ' + c.formula : '') + (c.unit ? ' (' + c.unit + ')' : '')) + '</span><span class="badge">' + esc(c.type === 'formula' ? W.computedBadge : c.required ? W.required : W.optional) + '</span></div>').join('') +
+      (k.model.workflow ? '<p><span class="caps">' + esc(W.workflow) + '</span><br>' + k.model.workflow.transitions.map((t) => esc([t.from].flat().join(' | ') + ' → ' + t.to + (t.if ? ' (' + t.if + ')' : ''))).join('<br>') + '</p>' : '') +
+      (k.model.path ? '<p><span class="caps">' + esc(W.rangement) + '</span><br><code class="url">' + esc(k.model.path) + '</code></p>' : ''),
       '<a class="badge" href="#/entree/' + esc(k.model.id) + '">' + esc(W.fullEntry) + '</a>');
   }));
   root.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', async () => {
     const k = (await api(inSpace('/kinds'))).find((one) => one.kind === b.dataset.add);
     if (!k || !k.model) return;
+    const fields = k.model.fields.filter((c) => !['list', 'formula', 'lines'].includes(c.type));
+    const targets = {};
+    for (const c of fields) if (c.type === 'link' && c.target) targets[c.name] = await api(inSpace('/entries?limit=200&kind=' + encodeURIComponent(c.target)));
     const input = (c) => {
-      const id = 'f_' + c.nom;
-      if (c.nature === 'choix') return '<select id="' + id + '"><option value=""></option>' + c.choix.map((o) => '<option>' + esc(o) + '</option>').join('') + '</select>';
-      if (c.nature === 'oui-non') return '<select id="' + id + '"><option value=""></option><option value="true">✓</option><option value="false">—</option></select>';
-      const type = c.nature === 'date' ? 'date' : c.nature === 'moment' ? 'datetime-local' : ['nombre', 'montant'].includes(c.nature) ? 'number' : 'text';
+      const id = 'f_' + c.name;
+      if (c.type === 'link') return '<select id="' + id + '"' + (c.cardinality === 'many' ? ' multiple' : '') + '><option value=""></option>' + (targets[c.name] || []).map((o) => '<option value="' + esc(o.id) + '">' + esc(o.title) + '</option>').join('') + '</select>';
+      if (c.type === 'choice') return '<select id="' + id + '"><option value=""></option>' + c.options.map((o) => '<option>' + esc(o) + '</option>').join('') + '</select>';
+      if (c.type === 'boolean') return '<select id="' + id + '"><option value=""></option><option value="true">✓</option><option value="false">—</option></select>';
+      const type = c.type === 'date' ? 'date' : c.type === 'datetime' ? 'datetime-local' : ['number', 'amount'].includes(c.type) ? 'number' : 'text';
       return '<input id="' + id + '" type="' + type + '"' + (type === 'number' ? ' step="any"' : '') + '>';
     };
-    const fields = k.model.champs.filter((c) => !['lien', 'liste'].includes(c.nature));
     openDrawer(say(W.addOne, { kind: k.kind }), '<div class="form-field"><label>' + esc(W.title) + ' *</label><input id="f__title"></div>' +
-      fields.map((c) => '<div class="form-field"><label>' + esc(c.nom + (c.obligatoire ? ' *' : '') + (c.unite ? ' · ' + c.unite : '')) + '</label>' + input(c) + '</div>').join('') + '<p class="error-text" id="f__error"></p>',
+      fields.map((c) => '<div class="form-field"><label>' + esc(c.name + (c.required ? ' *' : '') + (c.unit ? ' · ' + c.unit : '') + (c.target ? ' → ' + c.target : '')) + '</label>' + input(c) + '</div>').join('') + '<p class="error-text" id="f__error"></p>',
       '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button id="f__save">' + esc(W.save) + '</button>');
     document.getElementById('f__save').addEventListener('click', async () => {
       const data = {};
       for (const c of fields) {
-        const v = document.getElementById('f_' + c.nom).value;
+        const el = document.getElementById('f_' + c.name);
+        if (c.type === 'link' && c.cardinality === 'many') {
+          const picked = [...el.selectedOptions].map((o) => o.value).filter(Boolean);
+          if (picked.length) data[c.name] = picked;
+          continue;
+        }
+        const v = el.value;
         if (v === '') continue;
-        data[c.nom] = ['nombre', 'montant'].includes(c.nature) ? Number(v) : c.nature === 'oui-non' ? v === 'true' : v;
+        data[c.name] = ['number', 'amount'].includes(c.type) ? Number(v) : c.type === 'boolean' ? v === 'true' : v;
       }
       try {
         await api(inSpace('/save'), { method: 'POST', body: { entries: [{ kind: k.kind, title: document.getElementById('f__title').value.trim(), data }] } });

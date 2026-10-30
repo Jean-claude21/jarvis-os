@@ -1,7 +1,8 @@
 import { agenda, type Occurrence } from './agenda';
 import type { Tx } from './db';
 import { CLOSED } from './keywords';
-import { DEFAULT_ZONE, inZone } from './time';
+import { inZone } from './time';
+import { zoneOf } from './zone';
 
 // What needs her now (spec 013), read from what she already keeps — no new field, no new kind:
 // what went wrong, what is late, what Jarvis proposed, what comes today and this week. The
@@ -49,8 +50,9 @@ export async function attention(
   tx: Tx,
   spaceIds: string[],
   now = new Date(),
-  zone = DEFAULT_ZONE,
+  given?: string,
 ): Promise<Attention> {
+  const zone = given ?? (await zoneOf(tx));
   const { start, end } = dayBounds(now, zone);
   const items: AttentionItem[] = [];
   const seen = new Set<string>();

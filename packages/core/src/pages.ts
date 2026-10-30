@@ -4,6 +4,7 @@ import { readerOf, type EntryView, type Reader } from './compute';
 import type { Tx } from './db';
 import { evaluate, isScope, parse, todayOf, type Clock } from './formula';
 import { labelSchema, type Label } from './models';
+import { query } from './query';
 import { requestSchema, runRequest, withParams } from './request';
 
 // Pages (spec 014): what an app shows, declared — filters and blocks — computed by the core and
@@ -96,6 +97,13 @@ export const blockSchema = z.discriminatedUnion('block', [
   }),
   /** A form to add an entry of a kind, from its model. */
   z.object({ block: z.literal('form'), title, kind }),
+  /** The escape hatch (decision 0004): one `select` over her copies, drawn as a figure, bars, a line or a table. */
+  z.object({
+    block: z.literal('sql'),
+    title,
+    sql: z.string().trim().min(1).max(10_000),
+    chart: z.enum(['number', 'bar', 'line', 'table']).default('table'),
+  }),
   /** One entry with its fields, formulas and relations (a record page: `{record}` is its id). */
   z.object({
     block: z.literal('record'),
@@ -137,7 +145,7 @@ export function checkPage(data: unknown): PageData {
       .map((issue) => `${issue.path.join('.') || 'page'}: ${issue.message}`)
       .join('; ');
     throw new Error(
-      `A « ${PAGE_KIND} » is { app?, filters?: [{ name, type: month|choice|text|record, options?, default? }], blocks: [{ block: stat|stat_delta|gauge|bar|line|breakdown|heatmap|table|task_list|kanban|calendar|form|record, … }] } — ${issues}.`,
+      `A « ${PAGE_KIND} » is { app?, filters?: [{ name, type: month|choice|text|record, options?, default? }], blocks: [{ block: stat|stat_delta|gauge|bar|line|breakdown|heatmap|table|task_list|kanban|calendar|form|record|sql, … }] } — ${issues}.`,
     );
   }
   for (const block of parsed.data.blocks) {
@@ -355,6 +363,15 @@ async function drawBlock(
         fields:
           model?.fields.filter((one) => !['formula', 'lines', 'list'].includes(one.type)) ?? [],
       };
+    }
+    case 'sql': {
+      // Filters reach it as quoted text: « where to_char(…) = {month} ».
+      const sql = block.sql.replace(/\{(\w+)\}/g, (_, name: string) => {
+        if (!(name in params)) throw new Error(`« {${name}} » is not a filter of this page.`);
+        return `'${String(params[name]).replace(/'/g, "''")}'`;
+      });
+      const result = await query(tx, { spaceIds: [reader.spaceId], sql });
+      return { ...base, chart: block.chart, ...result };
     }
     case 'record': {
       const id = params.record;

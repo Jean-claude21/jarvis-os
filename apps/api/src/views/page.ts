@@ -14,9 +14,17 @@ input, select { font: inherit; padding: 6px 8px; border: 1px solid var(--rule-st
 .delta.up { color: var(--error); } .delta.down { color: var(--success); }
 .bars { display: grid; gap: 7px; }
 .bar { display: grid; grid-template-columns: minmax(70px, 34%) 1fr auto; gap: 10px; align-items: center; }
-.bar .track, .gauge .track { height: 12px; background: var(--clay); border-radius: 2px; overflow: hidden; }
-.bar .fill, .gauge .fill { height: 100%; background: var(--primary); }
-.gauge { margin: 8px 0 12px; } .gauge .fill.over { background: var(--error); }
+/* The validated design (docs/design/jarvis.html): panels with a sand head, KPIs, thin status bars. */
+.card { background: var(--sand); padding: 0; display: flex; flex-direction: column; }
+.card > h2 { font: 600 11px/1.4 Archivo, system-ui, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: var(--bark); padding: 10px 12px; margin: 0; }
+.card > .body { background: var(--paper); border-top: 1px solid var(--rule); padding: 14px 16px; flex: 1; min-width: 0; }
+.kpi { font: 600 26px/1.15 "JetBrains Mono", ui-monospace, monospace; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi small { font-size: 13px; font-weight: 500; color: var(--bark); margin-left: 4px; }
+.kpi-sub { color: var(--bark); font-size: 12.5px; margin-top: 4px; }
+.card.alert { border-color: var(--verify); } .card.alert > h2 { color: var(--verify); } .card.alert > .body { background: var(--verify-surface); }
+.bar .track, .gauge .track { height: 6px; background: var(--clay); border-radius: 1px; overflow: hidden; }
+.bar .fill, .gauge .fill { height: 100%; background: var(--ink); border-radius: 1px; }
+.gauge { margin: 6px 0 12px; } .gauge .fill.ok { background: var(--success); } .gauge .fill.warn { background: var(--ochre); } .gauge .fill.over { background: var(--error); }
 .gauge .top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
 .share { display: flex; height: 16px; gap: 2px; border-radius: 2px; overflow: hidden; }
 .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--bark); }
@@ -72,9 +80,10 @@ function open(id) {
   if (framed() && window.parent !== window) { try { window.parent.location.hash = '#/entree/' + id; return; } catch {} }
   if (!framed()) tellModel(say(words.opened, { id }), { id });
 }
-function card(b, inner, wide) {
-  return '<article class="card' + (wide ? ' wide' : '') + '">' + (b.title ? '<h2>' + esc(tr(b.title)) + '</h2>' : '') + inner + '</article>';
+function card(b, inner, wide, tone) {
+  return '<article class="card' + (wide ? ' wide' : '') + (tone ? ' ' + tone : '') + '">' + (b.title ? '<h2>' + esc(tr(b.title)) + '</h2>' : '') + '<div class="body">' + inner + '</div></article>';
 }
+const figure = (b) => '<div class="kpi">' + fmt(b.value) + (b.unit ? '<small>' + esc(b.unit) + '</small>' : '') + '</div>';
 function table(columns, rows, extra, kind) {
   if (!rows.length) return '<p class="empty">' + esc(words.empty) + '</p>';
   const nums = columns.map((c) => rows.every((r) => r[c] == null || numeric(r[c])));
@@ -82,11 +91,11 @@ function table(columns, rows, extra, kind) {
     rows.map((r) => '<tr class="' + (r.id ? 'go' : '') + '"' + (r.id ? ' data-open="' + esc(r.id) + '"' : '') + '>' + columns.map((c, i) => '<td class="' + (nums[i] ? 'n num' : '') + '">' + fmt(optionLabel(kind, c, r[c])) + '</td>').join('') + '</tr>').join('') + (extra || '') + '</tbody></table></div>';
 }
 const draw = {
-  stat: (b) => card(b, '<div class="kpi">' + fmt(b.value) + (b.unit ? ' <span class="muted" style="font-size:14px">' + esc(b.unit) + '</span>' : '') + '</div>'),
-  stat_delta: (b) => card(b, '<div class="kpi">' + fmt(b.value) + (b.unit ? ' <span class="muted" style="font-size:14px">' + esc(b.unit) + '</span>' : '') + '</div>' +
-    (b.delta == null ? '<div class="muted">' + esc(words.noCompare) + '</div>' : '<div class="delta ' + (b.delta > 0 ? 'up' : 'down') + '">' + (b.delta > 0 ? '↑ ' : '↓ ') + fmt(Math.abs(b.delta)) + ' % ' + esc(say(words.vsPrevious, { value: fmt(b.previous) })) + '</div>')),
+  stat: (b) => card(b, figure(b), false, numeric(b.value) && b.value < 0 ? 'alert' : ''),
+  stat_delta: (b) => card(b, figure(b) +
+    (b.delta == null ? '<div class="kpi-sub">' + esc(words.noCompare) + '</div>' : '<div class="kpi-sub delta ' + (b.delta > 0 ? 'up' : 'down') + '">' + (b.delta > 0 ? '↑ ' : '↓ ') + fmt(Math.abs(b.delta)) + ' % ' + esc(say(words.vsPrevious, { value: fmt(b.previous) })) + '</div>')),
   gauge: (b) => card(b, b.items.length ? b.items.map((g) => { const p = numeric(g.max) && g.max > 0 && numeric(g.value) ? g.value / g.max * 100 : 0;
-    return '<div class="gauge"><div class="top"><span>' + fmt(g.label) + '</span><span class="num">' + fmt(g.value) + ' / ' + fmt(g.max) + '</span></div><div class="track"><div class="fill' + (p > 100 ? ' over' : '') + '" style="width:' + Math.min(100, Math.max(1, p)) + '%"></div></div></div>'; }).join('') : '<p class="empty">' + esc(words.empty) + '</p>'),
+    return '<div class="gauge"><div class="top"><span>' + fmt(g.label) + '</span><span class="num">' + fmt(g.value) + ' / ' + fmt(g.max) + '</span></div><div class="track"><div class="fill ' + (p > 100 ? 'over' : p >= 80 ? 'warn' : 'ok') + '" style="width:' + Math.min(100, Math.max(1, p)) + '%"></div></div></div>'; }).join('') : '<p class="empty">' + esc(words.empty) + '</p>'),
   bar: (b) => { const max = Math.max(1, ...b.points.map((p) => Math.abs(p.value)));
     return card(b, b.points.length ? '<div class="bars">' + b.points.map((p) => '<div class="bar"><span>' + fmt(b.groupField ? optionLabel(b.kind, b.groupField, p.label) : p.label) + '</span><span class="track"><span class="fill" style="display:block;width:' + Math.max(1, Math.abs(p.value) / max * 100) + '%"></span></span><span class="num">' + fmt(p.value) + '</span></div>').join('') + '</div>' : '<p class="empty">' + esc(words.empty) + '</p>'); },
   breakdown: (b) => { const total = b.points.reduce((t, p) => t + Math.max(0, p.value), 0) || 1;
@@ -109,6 +118,15 @@ const draw = {
         : f.type === 'boolean' ? '<select name="' + esc(f.name) + '"><option value=""></option><option value="true">✓</option><option value="false">—</option></select>'
         : '<input name="' + esc(f.name) + '" placeholder="' + esc(f.type === 'link' ? words.linkHint : '') + '" type="' + (f.type === 'date' ? 'date' : f.type === 'datetime' ? 'datetime-local' : ['number', 'amount'].includes(f.type) ? 'number' : 'text') + '" step="any">') + '</label>').join('') +
     '</div><p class="error-text" data-error></p><button>' + esc(words.add) + '</button></form>', true),
+  sql: (b) => {
+    // Raw rows: the first column names each point, the first number column gives its value.
+    const x = b.columns[0];
+    const y = b.columns.find((c) => b.rows.some((r) => numeric(r[c]) || (r[c] !== null && r[c] !== '' && !isNaN(Number(r[c])))));
+    const points = y ? b.rows.map((r) => ({ label: r[x], value: Number(r[y]) || 0 })) : [];
+    if (b.chart === 'number') return draw.stat({ title: b.title, value: y && b.rows[0] ? Number(b.rows[0][y]) : null });
+    if ((b.chart === 'bar' || b.chart === 'line') && y) return draw[b.chart]({ title: b.title, points });
+    return card(b, table(b.columns, b.rows), true);
+  },
   record: (b) => { const r = b.record; if (!r) return card(b, '<p class="empty">' + esc(words.empty) + '</p>', true);
     // Under the entry's own page, its fields are already shown: only what belongs to it.
     const own = String(current.id).startsWith('record:') ? [] : r.fields;

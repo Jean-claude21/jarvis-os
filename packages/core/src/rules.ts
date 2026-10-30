@@ -7,6 +7,7 @@ import type { SaveInput } from './schemas';
 import { evaluate, isScope, parse, todayOf } from './formula';
 import { runScript } from './scripts';
 import { DEFAULT_ZONE, nextTime } from './time';
+import { zoneOf } from './zone';
 import { trial, type Trial } from './trial';
 
 // Rules (spec 014): « when / if / then », said once, run by Jarvis. A rule is an entry of kind
@@ -330,7 +331,8 @@ export async function runDueRules(
         const rule = (await rulesOf(tx, row.space_id)).find((one) => one.id === row.entry_id);
         if (!rule) return;
         const when = rule.data.when;
-        const zone = 'schedule' in when ? (when.timezone ?? DEFAULT_ZONE) : DEFAULT_ZONE;
+        const herZone = await zoneOf(tx);
+        const zone = 'schedule' in when ? (when.timezone ?? herZone) : herZone;
         const today = todayOf({ now, zone });
         if ('schedule' in when) {
           const due = rule.data.next ? new Date(rule.data.next) : null;

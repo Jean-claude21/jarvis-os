@@ -33,6 +33,9 @@ import {
   migrationSchema,
   runScript,
   testRule,
+  OPERATORS,
+  runView,
+  type ViewData,
 } from '@jarvis-os/core';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -534,6 +537,47 @@ export async function mcpServerFor(
   );
 
   // The app engine (spec 014): try a rule, run a script, migrate a kind, export or install an app.
+  server.registerTool(
+    'view',
+    {
+      description: [
+        'The entries of a kind as she explores them (spec 015): `view` = { kind, type: table|kanban|calendar,',
+        'filters: [{ field, op, value? }] (a field of the kind or one link away, « fund.title »; op among',
+        `${OPERATORS.join(', ')}), sort: [{ field, desc? }], columns?, groupBy?, by?, date? }, or \`id\` of a`,
+        'view she kept (an entry « View »; save one with `save` to keep it, `label` { fr, en }, `default`).',
+        'Returns the rows, totals, the fields she can filter, and what the kind can be shown as.',
+      ].join(' '),
+      inputSchema: {
+        id: z.string().min(1).optional(),
+        view: z.record(z.string(), z.unknown()).optional(),
+        space: spaceArg,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    tool(
+      async ({
+        id,
+        view,
+        space,
+      }: {
+        id?: string | undefined;
+        view?: Record<string, unknown> | undefined;
+        space?: string | undefined;
+      }) =>
+        act(async (tx) => {
+          let data = view ?? {};
+          if (id) {
+            const kept = await get(tx, at(space), id);
+            if (!kept || kept.kind.toLowerCase() !== 'view')
+              throw new Error(`No view ${id} in this space.`);
+            data = { ...kept.data, ...data };
+          }
+          const result = await runView(tx, at(space), data as ViewData);
+          return { ...result, fields: result.fields.map((field) => field.path) };
+        }),
+    ),
+  );
+
   server.registerTool(
     'rule_test',
     {

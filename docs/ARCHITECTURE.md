@@ -160,6 +160,21 @@ flowchart TB
 - **Trials** (`trial.ts`): a rule, a script, a migration or an install runs in a savepoint, its
   journal is read and rolled back — what she sees before saying yes.
 
+## Views, her settings, her keys (spec 015)
+
+- **Views** (`views.ts`): the entries of a kind as she explores them — filters on any field and one
+  link away (each filter is a formula), sorts, columns, groups and totals, as a table, a kanban (a
+  choice field; dragging a card is a save, through the workflow) or a calendar (a date field). A
+  view she keeps is an entry « View », a tab of its app; Claude reads the same with `view`.
+- **Areas**: a model's `area` (« Personnel », « Professionnel ») groups her apps in the sidebar.
+- **Her zone** is in her « Channel » (`zoneOf`, `setZone`): every clock of the core reads it.
+- **Telegram from the app**: a code whose fingerprint waits in her « Channel »; the watcher reads
+  the bot and finds whose code it is (`jarvis_channel_by_code`, migration 0009).
+- **Personal keys** (`personal_key`, migration 0010): for an app of hers (the real-time app of
+  decision 0009); her policy only, the fingerprint only; the API takes `Bearer jos_…` as her.
+- **Technical names are English**; what she reads comes from `label` and `optionLabels` (`fr`,
+  `en`) and the catalogs. A refusal carries a `code` the app says in her language.
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |

@@ -52,7 +52,13 @@ computed }] }, file: { name, text }, entry, params, today }` ; il rend une liste
 5. **Changer la forme de ses données** : change d'abord le modèle (avec elle), puis `migrate`
    (`rename`, `set`, `remove`) — l'essai dit combien d'entrées changent et lesquelles ne suivraient
    pas le modèle. Une migration s'annule d'un coup.
-6. **Partager une app** : `app_export` la rend en un paquet (modèles, pages, règles, scripts) qu'une
+6. **Une view** (ce qu'elle explore elle-même dans l'app) : `view` avec `{ kind, type:
+table|kanban|calendar, filters: [{ field, op, value? }], sort, columns, groupBy }` — un filter
+   peut passer par un link (« fund.title »). Pour la garder : une entrée de kind « View »,
+   `data` = la même chose + `app`, `label` `{ fr, en }`, `default` ; elle devient un onglet de l'app.
+7. **Ranger une app** : `area` sur ses models (« Personnel », « Professionnel » — ses mots) ;
+   l'app les groupe dans la barre latérale.
+8. **Partager une app** : `app_export` la rend en un paquet (modèles, pages, règles, scripts) qu'une
    autre personne ou un autre espace installe avec `app_install` et `bundle`.
-7. Les chiffres viennent des formules, des pages ou de `query` — jamais de ta tête. Si un bloc
+9. Les chiffres viennent des formules, des pages ou de `query` — jamais de ta tête. Si un bloc
    montre une erreur, lis-la et corrige la page.

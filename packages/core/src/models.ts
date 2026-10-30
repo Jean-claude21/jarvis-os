@@ -131,6 +131,8 @@ export const modelDataSchema = z
     groupBy: z.string().trim().min(1).max(60).optional(),
     /** The app it belongs to (« Finances »), for the platform's menu. */
     app: z.string().trim().min(1).max(60).optional(),
+    /** Where she files it, in her words (« Personnel », « Professionnel »): apps are grouped by it. */
+    area: z.string().trim().min(1).max(60).optional(),
     workflow: workflowSchema.optional(),
   })
   .superRefine((model, context) => {

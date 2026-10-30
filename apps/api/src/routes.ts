@@ -32,6 +32,7 @@ import {
   querySchema,
   renameSpace,
   save,
+  modelsOf,
   spacesOf,
   undo,
   withdrawInvitation,
@@ -43,14 +44,26 @@ import {
   pagesOf,
   renderPage,
   installApp,
+  runView,
+  viewsOf,
+  setZone,
+  zoneOf,
+  createKey,
+  fingerprintOf,
+  KEY_PREFIX,
+  keyOwner,
+  keysOf,
+  revokeKey,
+  type ViewData,
 } from '@jarvis-os/core';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type pg from 'pg';
 import { z } from 'zod';
 import { shippedApp, shippedApps } from './apps';
+import { telegramLink } from './telegram';
 import type { Auth } from './auth';
-import { failure } from './errors';
+import { codeOf, failure } from './errors';
 import { invitationLink, namesOf, spaceFor } from './spaces';
 import { computeDashboard, widgetSchema, widgetsOf, type Widget } from './views/dashboard';
 import { DOCUMENT_HOURS, documentShown, documentToken } from './views/document';
@@ -116,9 +129,28 @@ export function apiRoutes(deps: {
   const api = new Hono<Env>();
 
   api.use('*', async (c, next) => {
-    const session = await deps.auth.api.getSession({ headers: c.req.raw.headers });
+    // A personal key (spec 015) acts as her, like her session.
+    const bearer = /^Bearer\s+(\S+)$/i.exec(c.req.header('authorization') ?? '')?.[1] ?? '';
+    const byKey = bearer.startsWith(KEY_PREFIX) ? await keyOwner(deps.db, bearer) : null;
+    if (bearer.startsWith(KEY_PREFIX) && !byKey)
+      return c.json({ error: 'This key answers nothing.' }, 401);
+    const session = byKey
+      ? await deps.db
+          .query<{ id: string; email: string; name: string }>(
+            'select id, email, name from "user" where id = $1',
+            [byKey],
+          )
+          .then(({ rows }) => (rows[0] ? { user: rows[0] } : null))
+      : await deps.auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: 'Sign in first.' }, 401);
     const person = session.user.id;
+    if (byKey) {
+      await asPerson(deps.db, person, (tx) =>
+        tx.query('update personal_key set last_used_at = now() where fingerprint = $1', [
+          fingerprintOf(bearer),
+        ]),
+      );
+    }
     const spaces = await asPerson(deps.db, person, (tx) => spacesOf(tx));
     if (spaces.length === 0) return c.json({ error: 'This account has no space.' }, 500);
     c.set('person', person);
@@ -132,7 +164,8 @@ export function apiRoutes(deps: {
   api.onError((error, c) => {
     const { status, message } = failure(error);
     if (status === 500) console.error(error);
-    return c.json({ error: message }, status);
+    const code = status === 500 ? null : codeOf(message);
+    return c.json({ error: message, ...(code ? { code } : {}) }, status);
   });
 
   const actorOf = (c: Context<Env>): Actor => {
@@ -262,6 +295,53 @@ export function apiRoutes(deps: {
     });
     return c.json(
       await act(c, async (tx, _a, space) => withComputed(tx, space, await find(tx, space, input))),
+    );
+  });
+
+  // Filing an app in an area (spec 015): every model of the app says it.
+  api.post('/apps/area', async (c) => {
+    const body = (await c.req.json()) as { app?: string; area?: string };
+    const app = String(body.app ?? '').trim();
+    const area = String(body.area ?? '')
+      .trim()
+      .slice(0, 60);
+    return c.json(
+      await act(c, async (tx, actor, space) => {
+        const models = (await modelsOf(tx, space)).filter((one) => one.app === app);
+        if (!models.length) throw new Error(`No app « ${app} » in this space.`);
+        await save(tx, actor, space, {
+          entries: models.map((one) => ({ id: one.id, data: { area: area || null } })),
+        });
+        return { app, area: area || null, models: models.length };
+      }),
+    );
+  });
+
+  // Her views (spec 015): those she kept, and one run — kept (`id`, with what she changed) or not.
+  api.get('/views', async (c) =>
+    c.json(
+      await act(c, (tx, _a, space) =>
+        viewsOf(tx, space, {
+          kind: c.req.query('kind') || undefined,
+          app: c.req.query('app') || undefined,
+        }),
+      ),
+    ),
+  );
+
+  api.post('/views/run', async (c) => {
+    const body = (await c.req.json()) as { id?: string; view?: Record<string, unknown> };
+    return c.json(
+      await act(c, async (tx, _a, space) => {
+        let view = body.view ?? {};
+        if (body.id) {
+          const kept = await get(tx, space, body.id);
+          if (!kept || kept.kind.toLowerCase() !== 'view')
+            throw new Error(`No view ${body.id} in this space.`);
+          view = { ...kept.data, ...view };
+        }
+        return runView(tx, space, view as ViewData);
+      }),
     );
   });
 
@@ -495,8 +575,37 @@ export function apiRoutes(deps: {
   );
 
   // Her calendar (spec 011): everything dated in her spaces, for a window (this week by default).
+  // Her Telegram (spec 015): a link to the bot with a code made for her; the watcher does the rest.
+  api.post('/me/telegram', async (c) =>
+    c.json(await telegramLink(deps.db, actorOf(c), process.env.JARVIS_TELEGRAM_BOT_TOKEN)),
+  );
+
+  // Her personal keys (spec 015): made, listed, revoked from her settings; a key is shown once.
+  api.get('/me/keys', async (c) => c.json(await as(c, (tx) => keysOf(tx))));
+  api.post('/me/keys', async (c) => {
+    const body = (await c.req.json()) as { name?: string };
+    return c.json(
+      await as(c, (tx) => createKey(tx, c.get('person'), String(body.name ?? ''))),
+      201,
+    );
+  });
+  api.delete('/me/keys/:id', async (c) => {
+    await as(c, (tx) => revokeKey(tx, c.req.param('id')));
+    return c.json({ revoked: c.req.param('id') });
+  });
+
+  // Her time zone (spec 015): read and changed from her profile.
+  api.get('/me/zone', async (c) => c.json({ zone: await as(c, (tx) => zoneOf(tx)) }));
+  api.post('/me/zone', async (c) => {
+    const body = (await c.req.json()) as { zone?: string };
+    return c.json({
+      zone: await as(c, (tx, actor) => setZone(tx, actor, String(body.zone ?? ''))),
+    });
+  });
+
   api.get('/agenda', async (c) => {
-    const from = new Date(c.req.query('from') ?? weekStart(new Date()));
+    const zone = await as(c, (tx) => zoneOf(tx));
+    const from = new Date(c.req.query('from') ?? weekStart(new Date(), zone));
     const to = c.req.query('to')
       ? new Date(c.req.query('to')!)
       : new Date(from.getTime() + 7 * 86_400_000);

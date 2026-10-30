@@ -180,6 +180,15 @@ stored in English and reported in `notes`; migration 0006 renamed what was store
 
 `jarvis_due_rules` (migration 0007) finds the rules that may be due, and nothing else.
 
+## Views, zone, keys (spec 015)
+
+| Function                                       | What it does                                                                      |
+| ---------------------------------------------- | --------------------------------------------------------------------------------- |
+| `runView`, `viewsOf`, `checkView`              | a view run (filters, sort, columns, groups, totals, kanban, calendar); those kept |
+| `filterFormula`                                | one filter as a formula (`fund.title = 'Courses'`)                                |
+| `zoneOf`, `setZone`, `isZone`                  | her time zone, kept in her « Channel »                                            |
+| `createKey`, `keysOf`, `revokeKey`, `keyOwner` | personal keys: made, listed, revoked; whose a key is                              |
+
 ## Database
 
 `db/migrations/` is applied in order by `pnpm db:migrate` (the `dev` branch, or the URL in

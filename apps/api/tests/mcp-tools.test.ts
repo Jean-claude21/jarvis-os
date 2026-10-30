@@ -49,6 +49,7 @@ describe('Jarvis’s method on connection (story 3)', () => {
         'page',
         'rule_test',
         'run_script',
+        'view',
         'create_space',
         'dashboard',
         'edit_document',

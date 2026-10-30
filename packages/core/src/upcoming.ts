@@ -1,7 +1,8 @@
 import { agenda } from './agenda';
 import type { Tx } from './db';
 import { CLOSED } from './keywords';
-import { DEFAULT_ZONE, inZone } from './time';
+import { inZone } from './time';
+import { zoneOf } from './zone';
 
 /** Something dated that comes soon: a reminder, an event, a deadline, a day. */
 export interface Upcoming {
@@ -38,8 +39,9 @@ export async function upcoming(
   spaceIds: string[],
   days = 3,
   now = new Date(),
-  zone = DEFAULT_ZONE,
+  given?: string,
 ): Promise<Upcoming[]> {
+  const zone = given ?? (await zoneOf(tx));
   const local = shown(now.toISOString(), true, zone).split('-').map(Number) as [
     number,
     number,
@@ -47,7 +49,7 @@ export async function upcoming(
   ];
   const from = inZone({ year: local[0], month: local[1], day: local[2], hour: 0, minute: 0 }, zone);
   const to = new Date(from.getTime() + (days + 1) * 86_400_000);
-  const seen = await agenda(tx, spaceIds, { from, to, today: now });
+  const seen = await agenda(tx, spaceIds, { from, to, today: now, zone });
   return seen
     .filter((one) => !one.status || !CLOSED.has(one.status))
     .slice(0, 50)

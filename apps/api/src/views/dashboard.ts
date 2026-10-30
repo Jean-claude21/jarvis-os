@@ -6,16 +6,16 @@ import { viewWords } from './words';
 
 /** A widget: one query and how to draw it (decision 0006). Figures are never stored. */
 export const widgetSchema = z.object({
-  titre: z.string().min(1).max(120),
-  requete: z.string().min(1).max(10_000),
-  /** « nombre » (one figure), « barres » (compare), « courbe » (over time), « tableau ». */
-  graphe: z.enum(['nombre', 'barres', 'courbe', 'tableau']).default('tableau'),
+  title: z.string().min(1).max(120),
+  query: z.string().min(1).max(10_000),
+  /** `number` (one figure), `bar` (compare), `line` (over time), `table`. */
+  chart: z.enum(['number', 'bar', 'line', 'table']).default('table'),
 });
 export type Widget = z.input<typeof widgetSchema>;
 
 export interface DrawnWidget {
   title: string;
-  chart: 'nombre' | 'barres' | 'courbe' | 'tableau';
+  chart: 'number' | 'bar' | 'line' | 'table';
   columns: string[];
   rows: Record<string, unknown>[];
   truncated: boolean;
@@ -29,19 +29,32 @@ export interface Dashboard {
   widgets: DrawnWidget[];
 }
 
-/** The widgets of a saved dashboard: `data.widgets`, or the routine's one `requete` and `graphe`. */
+// The words of spec 005, still read: titre, requete, graphe (nombre, barres, courbe, tableau).
+const CHARTS: Record<string, string> = {
+  nombre: 'number',
+  barres: 'bar',
+  courbe: 'line',
+  tableau: 'table',
+};
+const inNewWords = (raw: Record<string, unknown>) => ({
+  title: raw.title ?? raw.titre ?? 'Result',
+  query: raw.query ?? raw.requete,
+  chart:
+    typeof (raw.chart ?? raw.graphe) === 'string'
+      ? (CHARTS[String(raw.chart ?? raw.graphe)] ?? raw.chart ?? raw.graphe)
+      : undefined,
+});
+
+/** The widgets of a saved dashboard: `data.widgets`, or one `query` and `chart`. */
 export function widgetsOf(data: Record<string, unknown>): Widget[] {
-  if (Array.isArray(data.widgets)) return z.array(widgetSchema).parse(data.widgets);
-  if (typeof data.requete === 'string') {
-    return [
-      widgetSchema.parse({
-        titre: data.titre ?? 'Résultat',
-        requete: data.requete,
-        graphe: data.graphe,
-      }),
-    ];
+  if (Array.isArray(data.widgets)) {
+    return z
+      .array(widgetSchema)
+      .parse(data.widgets.map((one) => inNewWords(one as Record<string, unknown>)));
   }
-  throw new Error('This dashboard has no `widgets` (each: titre, requete, graphe).');
+  if (typeof (data.query ?? data.requete) === 'string')
+    return [widgetSchema.parse(inNewWords(data))];
+  throw new Error('This dashboard has no `widgets` (each: title, query, chart).');
 }
 
 /** Every widget recomputed now, each in its own read-only query; a failing one says why. */
@@ -52,16 +65,16 @@ export async function computeDashboard(
 ): Promise<Dashboard> {
   const widgets: DrawnWidget[] = [];
   for (const raw of input.widgets) {
-    const widget = widgetSchema.parse(raw);
+    const widget = widgetSchema.parse(inNewWords(raw as Record<string, unknown>));
     try {
       const result: QueryResult = await asPerson(db, person, (tx) =>
-        query(tx, { spaceIds: input.spaces.map((one) => one.id), sql: widget.requete }),
+        query(tx, { spaceIds: input.spaces.map((one) => one.id), sql: widget.query }),
       );
-      widgets.push({ title: widget.titre, chart: widget.graphe, ...result });
+      widgets.push({ title: widget.title, chart: widget.chart, ...result });
     } catch (error) {
       widgets.push({
-        title: widget.titre,
-        chart: widget.graphe,
+        title: widget.title,
+        chart: widget.chart,
         columns: [],
         rows: [],
         truncated: false,
@@ -138,7 +151,7 @@ function table(widget) {
     '</tr></thead><tbody>' + widget.rows.map((r) => '<tr>' + widget.columns.map((c, i) => '<td class="' + (nums[i] ? 'n num' : '') + '">' +
       (r[c] !== null && typeof r[c] === 'object' ? esc(JSON.stringify(r[c])) : fmt(r[c])) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>';
 }
-const draw = { nombre: number, barres: bars, courbe: line, tableau: table };
+const draw = { number: number, bar: bars, line: line, table: table };
 function render(data) {
   const root = document.getElementById('root');
   if (!data || !data.widgets) { root.innerHTML = '<p class="empty">' + esc(words.nothing) + '</p>'; return; }
@@ -146,7 +159,7 @@ function render(data) {
   root.innerHTML = '<header class="head"><div><div class="caps">' + esc(words.title) + '</div><h1>' + esc(data.title) + '</h1>' +
     '<div class="meta">' + data.spaces.map((s) => '<span class="badge">' + esc(s) + '</span>').join('') +
     '<span class="muted">' + esc(say(words.computed, { time })) + '</span></div></div></header>' +
-    '<section class="grid">' + data.widgets.map((w) => '<article class="card' + (w.chart === 'tableau' || w.chart === 'courbe' ? ' wide' : '') + '">' +
+    '<section class="grid">' + data.widgets.map((w) => '<article class="card' + (w.chart === 'table' || w.chart === 'line' ? ' wide' : '') + '">' +
       '<h2>' + esc(w.title) + '</h2>' +
       (w.error ? '<p class="error-text">' + esc(say(words.failed, { reason: w.error })) + '</p>' : (w.rows.length ? draw[w.chart](w) : '<p class="empty">' + esc(words.empty) + '</p>')) +
       (w.truncated ? '<p class="muted">' + esc(words.more) + '</p>' : '') + '</article>').join('') + '</section>';

@@ -220,6 +220,11 @@ const ICONS = {
 const script = `
 const W = WORDS;
 const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';');
+// Technical names stay English; what she reads comes from the models' labels, in her language.
+const tr = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v[LANG] || v.en || v.fr || '' : v);
+const kindLabel = (k) => (k && k.model && k.model.label ? tr(k.model.label) : k.kind);
+const fieldLabelOf = (model, name) => { const f = model && model.fields.find((c) => c.name === name); return f && f.label ? tr(f.label) : name; };
+const optionLabelOf = (model, name, v) => { const f = model && model.fields.find((c) => c.name === name); return f && f.optionLabels && typeof v === 'string' && f.optionLabels[v] ? tr(f.optionLabels[v]) : v; };
 const say = (t, v) => String(t).replace(/\\{(\\w+)\\}/g, (_, k) => (v && v[k] != null ? v[k] : ''));
 const locale = LANG === 'en' ? 'en' : 'fr';
 const day = (iso) => iso ? new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -295,10 +300,18 @@ let pick = null;
 let reading = false;
 async function drawApps() {
   const kinds = await api(inSpace('/kinds'));
-  const apps = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app))];
+  const appPages = await api(inSpace('/pages'));
+  const apps = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app).concat(appPages.filter((p) => p.app).map((p) => p.app)))];
   document.getElementById('apps').innerHTML = '<div class="caps">' + esc(W.navApps) + '</div>' +
     apps.map((a) => '<a class="navi" data-app="' + esc(encodeURIComponent(a)) + '" href="#/app/' + esc(encodeURIComponent(a)) + '"><span class="app-dot">' + esc(a.slice(0, 1).toUpperCase()) + '</span><span>' + esc(a) + '</span></a>').join('') +
     '<a class="navi ghost" href="#/app">' + ICON_PLUS + '<span>' + esc(W.newApp) + '</span></a>';
+}
+
+// A kind whose model links it, or that other models link to (spec 014): its record page shows them.
+async function hasRelations(kind) {
+  const fold = (t) => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const models = (await api(inSpace('/kinds'))).filter((k) => k.model);
+  return models.some((k) => k.model.fields.some((f) => f.type === 'link' && (fold(k.kind) === fold(kind) || (f.inverse && f.target && fold(f.target) === fold(kind)))));
 }
 
 // Her day in one band, 6:00 to 23:00: the template, the events, the proposals; now marked.
@@ -333,7 +346,7 @@ const pages = {
     let detail = '<div class="pane"><div class="pb pad"><p class="empty">' + esc(W.allClear) + '</p></div></div>';
     if (sel) {
       const e = await api('/entries/' + encodeURIComponent(sel.id) + '?space=' + encodeURIComponent(sel.spaceId));
-      const fields = Object.keys(e.data).filter((f) => !['texte', 'source'].includes(f)).slice(0, 8);
+      const fields = Object.keys(e.data).filter((f) => !['text', 'source'].includes(f)).slice(0, 8);
       const value = (v) => v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v);
       const links = e.links.out.concat(e.links.in);
       const acts = [];
@@ -341,13 +354,13 @@ const pages = {
       else if (sel.group === 'fix') acts.push(['retry', W.a_retry, W.a_retryWhy, true], ['done', W.a_done, W.a_doneWhy]);
       else {
         acts.push(['done', W.a_done, W.a_doneWhy, sel.group === 'late']);
-        if (e.data.quand || e.data.echeance || e.data.debut) acts.push(['later', W.a_later, W.a_laterWhy, sel.group !== 'late']);
+        if (e.data.at || e.data.due || e.data.start) acts.push(['later', W.a_later, W.a_laterWhy, sel.group !== 'late']);
         acts.push(['cancel', W.a_cancel, W.a_cancelWhy]);
       }
       detail = '<button class="quiet back" data-back>← ' + esc(W.back) + '</button>' +
         '<section class="pane"><div class="ph"><span>' + esc(sel.kind + ' · ' + W['g_' + sel.group]) + '</span><span class="tag ' + esc(sel.group) + '">' + esc(W['r_' + sel.reason] || sel.reason) + '</span></div><div class="pb pad subject">' +
         '<div class="caps">' + esc(sel.space) + '</div><h2>' + esc(e.title) + '</h2>' + (sel.when ? '<p class="muted" style="margin:0 0 10px">' + esc(when(sel)) + '</p>' : '') +
-        (typeof e.data.texte === 'string' ? '<p style="margin:0 0 10px">' + esc(e.data.texte.slice(0, 400)) + (e.data.texte.length > 400 ? '…' : '') + '</p>' : '') +
+        (typeof e.data.text === 'string' ? '<p style="margin:0 0 10px">' + esc(e.data.text.slice(0, 400)) + (e.data.text.length > 400 ? '…' : '') + '</p>' : '') +
         fields.map((f) => '<div class="field-row"><span class="caps">' + esc(f) + '</span><span>' + esc(value(e.data[f])) + '</span>' + originBadge(e.origin[f] || 'said') + '</div>').join('') +
         (links.length ? '<div class="chips" style="margin-top:12px">' + links.map((l) => '<a class="chip" href="#/entree/' + esc(l.entry.id) + '">' + esc(l.entry.title) + '<small>' + esc(l.role) + '</small></a>').join('') + '</div>' : '') +
         '<div class="actions" style="margin-top:12px"><a class="link" href="#/entree/' + esc(e.id) + '">' + esc(W.fullEntry) + ' →</a></div></div></section>' +
@@ -365,41 +378,54 @@ const pages = {
     const kinds = await api(inSpace('/kinds'));
     if (!name) {
       const apps = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app))];
-      return '<p class="lead">' + esc(W.appsLead) + '</p>' + card(W.newApp, '<p class="muted">' + esc(W.newAppHow) + '</p>', true) +
-        (apps.length ? '<section class="grid">' + apps.map((a) => card(a, '<a class="link" href="#/app/' + esc(encodeURIComponent(a)) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>' : '');
+      const shipped = await api('/apps');
+      return '<p class="lead">' + esc(W.appsLead) + '</p>' +
+        (apps.length ? '<section class="grid">' + apps.map((a) => card(a, '<a class="link" href="#/app/' + esc(encodeURIComponent(a)) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>' : '') +
+        '<h2 style="margin:22px 0 10px">' + esc(W.shippedApps) + '</h2><section class="grid">' + shipped.map((a) => card(a.app, '<p class="muted">' + esc(tr(a.description)) + '</p><div class="actions">' +
+          (apps.includes(a.app) ? '<span class="badge said">' + esc(W.installed) + '</span>' : '<button data-install="' + esc(a.app) + '">' + esc(W.install) + '</button>') + '</div>')).join('') + '</section>' +
+        card(W.newApp, '<p class="muted">' + esc(W.newAppHow) + '</p>', true);
     }
     const models = kinds.filter((k) => k.model && k.model.app === name);
-    if (!models.length) return empty(W.noApp);
+    const appPages = await api(inSpace('/pages?app=' + encodeURIComponent(name)));
+    if (!models.length && !appPages.length) return empty(W.noApp);
+    const pageTabs = appPages.map((p) => '<a class="' + (p.id === params.get('page') || (!params.get('page') && !params.get('kind') && p === appPages[0]) ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?page=' + esc(encodeURIComponent(p.id)) + '">' + esc(tr(p.label) || p.title) + '</a>').join('');
+    const kindTabs = (on) => models.map((k) => '<a class="' + (k.kind === on ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '">' + esc(kindLabel(k)) + ' <span class="muted num">' + k.count + '</span></a>').join('');
+    const shownPage = params.get('page') ? appPages.find((p) => p.id === params.get('page')) : !params.get('kind') ? appPages[0] : null;
+    if (shownPage) {
+      const q = new URLSearchParams(params); q.delete('page'); q.set('space', space);
+      return '<nav class="tabs">' + pageTabs + kindTabs(null) + '</nav>' + frame('/app/frame/page/' + encodeURIComponent(shownPage.id) + '?' + q.toString());
+    }
     const current = models.find((k) => k.kind === params.get('kind')) || models[0];
     const model = current.model;
-    const champs = model.champs.filter((c) => c.nature !== 'lien');
-    const cols = (model.colonnes && model.colonnes.length ? model.colonnes : champs.slice(0, 5).map((c) => c.nom)).filter((c) => c !== 'titre');
-    const natureOf = (n) => (model.champs.find((c) => c.nom === n) || {}).nature;
+    const shown = model.fields.filter((c) => !['link', 'lines', 'list'].includes(c.type));
+    const cols = (model.columns && model.columns.length ? model.columns : shown.slice(0, 5).map((c) => c.name)).filter((c) => c !== 'title');
+    const natureOf = (n) => { const f = model.fields.find((c) => c.name === n) || {}; return f.type === 'formula' ? 'number' : f.type; };
+    const valueOf = (e, n) => e.computed && n in e.computed ? e.computed[n] : e.data[n];
     const list = await api(inSpace('/entries?limit=200&kind=' + encodeURIComponent(current.kind)));
     const fmt = (n, v) => {
       if (v === undefined || v === null) return '<span class="muted">—</span>';
-      if (natureOf(n) === 'montant' || natureOf(n) === 'nombre') return '<span class="num ' + (natureOf(n) === 'montant' && v < 0 ? 'neg' : '') + '">' + esc(num(v)) + '</span>';
-      if (natureOf(n) === 'oui-non') return v ? '✓' : '—';
-      return esc(typeof v === 'object' ? JSON.stringify(v) : v);
+      if (typeof v === 'number' || natureOf(n) === 'amount' || natureOf(n) === 'number') return '<span class="num ' + (v < 0 ? 'neg' : '') + '">' + esc(num(v)) + '</span>';
+      if (natureOf(n) === 'boolean' || typeof v === 'boolean') return v ? '✓' : '—';
+      return esc(typeof v === 'object' ? JSON.stringify(v) : optionLabelOf(model, n, v));
     };
     const groupOf = (e) => {
-      if (!model.regroupement) return '';
-      const v = e.data[model.regroupement];
+      if (!model.groupBy) return '';
+      const v = valueOf(e, model.groupBy);
       if (typeof v === 'string' && v.length >= 7 && v.charAt(4) === '-') return v.slice(0, 7);
       return v === undefined ? '—' : String(v);
     };
     const groups = [...new Set(list.map(groupOf))].sort().reverse();
-    const sum = (rows) => rows.reduce((t, e) => t + (typeof e.data[model.total] === 'number' ? e.data[model.total] : 0), 0);
+    const sum = (rows) => rows.reduce((t, e) => t + (typeof valueOf(e, model.total) === 'number' ? valueOf(e, model.total) : 0), 0);
     const totalRow = (rows, label) => model.total ? '<tr class="total"><td>' + esc(label) + '</td>' + cols.map((c) => '<td class="' + (c === model.total ? 'n num' : '') + '">' + (c === model.total ? esc(num(sum(rows))) : '') + '</td>').join('') + '</tr>' : '';
     const body = groups.map((g) => {
       const rows = list.filter((e) => groupOf(e) === g);
       return (g ? '<tr class="group"><td colspan="' + (cols.length + 1) + '">' + esc(g) + '</td></tr>' : '') +
-        rows.map((e) => '<tr data-go="#/entree/' + esc(e.id) + '"><td>' + esc(e.title) + '</td>' + cols.map((c) => '<td class="' + (['montant', 'nombre'].includes(natureOf(c)) ? 'n' : '') + '">' + fmt(c, e.data[c]) + '</td>').join('') + '</tr>').join('') +
+        rows.map((e) => '<tr data-go="#/entree/' + esc(e.id) + '"><td>' + esc(e.title) + '</td>' + cols.map((c) => '<td class="' + (['amount', 'number'].includes(natureOf(c)) ? 'n' : '') + '">' + fmt(c, valueOf(e, c)) + '</td>').join('') + '</tr>').join('') +
         (g && model.total ? totalRow(rows, say(W.subtotal, { group: g })) : '');
     }).join('') + totalRow(list, W.total);
-    const tabs = '<nav class="tabs">' + models.map((k) => '<a class="' + (k.kind === current.kind ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '">' + esc(k.kind) + ' <span class="muted num">' + k.count + '</span></a>').join('') + '</nav>';
-    return '<div class="head"><div><p class="lead" style="margin:0">' + esc(say(W.appLead, { n: models.length })) + '</p></div><div class="actions"><button class="quiet" data-model="' + esc(current.kind) + '">' + esc(W.seeModel) + '</button><button data-add="' + esc(current.kind) + '">' + esc(say(W.addOne, { kind: current.kind })) + '</button></div></div>' + tabs +
-      card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th>' + cols.map((c) => '<th class="' + (['montant', 'nombre'].includes(natureOf(c)) ? 'n' : '') + '">' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>' : empty(), true);
+    const tabs = '<nav class="tabs">' + pageTabs + kindTabs(current.kind) + '</nav>';
+    return '<div class="head"><div><p class="lead" style="margin:0">' + esc(say(W.appLead, { n: models.length })) + '</p></div><div class="actions"><button class="quiet" data-model="' + esc(current.kind) + '">' + esc(W.seeModel) + '</button><button data-add="' + esc(current.kind) + '">' + esc(say(W.addOne, { kind: kindLabel(current) })) + '</button></div></div>' + tabs +
+      card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th>' + cols.map((c) => '<th class="' + (['amount', 'number'].includes(natureOf(c)) ? 'n' : '') + '">' + esc(fieldLabelOf(model, c)) + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>' : empty(), true);
   },
 
   // Her files (spec 013): what each is, what Jarvis read of it, what it is linked to.
@@ -457,10 +483,10 @@ const pages = {
   async entree (params, id) {
     const e = await api(inSpace('/entries/' + encodeURIComponent(id)));
     const hist = await api(inSpace('/history?limit=20&target=' + encodeURIComponent(id)));
-    const fields = Object.keys(e.data).filter((f) => f !== 'texte' && f !== 'source');
+    const fields = Object.keys(e.data).filter((f) => f !== 'text' && f !== 'source');
     const value = (v) => v !== null && typeof v === 'object' ? '<code>' + esc(JSON.stringify(v)) + '</code>' : esc(v);
     let text = '';
-    if (typeof e.data.texte === 'string') {
+    if (typeof e.data.text === 'string') {
       const d = await api(inSpace('/documents/' + encodeURIComponent(id)));
       text = card(W.text, '<div class="actions" style="margin-bottom:8px"><a class="link" href="#/document/' + esc(id) + '">' + esc(W.open) + ' →</a></div><div class="doc">' + d.html + '</div>', true);
     }
@@ -470,16 +496,17 @@ const pages = {
       (e.data.source ? '<div class="meta muted">' + esc(say(W.source, { path: e.data.source })) + '</div>' : '') + '</div>' +
       '<div class="actions">' + (e.archivedAt ? '' : '<button class="quiet" id="aside">' + esc(W.setAside) + '</button>') + '</div></div>' +
       '<section class="grid">' +
-      card(W.fields, fields.length ? fields.map((f) => '<div class="field-row"><span class="caps">' + esc(f) + '</span><span>' + value(e.data[f]) + '</span>' + originBadge(e.origin[f] || 'said') + '</div>').join('') : empty()) +
+      card(W.fields, fields.length || e.computed ? fields.map((f) => '<div class="field-row"><span class="caps">' + esc(f) + '</span><span>' + (f === 'status' ? esc(W['st_' + e.data[f]] || e.data[f]) : value(e.data[f])) + '</span>' + originBadge(e.origin[f] || 'said') + '</div>').join('') +
+        Object.entries(e.computed || {}).map(([f, v]) => '<div class="field-row"><span class="caps">' + esc(f) + '</span><span class="num">' + esc(typeof v === 'number' ? num(v) : v === null ? '—' : String(v)) + '</span><span class="badge">' + esc(W.computedBadge) + '</span></div>').join('') : empty()) +
       card(W.links, links.length ? '<ul class="list">' + links.join('') + '</ul>' : empty()) +
       text +
       card(W.history, '<ul class="list">' + hist.map((h) => '<li><span>' + esc(said(h.command)) + ' <span class="muted">' + esc(say(W.by, { who: h.client || h.actor === me.person.id && me.person.name || h.actor, door: h.door })) + ' · ' + esc(time(h.at)) + '</span></span>' +
         (h.undoneBy ? '<span class="badge">' + esc(W.undone) + '</span>' : h.command === 'journal.undo' ? '' : '<button class="quiet" data-undo="' + h.id + '">' + esc(W.undo) + '</button>') + '</li>').join('') + '</ul>', true) +
-      '</section>';
+      '</section>' + (await hasRelations(e.kind) ? '<h2 style="margin:20px 0 8px">' + esc(W.relations) + '</h2>' + frame('/app/frame/record/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(space)) : '');
   },
 
   async documents () {
-    const r = await api(inSpace('/query'), { method: 'POST', body: { sql: "select id, kind, title, length(data->>'texte') as taille, updated_at from my_entries where length(data->>'texte') > 400 and archived_at is null order by updated_at desc limit 300" } });
+    const r = await api(inSpace('/query'), { method: 'POST', body: { sql: "select id, kind, title, length(data->>'text') as taille, updated_at from my_entries where length(data->>'text') > 400 and archived_at is null order by updated_at desc limit 300" } });
     return card('', r.rows.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th><th>' + esc(W.kind) + '</th><th class="n">' + esc(W.size) + '</th><th>' + esc(W.updated) + '</th></tr></thead><tbody>' +
       r.rows.map((d) => '<tr data-go="#/document/' + esc(d.id) + '"><td>' + esc(d.title) + '</td><td><span class="badge">' + esc(d.kind) + '</span></td><td class="n num">' + esc(say(W.chars, { n: num(d.taille) })) + '</td><td class="muted">' + esc(day(d.updated_at)) + '</td></tr>').join('') +
       '</tbody></table></div>' : empty(), true);
@@ -492,7 +519,7 @@ const pages = {
   async tableaux (params) {
     const id = params.get('id');
     if (id) return '<p><a class="link" href="#/tableaux">← ' + esc(W.back) + '</a></p>' + frame('/app/frame/dashboard/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(space));
-    const list = await api(inSpace('/entries?kind=' + encodeURIComponent('Tableau de bord')));
+    const list = await api(inSpace('/entries?kind=' + encodeURIComponent('Dashboard')));
     return list.length ? '<section class="grid">' + list.map((d) => card(d.title, '<p class="muted">' + esc(day(d.updatedAt)) + '</p><a class="link" href="#/tableaux?id=' + esc(d.id) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>' : card('', empty(W.noDashboards));
   },
 
@@ -541,11 +568,11 @@ const pages = {
   },
 
   async rappels () {
-    const list = await api(inSpace('/entries?limit=200&kind=Rappel'));
-    const canal = await api('/entries?kind=Canal&limit=1&space=' + encodeURIComponent(me.space.id));
+    const list = await api(inSpace('/entries?limit=200&kind=Reminder'));
+    const canal = await api('/entries?kind=Channel&limit=1&space=' + encodeURIComponent(me.space.id));
     return '<p class="badge ' + (canal.length ? 'said' : 'error') + '" style="white-space:normal;margin-bottom:14px">' + esc(canal.length ? W.channelOn : W.channelOff) + '</p>' +
       card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th><th>' + esc(W.when) + '</th><th>' + esc(W.repeats) + '</th><th>' + esc(W.status) + '</th></tr></thead><tbody>' +
-        list.map((r) => '<tr data-go="#/entree/' + esc(r.id) + '"><td>' + esc(r.title) + (r.data.message ? '<div class="muted">' + esc(r.data.message) + '</div>' : '') + '</td><td class="num">' + esc(time(r.data.prochaine || r.data.quand)) + '</td><td class="num">' + esc(r.data.repete || '') + '</td><td><span class="badge">' + esc(r.data.statut || '—') + '</span></td></tr>').join('') +
+        list.map((r) => '<tr data-go="#/entree/' + esc(r.id) + '"><td>' + esc(r.title) + (r.data.message ? '<div class="muted">' + esc(r.data.message) + '</div>' : '') + '</td><td class="num">' + esc(time(r.data.next || r.data.at)) + '</td><td class="num">' + esc(r.data.repeat || '') + '</td><td><span class="badge">' + esc(r.data.status ? W['st_' + r.data.status] || r.data.status : '—') + '</span></td></tr>').join('') +
         '</tbody></table></div>' : empty(), true);
   },
 
@@ -568,7 +595,7 @@ const pages = {
         const list = await api('/spaces/' + encodeURIComponent(s.id) + '/invitations');
         invites = list.filter((i) => i.state === 'open').map((i) => '<li><span>' + esc(i.email) + ' <span class="muted">' + esc(day(i.expiresAt)) + '</span></span><button class="quiet" data-withdraw="' + esc(s.id + '/' + i.id) + '">' + esc(W.withdraw) + '</button></li>').join('');
       }
-      const charter = await api('/entries?kind=Charte&limit=5&space=' + encodeURIComponent(s.id));
+      const charter = await api('/entries?kind=Charter&limit=5&space=' + encodeURIComponent(s.id));
       blocks.push(card(s.name, '<p class="muted" style="margin:0 0 8px">' + esc(s.personal ? W.own : W.shared) + ' · ' + esc(W[s.role] || s.role) + '</p>' +
         '<div class="caps">' + esc(W.members) + '</div><ul class="list">' + s.members.map((m) => '<li><span>' + esc(m.name || m.person) + '</span><span class="badge">' + esc(W[m.role] || m.role) + '</span></li>').join('') + '</ul>' +
         '<div class="caps" style="margin-top:10px">' + esc(W.charter) + '</div>' + (charter.length ? '<ul class="list">' + charter.map((c) => '<li><a class="link" href="#/entree/' + esc(c.id) + '" data-space="' + esc(s.id) + '">' + esc(c.title) + '</a></li>').join('') + '</ul>' : '<p class="muted">' + esc(W.noCharter) + '</p>') +
@@ -709,12 +736,12 @@ function bind() {
       const e = await api('/entries/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(spaceId));
       const data = {};
       const act = b.dataset.act;
-      if (act === 'done') data.statut = 'fait';
-      if (act === 'cancel' || act === 'refuse') data.statut = 'annulé';
-      if (act === 'accept' || act === 'retry') data.statut = 'à venir';
-      if (act === 'retry' && e.data.erreur !== undefined) data.erreur = null;
+      if (act === 'done') data.status = 'done';
+      if (act === 'cancel' || act === 'refuse') data.status = 'cancelled';
+      if (act === 'accept' || act === 'retry') data.status = 'planned';
+      if (act === 'retry' && e.data.error !== undefined) data.error = null;
       if (act === 'later') {
-        for (const f of ['quand', 'echeance', 'debut', 'fin']) if (typeof e.data[f] === 'string') data[f] = dayLater(e.data[f]);
+        for (const f of ['at', 'due', 'start', 'end']) if (typeof e.data[f] === 'string') data[f] = dayLater(e.data[f]);
       }
       await api('/save?space=' + encodeURIComponent(spaceId), { method: 'POST', body: { entries: [{ id, data }] } });
       pick = null; reading = false;
@@ -738,34 +765,59 @@ function bind() {
       (f.links.length ? '<div class="chips">' + f.links.map((l) => '<a class="chip" href="#/entree/' + esc(l.id) + '">' + esc(l.title) + '<small>' + esc(l.role) + '</small></a>').join('') + '</div>' : ''),
       '<a class="badge" href="#/entree/' + esc(id) + '">' + esc(W.fullEntry) + '</a><a class="badge primary" href="' + esc(src) + '&download=1">' + esc(W.download) + '</a>');
   }));
+  root.querySelectorAll('[data-install]').forEach((b) => b.addEventListener('click', async () => {
+    const name = b.dataset.install;
+    try {
+      const tried = await api(inSpace('/apps/install'), { method: 'POST', body: { name } });
+      openDrawer(say(W.installWhat, { app: name }), '<ul class="list">' + tried.result.created.map((one) => '<li>' + esc(one) + '</li>').join('') + '</ul>' +
+        (tried.result.kept.length ? '<p class="muted">' + esc(say(W.installKept, { n: tried.result.kept.length })) + '</p>' : '') + '<p class="error-text" id="i__error"></p>',
+        '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button id="i__go">' + esc(W.install) + '</button>');
+      document.getElementById('i__go').addEventListener('click', async () => {
+        try {
+          await api(inSpace('/apps/install'), { method: 'POST', body: { name, dryRun: false } });
+          closeDrawer(); toast(say(W.installedToast, { app: name }), null); await drawApps(); location.hash = '#/app/' + encodeURIComponent(name);
+        } catch (error) { document.getElementById('i__error').textContent = error.message; }
+      });
+    } catch (error) { alert(error.message); }
+  }));
   root.querySelectorAll('[data-model]').forEach((b) => b.addEventListener('click', async () => {
     const k = (await api(inSpace('/kinds'))).find((one) => one.kind === b.dataset.model);
     if (!k || !k.model) return;
-    openDrawer(say(W.modelOf, { kind: k.kind }), '<p class="muted">' + esc(W.modelLead) + '</p>' + k.model.champs.map((c) =>
-      '<div class="field-row"><span class="caps">' + esc(c.nom) + '</span><span>' + esc(c.nature + (c.choix ? ' : ' + c.choix.join(', ') : '') + (c.vers ? ' → ' + c.vers : '') + (c.unite ? ' (' + c.unite + ')' : '')) + '</span><span class="badge">' + esc(c.obligatoire ? W.required : W.optional) + '</span></div>').join('') +
-      (k.model.rangement ? '<p><span class="caps">' + esc(W.rangement) + '</span><br><code class="url">' + esc(k.model.rangement) + '</code></p>' : ''),
+    openDrawer(say(W.modelOf, { kind: kindLabel(k) }), '<p class="muted">' + esc(W.modelLead) + '</p>' + k.model.fields.map((c) =>
+      '<div class="field-row"><span class="caps">' + esc(fieldLabelOf(k.model, c.name)) + '</span><span>' + esc((W['ty_' + c.type] || c.type) + (c.options ? ' : ' + c.options.map((o) => optionLabelOf(k.model, c.name, o)).join(', ') : '') + (c.target ? ' → ' + c.target : '') + (c.formula ? ' = ' + c.formula : '') + (c.unit ? ' (' + c.unit + ')' : '')) + '</span><span class="badge">' + esc(c.type === 'formula' ? W.computedBadge : c.required ? W.required : W.optional) + '</span></div>').join('') +
+      (k.model.workflow ? '<p><span class="caps">' + esc(W.workflow) + '</span><br>' + k.model.workflow.transitions.map((t) => esc([t.from].flat().join(' | ') + ' → ' + t.to + (t.if ? ' (' + t.if + ')' : ''))).join('<br>') + '</p>' : '') +
+      (k.model.path ? '<p><span class="caps">' + esc(W.rangement) + '</span><br><code class="url">' + esc(k.model.path) + '</code></p>' : ''),
       '<a class="badge" href="#/entree/' + esc(k.model.id) + '">' + esc(W.fullEntry) + '</a>');
   }));
   root.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', async () => {
     const k = (await api(inSpace('/kinds'))).find((one) => one.kind === b.dataset.add);
     if (!k || !k.model) return;
+    const fields = k.model.fields.filter((c) => !['list', 'formula', 'lines'].includes(c.type));
+    const targets = {};
+    for (const c of fields) if (c.type === 'link' && c.target) targets[c.name] = await api(inSpace('/entries?limit=200&kind=' + encodeURIComponent(c.target)));
     const input = (c) => {
-      const id = 'f_' + c.nom;
-      if (c.nature === 'choix') return '<select id="' + id + '"><option value=""></option>' + c.choix.map((o) => '<option>' + esc(o) + '</option>').join('') + '</select>';
-      if (c.nature === 'oui-non') return '<select id="' + id + '"><option value=""></option><option value="true">✓</option><option value="false">—</option></select>';
-      const type = c.nature === 'date' ? 'date' : c.nature === 'moment' ? 'datetime-local' : ['nombre', 'montant'].includes(c.nature) ? 'number' : 'text';
+      const id = 'f_' + c.name;
+      if (c.type === 'link') return '<select id="' + id + '"' + (c.cardinality === 'many' ? ' multiple' : '') + '><option value=""></option>' + (targets[c.name] || []).map((o) => '<option value="' + esc(o.id) + '">' + esc(o.title) + '</option>').join('') + '</select>';
+      if (c.type === 'choice') return '<select id="' + id + '"><option value=""></option>' + c.options.map((o) => '<option value="' + esc(o) + '">' + esc(optionLabelOf(k.model, c.name, o)) + '</option>').join('') + '</select>';
+      if (c.type === 'boolean') return '<select id="' + id + '"><option value=""></option><option value="true">✓</option><option value="false">—</option></select>';
+      const type = c.type === 'date' ? 'date' : c.type === 'datetime' ? 'datetime-local' : ['number', 'amount'].includes(c.type) ? 'number' : 'text';
       return '<input id="' + id + '" type="' + type + '"' + (type === 'number' ? ' step="any"' : '') + '>';
     };
-    const fields = k.model.champs.filter((c) => !['lien', 'liste'].includes(c.nature));
-    openDrawer(say(W.addOne, { kind: k.kind }), '<div class="form-field"><label>' + esc(W.title) + ' *</label><input id="f__title"></div>' +
-      fields.map((c) => '<div class="form-field"><label>' + esc(c.nom + (c.obligatoire ? ' *' : '') + (c.unite ? ' · ' + c.unite : '')) + '</label>' + input(c) + '</div>').join('') + '<p class="error-text" id="f__error"></p>',
+    openDrawer(say(W.addOne, { kind: kindLabel(k) }), '<div class="form-field"><label>' + esc(W.title) + ' *</label><input id="f__title"></div>' +
+      fields.map((c) => '<div class="form-field"><label>' + esc(fieldLabelOf(k.model, c.name) + (c.required ? ' *' : '') + (c.unit ? ' · ' + c.unit : '')) + '</label>' + input(c) + '</div>').join('') + '<p class="error-text" id="f__error"></p>',
       '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button id="f__save">' + esc(W.save) + '</button>');
     document.getElementById('f__save').addEventListener('click', async () => {
       const data = {};
       for (const c of fields) {
-        const v = document.getElementById('f_' + c.nom).value;
+        const el = document.getElementById('f_' + c.name);
+        if (c.type === 'link' && c.cardinality === 'many') {
+          const picked = [...el.selectedOptions].map((o) => o.value).filter(Boolean);
+          if (picked.length) data[c.name] = picked;
+          continue;
+        }
+        const v = el.value;
         if (v === '') continue;
-        data[c.nom] = ['nombre', 'montant'].includes(c.nature) ? Number(v) : c.nature === 'oui-non' ? v === 'true' : v;
+        data[c.name] = ['number', 'amount'].includes(c.type) ? Number(v) : c.type === 'boolean' ? v === 'true' : v;
       }
       try {
         await api(inSpace('/save'), { method: 'POST', body: { entries: [{ kind: k.kind, title: document.getElementById('f__title').value.trim(), data }] } });

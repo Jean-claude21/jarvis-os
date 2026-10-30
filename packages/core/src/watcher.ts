@@ -3,8 +3,8 @@ import { asPerson, type Actor } from './db';
 import { get, save } from './entries';
 import { DEFAULT_ZONE, nextTime, timeOf } from './time';
 
-// The watcher (spec 006): it tells her on time. A reminder is an entry « Rappel »: `quand` (a time,
-// once) or `repete` (five fields, again and again) on the clock of `fuseau`; `message` what to say.
+// The watcher (spec 006): it tells her on time. A reminder is an entry « Reminder »: `at` (a time,
+// once) or `repeat` (five fields, again and again) on the clock of `timezone`; `message` what to say.
 // Each pass finds what is due, tells the people of its space, then writes what it did.
 
 /** A reminder due now, as told to one person. */
@@ -31,7 +31,7 @@ export interface PassReport {
 
 /**
  * One pass: every reminder due by `now`, told through `tell` (true when she was reached) to each
- * person of its space; a repeated one moves to its next time, a single one becomes « envoyé ».
+ * person of its space; a repeated one moves to its next time, a single one becomes `sent`.
  */
 export async function watchOnce(
   db: pg.Pool,
@@ -50,8 +50,8 @@ export async function watchOnce(
     const actor: Actor = { person: keeper, door: 'watcher' };
     const entry = await asPerson(db, keeper, (tx) => get(tx, row.space_id, row.entry_id));
     if (!entry) continue;
-    const zone = typeof entry.data.fuseau === 'string' ? entry.data.fuseau : DEFAULT_ZONE;
-    const repete = typeof entry.data.repete === 'string' ? entry.data.repete : null;
+    const zone = typeof entry.data.timezone === 'string' ? entry.data.timezone : DEFAULT_ZONE;
+    const repeat = typeof entry.data.repeat === 'string' ? entry.data.repeat : null;
     const write = (data: Record<string, unknown>) =>
       asPerson(db, keeper, (tx) =>
         save(tx, actor, row.space_id, {
@@ -59,16 +59,16 @@ export async function watchOnce(
         }),
       );
     try {
-      const next = (after: Date) => nextTime(repete!, after, zone).toISOString();
-      const at = timeOf(repete ? entry.data.prochaine : entry.data.quand, zone);
-      if (repete && !at) {
-        await write({ prochaine: next(now) });
+      const next = (after: Date) => nextTime(repeat!, after, zone).toISOString();
+      const at = timeOf(repeat ? entry.data.next : entry.data.at, zone);
+      if (repeat && !at) {
+        await write({ next: next(now) });
         report.scheduled += 1;
         continue;
       }
       if (!at || at > now) continue;
-      if (repete && now.getTime() - at.getTime() > STALE_MS) {
-        await write({ prochaine: next(now) });
+      if (repeat && now.getTime() - at.getTime() > STALE_MS) {
+        await write({ next: next(now) });
         report.skipped += 1;
         continue;
       }
@@ -82,22 +82,20 @@ export async function watchOnce(
             title: entry.title,
             message: typeof entry.data.message === 'string' ? entry.data.message : null,
             at,
-            repeated: repete !== null,
+            repeated: repeat !== null,
           })) || reached;
       }
       const sentAt = now.toISOString();
       await write(
-        repete
-          ? { prochaine: next(now), dernier_envoi: sentAt }
-          : { statut: reached ? 'envoyé' : 'non envoyé', dernier_envoi: sentAt },
+        repeat
+          ? { next: next(now), last_sent: sentAt }
+          : { status: reached ? 'sent' : 'failed', last_sent: sentAt },
       );
       if (reached) report.sent += 1;
       else report.failed += 1;
     } catch (error) {
       // A reminder she wrote wrong says so in its own fields, once, and stops.
-      await write({ statut: 'à corriger', erreur: (error as Error).message }).catch(
-        () => undefined,
-      );
+      await write({ status: 'to_fix', error: (error as Error).message }).catch(() => undefined);
       report.failed += 1;
     }
   }

@@ -15,6 +15,9 @@ import {
   readDocument,
   slugOf,
   spacesOf,
+  renderPage,
+  renderRecord,
+  useScriptRunner,
 } from '@jarvis-os/core';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { Hono } from 'hono';
@@ -26,11 +29,13 @@ import { fill, langOf, wordsOf } from './i18n';
 import { mcpServerFor } from './mcp';
 import { consentPage, invitationPage, messagePage, signInPage } from './pages';
 import { apiRoutes } from './routes';
+import { quickjsRunner } from './scripts';
 import type { Settings } from './settings';
 import { objectStorage } from './storage';
 import { appPage } from './platform/page';
 import { spaceFor } from './spaces';
 import { computeDashboard, dashboardView, widgetsOf } from './views/dashboard';
+import { pageView } from './views/page';
 import {
   DOCUMENT_HOURS,
   documentShown,
@@ -46,6 +51,8 @@ import { readUploadToken, uploadView } from './views/upload';
  */
 export function makeApp(settings: Settings) {
   const db = pool(settings.appUrl);
+  // Her scripts (spec 014) run in QuickJS, whichever door starts them.
+  useScriptRunner(quickjsRunner);
   const blobs = objectStorage(settings.storage);
   const auth = makeAuth({ db, secret: settings.authSecret, publicUrl: settings.publicUrl });
   const resource = mcpResource(settings.publicUrl);
@@ -187,6 +194,23 @@ export function makeApp(settings: Settings) {
           ),
         );
       }
+      if (c.req.param('view') === 'page') {
+        const params = { ...c.req.query() };
+        delete params.space;
+        const drawn = await asPerson(db, person, async (tx) => {
+          const entry = await get(tx, space.id, id);
+          return entry && entry.kind.toLowerCase() === 'page'
+            ? renderPage(tx, space.id, entry, params)
+            : null;
+        });
+        if (!drawn) return c.notFound();
+        return c.html(pageView({ ...drawn, frame: true }));
+      }
+      if (c.req.param('view') === 'record') {
+        const drawn = await asPerson(db, person, (tx) => renderRecord(tx, space.id, id));
+        if (!drawn) return c.notFound();
+        return c.html(pageView({ ...drawn, frame: true }));
+      }
       if (c.req.param('view') === 'document') {
         const read = await asPerson(db, person, (tx) =>
           readDocument(tx, space.id, { id, whole: true }),
@@ -268,18 +292,19 @@ export function makeApp(settings: Settings) {
       for (const one of occurrences) {
         if (!one.repeated || series.has(one.id)) continue;
         const data = (await get(tx, one.spaceId, one.id))?.data ?? {};
-        if (typeof data.repete !== 'string') continue;
-        const skipped: unknown[] = Array.isArray(data.sauf) ? data.sauf : [data.sauf];
+        if (typeof data.repeat !== 'string') continue;
+        const skipped: unknown[] = Array.isArray(data.except) ? data.except : [data.except];
         series.set(one.id, {
-          repete: data.repete,
-          duree: minutesOf(data.duree),
-          sauf: skipped
+          repeat: data.repeat,
+          duration: minutesOf(data.duration),
+          except: skipped
             .filter(
               (day): day is string => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}/.test(day),
             )
             .map((day) => day.slice(0, 10)),
-          fuseau: typeof data.fuseau === 'string' && data.fuseau ? data.fuseau : DEFAULT_ZONE,
-          jusqu: typeof data.jusqu === 'string' ? data.jusqu : null,
+          timezone:
+            typeof data.timezone === 'string' && data.timezone ? data.timezone : DEFAULT_ZONE,
+          until: typeof data.until === 'string' ? data.until : null,
         });
       }
       return { name: spaces.find((one) => one.personal)?.name ?? '', occurrences, series };

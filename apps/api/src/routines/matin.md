@@ -5,7 +5,7 @@ when: elle dit bonjour, demande sa journée, « qu'est-ce qui m'attend », ou le
 
 # Le matin
 
-1. `query` : les rappels dont `data.quand` tombe aujourd'hui ou est passé et encore « à venir ».
+1. `query` : les rappels dont `data.at` tombe aujourd'hui ou est passé et encore `planned`.
 2. `query` : les échéances des 30 prochains jours (toute entrée dont un champ date tombe dans la période).
 3. Si elle a une routine du matin à elle (kind « Routine »), lis-la et suis-la d'abord.
 4. Réponds court : ce qui est à elle aujourd'hui (trois choses au plus), ce qui approche, ce qui traîne.

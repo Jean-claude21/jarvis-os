@@ -53,8 +53,8 @@ describe('a model through MCP', () => {
           data: {
             cadence: 'mar · mer · sam',
             aspect: 'Corps',
-            repete: '30 18 * * 2,3,6',
-            duree: 90,
+            repeat: '30 18 * * 2,3,6',
+            duration: 90,
           },
         },
       ],

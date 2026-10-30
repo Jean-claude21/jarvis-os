@@ -136,10 +136,10 @@ describe('the charter of a space (story 4)', () => {
       space: 'Nous',
       entries: [
         {
-          kind: 'Charte',
+          kind: 'Charter',
           title: 'Charte du foyer',
           data: {
-            texte: 'La dîme sort en premier. Une dépense au-delà de 50 000 se décide à deux.',
+            text: 'La dîme sort en premier. Une dépense au-delà de 50 000 se décide à deux.',
           },
         },
       ],
@@ -150,7 +150,7 @@ describe('the charter of a space (story 4)', () => {
         {
           kind: 'Routine',
           title: 'Bilan du dimanche',
-          data: { quand: 'le dimanche soir', consigne: 'Revoir la semaine à deux.' },
+          data: { quand: 'le dimanche soir', instruction: 'Revoir la semaine à deux.' },
         },
       ],
     });

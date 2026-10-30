@@ -5,23 +5,26 @@ import {
   save,
   spacesOf,
   watchOnce,
+  runDueRules,
+  useScriptRunner,
   type Due,
   type PassReport,
 } from '@jarvis-os/core';
 import { parseArgs } from 'node:util';
 import type pg from 'pg';
 import { wordsOf } from './i18n';
+import { quickjsRunner } from './scripts';
 import { settingsFor, type Branch } from './settings';
 
 /** How often the watcher looks: once a minute, the precision of a reminder. */
 export const WATCH_EVERY_MS = 60_000;
 
-/** Where she is told: an entry « Canal » of her own space, `telegram` the chat of her bot. */
+/** Where she is told: an entry « Channel » of her own space, `telegram` the chat of her bot. */
 export async function channelOf(db: pg.Pool, person: string): Promise<{ telegram?: string }> {
   return asPerson(db, person, async (tx) => {
     const own = (await spacesOf(tx)).find((one) => one.personal);
     if (!own) return {};
-    const [canal] = await find(tx, own.id, { kind: 'Canal', limit: 1 });
+    const [canal] = await find(tx, own.id, { kind: 'Channel', limit: 1 });
     const telegram = canal?.data.telegram;
     return typeof telegram === 'string' || typeof telegram === 'number'
       ? { telegram: String(telegram) }
@@ -66,12 +69,17 @@ export function watch(
   signal?: AbortSignal,
 ) {
   const tell = tellerFor(db, telegramToken);
+  useScriptRunner(quickjsRunner);
   let running = false;
   const pass = async () => {
     if (running || signal?.aborted) return;
     running = true;
     try {
-      onPass(await watchOnce(db, new Date(), tell));
+      const now = new Date();
+      onPass(await watchOnce(db, now, tell));
+      // Her scheduled rules and « before » rules (spec 014), on the same clock.
+      const rules = await runDueRules(db, now);
+      if (rules.failed) console.warn('[watcher] rules', rules);
     } catch (error) {
       console.error('[watcher]', (error as Error).message);
     } finally {
@@ -105,12 +113,12 @@ if (process.argv[1]?.endsWith('watcher.ts')) {
     }
     await asPerson(db, person, async (tx) => {
       const own = (await spacesOf(tx)).find((one) => one.personal)!;
-      const [canal] = await find(tx, own.id, { kind: 'Canal', limit: 1 });
+      const [canal] = await find(tx, own.id, { kind: 'Channel', limit: 1 });
       await save(tx, { person, door: 'cli' }, own.id, {
         entries: [
           canal
             ? { id: canal.id, data: { telegram: chat } }
-            : { kind: 'Canal', title: 'Telegram', data: { telegram: chat } },
+            : { kind: 'Channel', title: 'Telegram', data: { telegram: chat } },
         ],
       });
     });

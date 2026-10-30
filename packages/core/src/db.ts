@@ -9,6 +9,8 @@ export interface Actor {
   door: string;
   /** The client behind the door, when known (« claude », « chatgpt », « jarvis-app »). */
   client?: string;
+  /** How deep in rules and scripts this change is (spec 014): rules stop at three. */
+  depth?: number;
 }
 
 export function pool(connectionString: string): pg.Pool {

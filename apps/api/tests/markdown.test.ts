@@ -54,7 +54,7 @@ describe('a Markdown folder in, a zip out', () => {
       'personnes/kossi.md',
     ]);
     expect(files.get('personnes/kossi.md')).toContain(
-      '- mentionne : [Mariage](../cultures/mariage/_carte.md)',
+      '- mentions : [Mariage](../cultures/mariage/_carte.md)',
     );
     expect(files.get('fichier/accord-signe.txt')).toBe('Bon pour accord');
   });

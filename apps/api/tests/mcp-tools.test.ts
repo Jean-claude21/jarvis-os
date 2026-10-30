@@ -17,7 +17,7 @@ beforeAll(async () => {
         title: 'Dépenses',
         data: {
           quand: 'elle note une dépense',
-          consigne: 'Toujours un poste parmi Transport, Repas, Logement.',
+          instruction: 'Toujours un poste parmi Transport, Repas, Logement.',
         },
       },
     ],
@@ -42,7 +42,13 @@ describe('Jarvis’s method on connection (story 3)', () => {
       [
         'add_file',
         'agenda',
+        'app_export',
+        'app_install',
         'archive',
+        'migrate',
+        'page',
+        'rule_test',
+        'run_script',
         'create_space',
         'dashboard',
         'edit_document',
@@ -64,7 +70,7 @@ describe('Jarvis’s method on connection (story 3)', () => {
       ].sort(),
     );
     const base = await ama.call<{ text: string }>('routine', { name: 'Le temps' });
-    expect(base.value.text).toContain('Rappel');
+    expect(base.value.text).toContain('Reminder');
     const hers = await ama.call<{ text: string }>('routine', { name: 'dépenses' });
     expect(hers.value.text).toContain('Transport, Repas, Logement');
     const none = await ama.call<{ error: string }>('routine', { name: 'Inconnue' });

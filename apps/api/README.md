@@ -53,6 +53,9 @@ all. Run it again to take a change.
 | GET    | `/api/now`                                                   | `attention`: to fix, late, proposed, today, this week; her day (spec 013)               |
 | GET    | `/api/files`                                                 | `filesOf`: her files with their links (spec 013); `/api/files/:id?download=1` downloads |
 | GET    | `/api/agenda?from&to`                                        | `agenda` over all her spaces (spec 011), this week by default                           |
+| GET    | `/api/pages?app`, `/api/pages/:id?<filters>&record`          | `pagesOf`; one page computed with `renderPage` (spec 014)                               |
+| GET    | `/api/apps`                                                  | the apps Jarvis ships (`src/apps/*.json`)                                               |
+| POST   | `/api/apps/install` (`name`, `dryRun`)                       | `installApp`, tried unless `dryRun` is false                                            |
 | POST   | `/api/agenda/address`                                        | a new private address for her phone's calendar; the old one stops                       |
 
 Every route acts in the space named by `?space=` (an id or a name) or the `x-jarvis-space` header,
@@ -143,6 +146,12 @@ id); `query` reads all of them, `my_entries.space` naming each row's.
 | `edit_document`  | one change by section (append, replace, insert after) or passage     |
 | `read_document`  | outline, then text or sections; view `ui://jarvis/document`          |
 | `agenda`         | her calendar for a window, every kind with a time field (spec 011)   |
+| `page`           | a page of her app, computed for its filters; view `ui://jarvis/page` |
+| `rule_test`      | a rule tried on an entry: what it would change, nothing changed      |
+| `run_script`     | a script run in QuickJS (`src/scripts.ts`), tried by default         |
+| `migrate`        | rename, set, remove a field across a kind, tried by default          |
+| `app_export`     | an app as a bundle: models, pages, rules, scripts                    |
+| `app_install`    | a shipped app (Finances, Routines) or a bundle, tried by default     |
 
 A document's reading link, `/document/:token` (a day, one document), is a page to read and print as
 PDF; `?format=md` gives its Markdown file.

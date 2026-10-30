@@ -100,12 +100,14 @@ flowchart LR
 - **The watcher** (spec 006): a pass each minute finds the reminders due through one function that
   returns ids and members only, tells each person through her « Canal » (Telegram), and writes what
   it did as a member, under row-level security.
-- **Type models** (spec 012): a kind's shape is an entry « Modèle » (fields, natures, required,
-  choices, rangement, display). The core's `save` makes every door follow it; the export places
-  entries by its rangement. The first layer of the apps Claude builds with her (Finances, Routines):
-  models, then relations and computations, pages, rules — data, never code.
-- **The calendar** (spec 011): time is a field, not a kind. Any entry with `debut` (and `fin` or
-  `duree`), `quand`, `echeance`, `date` or `repete` is in her calendar; `agenda` places its
+- **Type models** (specs 012, 014): a kind's shape is an entry « Model » (fields and their type,
+  required, options, relations, formulas, lines, workflow, path, display). The core's `save` makes
+  every door follow it; the export places entries by its path.
+- **The app engine** (spec 014, decision 0008): an app is entries of system kinds — `Model`,
+  `Page`, `Rule`, `Script` — that Claude writes with her and the core checks. Engine keywords are
+  English; her kinds and fields stay in her words. See « The app engine » below.
+- **The calendar** (spec 011): time is a field, not a kind. Any entry with `start` (and `end` or
+  `duration`), `at`, `due`, `date` or `repeat` is in her calendar; `agenda` places its
   occurrences in a window, computed, never stored. Claude (`agenda`), the app (« Agenda »), the
   anticipation (`upcoming`) and her phone (a private iCalendar address) read the same function.
 
@@ -116,6 +118,47 @@ flowchart LR
   A --> P[the app: her week]
   A --> I[her phone: /agenda/:key.ics]
 ```
+
+## The app engine
+
+```mermaid
+flowchart TB
+  subgraph write[Every write: save]
+    S[save] --> M{model: fields, links, lines, workflow}
+    M -->|refused| E[a sentence: what to fix]
+    M --> J[(entry · links · journal)]
+    J --> R[rules: saved / changed]
+    R -->|create · update · link · remind · run_script| S
+  end
+  subgraph read[Every read: computed now]
+    P[page: filters and blocks] --> Q[declarative query: kind · where · groupBy · aggregate]
+    Q --> F[formulas over relations and lines]
+    F --> J
+  end
+  W[watcher] -->|schedule · before| R
+  X[script: run input → changes] -->|checked against reads / writes| S
+  T[trial: savepoint, journal read, rolled back] -.-> R & X & G[migrate] & B[app_install]
+```
+
+- **Relations** are `link` fields (`target`, `cardinality`, `inverse`): given as ids in `data`,
+  stored as links whose role is the field's name; the other side reads them by their inverse.
+- **Formulas** (`formula.ts`) are a small language parsed and evaluated by the core, never `eval`:
+  arithmetic, comparisons, `sum avg count min max … where`, dates, `streak`. Computed when read
+  (`computedOf`, `withComputed`), never stored; the doors return them as `computed`.
+- **Pages** (`pages.ts`) declare filters and blocks (`stat`, `stat_delta`, `gauge`, `bar`, `line`,
+  `breakdown`, `heatmap`, `table`, `task_list`, `kanban`, `calendar`, `form`, `record`). The core
+  computes them; one view draws them inside Claude (`ui://jarvis/page`) and framed in the app.
+- **Rules** (`rules.ts`) run inside the save that triggers them (three deep at most, never on their
+  own change), and on a schedule or some days before a date through the watcher
+  (`jarvis_due_rules`, migration 0007).
+- **Scripts** (`scripts.ts`) are pure: `run(input)` returns changes, checked against what the
+  script declared it writes, then saved. The core defines the port (`ScriptRunner`); the API gives
+  QuickJS (WebAssembly): no network, no files, a deadline and a memory limit.
+- **Migrations** (`migrations.ts`) rename, set or remove a field across a kind, journaled as one
+  `migration.run` undone at once. **Bundles** (`bundles.ts`) export and install an app; Finances
+  and Routines ship with Jarvis (`apps/api/src/apps/*.json`).
+- **Trials** (`trial.ts`): a rule, a script, a migration or an install runs in a savepoint, its
+  journal is read and rolled back — what she sees before saying yes.
 
 ## The doors
 

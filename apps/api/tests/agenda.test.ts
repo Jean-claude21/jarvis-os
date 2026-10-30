@@ -15,18 +15,18 @@ beforeAll(async () => {
       {
         kind: 'Événement',
         title: 'Dentiste',
-        data: { debut: '2026-10-29T14:00', fin: '2026-10-29T15:00' },
+        data: { start: '2026-10-29T14:00', end: '2026-10-29T15:00' },
       },
       {
         kind: 'Habitude',
         title: 'Gym, mardi et mercredi',
-        data: { repete: '30 18 * * 2,3', duree: 90 },
+        data: { repeat: '30 18 * * 2,3', duration: 90 },
       },
-      { kind: 'Obligation', title: 'Frais de dossier', data: { echeance: '2026-10-31' } },
+      { kind: 'Obligation', title: 'Frais de dossier', data: { due: '2026-10-31' } },
       {
         kind: 'Créneau',
         title: 'Mémoire',
-        data: { debut: '2026-10-30T16:00', fin: '2026-10-30T18:00', statut: 'proposé' },
+        data: { start: '2026-10-30T16:00', end: '2026-10-30T18:00', status: 'proposed' },
       },
     ],
   });
@@ -35,11 +35,11 @@ beforeAll(async () => {
     new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
   await ama.json('/api/save', {
     entries: [
-      { kind: 'Obligation', title: 'Passeport', data: { echeance: soon(20) } },
+      { kind: 'Obligation', title: 'Passeport', data: { due: soon(20) } },
       {
         kind: 'Créneau',
         title: 'Relire le chapitre',
-        data: { debut: `${soon(12)}T16:00`, duree: 120, statut: 'proposé' },
+        data: { start: `${soon(12)}T16:00`, duration: 120, status: 'proposed' },
       },
     ],
   });

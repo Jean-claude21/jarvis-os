@@ -3,7 +3,7 @@ import { get, save } from './entries';
 import { history, type JournalLine } from './journal';
 import { TEXT_FIELD } from './markdown';
 
-// A document is an entry whose text is Markdown in `texte` (spec 008): a theory, a review, a
+// A document is an entry whose text is Markdown in `text` (spec 008): a theory, a review, a
 // reflection. It is written and changed section by section, so a model never sends it whole again,
 // and read the same way, so a long one never floods a conversation.
 

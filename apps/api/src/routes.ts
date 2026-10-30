@@ -39,11 +39,16 @@ import {
   type Blobs,
   type Space,
   type Tx,
+  withComputed,
+  pagesOf,
+  renderPage,
+  installApp,
 } from '@jarvis-os/core';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type pg from 'pg';
 import { z } from 'zod';
+import { shippedApp, shippedApps } from './apps';
 import type { Auth } from './auth';
 import { failure } from './errors';
 import { invitationLink, namesOf, spaceFor } from './spaces';
@@ -255,11 +260,47 @@ export function apiRoutes(deps: {
       archived: q.archived === 'true',
       ...(q.limit ? { limit: Number(q.limit) } : {}),
     });
-    return c.json(await act(c, (tx, _a, space) => find(tx, space, input)));
+    return c.json(
+      await act(c, async (tx, _a, space) => withComputed(tx, space, await find(tx, space, input))),
+    );
+  });
+
+  // The apps Jarvis ships (spec 014), and installing one: tried first unless `dryRun` is false.
+  api.get('/apps', (c) =>
+    c.json(shippedApps.map((one) => ({ app: one.app, description: one.description ?? '' }))),
+  );
+
+  api.post('/apps/install', async (c) => {
+    const body = (await c.req.json()) as { name?: string; dryRun?: boolean };
+    const bundle = shippedApp(String(body.name ?? ''));
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        installApp(tx, actor, space, bundle, body.dryRun !== false),
+      ),
+    );
+  });
+
+  // The pages of her apps (spec 014): the list, and one computed for her filters.
+  api.get('/pages', async (c) =>
+    c.json(await act(c, (tx, _a, space) => pagesOf(tx, space, c.req.query('app') || undefined))),
+  );
+
+  api.get('/pages/:id', async (c) => {
+    const params = { ...c.req.query() };
+    delete params.space;
+    const drawn = await act(c, async (tx, _a, space) => {
+      const entry = await get(tx, space, c.req.param('id'));
+      if (!entry || entry.kind.toLowerCase() !== 'page') return null;
+      return renderPage(tx, space, entry, params);
+    });
+    return drawn ? c.json(drawn) : c.json({ error: `No page ${c.req.param('id')}.` }, 404);
   });
 
   api.get('/entries/:id', async (c) => {
-    const entry = await act(c, (tx, _a, space) => get(tx, space, c.req.param('id')));
+    const entry = await act(c, async (tx, _a, space) => {
+      const one = await get(tx, space, c.req.param('id'));
+      return one ? (await withComputed(tx, space, [one]))[0] : null;
+    });
     return entry ? c.json(entry) : c.json({ error: `No entry ${c.req.param('id')}.` }, 404);
   });
 
@@ -405,9 +446,9 @@ export function apiRoutes(deps: {
           reminders: number;
         }>(
           `select space_id, count(*)::int as entries,
-                  count(*) filter (where data ? 'texte' and length(data->>'texte') > 400)::int as documents,
-                  count(*) filter (where jarvis_fold(kind) = 'rappel'
-                    and coalesce(data->>'statut', '') not in ('fait', 'envoyé', 'annulé'))::int as reminders
+                  count(*) filter (where data ? 'text' and length(data->>'text') > 400)::int as documents,
+                  count(*) filter (where jarvis_fold(kind) = 'reminder'
+                    and coalesce(data->>'status', '') not in ('done', 'sent', 'cancelled'))::int as reminders
              from entry where space_id = any($1) and archived_at is null group by space_id`,
           [ids],
         );
@@ -473,7 +514,7 @@ export function apiRoutes(deps: {
     const own = spaces.find((one) => one.personal);
     const linked = own
       ? await as(c, async (tx) =>
-          (await find(tx, own.id, { kind: 'Canal', limit: 1 })).some(
+          (await find(tx, own.id, { kind: 'Channel', limit: 1 })).some(
             (one) => typeof one.data.agenda === 'string',
           ),
         )
@@ -519,7 +560,7 @@ export function apiRoutes(deps: {
       })
       .parse(await c.req.json());
     const spaces = c.get('spaces');
-    let title = 'Tableau de bord';
+    let title = 'Dashboard';
     let widgets: Widget[] = input.widgets ?? [];
     if (input.id) {
       const saved = await act(c, (tx, _a, space) => get(tx, space, input.id!));

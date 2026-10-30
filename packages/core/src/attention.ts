@@ -1,5 +1,6 @@
 import { agenda, type Occurrence } from './agenda';
 import type { Tx } from './db';
+import { CLOSED } from './keywords';
 import { DEFAULT_ZONE, inZone } from './time';
 
 // What needs her now (spec 013), read from what she already keeps — no new field, no new kind:
@@ -29,8 +30,8 @@ export interface Attention {
   day: Occurrence[];
 }
 
-const DONE = new Set(['fait', 'envoyé', 'envoye', 'annulé', 'annule', 'non envoyé', 'à corriger']);
-const TO_FIX = ['à corriger', 'non envoyé'];
+const DONE = new Set([...CLOSED, 'to_fix']);
+const TO_FIX = ['to_fix', 'failed'];
 
 /** Midnight of the day of `at` on her clock, and of the next. */
 function dayBounds(at: Date, zone: string): { start: Date; end: Date } {
@@ -68,9 +69,9 @@ export async function attention(
     space_id: string;
     status: string;
   }>(
-    `select e.id, e.kind, e.title, s.name as space, e.space_id, e.data->>'statut' as status
+    `select e.id, e.kind, e.title, s.name as space, e.space_id, e.data->>'status' as status
        from entry e join space s on s.id = e.space_id
-      where e.space_id = any($1) and e.archived_at is null and e.data->>'statut' = any($2)
+      where e.space_id = any($1) and e.archived_at is null and e.data->>'status' = any($2)
       order by e.updated_at desc limit 20`,
     [spaceIds, TO_FIX],
   );
@@ -144,7 +145,7 @@ export async function attention(
   }>(
     `select e.id, e.kind, e.title, s.name as space, e.space_id
        from entry e join space s on s.id = e.space_id
-      where e.space_id = any($1) and e.archived_at is null and e.data->>'statut' in ('proposé', 'propose')
+      where e.space_id = any($1) and e.archived_at is null and e.data->>'status' = 'proposed'
       order by e.created_at desc limit 20`,
     [spaceIds],
   );
@@ -158,7 +159,7 @@ export async function attention(
       group: 'proposed',
       when: null,
       allDay: false,
-      status: 'proposé',
+      status: 'proposed',
       reason: 'proposed',
     });
   }

@@ -22,8 +22,15 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     /^No space|not hers|stays private|^Only an owner|last member|cannot be left|is not undone|no e-mail address|needs a name|^A space needs/.test(
       message,
     ) ||
-    // The calendar (spec 011) and the models (spec 012): what to write instead.
-    /must come after its start|covers at most|are ISO days|follows its model|^A « Modèle » is/.test(
+    // The calendar (spec 011), the models (specs 012, 014): what to write instead.
+    /must come after its start|covers at most|are ISO days|follows its model|^A « Model » is/.test(
+      message,
+    ) ||
+    /cannot go from|cannot go to|starts as|» links (a|one)|»: no entry|^Formula «|^A « (Page|Rule|Script) » is|is not a filter of this page|^No page/.test(
+      message,
+    ) ||
+    // Rules, scripts, apps (spec 014).
+    /^The script|^Script «|^Scripts cannot run|^Rule «|may not (write|change)|^No (rule|script|app) «|ships with Jarvis|needs an entry|^Give /.test(
       message,
     )
   ) {

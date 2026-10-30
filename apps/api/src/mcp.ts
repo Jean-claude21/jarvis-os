@@ -25,6 +25,14 @@ import {
   type Blobs,
   type Space,
   type Tx,
+  withComputed,
+  bundleSchema,
+  exportApp,
+  installApp,
+  migrateKind,
+  migrationSchema,
+  runScript,
+  testRule,
 } from '@jarvis-os/core';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -33,6 +41,7 @@ import type pg from 'pg';
 import { z } from 'zod';
 import { failure } from './errors';
 import { instructionsFor } from './instructions';
+import { shippedApp, shippedApps } from './apps';
 import { invitationLink, namesOf, spaceFor } from './spaces';
 import { registerViews } from './views/register';
 
@@ -69,7 +78,7 @@ const json = (value: unknown) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }],
 });
 
-/** The text of an entry kept as instructions (a routine's consigne, a charter's texte). */
+/** The text of an entry kept as instructions (a routine's instruction, a charter's text). */
 const textOf = (data: Record<string, unknown>, ...keys: string[]) => {
   for (const key of keys) if (typeof data[key] === 'string' && data[key]) return data[key];
   return JSON.stringify(data);
@@ -83,17 +92,19 @@ async function methodOf(tx: Tx, spaces: Space[]) {
     for (const entry of await find(tx, space.id, { kind: 'Routine', limit: 100 })) {
       routines.push({
         name: entry.title,
-        // A routine she said (quand, consigne) or one read from her files (description, texte).
-        when: String(entry.data.quand ?? entry.data.when ?? entry.data.description ?? ''),
-        text: textOf(entry.data, 'consigne', 'texte', 'text'),
+        // A routine she said (when, instruction) or one read from her files (description, text).
+        when: String(
+          entry.data.when ?? entry.data.at ?? entry.data.quand ?? entry.data.description ?? '',
+        ),
+        text: textOf(entry.data, 'instruction', 'text', 'description'),
         space: space.name,
       });
     }
-    for (const entry of await find(tx, space.id, { kind: 'Charte', limit: 10 })) {
+    for (const entry of await find(tx, space.id, { kind: 'Charter', limit: 10 })) {
       charters.push({
         space: space.name,
         title: entry.title,
-        text: textOf(entry.data, 'texte', 'text'),
+        text: textOf(entry.data, 'text'),
       });
     }
   }
@@ -268,19 +279,23 @@ export async function mcpServerFor(
         space,
         ...args
       }: z.input<typeof findInputSchema> & { space?: string | undefined }) =>
-        act((tx) => find(tx, at(space), args)),
+        act(async (tx) => withComputed(tx, at(space), await find(tx, at(space), args))),
     ),
   );
 
   server.registerTool(
     'get',
     {
-      description: 'One entry with its fields, their origins and its links both ways.',
+      description:
+        'One entry with its fields, their origins, its links both ways and its formulas computed (`computed`).',
       inputSchema: { id: z.string().min(1), space: spaceArg },
       annotations: { readOnlyHint: true },
     },
     tool(async ({ id, space }: { id: string; space?: string | undefined }) => {
-      const entry = await act((tx) => get(tx, at(space), id));
+      const entry = await act(async (tx) => {
+        const one = await get(tx, at(space), id);
+        return one ? (await withComputed(tx, at(space), [one]))[0] : null;
+      });
       if (!entry) throw new Error(`No entry ${id} in this space.`);
       return entry;
     }),
@@ -471,9 +486,9 @@ export async function mcpServerFor(
     'agenda',
     {
       description: [
-        'Her calendar for a window: every entry of any kind that has a time — `debut`/`fin`/`duree`',
-        '(a span), `quand` (a moment), `echeance` (a deadline), `date` (a day, from today on),',
-        '`repete` (again and again, minus the days in `sauf`) — at its place, sorted. Answer « what do',
+        'Her calendar for a window: every entry of any kind that has a time — `start`/`end`/`duration`',
+        '(a span), `at` (a moment), `due` (a deadline), `date` (a day, from today on),',
+        '`repeat` (again and again, minus the days in `except`) — at its place, sorted. Answer « what do',
         'I have Thursday? » from this, never from memory. `from`/`to`: ISO times or days',
         '(« 2026-10-29 »); at most 366 days. Every space this client reaches unless `space` is given.',
       ].join(' '),
@@ -516,6 +531,144 @@ export async function mcpServerFor(
       }
       return found;
     }),
+  );
+
+  // The app engine (spec 014): try a rule, run a script, migrate a kind, export or install an app.
+  server.registerTool(
+    'rule_test',
+    {
+      description:
+        'Try one of her rules (an entry « Rule », by title or id) on an entry — or on nothing, for a schedule — and say what it would change; nothing is changed.',
+      inputSchema: {
+        rule: z.string().min(1),
+        entry: z.string().min(1).optional(),
+        space: spaceArg,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    tool(
+      async ({
+        rule,
+        entry,
+        space,
+      }: {
+        rule: string;
+        entry?: string | undefined;
+        space?: string | undefined;
+      }) => act((tx) => testRule(tx, actor, at(space), { rule, entryId: entry })),
+    ),
+  );
+
+  server.registerTool(
+    'run_script',
+    {
+      description: [
+        'Run one of her scripts (an entry « Script »: `run(input)` returns changes): `file` the entry of',
+        'a file it reads (a bank statement), `entry` an entry it works on, `params` her choices.',
+        '`dryRun` (default true) only tries and lists what would change: show her, then run with',
+        '`dryRun: false` after her yes. Its changes are checked against what it declared it writes,',
+        'journaled and undoable.',
+      ].join(' '),
+      inputSchema: {
+        script: z.string().min(1),
+        file: z.string().min(1).optional(),
+        entry: z.string().min(1).optional(),
+        params: z.record(z.string(), z.string()).optional(),
+        dryRun: z.boolean().default(true),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async (args: {
+        script: string;
+        file?: string | undefined;
+        entry?: string | undefined;
+        params?: Record<string, string> | undefined;
+        dryRun: boolean;
+        space?: string | undefined;
+      }) =>
+        act((tx) =>
+          runScript(tx, actor, at(args.space), {
+            script: args.script,
+            fileId: args.file,
+            entryId: args.entry,
+            params: args.params ?? {},
+            dryRun: args.dryRun,
+          }),
+        ),
+    ),
+  );
+
+  server.registerTool(
+    'migrate',
+    {
+      description: [
+        'Change every entry of a kind when its model changes: `steps` among { rename: { from, to } },',
+        '{ set: { field, formula } } (a formula of the entry), { remove: field }; `where` a formula to',
+        'choose some. `dryRun` (default true) counts, shows a sample and the entries that would not follow',
+        'the model; then run with `dryRun: false` after her yes — undone at once with `undo`.',
+      ].join(' '),
+      inputSchema: {
+        kind: z.string().min(1),
+        steps: migrationSchema.shape.steps,
+        where: z.string().min(1).optional(),
+        dryRun: z.boolean().default(true),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async ({
+        space,
+        ...input
+      }: z.input<typeof migrationSchema> & { space?: string | undefined }) =>
+        act((tx) => migrateKind(tx, actor, at(space), input)),
+    ),
+  );
+
+  server.registerTool(
+    'app_export',
+    {
+      description:
+        'One of her apps as a bundle: the models, pages, rules and scripts that name it — to keep, share or install in another space.',
+      inputSchema: { app: z.string().min(1), space: spaceArg },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async ({ app, space }: { app: string; space?: string | undefined }) =>
+      act((tx) => exportApp(tx, at(space), app)),
+    ),
+  );
+
+  server.registerTool(
+    'app_install',
+    {
+      description: [
+        `Install an app in a space: one that ships with Jarvis by \`name\` (${shippedApps.map((one) => `« ${one.app} »: ${typeof one.description === 'object' ? (one.description.en ?? '') : (one.description ?? '')}`).join(' ')})`,
+        'or a `bundle` (from `app_export`). `dryRun` (default true) lists what would be created; what',
+        'is already there (same kind and title) is kept. Show her, then install with `dryRun: false`.',
+      ].join(' '),
+      inputSchema: {
+        name: z.string().min(1).optional(),
+        bundle: z.record(z.string(), z.unknown()).optional(),
+        dryRun: z.boolean().default(true),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async (args: {
+        name?: string | undefined;
+        bundle?: Record<string, unknown> | undefined;
+        dryRun: boolean;
+        space?: string | undefined;
+      }) => {
+        const bundle = args.bundle
+          ? bundleSchema.parse(args.bundle)
+          : args.name
+            ? shippedApp(args.name)
+            : null;
+        if (!bundle) throw new Error('Give `name` (an app Jarvis ships) or `bundle`.');
+        return act((tx) => installApp(tx, actor, at(args.space), bundle, args.dryRun));
+      },
+    ),
   );
 
   registerViews(server, {

@@ -1,0 +1,143 @@
+{
+  "app": "Routines",
+  "version": 1,
+  "description": {
+    "fr": "Habitudes avec leur cadence dans l'agenda, pointages, séries et taux de régularité ; la semaine et la régularité en un coup d'œil, un rappel quand une habitude non négociable n'est pas pointée.",
+    "en": "Habits with their cadence in the calendar, check-ins, streaks and consistency; the week and the consistency at a glance, a reminder when a non-negotiable habit is not checked in."
+  },
+  "models": [
+    {
+      "title": "Habit",
+      "data": {
+        "label": { "fr": "Habitude", "en": "Habit" },
+        "fields": [
+          {
+            "name": "repeat",
+            "type": "text",
+            "label": { "fr": "Cadence", "en": "Cadence" },
+            "help": "Five fields (« 30 18 * * 2,3 »): it puts the habit in the calendar."
+          },
+          { "name": "duration", "type": "duration", "label": { "fr": "Durée", "en": "Duration" } },
+          {
+            "name": "facet",
+            "type": "choice",
+            "options": ["mind", "soul", "body", "relationships", "work"],
+            "label": { "fr": "Aspect", "en": "Facet" },
+            "optionLabels": {
+              "mind": { "fr": "esprit", "en": "mind" },
+              "soul": { "fr": "âme", "en": "soul" },
+              "body": { "fr": "corps", "en": "body" },
+              "relationships": { "fr": "relations", "en": "relationships" },
+              "work": { "fr": "travail", "en": "work" }
+            }
+          },
+          {
+            "name": "non_negotiable",
+            "type": "boolean",
+            "label": { "fr": "Non négociable", "en": "Non-negotiable" }
+          },
+          {
+            "name": "streak",
+            "type": "formula",
+            "label": { "fr": "Série", "en": "Streak" },
+            "formula": "streak(check_ins.date)"
+          },
+          {
+            "name": "rate_30d",
+            "type": "formula",
+            "label": { "fr": "Régularité 30 j (%)", "en": "30-day rate (%)" },
+            "formula": "round(count(check_ins where last_days(date, 30)) / 30 * 100)"
+          },
+          {
+            "name": "last",
+            "type": "formula",
+            "label": { "fr": "Dernier pointage", "en": "Last check-in" },
+            "formula": "max(check_ins.date)"
+          }
+        ],
+        "columns": ["facet", "streak", "rate_30d", "last"],
+        "path": "routines/habits/{title}.md"
+      }
+    },
+    {
+      "title": "CheckIn",
+      "data": {
+        "label": { "fr": "Pointage", "en": "Check-in" },
+        "fields": [
+          {
+            "name": "date",
+            "type": "date",
+            "required": true,
+            "label": { "fr": "Date", "en": "Date" }
+          },
+          {
+            "name": "habit",
+            "type": "link",
+            "target": "Habit",
+            "inverse": "check_ins",
+            "required": true,
+            "label": { "fr": "Habitude", "en": "Habit" }
+          },
+          { "name": "note", "type": "text", "label": { "fr": "Note", "en": "Note" } }
+        ],
+        "columns": ["date"],
+        "path": "routines/{year}/{month}/{date}-{title}.md"
+      }
+    }
+  ],
+  "pages": [
+    {
+      "title": "Consistency",
+      "data": {
+        "label": { "fr": "Ma régularité", "en": "My consistency" },
+        "order": 1,
+        "blocks": [
+          { "block": "calendar", "title": { "fr": "Cette semaine", "en": "This week" }, "days": 7 },
+          {
+            "block": "gauge",
+            "title": { "fr": "Régularité sur 30 jours (%)", "en": "30-day consistency (%)" },
+            "kind": "Habit",
+            "value": "rate_30d",
+            "max": "100"
+          },
+          {
+            "block": "heatmap",
+            "title": { "fr": "Jours pointés", "en": "Days checked in" },
+            "kind": "CheckIn",
+            "days": 35
+          },
+          {
+            "block": "table",
+            "title": { "fr": "Habitudes", "en": "Habits" },
+            "query": {
+              "kind": "Habit",
+              "fields": ["facet", "streak", "rate_30d", "last"],
+              "sort": "-streak"
+            }
+          },
+          { "block": "form", "title": { "fr": "Pointer", "en": "Check in" }, "kind": "CheckIn" }
+        ]
+      }
+    }
+  ],
+  "rules": [
+    {
+      "title": "Non-negotiable missed",
+      "data": {
+        "when": { "schedule": "0 21 * * *" },
+        "then": [{ "run_script": { "script": "Habits of the day" } }]
+      }
+    }
+  ],
+  "scripts": [
+    {
+      "title": "Habits of the day",
+      "data": {
+        "description": "In the evening: a reminder for each non-negotiable habit not checked in today.",
+        "reads": ["Habit"],
+        "writes": ["Reminder"],
+        "code": "function run(input) {\n  return input.entries.Habit\n    .filter((h) => h.data.non_negotiable && h.computed.last !== input.today)\n    .map((h) => ({ remind: { text: h.title } }));\n}"
+      }
+    }
+  ]
+}

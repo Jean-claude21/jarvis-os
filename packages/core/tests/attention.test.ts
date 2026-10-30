@@ -12,33 +12,33 @@ beforeAll(async () => {
     save(tx, ama.actor, ama.space, {
       entries: [
         {
-          kind: 'Rappel',
+          kind: 'Reminder',
           title: 'Taxe foncière',
-          data: { quand: '2026-10-30T08:00', statut: 'non envoyé' },
+          data: { at: '2026-10-30T08:00', status: 'failed' },
         },
-        { kind: 'Obligation', title: 'Rembourser Paul', data: { echeance: '2026-10-29' } },
+        { kind: 'Obligation', title: 'Rembourser Paul', data: { due: '2026-10-29' } },
         {
           kind: 'Obligation',
           title: 'Déjà payé',
-          data: { echeance: '2026-10-28', statut: 'fait' },
+          data: { due: '2026-10-28', status: 'done' },
         },
         {
           kind: 'Événement',
           title: 'Réunion passée',
-          data: { debut: '2026-10-29T10:00', fin: '2026-10-29T11:00' },
+          data: { start: '2026-10-29T10:00', end: '2026-10-29T11:00' },
         },
         {
           kind: 'Événement',
           title: 'Dentiste',
-          data: { debut: '2026-10-30T14:00', fin: '2026-10-30T15:00' },
+          data: { start: '2026-10-30T14:00', end: '2026-10-30T15:00' },
         },
-        { kind: 'Habitude', title: 'Prière', data: { repete: '30 4 * * *', duree: 60 } },
+        { kind: 'Habitude', title: 'Prière', data: { repeat: '30 4 * * *', duration: 60 } },
         {
           kind: 'Créneau',
           title: 'Mémoire',
-          data: { debut: '2026-10-30T16:00', duree: 120, statut: 'proposé' },
+          data: { start: '2026-10-30T16:00', duration: 120, status: 'proposed' },
         },
-        { kind: 'Idée', title: 'Ajuster le coucher', data: { statut: 'proposé' } },
+        { kind: 'Idée', title: 'Ajuster le coucher', data: { status: 'proposed' } },
         { kind: 'Date', title: 'Anniversaire', data: { date: '2026-11-01' } },
       ],
     }),

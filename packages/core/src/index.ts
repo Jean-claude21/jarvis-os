@@ -99,10 +99,76 @@ export {
   modelFieldSchema,
   modelOf,
   modelsOf,
-  NATURES,
+  fieldOf,
+  TYPES,
   placeOf,
+  workflowSchema,
+  labelSchema,
+  type Label,
+  type FieldType,
   type Model,
   type ModelData,
   type ModelField,
+  type Workflow,
 } from './models';
+export {
+  CLOSED,
+  dataInNewWords,
+  FIELD_RENAMES,
+  KIND_RENAMES,
+  modelInNewWords,
+  STATUSES,
+  statusOf,
+} from './keywords';
+export {
+  evaluate,
+  formulaValue,
+  FUNCTIONS,
+  parse,
+  todayOf,
+  type Clock,
+  type Node,
+  type Scope,
+} from './formula';
+export { computedOf, EntryView, Reader, readerOf, withComputed, type EntryRow } from './compute';
 export { attention, type Attention, type AttentionGroup, type AttentionItem } from './attention';
+export { requestSchema, runRequest, withParams, type Request, type RequestResult } from './request';
+export {
+  blockSchema,
+  checkPage,
+  PAGE_KIND,
+  pageDataSchema,
+  pagesOf,
+  renderPage,
+  renderRecord,
+  type Block,
+  type DrawnBlock,
+  type DrawnPage,
+  type PageData,
+} from './pages';
+export { trial, type Trial, type TrialChange } from './trial';
+export {
+  actionSchema,
+  checkRule,
+  RULE_DEPTH,
+  RULE_KIND,
+  ruleDataSchema,
+  rulesOf,
+  runDueRules,
+  testRule,
+  type Action,
+  type RuleData,
+} from './rules';
+export {
+  checkScript,
+  runScript,
+  SCRIPT_KIND,
+  scriptDataSchema,
+  scriptOutputSchema,
+  useScriptRunner,
+  type ScriptData,
+  type ScriptRun,
+  type ScriptRunner,
+} from './scripts';
+export { migrateKind, migrationSchema, type Migration, type MigrationReport } from './migrations';
+export { bundleSchema, exportApp, installApp, type Bundle, type InstallReport } from './bundles';

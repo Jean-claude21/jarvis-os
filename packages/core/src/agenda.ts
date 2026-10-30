@@ -7,8 +7,8 @@ import { DEFAULT_ZONE, inZone, minutesOf, nextTime, TIME_FIELDS, timeOf } from '
 export { minutesOf, TIME_FIELDS } from './time';
 
 // The calendar (spec 011): time is a property any entry may carry, not a kind. The calendar of a
-// window is computed from the entries that have one — `debut` (and `fin` or `duree`), `quand`,
-// `echeance`, `date`, `repete` — never stored twice.
+// window is computed from the entries that have one — `start` (and `end` or `duration`), `at`,
+// `due`, `date`, `repeat` — never stored twice.
 
 /** One thing at its place in time. */
 export interface Occurrence {
@@ -22,7 +22,7 @@ export interface Occurrence {
   /** ISO instant, or null for a moment, a deadline or a day without an end. */
   end: string | null;
   allDay: boolean;
-  /** A span (`debut`), a moment (`quand`, `repete`), a deadline (`echeance`), a day (`date`). */
+  /** A span (`start`), a moment (`at`, `repeat`), a deadline (`due`), a day (`date`). */
   type: 'span' | 'moment' | 'deadline' | 'day';
   repeated: boolean;
   status: string | null;
@@ -34,8 +34,8 @@ export interface Occurrence {
 export const AGENDA_MAX_DAYS = 366;
 export const AGENDA_MAX_REPEATS = 200;
 
-const CANCELLED = new Set(['annulé', 'annule']);
-const PROPOSED = new Set(['proposé', 'propose']);
+const CANCELLED = new Set(['cancelled']);
+const PROPOSED = new Set(['proposed']);
 const DAY_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 const MINUTE = 60_000;
 
@@ -66,9 +66,9 @@ interface Row {
 /** The occurrences of one entry in [from, to). */
 export function occurrencesOf(row: Row, from: Date, to: Date, today: Date): Occurrence[] {
   const data = row.data;
-  const status = typeof data.statut === 'string' ? data.statut : null;
+  const status = typeof data.status === 'string' ? data.status : null;
   if (status && CANCELLED.has(status.toLowerCase())) return [];
-  const zone = typeof data.fuseau === 'string' && data.fuseau ? data.fuseau : DEFAULT_ZONE;
+  const zone = typeof data.timezone === 'string' && data.timezone ? data.timezone : DEFAULT_ZONE;
   const base = {
     id: row.id,
     kind: row.kind,
@@ -82,23 +82,28 @@ export function occurrencesOf(row: Row, from: Date, to: Date, today: Date): Occu
     end ? at < to && end > from : at >= from && at < to;
   const out: Occurrence[] = [];
 
-  if (typeof data.repete === 'string' && data.repete.trim()) {
-    const minutes = minutesOf(data.duree);
+  if (typeof data.repeat === 'string' && data.repeat.trim()) {
+    const minutes = minutesOf(data.duration);
     const skipped = new Set(
-      (Array.isArray(data.sauf) ? data.sauf : typeof data.sauf === 'string' ? [data.sauf] : [])
+      (Array.isArray(data.except)
+        ? data.except
+        : typeof data.except === 'string'
+          ? [data.except]
+          : []
+      )
         .filter((one): one is string => typeof one === 'string')
         .map((one) => one.trim().slice(0, 10)),
     );
     const localDay = (at: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(at);
-    // A repetition starts where it says it starts (`debut`), else it always was.
-    const begins = placed(data.debut, zone)?.at;
-    const ends = placed(data.jusqu ?? data.fin_repetition, zone)?.at;
+    // A repetition starts where it says it starts (`start`), else it always was.
+    const begins = placed(data.start, zone)?.at;
+    const ends = placed(data.until, zone)?.at;
     let cursor = new Date(
       Math.max(from.getTime() - (minutes ?? 0) * MINUTE, begins?.getTime() ?? 0) - 1,
     );
     try {
       for (let n = 0; n < AGENDA_MAX_REPEATS; n += 1) {
-        const at = nextTime(data.repete, cursor, zone);
+        const at = nextTime(data.repeat, cursor, zone);
         if (at >= to || (ends && at > ends)) break;
         cursor = at;
         if (skipped.has(localDay(at))) continue;
@@ -119,10 +124,10 @@ export function occurrencesOf(row: Row, from: Date, to: Date, today: Date): Occu
     return out;
   }
 
-  const span = placed(data.debut, zone);
+  const span = placed(data.start, zone);
   if (span) {
-    const given = placed(data.fin, zone);
-    const minutes = minutesOf(data.duree);
+    const given = placed(data.end, zone);
+    const minutes = minutesOf(data.duration);
     let end = given
       ? given.allDay
         ? new Date(given.at.getTime() + 24 * 60 * MINUTE)
@@ -147,8 +152,8 @@ export function occurrencesOf(row: Row, from: Date, to: Date, today: Date): Occu
   }
 
   for (const [field, type] of [
-    ['quand', 'moment'],
-    ['echeance', 'deadline'],
+    ['at', 'moment'],
+    ['due', 'deadline'],
     ['date', 'day'],
   ] as const) {
     const one = placed(data[field], zone);
@@ -203,17 +208,17 @@ export const fingerprintOf = (key: string) => createHash('sha256').update(key).d
 
 /**
  * A new private address key for her phone's calendar (spec 011), kept as a fingerprint in her
- * « Canal » entry of her own space; the previous key answers nothing any more.
+ * « Channel » entry of her own space; the previous key answers nothing any more.
  */
 export async function renewCalendarKey(tx: Tx, actor: Actor, ownSpaceId: string): Promise<string> {
   const key = randomBytes(24).toString('base64url');
-  const [canal] = await find(tx, ownSpaceId, { kind: 'Canal', limit: 1 });
+  const [canal] = await find(tx, ownSpaceId, { kind: 'Channel', limit: 1 });
   await save(tx, actor, ownSpaceId, {
     entries: [
       canal
         ? { id: canal.id, data: { agenda: fingerprintOf(key) }, origin: 'inferred' }
         : {
-            kind: 'Canal',
+            kind: 'Channel',
             title: 'Canaux',
             data: { agenda: fingerprintOf(key) },
             origin: 'inferred',

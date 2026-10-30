@@ -29,7 +29,7 @@ describe('the occurrences of one entry', () => {
   it('places a span, a moment, a deadline and a day, on her clock', () => {
     expect(
       occurrencesOf(
-        row({ debut: '2026-10-29T14:00', fin: '2026-10-29T15:00' }),
+        row({ start: '2026-10-29T14:00', end: '2026-10-29T15:00' }),
         from,
         to,
         today,
@@ -41,14 +41,14 @@ describe('the occurrences of one entry', () => {
       allDay: false,
     });
     expect(
-      occurrencesOf(row({ debut: '2026-10-29T14:00', duree: '1h30' }), from, to, today)[0]?.end,
+      occurrencesOf(row({ start: '2026-10-29T14:00', duration: '1h30' }), from, to, today)[0]?.end,
     ).toBe('2026-10-29T14:30:00.000Z');
-    expect(occurrencesOf(row({ quand: '2026-10-30T09:00' }), from, to, today)[0]).toMatchObject({
+    expect(occurrencesOf(row({ at: '2026-10-30T09:00' }), from, to, today)[0]).toMatchObject({
       type: 'moment',
       end: null,
     });
     // A day alone is the whole day, from midnight on her clock.
-    expect(occurrencesOf(row({ echeance: '2026-10-31' }), from, to, today)[0]).toMatchObject({
+    expect(occurrencesOf(row({ due: '2026-10-31' }), from, to, today)[0]).toMatchObject({
       type: 'deadline',
       allDay: true,
       start: '2026-10-30T23:00:00.000Z',
@@ -62,7 +62,7 @@ describe('the occurrences of one entry', () => {
 
   it('repeats in the window, with a duration, without the days off', () => {
     const gym = occurrencesOf(
-      row({ repete: '30 18 * * 2,3', duree: 90, sauf: ['2026-10-28'] }, 'Habitude'),
+      row({ repeat: '30 18 * * 2,3', duration: 90, except: ['2026-10-28'] }, 'Habitude'),
       from,
       to,
       today,
@@ -70,29 +70,29 @@ describe('the occurrences of one entry', () => {
     expect(gym.map((one) => one.start)).toEqual(['2026-10-27T17:30:00.000Z']);
     expect(gym[0]).toMatchObject({ end: '2026-10-27T19:00:00.000Z', repeated: true, type: 'span' });
     // Every evening at 20:45 but Saturday: six times this week.
-    expect(occurrencesOf(row({ repete: '45 20 * * 0-5' }, 'Rappel'), from, to, today)).toHaveLength(
-      6,
-    );
+    expect(
+      occurrencesOf(row({ repeat: '45 20 * * 0-5' }, 'Reminder'), from, to, today),
+    ).toHaveLength(6);
     // A repetition that starts on Thursday.
     expect(
-      occurrencesOf(row({ repete: '0 7 * * *', debut: '2026-10-29' }), from, to, today).map((one) =>
+      occurrencesOf(row({ repeat: '0 7 * * *', start: '2026-10-29' }), from, to, today).map((one) =>
         one.start.slice(0, 10),
       ),
     ).toEqual(['2026-10-29', '2026-10-30', '2026-10-31', '2026-11-01']);
   });
 
   it('bounds a repetition, and leaves out what is cancelled or wrong', () => {
-    expect(occurrencesOf(row({ repete: '*/5 * * * *' }), from, to, today)).toHaveLength(200);
+    expect(occurrencesOf(row({ repeat: '*/5 * * * *' }), from, to, today)).toHaveLength(200);
     expect(
-      occurrencesOf(row({ quand: '2026-10-30T09:00', statut: 'annulé' }), from, to, today),
+      occurrencesOf(row({ at: '2026-10-30T09:00', status: 'cancelled' }), from, to, today),
     ).toEqual([]);
-    expect(occurrencesOf(row({ repete: 'chaque soir' }), from, to, today)).toEqual([]);
-    expect(occurrencesOf(row({ debut: '2026-11-05T10:00' }), from, to, today)).toEqual([]);
+    expect(occurrencesOf(row({ repeat: 'chaque soir' }), from, to, today)).toEqual([]);
+    expect(occurrencesOf(row({ start: '2026-11-05T10:00' }), from, to, today)).toEqual([]);
   });
 
   it('marks what Jarvis proposed', () => {
     expect(
-      occurrencesOf(row({ debut: '2026-10-30T16:00', statut: 'proposé' }), from, to, today)[0]
+      occurrencesOf(row({ start: '2026-10-30T16:00', status: 'proposed' }), from, to, today)[0]
         ?.proposed,
     ).toBe(true);
   });
@@ -119,18 +119,18 @@ describe('her calendar', () => {
           {
             kind: 'Événement',
             title: 'Dentiste',
-            data: { debut: '2026-10-29T14:00', fin: '2026-10-29T15:00' },
+            data: { start: '2026-10-29T14:00', end: '2026-10-29T15:00' },
           },
           {
             kind: 'Obligation',
             title: 'Frais de dossier',
-            data: { echeance: '2026-10-31', montant: 120000 },
+            data: { due: '2026-10-31', montant: 120000 },
           },
-          { kind: 'Habitude', title: 'Gym', data: { repete: '30 18 * * 2,3', duree: 90 } },
+          { kind: 'Habitude', title: 'Gym', data: { repeat: '30 18 * * 2,3', duration: 90 } },
           {
-            kind: 'Rappel',
+            kind: 'Reminder',
             title: 'Déjà envoyé',
-            data: { quand: '2026-10-30T08:00', statut: 'envoyé' },
+            data: { at: '2026-10-30T08:00', status: 'sent' },
           },
           { kind: 'Journal', title: '27 octobre', data: { date: '2026-10-27' } },
           { kind: 'Personne', title: 'Paul', data: { telephone: '…' } },
@@ -145,7 +145,7 @@ describe('her calendar', () => {
       'Habitude:Gym',
       'Habitude:Gym',
       'Événement:Dentiste',
-      'Rappel:Déjà envoyé',
+      'Reminder:Déjà envoyé',
       'Obligation:Frais de dossier',
     ]);
     expect(week[0]?.space).toBe('Ama');
@@ -174,7 +174,7 @@ describe('the private address of her calendar', () => {
     const second = await kofi.as((tx) => renewCalendarKey(tx, kofi.actor, kofi.space));
     expect(await calendarOwner(db, first)).toBeNull();
     expect(await calendarOwner(db, second)).toBe(kofi.id);
-    const [canal] = await kofi.as((tx) => find(tx, kofi.space, { kind: 'Canal' }));
+    const [canal] = await kofi.as((tx) => find(tx, kofi.space, { kind: 'Channel' }));
     expect(JSON.stringify(canal?.data)).not.toContain(second);
     expect(await calendarOwner(db, 'not-a-key')).toBeNull();
   });

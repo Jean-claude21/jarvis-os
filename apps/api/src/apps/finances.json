@@ -1,0 +1,348 @@
+{
+  "app": "Finances",
+  "version": 1,
+  "description": {
+    "fr": "Comptes, fonds (enveloppes de budget), mouvements, factures et rapprochements : soldes et restes calculés, la vue du mois, une alerte quand un fonds est dépassé, un import de relevé CSV.",
+    "en": "Accounts, funds (budget envelopes), transactions, bills and reconciliations: balances and remainders computed, the month overview, an alert when a fund is overspent, a CSV statement import."
+  },
+  "models": [
+    {
+      "title": "Account",
+      "data": {
+        "label": { "fr": "Compte", "en": "Account" },
+        "fields": [
+          {
+            "name": "type",
+            "type": "choice",
+            "options": ["cash", "bank", "mobile_money", "savings"],
+            "label": { "fr": "Type", "en": "Type" },
+            "optionLabels": {
+              "cash": { "fr": "espèces", "en": "cash" },
+              "bank": { "fr": "banque", "en": "bank" },
+              "mobile_money": { "fr": "mobile money", "en": "mobile money" },
+              "savings": { "fr": "épargne", "en": "savings" }
+            }
+          },
+          {
+            "name": "opening_balance",
+            "type": "amount",
+            "label": { "fr": "Solde de départ", "en": "Opening balance" },
+            "help": "The balance on the day she starts following this account."
+          },
+          {
+            "name": "balance",
+            "type": "formula",
+            "label": { "fr": "Solde", "en": "Balance" },
+            "formula": "opening_balance + sum(transactions.amount where direction = 'in') - sum(transactions.amount where direction = 'out')"
+          },
+          {
+            "name": "gap",
+            "type": "formula",
+            "label": { "fr": "Écart avec la banque", "en": "Gap with the bank" },
+            "formula": "if(count(reconciliations) > 0, sum(reconciliations.bank_balance where date = max(reconciliations.date)) - balance, null)"
+          }
+        ],
+        "columns": ["type", "balance"],
+        "path": "finances/accounts/{title}.md"
+      }
+    },
+    {
+      "title": "Fund",
+      "data": {
+        "label": { "fr": "Fonds", "en": "Fund" },
+        "fields": [
+          {
+            "name": "monthly_budget",
+            "type": "amount",
+            "label": { "fr": "Budget du mois", "en": "Monthly budget" }
+          },
+          {
+            "name": "spent_this_month",
+            "type": "formula",
+            "label": { "fr": "Dépensé ce mois", "en": "Spent this month" },
+            "formula": "sum(allocations.amount where direction = 'out' and this_month(date))"
+          },
+          {
+            "name": "remaining",
+            "type": "formula",
+            "label": { "fr": "Reste", "en": "Remaining" },
+            "formula": "monthly_budget - spent_this_month"
+          }
+        ],
+        "columns": ["monthly_budget", "spent_this_month", "remaining"],
+        "path": "finances/funds/{title}.md"
+      }
+    },
+    {
+      "title": "Transaction",
+      "data": {
+        "label": { "fr": "Mouvement", "en": "Transaction" },
+        "fields": [
+          {
+            "name": "amount",
+            "type": "amount",
+            "required": true,
+            "label": { "fr": "Montant", "en": "Amount" },
+            "help": "Always positive: the direction says whether money comes in or goes out."
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "required": true,
+            "label": { "fr": "Date", "en": "Date" }
+          },
+          {
+            "name": "direction",
+            "type": "choice",
+            "options": ["in", "out", "transfer"],
+            "required": true,
+            "label": { "fr": "Sens", "en": "Direction" },
+            "optionLabels": {
+              "in": { "fr": "entrée", "en": "in" },
+              "out": { "fr": "sortie", "en": "out" },
+              "transfer": { "fr": "réaffectation", "en": "transfer" }
+            }
+          },
+          {
+            "name": "account",
+            "type": "link",
+            "target": "Account",
+            "inverse": "transactions",
+            "required": true,
+            "label": { "fr": "Compte", "en": "Account" }
+          },
+          {
+            "name": "fund",
+            "type": "link",
+            "target": "Fund",
+            "inverse": "allocations",
+            "label": { "fr": "Fonds", "en": "Fund" }
+          },
+          {
+            "name": "bill",
+            "type": "link",
+            "target": "Bill",
+            "inverse": "payments",
+            "label": { "fr": "Facture", "en": "Bill" }
+          },
+          { "name": "note", "type": "text", "label": { "fr": "Note", "en": "Note" } }
+        ],
+        "columns": ["date", "direction", "amount"],
+        "total": "amount",
+        "groupBy": "date",
+        "path": "finances/{year}/{month}/{title}.md"
+      }
+    },
+    {
+      "title": "Bill",
+      "data": {
+        "label": { "fr": "Facture", "en": "Bill" },
+        "fields": [
+          {
+            "name": "amount",
+            "type": "amount",
+            "required": true,
+            "label": { "fr": "Montant", "en": "Amount" }
+          },
+          { "name": "due", "type": "date", "label": { "fr": "Échéance", "en": "Due" } },
+          {
+            "name": "state",
+            "type": "choice",
+            "options": ["to_pay", "paid", "cancelled"],
+            "label": { "fr": "État", "en": "State" },
+            "optionLabels": {
+              "to_pay": { "fr": "à payer", "en": "to pay" },
+              "paid": { "fr": "payée", "en": "paid" },
+              "cancelled": { "fr": "annulée", "en": "cancelled" }
+            }
+          },
+          {
+            "name": "paid",
+            "type": "formula",
+            "label": { "fr": "Payé", "en": "Paid" },
+            "formula": "sum(payments.amount)"
+          },
+          {
+            "name": "left_to_pay",
+            "type": "formula",
+            "label": { "fr": "Reste à payer", "en": "Left to pay" },
+            "formula": "amount - paid"
+          }
+        ],
+        "columns": ["due", "amount", "state"],
+        "workflow": {
+          "field": "state",
+          "initial": "to_pay",
+          "transitions": [
+            { "from": "to_pay", "to": "paid" },
+            { "from": "to_pay", "to": "cancelled" },
+            { "from": "paid", "to": "to_pay" }
+          ]
+        },
+        "path": "finances/bills/{title}.md"
+      }
+    },
+    {
+      "title": "Reconciliation",
+      "data": {
+        "label": { "fr": "Rapprochement", "en": "Reconciliation" },
+        "fields": [
+          {
+            "name": "date",
+            "type": "date",
+            "required": true,
+            "label": { "fr": "Date", "en": "Date" }
+          },
+          {
+            "name": "bank_balance",
+            "type": "amount",
+            "required": true,
+            "label": { "fr": "Solde lu à la banque", "en": "Balance at the bank" },
+            "help": "The balance read on the bank's statement or app."
+          },
+          {
+            "name": "account",
+            "type": "link",
+            "target": "Account",
+            "inverse": "reconciliations",
+            "required": true,
+            "label": { "fr": "Compte", "en": "Account" }
+          }
+        ],
+        "columns": ["date", "bank_balance"]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "title": "Month overview",
+      "data": {
+        "label": { "fr": "Vue du mois", "en": "Month overview" },
+        "order": 1,
+        "filters": [{ "name": "month", "type": "month", "label": { "fr": "Mois", "en": "Month" } }],
+        "blocks": [
+          {
+            "block": "stat",
+            "title": { "fr": "Solde de tous les comptes", "en": "Balance of all accounts" },
+            "query": { "kind": "Account", "aggregate": { "total": "sum(balance)" } }
+          },
+          {
+            "block": "stat_delta",
+            "title": { "fr": "Dépenses du mois", "en": "Spending this month" },
+            "query": {
+              "kind": "Transaction",
+              "where": "direction = 'out' and month(date) = {month}",
+              "aggregate": { "total": "sum(amount)" }
+            }
+          },
+          {
+            "block": "stat",
+            "title": { "fr": "Entrées du mois", "en": "Income this month" },
+            "query": {
+              "kind": "Transaction",
+              "where": "direction = 'in' and month(date) = {month}",
+              "aggregate": { "total": "sum(amount)" }
+            }
+          },
+          {
+            "block": "gauge",
+            "title": { "fr": "Fonds", "en": "Funds" },
+            "kind": "Fund",
+            "value": "spent_this_month",
+            "max": "monthly_budget"
+          },
+          {
+            "block": "breakdown",
+            "title": { "fr": "Dépenses par fonds", "en": "Spending by fund" },
+            "query": {
+              "kind": "Transaction",
+              "where": "direction = 'out' and month(date) = {month}",
+              "groupBy": "fund.title",
+              "aggregate": { "total": "sum(amount)" },
+              "sort": "-total"
+            }
+          },
+          {
+            "block": "line",
+            "title": { "fr": "Dépenses mois par mois", "en": "Spending month by month" },
+            "query": {
+              "kind": "Transaction",
+              "where": "direction = 'out'",
+              "groupBy": "month(date)",
+              "aggregate": { "total": "sum(amount)" }
+            }
+          },
+          {
+            "block": "task_list",
+            "title": { "fr": "À payer", "en": "To pay" },
+            "kind": "Bill",
+            "where": "state = 'to_pay'",
+            "detail": "due",
+            "action": { "label": "✓", "set": { "state": "paid" } }
+          },
+          {
+            "block": "table",
+            "title": { "fr": "Mouvements du mois", "en": "Transactions this month" },
+            "query": {
+              "kind": "Transaction",
+              "where": "month(date) = {month}",
+              "fields": ["date", "direction", "amount", "account", "fund"],
+              "sort": "-date"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "title": "Accounts",
+      "data": {
+        "label": { "fr": "Comptes", "en": "Accounts" },
+        "order": 2,
+        "blocks": [
+          {
+            "block": "table",
+            "title": { "fr": "Comptes", "en": "Accounts" },
+            "query": { "kind": "Account", "fields": ["type", "balance", "gap"] },
+            "total": "balance"
+          },
+          {
+            "block": "bar",
+            "title": { "fr": "Solde par compte", "en": "Balance by account" },
+            "query": {
+              "kind": "Account",
+              "groupBy": "title",
+              "aggregate": { "balance": "sum(balance)" },
+              "sort": "-balance"
+            }
+          },
+          {
+            "block": "form",
+            "title": { "fr": "Noter un mouvement", "en": "Record a transaction" },
+            "kind": "Transaction"
+          }
+        ]
+      }
+    }
+  ],
+  "rules": [
+    {
+      "title": "Fund overspent",
+      "data": {
+        "when": { "saved": "Transaction" },
+        "if": "direction = 'out' and fund.remaining < 0",
+        "then": [{ "remind": { "text": "{fund.title} : {-fund.remaining}" } }]
+      }
+    }
+  ],
+  "scripts": [
+    {
+      "title": "Statement import",
+      "data": {
+        "description": "Reads a CSV statement (date;label;amount, one header line) and creates one transaction per line on the account given as params.account; a negative amount goes out.",
+        "reads": ["Account"],
+        "writes": ["Transaction"],
+        "code": "function run(input) {\n  if (!input.file || !input.file.text) throw new Error('Give the statement file.');\n  const account = input.entries.Account.find((one) => one.title === input.params.account);\n  if (!account) throw new Error('Give the account by its title in params.account.');\n  const lines = input.file.text.trim().split(/\\r?\\n/).slice(1);\n  return lines.filter((line) => line.trim()).map((line, i) => {\n    const [date, label, amount] = line.split(';').map((part) => part.trim());\n    const value = Number(String(amount).replace(/\\s/g, '').replace(',', '.'));\n    return { create: { ref: 't' + i, kind: 'Transaction', title: label, data: { amount: Math.abs(value), date, direction: value < 0 ? 'out' : 'in', account: account.id } } };\n  });\n}"
+      }
+    }
+  ]
+}

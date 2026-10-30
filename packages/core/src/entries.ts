@@ -6,6 +6,7 @@ import { formulaValue } from './formula';
 import { checkPage } from './pages';
 import { checkRule, runRulesAfterSave, type Changed } from './rules';
 import { checkScript } from './scripts';
+import { checkView } from './views';
 import { dataInNewWords, KIND_RENAMES, modelInNewWords, ROLE_RENAMES } from './keywords';
 import {
   checkAgainst,
@@ -95,6 +96,7 @@ const SYSTEM_CHECKS: Record<string, (data: Record<string, unknown>) => unknown> 
   page: checkPage,
   rule: checkRule,
   script: checkScript,
+  view: checkView,
 };
 const checkSystem = (kind: string, data: Record<string, unknown>) =>
   SYSTEM_CHECKS[foldKind(kind)]?.(data);

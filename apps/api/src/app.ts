@@ -5,7 +5,6 @@ import {
   agenda,
   asPerson,
   calendarOwner,
-  DEFAULT_ZONE,
   clientSpaces,
   FILE_MAX_BYTES,
   get,
@@ -18,6 +17,7 @@ import {
   renderPage,
   renderRecord,
   useScriptRunner,
+  zoneOf,
 } from '@jarvis-os/core';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { Hono } from 'hono';
@@ -171,6 +171,8 @@ export function makeApp(settings: Settings) {
   app.get('/', (c) => c.redirect('/app'));
   app.get('/app', async (c) => {
     if (!(await sessionOf(c.req.raw))) return c.redirect(SIGN_IN_PAGE);
+    // Never kept by the browser: a new version reaches her at the next open.
+    c.header('cache-control', 'no-store');
     return c.html(appPage(langOf(c.req.header('accept-language'))));
   });
   app.get('/app/frame/:view/:id', async (c) => {
@@ -277,7 +279,8 @@ export function makeApp(settings: Settings) {
     const owner = await calendarOwner(db, key);
     if (!owner) return c.text(wordsOf(lang).calendarGone, 404);
     const now = new Date();
-    const { occurrences, name, series } = await asPerson(db, owner, async (tx) => {
+    const { occurrences, name, series, zone } = await asPerson(db, owner, async (tx) => {
+      const zone = await zoneOf(tx);
       const spaces = await spacesOf(tx);
       const occurrences = await agenda(
         tx,
@@ -302,19 +305,18 @@ export function makeApp(settings: Settings) {
               (day): day is string => typeof day === 'string' && /^\d{4}-\d{2}-\d{2}/.test(day),
             )
             .map((day) => day.slice(0, 10)),
-          timezone:
-            typeof data.timezone === 'string' && data.timezone ? data.timezone : DEFAULT_ZONE,
+          timezone: typeof data.timezone === 'string' && data.timezone ? data.timezone : zone,
           until: typeof data.until === 'string' ? data.until : null,
         });
       }
-      return { name: spaces.find((one) => one.personal)?.name ?? '', occurrences, series };
+      return { name: spaces.find((one) => one.personal)?.name ?? '', occurrences, series, zone };
     });
     const words = wordsOf(lang);
     return c.body(
       icsOf(occurrences, {
         name: fill(words.calendarName, { name }),
         now,
-        zone: DEFAULT_ZONE,
+        zone,
         proposed: words.calendarProposed,
         series,
       }),

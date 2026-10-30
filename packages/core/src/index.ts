@@ -172,3 +172,18 @@ export {
 } from './scripts';
 export { migrateKind, migrationSchema, type Migration, type MigrationReport } from './migrations';
 export { bundleSchema, exportApp, installApp, type Bundle, type InstallReport } from './bundles';
+export {
+  checkView,
+  filterFormula,
+  OPERATORS,
+  runView,
+  VIEW_KIND,
+  viewDataSchema,
+  viewsOf,
+  type Operator,
+  type ViewData,
+  type ViewField,
+  type ViewResult,
+} from './views';
+export { isZone, setZone, zoneOf } from './zone';
+export { createKey, KEY_PREFIX, keyOwner, keysOf, revokeKey, type PersonalKey } from './keys';

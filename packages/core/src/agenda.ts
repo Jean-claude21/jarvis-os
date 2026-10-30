@@ -3,6 +3,7 @@ import type pg from 'pg';
 import type { Actor, Tx } from './db';
 import { find, save } from './entries';
 import { DEFAULT_ZONE, inZone, minutesOf, nextTime, TIME_FIELDS, timeOf } from './time';
+import { zoneOf } from './zone';
 
 export { minutesOf, TIME_FIELDS } from './time';
 
@@ -64,11 +65,17 @@ interface Row {
 }
 
 /** The occurrences of one entry in [from, to). */
-export function occurrencesOf(row: Row, from: Date, to: Date, today: Date): Occurrence[] {
+export function occurrencesOf(
+  row: Row,
+  from: Date,
+  to: Date,
+  today: Date,
+  herZone = DEFAULT_ZONE,
+): Occurrence[] {
   const data = row.data;
   const status = typeof data.status === 'string' ? data.status : null;
   if (status && CANCELLED.has(status.toLowerCase())) return [];
-  const zone = typeof data.timezone === 'string' && data.timezone ? data.timezone : DEFAULT_ZONE;
+  const zone = typeof data.timezone === 'string' && data.timezone ? data.timezone : herZone;
   const base = {
     id: row.id,
     kind: row.kind,
@@ -183,7 +190,7 @@ export function occurrencesOf(row: Row, from: Date, to: Date, today: Date): Occu
 export async function agenda(
   tx: Tx,
   spaceIds: string[],
-  window: { from: Date; to: Date; today?: Date },
+  window: { from: Date; to: Date; today?: Date; zone?: string },
 ): Promise<Occurrence[]> {
   const { from, to } = window;
   if (!(to > from)) throw new Error('The end of the window must come after its start.');
@@ -198,8 +205,9 @@ export async function agenda(
     [spaceIds, TIME_FIELDS],
   );
   const today = window.today ?? new Date();
+  const zone = window.zone ?? (await zoneOf(tx));
   return rows
-    .flatMap((row) => occurrencesOf(row, from, to, today))
+    .flatMap((row) => occurrencesOf(row, from, to, today, zone))
     .sort((a, b) => a.start.localeCompare(b.start) || a.title.localeCompare(b.title));
 }
 

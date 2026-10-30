@@ -1,7 +1,8 @@
 import type pg from 'pg';
 import { asPerson, type Actor } from './db';
 import { get, save } from './entries';
-import { DEFAULT_ZONE, nextTime, timeOf } from './time';
+import { nextTime, timeOf } from './time';
+import { zoneOf } from './zone';
 
 // The watcher (spec 006): it tells her on time. A reminder is an entry « Reminder »: `at` (a time,
 // once) or `repeat` (five fields, again and again) on the clock of `timezone`; `message` what to say.
@@ -48,9 +49,13 @@ export async function watchOnce(
     const keeper = row.persons[0];
     if (!keeper) continue;
     const actor: Actor = { person: keeper, door: 'watcher' };
-    const entry = await asPerson(db, keeper, (tx) => get(tx, row.space_id, row.entry_id));
+    const [entry, herZone] = await asPerson(
+      db,
+      keeper,
+      async (tx) => [await get(tx, row.space_id, row.entry_id), await zoneOf(tx)] as const,
+    );
     if (!entry) continue;
-    const zone = typeof entry.data.timezone === 'string' ? entry.data.timezone : DEFAULT_ZONE;
+    const zone = typeof entry.data.timezone === 'string' ? entry.data.timezone : herZone;
     const repeat = typeof entry.data.repeat === 'string' ? entry.data.repeat : null;
     const write = (data: Record<string, unknown>) =>
       asPerson(db, keeper, (tx) =>

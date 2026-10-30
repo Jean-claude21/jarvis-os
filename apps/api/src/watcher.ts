@@ -14,6 +14,7 @@ import { parseArgs } from 'node:util';
 import type pg from 'pg';
 import { wordsOf } from './i18n';
 import { quickjsRunner } from './scripts';
+import { readTelegramLinks } from './telegram';
 import { settingsFor, type Branch } from './settings';
 
 /** How often the watcher looks: once a minute, the precision of a reminder. */
@@ -76,6 +77,12 @@ export function watch(
     running = true;
     try {
       const now = new Date();
+      // Who pressed « Start » with her code (spec 015), before telling anyone.
+      if (telegramToken) {
+        await readTelegramLinks(db, telegramToken, wordsOf('fr').channelLinked).catch((error) =>
+          console.warn('[watcher] telegram', (error as Error).message),
+        );
+      }
       onPass(await watchOnce(db, now, tell));
       // Her scheduled rules and « before » rules (spec 014), on the same clock.
       const rules = await runDueRules(db, now);

@@ -11,7 +11,7 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     };
   }
   const message = error instanceof Error ? error.message : String(error);
-  if (/^No (entry|change|stored file|routine|open invitation|member)/.test(message)) {
+  if (/^No (entry|change|stored file|routine|open invitation|member|key)/.test(message)) {
     return { status: 404, message };
   }
   if (
@@ -32,11 +32,32 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     // Rules, scripts, apps (spec 014).
     /^The script|^Script «|^Scripts cannot run|^Rule «|may not (write|change)|^No (rule|script|app) «|ships with Jarvis|needs an entry|^Give /.test(
       message,
-    )
+    ) ||
+    // Views, her settings, her keys (spec 015).
+    /^A « View » is|^No view |is not a time zone|^Telegram |^A key needs/.test(message)
   ) {
     return { status: 400, message };
   }
   // A Postgres error (a query she wrote, a policy): its own words, never a stack.
   if (typeof (error as { code?: unknown }).code === 'string') return { status: 400, message };
   return { status: 500, message: 'Something went wrong; it was logged.' };
+}
+
+/**
+ * What kind of refusal it is (spec 015), for the app to say it in her language: the sentence itself
+ * stays, written for the model, as the detail.
+ */
+export function codeOf(message: string): string | null {
+  const kinds: [RegExp, string][] = [
+    [/follows its model/, 'model'],
+    [/cannot go from|cannot go to|starts as/, 'workflow'],
+    [/» links (a|one)|»: no entry/, 'link'],
+    [/^Formula «/, 'formula'],
+    [/^A « \w+ » is/, 'shape'],
+    [/^The script|^Script «|may not (write|change)/, 'script'],
+    [/is not a time zone/, 'zone'],
+    [/^Telegram /, 'telegram'],
+    [/^No /, 'missing'],
+  ];
+  return kinds.find(([pattern]) => pattern.test(message))?.[1] ?? null;
 }

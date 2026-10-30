@@ -36,27 +36,32 @@ all. Run it again to take a change.
 
 ## Routes
 
-| Method | Path                                                         | Core function                                                                           |
-| ------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| GET    | `/api/me`                                                    | her account, her own space, all hers                                                    |
-| GET    | `/api/kinds`                                                 | `kinds`                                                                                 |
-| GET    | `/api/entries?text&kind&from&to&archived&limit`              | `find`                                                                                  |
-| GET    | `/api/entries/:id`                                           | `get`                                                                                   |
-| POST   | `/api/save`                                                  | `save`                                                                                  |
-| POST   | `/api/entries/:id/archive`                                   | `archive`                                                                               |
-| POST   | `/api/query` `{ sql }`                                       | `query`                                                                                 |
-| GET    | `/api/history?target&limit`                                  | `history`                                                                               |
-| POST   | `/api/undo` `{ journalId }`                                  | `undo`                                                                                  |
-| POST   | `/api/files` (multipart `file`, `title?`, `data?`, `links?`) | `addFile`                                                                               |
-| GET    | `/api/files/:id`                                             | the file's bytes                                                                        |
-| GET    | `/api/files/:id/link?seconds`                                | a link that opens it without a token                                                    |
-| GET    | `/api/now`                                                   | `attention`: to fix, late, proposed, today, this week; her day (spec 013)               |
-| GET    | `/api/files`                                                 | `filesOf`: her files with their links (spec 013); `/api/files/:id?download=1` downloads |
-| GET    | `/api/agenda?from&to`                                        | `agenda` over all her spaces (spec 011), this week by default                           |
-| GET    | `/api/pages?app`, `/api/pages/:id?<filters>&record`          | `pagesOf`; one page computed with `renderPage` (spec 014)                               |
-| GET    | `/api/apps`                                                  | the apps Jarvis ships (`src/apps/*.json`)                                               |
-| POST   | `/api/apps/install` (`name`, `dryRun`)                       | `installApp`, tried unless `dryRun` is false                                            |
-| POST   | `/api/agenda/address`                                        | a new private address for her phone's calendar; the old one stops                       |
+| Method | Path                                                                    | Core function                                                                           |
+| ------ | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| GET    | `/api/me`                                                               | her account, her own space, all hers                                                    |
+| GET    | `/api/kinds`                                                            | `kinds`                                                                                 |
+| GET    | `/api/entries?text&kind&from&to&archived&limit`                         | `find`                                                                                  |
+| GET    | `/api/entries/:id`                                                      | `get`                                                                                   |
+| POST   | `/api/save`                                                             | `save`                                                                                  |
+| POST   | `/api/entries/:id/archive`                                              | `archive`                                                                               |
+| POST   | `/api/query` `{ sql }`                                                  | `query`                                                                                 |
+| GET    | `/api/history?target&limit`                                             | `history`                                                                               |
+| POST   | `/api/undo` `{ journalId }`                                             | `undo`                                                                                  |
+| POST   | `/api/files` (multipart `file`, `title?`, `data?`, `links?`)            | `addFile`                                                                               |
+| GET    | `/api/files/:id`                                                        | the file's bytes                                                                        |
+| GET    | `/api/files/:id/link?seconds`                                           | a link that opens it without a token                                                    |
+| GET    | `/api/now`                                                              | `attention`: to fix, late, proposed, today, this week; her day (spec 013)               |
+| GET    | `/api/files`                                                            | `filesOf`: her files with their links (spec 013); `/api/files/:id?download=1` downloads |
+| GET    | `/api/agenda?from&to`                                                   | `agenda` over all her spaces (spec 011), this week by default                           |
+| GET    | `/api/pages?app`, `/api/pages/:id?<filters>&record`                     | `pagesOf`; one page computed with `renderPage` (spec 014)                               |
+| GET    | `/api/apps`                                                             | the apps Jarvis ships (`src/apps/*.json`)                                               |
+| POST   | `/api/apps/install` (`name`, `dryRun`)                                  | `installApp`, tried unless `dryRun` is false                                            |
+| POST   | `/api/apps/area` (`app`, `area`)                                        | files an app in an area (spec 015)                                                      |
+| GET    | `/api/views?kind&app`, POST `/api/views/run` (`id`, `view`)             | `viewsOf`; `runView` (spec 015)                                                         |
+| GET    | `/api/me/zone`, POST `/api/me/zone` (`zone`)                            | her time zone                                                                           |
+| POST   | `/api/me/telegram`                                                      | a link to the bot with a code made for her (`JARVIS_TELEGRAM_BOT_TOKEN`)                |
+| GET    | `/api/me/keys`, POST `/api/me/keys` (`name`), DELETE `/api/me/keys/:id` | personal keys; `Authorization: Bearer jos_…` then acts as her                           |
+| POST   | `/api/agenda/address`                                                   | a new private address for her phone's calendar; the old one stops                       |
 
 Every route acts in the space named by `?space=` (an id or a name) or the `x-jarvis-space` header,
 else in her own; `/api/query` reads all her spaces unless one is named (spec 004).
@@ -152,6 +157,7 @@ id); `query` reads all of them, `my_entries.space` naming each row's.
 | `migrate`        | rename, set, remove a field across a kind, tried by default          |
 | `app_export`     | an app as a bundle: models, pages, rules, scripts                    |
 | `app_install`    | a shipped app (Finances, Routines) or a bundle, tried by default     |
+| `view`           | a view run: filters (one link away), sort, columns, kanban, calendar |
 
 A document's reading link, `/document/:token` (a day, one document), is a page to read and print as
 PDF; `?format=md` gives its Markdown file.

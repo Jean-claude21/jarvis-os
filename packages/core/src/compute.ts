@@ -1,6 +1,7 @@
 import type { Tx } from './db';
 import { evaluate, parse, type Clock, type Node, type Scope } from './formula';
 import { MODEL_KIND, modelsOf, type Model, type ModelField } from './models';
+import { zoneOf } from './zone';
 
 // What an app reads (spec 014): an entry seen through its model — its fields, its relations both
 // ways, its lines, and its formulas computed now, never stored. One `Reader` per request keeps the
@@ -276,8 +277,10 @@ export class Reader {
 export async function readerOf(
   tx: Tx,
   spaceId: string,
-  clock: Clock = { now: new Date() },
+  given: Clock = { now: new Date() },
 ): Promise<Reader> {
+  // « today » is on her clock unless the caller says which.
+  const clock = given.zone ? given : { ...given, zone: await zoneOf(tx) };
   const reader = new Reader(tx, spaceId, clock);
   await reader.load();
   return reader;

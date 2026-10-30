@@ -167,6 +167,27 @@ body { background: var(--clay); }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 120px); opacity: 0; transition: .2s; background: var(--ink); color: var(--paper); padding: 10px 14px; border-radius: 2px; display: flex; gap: 14px; align-items: center; z-index: 30; font-size: 13px; max-width: calc(100vw - 32px); }
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
 .toast button { background: none; border: 0; color: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; padding: 0; }
+.vbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.vbar .grow { flex: 1; }
+.vbar .vsel { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--bark); }
+.vbar select { padding: 5px 6px; }
+.seg { display: inline-flex; border: 1px solid var(--rule-strong); border-radius: 2px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; padding: 6px 10px; }
+.chip .x { border: 0; background: transparent; color: var(--bark); padding: 0 2px; cursor: pointer; font-size: 12px; }
+th.sortable { cursor: pointer; user-select: none; }
+.kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(170px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.kcol { background: var(--sand); border: 1px solid var(--rule); padding: 8px; min-height: 90px; }
+.kcol.over { outline: 2px dashed var(--primary); }
+.kcard { display: block; background: var(--paper); border: 1px solid var(--rule); padding: 7px 9px; margin-top: 6px; color: var(--ink); text-decoration: none; cursor: grab; }
+.cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+.cday { min-height: 78px; border: 1px solid var(--rule); padding: 4px; display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.cday.off { border-color: transparent; }
+.cday.today { outline: 2px solid var(--primary); }
+.cev { font-size: 12px; background: var(--clay); color: var(--ink); padding: 1px 4px; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+label.check { display: flex; gap: 8px; align-items: center; padding: 5px 0; }
+@media (max-width: 640px) { .cday { min-height: 54px; } .cev { font-size: 10.5px; } }
+details.area summary { cursor: pointer; list-style: none; margin: 8px 0 2px; }
+details.area summary::-webkit-details-marker { display: none; }
 .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--rule); overflow-x: auto; margin-bottom: 14px; }
 .tabs a { padding: 8px 12px; text-decoration: none; color: var(--bark); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; font-size: 13.5px; }
 .tabs a.on { color: var(--ink); border-color: var(--primary); font-weight: 600; }
@@ -242,7 +263,11 @@ async function api(path, options) {
   const response = await fetch('/api' + path, opts);
   if (response.status === 401) { location.href = '/connexion'; throw new Error('401'); }
   const data = response.headers.get('content-type')?.includes('json') ? await response.json() : null;
-  if (!response.ok) throw new Error((data && data.error) || response.status);
+  if (!response.ok) {
+    // A refusal she can read (spec 015): its kind in her language, the model's sentence as the detail.
+    const known = data && data.code && W['err_' + data.code];
+    throw new Error(known ? known + ' — ' + data.error : (data && data.error) || response.status);
+  }
   return data;
 }
 const inSpace = (path) => path + (path.includes('?') ? '&' : '?') + 'space=' + encodeURIComponent(space);
@@ -297,13 +322,26 @@ function dayLater(text) {
 const clock = () => { const el = document.getElementById('clock'); if (el) el.textContent = new Date().toLocaleString(locale, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase(); };
 setInterval(clock, 30000);
 let pick = null;
+// The views she is exploring, by kind or kept view; the one on screen.
+const explorers = {};
+let explorerNow = null;
 let reading = false;
+// The kinds of her space, kept by drawApps: a kind shows its label, not its technical name.
+let knownKinds = [];
+const kindName = (name) => { const k = knownKinds.find((one) => one.kind === name); return k ? kindLabel(k) : name; };
+const areaOfApp = (kinds, app) => { const k = kinds.find((one) => one.model && one.model.app === app && one.model.area); return k ? k.model.area : ''; };
 async function drawApps() {
   const kinds = await api(inSpace('/kinds'));
+  knownKinds = kinds;
   const appPages = await api(inSpace('/pages'));
   const apps = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app).concat(appPages.filter((p) => p.app).map((p) => p.app)))];
+  // Apps grouped by the area she files them in (spec 015); those not filed last.
+  const groups = {};
+  for (const a of apps) (groups[areaOfApp(kinds, a) || ''] = groups[areaOfApp(kinds, a) || ''] || []).push(a);
+  const names = Object.keys(groups).sort((x, y) => (x === '') - (y === '') || x.localeCompare(y));
+  const link = (a) => '<a class="navi" data-app="' + esc(encodeURIComponent(a)) + '" href="#/app/' + esc(encodeURIComponent(a)) + '"><span class="app-dot">' + esc(a.slice(0, 1).toUpperCase()) + '</span><span>' + esc(a) + '</span></a>';
   document.getElementById('apps').innerHTML = '<div class="caps">' + esc(W.navApps) + '</div>' +
-    apps.map((a) => '<a class="navi" data-app="' + esc(encodeURIComponent(a)) + '" href="#/app/' + esc(encodeURIComponent(a)) + '"><span class="app-dot">' + esc(a.slice(0, 1).toUpperCase()) + '</span><span>' + esc(a) + '</span></a>').join('') +
+    (names.length === 1 && names[0] === '' ? groups[''].map(link).join('') : names.map((n) => '<details class="area" open><summary class="caps">' + esc(n || W.unfiled) + '</summary>' + groups[n].map(link).join('') + '</details>').join('')) +
     '<a class="navi ghost" href="#/app">' + ICON_PLUS + '<span>' + esc(W.newApp) + '</span></a>';
 }
 
@@ -341,7 +379,7 @@ const pages = {
     const list = items.length ? groups.map((g) => {
       const rows = items.filter((i) => i.group === g);
       return rows.length ? '<div class="gt">' + esc(W['g_' + g]) + ' · ' + rows.length + '</div>' + rows.map((i) =>
-        '<button class="row' + (sel && i.id === sel.id ? ' on' : '') + '" data-pick="' + esc(i.id) + '"><span><div class="t">' + esc(i.title) + '</div><div class="s">' + esc(i.kind + ' · ' + i.space + (i.when ? ' · ' + when(i) : '')) + '</div></span><span class="tag ' + esc(g) + '">' + esc(W['r_' + i.reason] || i.reason) + '</span></button>').join('') : '';
+        '<button class="row' + (sel && i.id === sel.id ? ' on' : '') + '" data-pick="' + esc(i.id) + '"><span><div class="t">' + esc(i.title) + '</div><div class="s">' + esc(kindName(i.kind) + ' · ' + i.space + (i.when ? ' · ' + when(i) : '')) + '</div></span><span class="tag ' + esc(g) + '">' + esc(W['r_' + i.reason] || i.reason) + '</span></button>').join('') : '';
     }).join('') : '<p class="empty">' + esc(W.allClear) + '</p>';
     let detail = '<div class="pane"><div class="pb pad"><p class="empty">' + esc(W.allClear) + '</p></div></div>';
     if (sel) {
@@ -358,7 +396,7 @@ const pages = {
         acts.push(['cancel', W.a_cancel, W.a_cancelWhy]);
       }
       detail = '<button class="quiet back" data-back>← ' + esc(W.back) + '</button>' +
-        '<section class="pane"><div class="ph"><span>' + esc(sel.kind + ' · ' + W['g_' + sel.group]) + '</span><span class="tag ' + esc(sel.group) + '">' + esc(W['r_' + sel.reason] || sel.reason) + '</span></div><div class="pb pad subject">' +
+        '<section class="pane"><div class="ph"><span>' + esc(kindName(sel.kind) + ' · ' + W['g_' + sel.group]) + '</span><span class="tag ' + esc(sel.group) + '">' + esc(W['r_' + sel.reason] || sel.reason) + '</span></div><div class="pb pad subject">' +
         '<div class="caps">' + esc(sel.space) + '</div><h2>' + esc(e.title) + '</h2>' + (sel.when ? '<p class="muted" style="margin:0 0 10px">' + esc(when(sel)) + '</p>' : '') +
         (typeof e.data.text === 'string' ? '<p style="margin:0 0 10px">' + esc(e.data.text.slice(0, 400)) + (e.data.text.length > 400 ? '…' : '') + '</p>' : '') +
         fields.map((f) => '<div class="field-row"><span class="caps">' + esc(f) + '</span><span>' + esc(value(e.data[f])) + '</span>' + originBadge(e.origin[f] || 'said') + '</div>').join('') +
@@ -380,7 +418,7 @@ const pages = {
       const apps = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app))];
       const shipped = await api('/apps');
       return '<p class="lead">' + esc(W.appsLead) + '</p>' +
-        (apps.length ? '<section class="grid">' + apps.map((a) => card(a, '<a class="link" href="#/app/' + esc(encodeURIComponent(a)) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>' : '') +
+        (apps.length ? '<section class="grid">' + apps.map((a) => card(a, '<p class="muted">' + esc(areaOfApp(kinds, a) || W.unfiled) + '</p><div class="actions"><a class="link" href="#/app/' + esc(encodeURIComponent(a)) + '">' + esc(W.open) + ' →</a><button class="quiet" data-area="' + esc(a) + '">' + esc(W.fileIn) + '</button></div>')).join('') + '</section>' : '') +
         '<h2 style="margin:22px 0 10px">' + esc(W.shippedApps) + '</h2><section class="grid">' + shipped.map((a) => card(a.app, '<p class="muted">' + esc(tr(a.description)) + '</p><div class="actions">' +
           (apps.includes(a.app) ? '<span class="badge said">' + esc(W.installed) + '</span>' : '<button data-install="' + esc(a.app) + '">' + esc(W.install) + '</button>') + '</div>')).join('') + '</section>' +
         card(W.newApp, '<p class="muted">' + esc(W.newAppHow) + '</p>', true);
@@ -388,44 +426,83 @@ const pages = {
     const models = kinds.filter((k) => k.model && k.model.app === name);
     const appPages = await api(inSpace('/pages?app=' + encodeURIComponent(name)));
     if (!models.length && !appPages.length) return empty(W.noApp);
-    const pageTabs = appPages.map((p) => '<a class="' + (p.id === params.get('page') || (!params.get('page') && !params.get('kind') && p === appPages[0]) ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?page=' + esc(encodeURIComponent(p.id)) + '">' + esc(tr(p.label) || p.title) + '</a>').join('');
+    const pageTabs = appPages.map((p) => '<a class="' + (p.id === params.get('page') || (!params.get('page') && !params.get('kind') && !params.get('view') && p === appPages[0]) ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?page=' + esc(encodeURIComponent(p.id)) + '">' + esc(tr(p.label) || p.title) + '</a>').join('');
     const kindTabs = (on) => models.map((k) => '<a class="' + (k.kind === on ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '">' + esc(kindLabel(k)) + ' <span class="muted num">' + k.count + '</span></a>').join('');
-    const shownPage = params.get('page') ? appPages.find((p) => p.id === params.get('page')) : !params.get('kind') ? appPages[0] : null;
+    const shownPage = params.get('page') ? appPages.find((p) => p.id === params.get('page')) : !params.get('kind') && !params.get('view') ? appPages[0] : null;
     if (shownPage) {
       const q = new URLSearchParams(params); q.delete('page'); q.set('space', space);
-      return '<nav class="tabs">' + pageTabs + kindTabs(null) + '</nav>' + frame('/app/frame/page/' + encodeURIComponent(shownPage.id) + '?' + q.toString());
+      return '<nav class="tabs">' + pageTabs + kindTabs(null) + (await api(inSpace('/views?app=' + encodeURIComponent(name)))).map((v) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?view=' + esc(encodeURIComponent(v.id)) + '">' + esc(tr(v.label) || v.title) + '</a>').join('') + '</nav>' + frame('/app/frame/page/' + encodeURIComponent(shownPage.id) + '?' + q.toString());
     }
-    const current = models.find((k) => k.kind === params.get('kind')) || models[0];
-    const model = current.model;
-    const shown = model.fields.filter((c) => !['link', 'lines', 'list'].includes(c.type));
-    const cols = (model.columns && model.columns.length ? model.columns : shown.slice(0, 5).map((c) => c.name)).filter((c) => c !== 'title');
-    const natureOf = (n) => { const f = model.fields.find((c) => c.name === n) || {}; return f.type === 'formula' ? 'number' : f.type; };
-    const valueOf = (e, n) => e.computed && n in e.computed ? e.computed[n] : e.data[n];
-    const list = await api(inSpace('/entries?limit=200&kind=' + encodeURIComponent(current.kind)));
-    const fmt = (n, v) => {
-      if (v === undefined || v === null) return '<span class="muted">—</span>';
-      if (typeof v === 'number' || natureOf(n) === 'amount' || natureOf(n) === 'number') return '<span class="num ' + (v < 0 ? 'neg' : '') + '">' + esc(num(v)) + '</span>';
-      if (natureOf(n) === 'boolean' || typeof v === 'boolean') return v ? '✓' : '—';
-      return esc(typeof v === 'object' ? JSON.stringify(v) : optionLabelOf(model, n, v));
+    // Her views (spec 015): the entries of a kind, filtered, sorted, as a table, a kanban or a calendar.
+    const views = await api(inSpace('/views?app=' + encodeURIComponent(name)));
+    const viewTabs = (on) => views.map((v) => '<a class="' + (v.id === on ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?view=' + esc(encodeURIComponent(v.id)) + '">' + esc(tr(v.label) || v.title) + '</a>').join('');
+    const saved = params.get('view') ? views.find((v) => v.id === params.get('view')) : null;
+    const current = saved ? models.find((k) => k.kind === saved.kind) || models[0] : models.find((k) => k.kind === params.get('kind')) || models[0];
+    const fallback = !saved && !params.get('kind') ? null : views.find((v) => v.kind === current.kind && v.default);
+    const key = saved ? 'v:' + saved.id : 'k:' + current.kind;
+    const st = explorers[key] || (explorers[key] = { id: saved ? saved.id : fallback ? fallback.id : null, view: saved || fallback ? {} : { kind: current.kind }, month: new Date().toISOString().slice(0, 7) });
+    const r = await api(inSpace('/views/run'), { method: 'POST', body: { id: st.id || undefined, view: st.view } });
+    explorerNow = { key, st, r, name, kind: current.kind, model: current.model };
+    const fl = (path) => {
+      const f = r.fields.find((x) => x.path === path);
+      if (path === 'title') return W.title;
+      if (!f) return path;
+      if (f.via && path.indexOf('.') > 0) {
+        const link = r.fields.find((x) => x.path === path.split('.')[0]);
+        const head = link && link.label ? tr(link.label) : path.split('.')[0];
+        return path.endsWith('.title') ? head : head + ' › ' + (f.label ? tr(f.label) : path.split('.').slice(1).join('.'));
+      }
+      return f.label ? tr(f.label) : path;
     };
-    const groupOf = (e) => {
-      if (!model.groupBy) return '';
-      const v = valueOf(e, model.groupBy);
-      if (typeof v === 'string' && v.length >= 7 && v.charAt(4) === '-') return v.slice(0, 7);
-      return v === undefined ? '—' : String(v);
+    const ol = (path, v) => { const f = r.fields.find((x) => x.path === path); return f && f.optionLabels && typeof v === 'string' && f.optionLabels[v] ? tr(f.optionLabels[v]) : v; };
+    const show = (path, v) => {
+      if (v === undefined || v === null || v === '') return '<span class="muted">—</span>';
+      if (typeof v === 'number') return '<span class="num ' + (v < 0 ? 'neg' : '') + '">' + esc(num(v)) + '</span>';
+      if (typeof v === 'boolean') return v ? '✓' : '—';
+      return esc(Array.isArray(v) ? v.join(', ') : ol(path, v));
     };
-    const groups = [...new Set(list.map(groupOf))].sort().reverse();
-    const sum = (rows) => rows.reduce((t, e) => t + (typeof valueOf(e, model.total) === 'number' ? valueOf(e, model.total) : 0), 0);
-    const totalRow = (rows, label) => model.total ? '<tr class="total"><td>' + esc(label) + '</td>' + cols.map((c) => '<td class="' + (c === model.total ? 'n num' : '') + '">' + (c === model.total ? esc(num(sum(rows))) : '') + '</td>').join('') + '</tr>' : '';
-    const body = groups.map((g) => {
-      const rows = list.filter((e) => groupOf(e) === g);
-      return (g ? '<tr class="group"><td colspan="' + (cols.length + 1) + '">' + esc(g) + '</td></tr>' : '') +
-        rows.map((e) => '<tr data-go="#/entree/' + esc(e.id) + '"><td>' + esc(e.title) + '</td>' + cols.map((c) => '<td class="' + (['amount', 'number'].includes(natureOf(c)) ? 'n' : '') + '">' + fmt(c, valueOf(e, c)) + '</td>').join('') + '</tr>').join('') +
-        (g && model.total ? totalRow(rows, say(W.subtotal, { group: g })) : '');
-    }).join('') + totalRow(list, W.total);
-    const tabs = '<nav class="tabs">' + pageTabs + kindTabs(current.kind) + '</nav>';
-    return '<div class="head"><div><p class="lead" style="margin:0">' + esc(say(W.appLead, { n: models.length })) + '</p></div><div class="actions"><button class="quiet" data-model="' + esc(current.kind) + '">' + esc(W.seeModel) + '</button><button data-add="' + esc(current.kind) + '">' + esc(say(W.addOne, { kind: kindLabel(current) })) + '</button></div></div>' + tabs +
-      card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th>' + cols.map((c) => '<th class="' + (['amount', 'number'].includes(natureOf(c)) ? 'n' : '') + '">' + esc(fieldLabelOf(model, c)) + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>' : empty(), true);
+    const v = r.view;
+    const isNum = (c) => c in r.totals || r.rows.some((row) => typeof row[c] === 'number');
+    const types = '<div class="seg">' + r.types.map((t) => '<button class="' + (t === r.type ? 'on' : 'quiet') + '" data-vtype="' + t + '">' + esc(W['vt_' + t]) + '</button>').join('') + '</div>';
+    const chips = v.filters.map((f, i) => '<span class="chip">' + esc(fl(f.field)) + ' <small>' + esc(W['op_' + f.op]) + '</small> ' + (['empty', 'not_empty', 'this_month'].includes(f.op) ? '' : esc(ol(f.field, f.value))) + ' <button class="x" data-vdel="' + i + '" aria-label="' + esc(W.remove) + '">✕</button></span>').join('');
+    const sortField = v.sort[0] ? v.sort[0].field : '';
+    const options = (sel, withNone) => (withNone ? '<option value="">' + esc(W.none) + '</option>' : '') + r.fields.filter((f) => !(f.via && f.path.endsWith('.title'))).map((f) => '<option value="' + esc(f.path) + '"' + (f.path === sel ? ' selected' : '') + '>' + esc(fl(f.path)) + '</option>').join('');
+    const bar = '<div class="vbar">' + types +
+      '<button class="quiet" data-vfilter>+ ' + esc(W.filter) + '</button>' + chips +
+      '<label class="vsel">' + esc(W.sortBy) + ' <select data-vsort>' + options(sortField, true) + '</select></label>' +
+      (sortField ? '<button class="quiet" data-vdir>' + (v.sort[0].desc ? '↓' : '↑') + '</button>' : '') +
+      (r.type === 'table' ? '<label class="vsel">' + esc(W.groupBy) + ' <select data-vgroup>' + options(v.groupBy || '', true) + '</select></label><button class="quiet" data-vcols>' + esc(W.columns) + '</button>' : '') +
+      '<span class="grow"></span>' +
+      (st.id ? '<button class="quiet" data-vupdate>' + esc(W.updateView) + '</button>' : '') + '<button class="quiet" data-vsave>' + esc(W.saveView) + '</button></div>';
+    let body = '';
+    if (r.type === 'table') {
+      const cols = r.columns;
+      const head = '<tr>' + cols.map((c) => '<th class="sortable ' + (isNum(c) ? 'n' : '') + '" data-vhead="' + esc(c) + '">' + esc(fl(c)) + (c === sortField ? (v.sort[0].desc ? ' ↓' : ' ↑') : '') + '</th>').join('') + '</tr>';
+      const line = (row) => '<tr data-go="#/entree/' + esc(row.id) + '">' + cols.map((c) => '<td class="' + (isNum(c) ? 'n' : '') + '">' + (c === 'title' ? esc(row.title) : show(c, row[c])) + '</td>').join('') + '</tr>';
+      const total = (rows, label) => Object.keys(r.totals).length ? '<tr class="total">' + cols.map((c, i) => '<td class="' + (isNum(c) ? 'n num' : '') + '">' + (i === 0 ? esc(label) : c in r.totals ? esc(num(rows.reduce((t, x) => t + (typeof x[c] === 'number' ? x[c] : 0), 0))) : '') + '</td>').join('') + '</tr>' : '';
+      const rowsHtml = r.groups ? r.groups.map((g) => '<tr class="group"><td colspan="' + cols.length + '">' + esc(ol(v.groupBy, g.name)) + ' · ' + g.rows.length + '</td></tr>' + g.rows.map(line).join('') + total(g.rows, say(W.subtotal, { group: ol(v.groupBy, g.name) }))).join('') : r.rows.map(line).join('');
+      body = r.rows.length ? '<div class="scroll"><table class="rows"><thead>' + head + '</thead><tbody>' + rowsHtml + total(r.rows, W.total) + '</tbody></table></div>' + (r.truncated ? '<p class="muted">' + esc(W.more) + '</p>' : '') : empty();
+    } else if (r.type === 'kanban') {
+      body = '<div class="kanban">' + r.kanban.columns.map((c) => '<div class="kcol" data-vdrop="' + esc(c.name) + '"><div class="caps">' + esc(ol(r.kanban.by, c.name)) + ' · ' + c.items.length + '</div>' +
+        c.items.map((i) => '<a class="kcard" draggable="true" data-vcard="' + esc(i.id) + '" href="#/entree/' + esc(i.id) + '">' + esc(i.title) + '</a>').join('') + '</div>').join('') + '</div><p class="muted">' + esc(W.dragHint) + '</p>';
+    } else {
+      const [y, m] = st.month.split('-').map(Number);
+      const first = new Date(Date.UTC(y, m - 1, 1));
+      const lead = (first.getUTCDay() + 6) % 7;
+      const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      const cells = [];
+      for (let i = 0; i < lead; i++) cells.push('<div class="cday off"></div>');
+      for (let d = 1; d <= days; d++) {
+        const day = st.month + '-' + String(d).padStart(2, '0');
+        const items = r.calendar.items.filter((i) => i.day === day);
+        cells.push('<div class="cday' + (day === new Date().toISOString().slice(0, 10) ? ' today' : '') + '"><span class="num muted">' + d + '</span>' + items.map((i) => '<a class="cev" href="#/entree/' + esc(i.id) + '">' + esc(i.title) + '</a>').join('') + '</div>');
+      }
+      body = '<div class="vbar"><button class="quiet" data-vmonth="-1">←</button><b>' + esc(first.toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })) + '</b><button class="quiet" data-vmonth="1">→</button></div>' +
+        '<div class="cal">' + W.weekdays.split(',').map((d) => '<div class="caps">' + esc(d) + '</div>').join('') + cells.join('') + '</div>';
+    }
+    const tabs = '<nav class="tabs">' + pageTabs + kindTabs(saved ? null : current.kind) + viewTabs(saved ? saved.id : null) + '</nav>';
+    return '<div class="head"><div><p class="lead" style="margin:0">' + esc(saved ? tr(saved.label) || saved.title : kindLabel(current)) + ' · ' + r.rows.length + '</p></div><div class="actions"><button class="quiet" data-model="' + esc(current.kind) + '">' + esc(W.seeModel) + '</button><button data-add="' + esc(current.kind) + '">' + esc(say(W.addOne, { kind: kindLabel(current) })) + '</button></div></div>' + tabs +
+      card('', bar + body, true);
   },
 
   // Her files (spec 013): what each is, what Jarvis read of it, what it is linked to.
@@ -492,7 +569,7 @@ const pages = {
     }
     const link = (l, dir) => '<li><span>' + (dir === 'out' ? '→ ' : '← ') + '<span class="muted">' + esc(l.role) + '</span> <a class="link" href="#/entree/' + esc(l.entry.id) + '">' + esc(l.entry.title) + '</a></span><span class="badge">' + esc(l.entry.kind) + '</span></li>';
     const links = e.links.out.map((l) => link(l, 'out')).concat(e.links.in.map((l) => link(l, 'in')));
-    return '<div class="head"><div><div class="caps">' + esc(e.kind) + (e.archivedAt ? ' · ' + esc(W.archived) : '') + '</div><h1>' + esc(e.title) + '</h1>' +
+    return '<div class="head"><div><div class="caps">' + esc(kindName(e.kind)) + (e.archivedAt ? ' · ' + esc(W.archived) : '') + '</div><h1>' + esc(e.title) + '</h1>' +
       (e.data.source ? '<div class="meta muted">' + esc(say(W.source, { path: e.data.source })) + '</div>' : '') + '</div>' +
       '<div class="actions">' + (e.archivedAt ? '' : '<button class="quiet" id="aside">' + esc(W.setAside) + '</button>') + '</div></div>' +
       '<section class="grid">' +
@@ -628,9 +705,20 @@ const pages = {
   },
 
   async compte () {
-    return card(W.accountTitle, '<div class="field-row"><span class="caps">' + esc(W.name) + '</span><span>' + esc(me.person.name) + '</span><span></span></div>' +
+    // Her zone and her Telegram (spec 015), beside who she is.
+    const { zone } = await api('/me/zone');
+    const channel = (await api('/entries?kind=Channel&limit=1&space=' + encodeURIComponent(me.space.id)))[0];
+    const zones = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [zone];
+    const keys = await api('/me/keys');
+    return '<section class="grid">' + card(W.accountTitle, '<div class="field-row"><span class="caps">' + esc(W.name) + '</span><span>' + esc(me.person.name) + '</span><span></span></div>' +
       '<div class="field-row"><span class="caps">' + esc(W.email) + '</span><span>' + esc(me.person.email) + '</span><span></span></div>' +
-      '<div class="actions" style="margin-top:14px"><button class="quiet" id="sign-out">' + esc(W.signOut) + '</button></div>');
+      '<div class="actions" style="margin-top:14px"><button class="quiet" id="sign-out">' + esc(W.signOut) + '</button></div>') +
+      card(W.zoneTitle, '<p class="muted">' + esc(W.zoneLead) + '</p><div class="form-field"><select id="zone">' + zones.map((z) => '<option' + (z === zone ? ' selected' : '') + '>' + esc(z) + '</option>').join('') + '</select></div>') +
+      card(W.telegramTitle, '<p class="badge ' + (channel && channel.data.telegram ? 'said' : 'error') + '" style="white-space:normal">' + esc(channel && channel.data.telegram ? W.channelOn : W.channelOff) + '</p><p class="muted">' + esc(W.telegramLead) + '</p><div id="tg"></div><div class="actions"><button id="tg-link">' + esc(channel && channel.data.telegram ? W.telegramAgain : W.telegramLink) + '</button></div>') +
+      card(W.keysTitle, '<p class="muted">' + esc(W.keysLead) + '</p><div id="newkey"></div>' +
+        (keys.length ? '<ul class="list">' + keys.map((k) => '<li><span>' + esc(k.name) + ' <span class="muted">· ' + esc(say(W.keyMade, { day: day(k.createdAt) })) + (k.lastUsedAt ? ' · ' + esc(say(W.keyUsed, { day: day(k.lastUsedAt) })) : '') + '</span></span><button class="quiet" data-revoke="' + esc(k.id) + '">' + esc(W.keyRevoke) + '</button></li>').join('') + '</ul>' : '') +
+        '<div class="actions"><button id="key-new">' + esc(W.keyNew) + '</button></div>') +
+      '</section>';
   },
 };
 
@@ -728,6 +816,82 @@ function bind() {
       } catch (error) { report.innerHTML = '<p class="error-text">' + esc(say(W.failed, { reason: error.message })) + '</p>'; event.target.disabled = false; }
     });
   }
+  // Her views (spec 015): each change runs the view again; saving keeps it as an entry « View ».
+  const ex = explorerNow;
+  const change = (patch) => { if (!ex) return; Object.assign(ex.st.view, patch(Object.assign({ filters: [], sort: [] }, ex.r.view))); show(); };
+  root.querySelectorAll('[data-vtype]').forEach((b) => b.addEventListener('click', () => change(() => ({ type: b.dataset.vtype }))));
+  root.querySelectorAll('[data-vdel]').forEach((b) => b.addEventListener('click', () => change((v) => ({ filters: v.filters.filter((_, i) => i !== Number(b.dataset.vdel)) }))));
+  root.querySelectorAll('[data-vsort]').forEach((s) => s.addEventListener('change', () => change(() => ({ sort: s.value ? [{ field: s.value, desc: false }] : [] }))));
+  root.querySelectorAll('[data-vdir]').forEach((b) => b.addEventListener('click', () => change((v) => ({ sort: v.sort.length ? [{ field: v.sort[0].field, desc: !v.sort[0].desc }] : [] }))));
+  root.querySelectorAll('[data-vhead]').forEach((th) => th.addEventListener('click', () => change((v) => ({ sort: [{ field: th.dataset.vhead, desc: v.sort[0] && v.sort[0].field === th.dataset.vhead ? !v.sort[0].desc : false }] }))));
+  root.querySelectorAll('[data-vgroup]').forEach((s) => s.addEventListener('change', () => change(() => ({ groupBy: s.value || undefined }))));
+  root.querySelectorAll('[data-vmonth]').forEach((b) => b.addEventListener('click', () => {
+    const [y, m] = ex.st.month.split('-').map(Number); const d = new Date(Date.UTC(y, m - 1 + Number(b.dataset.vmonth), 1));
+    ex.st.month = d.toISOString().slice(0, 7); show();
+  }));
+  root.querySelectorAll('[data-vfilter]').forEach((b) => b.addEventListener('click', () => {
+    const fieldOf = (path) => ex.r.fields.find((f) => f.path === path) || { type: 'text' };
+    const opsFor = (t) => ['amount', 'number', 'formula'].includes(t) ? ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'empty', 'not_empty']
+      : ['date', 'datetime'].includes(t) ? ['eq', 'gt', 'lt', 'this_month', 'last_days', 'empty', 'not_empty']
+      : t === 'choice' ? ['eq', 'ne', 'empty', 'not_empty'] : t === 'boolean' ? ['eq'] : ['contains', 'not_contains', 'eq', 'ne', 'empty', 'not_empty'];
+    const label = (f) => { const path = f.via && f.path.endsWith('.title') ? f.path.slice(0, -6) : f.path; const o = document.querySelector('[data-vsort] option[value="' + CSS.escape(path) + '"]'); return o ? o.textContent : f.path; };
+    openDrawer(W.filter, '<div class="form-field"><label>' + esc(W.field) + '</label><select id="vf_field">' + ex.r.fields.filter((f) => f.type !== 'link').map((f) => '<option value="' + esc(f.path) + '">' + esc(label(f)) + '</option>').join('') + '</select></div>' +
+      '<div class="form-field"><label>' + esc(W.condition) + '</label><select id="vf_op"></select></div><div class="form-field" id="vf_valuebox"><label>' + esc(W.value) + '</label><span id="vf_value"></span></div>',
+      '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button id="vf_apply">' + esc(W.apply) + '</button>');
+    const field = document.getElementById('vf_field'), op = document.getElementById('vf_op');
+    const refresh = () => {
+      const f = fieldOf(field.value);
+      op.innerHTML = opsFor(f.type).map((o) => '<option value="' + o + '">' + esc(W['op_' + o]) + '</option>').join('');
+      const value = () => {
+        const box = document.getElementById('vf_value');
+        document.getElementById('vf_valuebox').style.display = ['empty', 'not_empty', 'this_month'].includes(op.value) ? 'none' : '';
+        box.innerHTML = f.type === 'choice' ? '<select id="vf_v">' + (f.options || []).map((o) => '<option value="' + esc(o) + '">' + esc(f.optionLabels && f.optionLabels[o] ? tr(f.optionLabels[o]) : o) + '</option>').join('') + '</select>'
+          : f.type === 'boolean' ? '<select id="vf_v"><option value="true">✓</option><option value="false">—</option></select>'
+          : '<input id="vf_v" type="' + (op.value === 'last_days' || ['amount', 'number', 'formula'].includes(f.type) ? 'number' : ['date', 'datetime'].includes(f.type) ? 'date' : 'text') + '" step="any">';
+      };
+      op.onchange = value; value();
+    };
+    field.onchange = refresh; refresh();
+    document.getElementById('vf_apply').addEventListener('click', () => {
+      const f = fieldOf(field.value); const el = document.getElementById('vf_v'); let value = el ? el.value : undefined;
+      if (f.type === 'boolean') value = value === 'true';
+      else if (value !== undefined && value !== '' && (op.value === 'last_days' || ['amount', 'number', 'formula'].includes(f.type))) value = Number(value);
+      closeDrawer(); change((v) => ({ filters: v.filters.concat([{ field: field.value, op: op.value, ...(value === undefined || value === '' ? {} : { value }) }]) }));
+    });
+  }));
+  root.querySelectorAll('[data-vcols]').forEach((b) => b.addEventListener('click', () => {
+    const on = new Set(ex.r.columns);
+    const label = (f) => { const o = document.querySelector('[data-vsort] option[value="' + CSS.escape(f.path) + '"]'); return o ? o.textContent : f.path; };
+    openDrawer(W.columns, ex.r.fields.filter((f) => f.path !== 'title').map((f) => '<label class="check"><input type="checkbox" value="' + esc(f.path) + '"' + (on.has(f.path) ? ' checked' : '') + '> ' + esc(label(f)) + '</label>').join(''),
+      '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button id="vc_apply">' + esc(W.apply) + '</button>');
+    document.getElementById('vc_apply').addEventListener('click', () => {
+      const columns = [...document.querySelectorAll('.drawer input[type=checkbox]:checked, #drawer input[type=checkbox]:checked')].map((i) => i.value);
+      closeDrawer(); change(() => ({ columns }));
+    });
+  }));
+  const keep = async (id) => {
+    const view = Object.assign({}, ex.r.view, { kind: ex.kind, app: ex.name });
+    delete view.limit;
+    if (id) { await api(inSpace('/save'), { method: 'POST', body: { entries: [{ id, data: view }] } }); toast(W.viewUpdated, null); delete explorers[ex.key]; show(); return; }
+    const title = prompt(W.viewName); if (!title) return;
+    const saved = await api(inSpace('/save'), { method: 'POST', body: { entries: [{ kind: 'View', title, data: Object.assign(view, { label: { [LANG]: title } }) }] } });
+    location.hash = '#/app/' + encodeURIComponent(ex.name) + '?view=' + encodeURIComponent(saved.entries[0].id);
+  };
+  root.querySelectorAll('[data-vsave]').forEach((b) => b.addEventListener('click', () => keep(null).catch((e) => alert(e.message))));
+  root.querySelectorAll('[data-vupdate]').forEach((b) => b.addEventListener('click', () => keep(ex.st.id).catch((e) => alert(e.message))));
+  root.querySelectorAll('[data-vcard]').forEach((c) => c.addEventListener('dragstart', (event) => { event.dataTransfer.setData('text/plain', c.dataset.vcard); }));
+  root.querySelectorAll('[data-vdrop]').forEach((col) => {
+    col.addEventListener('dragover', (event) => { event.preventDefault(); col.classList.add('over'); });
+    col.addEventListener('dragleave', () => col.classList.remove('over'));
+    col.addEventListener('drop', async (event) => {
+      event.preventDefault(); col.classList.remove('over');
+      const id = event.dataTransfer.getData('text/plain'); if (!id || col.dataset.vdrop === '—') return;
+      try {
+        await api(inSpace('/save'), { method: 'POST', body: { entries: [{ id, data: { [ex.r.kanban.by]: col.dataset.vdrop } }] } });
+        toast(W.moved, { id, spaceId: space }); show();
+      } catch (error) { alert(error.message); }
+    });
+  });
   root.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => { pick = b.dataset.pick; reading = true; show(); }));
   root.querySelectorAll('[data-back]').forEach((b) => b.addEventListener('click', () => { reading = false; show(); }));
   root.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', async () => {
@@ -765,6 +929,37 @@ function bind() {
       (f.links.length ? '<div class="chips">' + f.links.map((l) => '<a class="chip" href="#/entree/' + esc(l.id) + '">' + esc(l.title) + '<small>' + esc(l.role) + '</small></a>').join('') + '</div>' : ''),
       '<a class="badge" href="#/entree/' + esc(id) + '">' + esc(W.fullEntry) + '</a><a class="badge primary" href="' + esc(src) + '&download=1">' + esc(W.download) + '</a>');
   }));
+  root.querySelectorAll('[data-area]').forEach((b) => b.addEventListener('click', async () => {
+    const area = prompt(say(W.fileInAsk, { app: b.dataset.area }));
+    if (area === null) return;
+    try { await api(inSpace('/apps/area'), { method: 'POST', body: { app: b.dataset.area, area: area.trim() } }); await drawApps(); show(); }
+    catch (error) { alert(error.message); }
+  }));
+  const zoneSelect = document.getElementById('zone');
+  if (zoneSelect) zoneSelect.addEventListener('change', async () => {
+    try { await api('/me/zone', { method: 'POST', body: { zone: zoneSelect.value } }); toast(say(W.zoneSaved, { zone: zoneSelect.value }), null); }
+    catch (error) { alert(error.message); }
+  });
+  const keyNew = document.getElementById('key-new');
+  if (keyNew) keyNew.addEventListener('click', async () => {
+    const name = prompt(W.keyName); if (!name) return;
+    try {
+      const made = await api('/me/keys', { method: 'POST', body: { name } });
+      await show();
+      document.getElementById('newkey').innerHTML = '<p class="badge read" style="white-space:normal">' + esc(W.keyOnce) + '</p><p><code class="url">' + esc(made.key) + '</code></p>';
+    } catch (error) { alert(error.message); }
+  });
+  root.querySelectorAll('[data-revoke]').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm(W.keyRevokeAsk)) return;
+    try { await api('/me/keys/' + encodeURIComponent(b.dataset.revoke), { method: 'DELETE' }); show(); } catch (error) { alert(error.message); }
+  }));
+  const tgLink = document.getElementById('tg-link');
+  if (tgLink) tgLink.addEventListener('click', async () => {
+    try {
+      const made = await api('/me/telegram', { method: 'POST', body: {} });
+      document.getElementById('tg').innerHTML = '<p><a class="badge primary" target="_blank" rel="noopener" href="' + esc(made.link) + '">' + esc(W.telegramOpen) + '</a></p><p class="muted">' + esc(say(W.telegramThen, { minutes: made.minutes })) + '</p>';
+    } catch (error) { alert(error.message); }
+  });
   root.querySelectorAll('[data-install]').forEach((b) => b.addEventListener('click', async () => {
     const name = b.dataset.install;
     try {

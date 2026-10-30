@@ -8,15 +8,19 @@ when: elle veut suivre quelque chose de façon structurée (ses finances, ses ha
 Un modèle dit une fois pour toutes ce que contient un type. Une fois posé, chaque `save` de ce type
 le suit : Jarvis refuse un champ inconnu, une valeur du mauvais type, un champ obligatoire
 manquant, un lien vers le mauvais type, un changement d'état non prévu — et dit quoi corriger.
-Les mots-clés sont en anglais ; ses types, ses champs et ses choix restent dans ses mots.
+Les noms techniques sont en anglais : mots-clés, kinds, fields et options d'une app (`Transaction`,
+`amount`, `out`). Ce qu'elle lit vient des `label` en `fr` et `en` : un model a `label`, chaque field
+`label` et, pour un `choice`, `optionLabels` (`{ out: { fr: 'sortie', en: 'out' } }`). Ses propres
+entrées (titres, textes) restent dans ses mots.
 
 1. Avant de proposer un modèle, appelle `kinds` : pars des types et des champs qu'elle a déjà, et
    de ses mots. Un type par nature de chose, au singulier (« Mouvement », « Habitude », « Compte »).
 2. Propose-lui le modèle en clair (les champs, ce qui est obligatoire, les choix, les liens, les
    calculs) et attends son accord. Puis un `save` : une entrée de kind « Model », titre = le type,
    `data` =
-   - `fields` : `[{ name, type, required?, options?, target?, cardinality?, inverse?, formula?,
-fields?, unit?, help? }]` ; `type` parmi text, number, amount, date, datetime, duration,
+   - `label` : `{ fr, en }` ;
+   - `fields` : `[{ name, type, label?, required?, options?, optionLabels?, target?, cardinality?,
+inverse?, formula?, fields?, unit?, help? }]` ; `type` parmi text, number, amount, date, datetime, duration,
      choice, boolean, list, link, formula, lines ;
    - `path` (facultatif) : où l'export range chaque entrée, avec `{year}`, `{month}`, `{day}`,
      `{date}`, `{title}`, `{id}` ou un champ (« finances/{year}/{month}/{title}.md ») ;

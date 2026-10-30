@@ -82,7 +82,7 @@ export function registerViews(server: McpServer, ctx: ViewContext): void {
         },
       ],
     }));
-  resource('Tableau de bord', VIEWS.dashboard, () => dashboardView());
+  resource('Dashboard', VIEWS.dashboard, () => dashboardView());
   resource('Page', VIEWS.page, () => pageView());
   resource('Entrée', VIEWS.entry, () => entryView());
   resource('Envoyer un fichier', VIEWS.upload, () => uploadView(), [new URL(ctx.publicUrl).origin]);
@@ -94,9 +94,9 @@ export function registerViews(server: McpServer, ctx: ViewContext): void {
     {
       description: [
         'Draw figures as a dashboard, recomputed now: a saved one by `name` (an entry of kind',
-        '« Tableau de bord » whose `data.widgets` lists { titre, requete, graphe }), or `widgets` given',
-        'here to show once. `graphe`: « nombre » (one figure), « barres » (compare), « courbe »',
-        '(over time, x sorted), « tableau ». Each `requete` is a `query` select. Hosts that show views',
+        '« Dashboard » whose `data.widgets` lists { title, query, chart }), or `widgets` given',
+        'here to show once. `chart`: `number` (one figure), `bar` (compare), `line`',
+        '(over time, x sorted), `table`. Each `query` is a `query` select. Hosts that show views',
         'draw it; the rows come back in words too.',
       ].join(' '),
       inputSchema: {
@@ -113,23 +113,21 @@ export function registerViews(server: McpServer, ctx: ViewContext): void {
       widgets?: z.input<typeof widgetSchema>[] | undefined;
     }) => {
       try {
-        let title = args.title ?? 'Tableau de bord';
+        let title = args.title ?? 'Dashboard';
         let widgets = args.widgets ?? [];
         if (args.name) {
           const wanted = args.name;
           const saved = await ctx.act(async (tx) => {
             for (const space of ctx.reach) {
               const found = (
-                await find(tx, space.id, { kind: 'Tableau de bord', text: wanted, limit: 5 })
+                await find(tx, space.id, { kind: 'Dashboard', text: wanted, limit: 5 })
               )[0];
               if (found) return found;
             }
             return null;
           });
           if (!saved)
-            throw new Error(
-              `No dashboard « ${wanted} »: save one first (kind « Tableau de bord »).`,
-            );
+            throw new Error(`No dashboard « ${wanted} »: save one first (kind « Dashboard »).`);
           title = saved.title;
           widgets = widgetsOf(saved.data);
         }
@@ -412,7 +410,7 @@ function registerDocuments(server: McpServer, ctx: ViewContext): void {
     'read_document',
     {
       description: [
-        'Read a document (any entry whose text is in `texte`): its outline always; its whole text when',
+        'Read a document (any entry whose text is in `text`): its outline always; its whole text when',
         'short or `whole`, else its opening — then ask the `sections` you need by their headings. Hosts',
         'that show views open it to read, with its versions and a reading link to print or download.',
       ].join(' '),

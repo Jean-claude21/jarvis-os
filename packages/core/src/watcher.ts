@@ -3,7 +3,7 @@ import { asPerson, type Actor } from './db';
 import { get, save } from './entries';
 import { DEFAULT_ZONE, nextTime, timeOf } from './time';
 
-// The watcher (spec 006): it tells her on time. A reminder is an entry « Rappel »: `at` (a time,
+// The watcher (spec 006): it tells her on time. A reminder is an entry « Reminder »: `at` (a time,
 // once) or `repeat` (five fields, again and again) on the clock of `timezone`; `message` what to say.
 // Each pass finds what is due, tells the people of its space, then writes what it did.
 

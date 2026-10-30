@@ -208,17 +208,17 @@ export const fingerprintOf = (key: string) => createHash('sha256').update(key).d
 
 /**
  * A new private address key for her phone's calendar (spec 011), kept as a fingerprint in her
- * « Canal » entry of her own space; the previous key answers nothing any more.
+ * « Channel » entry of her own space; the previous key answers nothing any more.
  */
 export async function renewCalendarKey(tx: Tx, actor: Actor, ownSpaceId: string): Promise<string> {
   const key = randomBytes(24).toString('base64url');
-  const [canal] = await find(tx, ownSpaceId, { kind: 'Canal', limit: 1 });
+  const [canal] = await find(tx, ownSpaceId, { kind: 'Channel', limit: 1 });
   await save(tx, actor, ownSpaceId, {
     entries: [
       canal
         ? { id: canal.id, data: { agenda: fingerprintOf(key) }, origin: 'inferred' }
         : {
-            kind: 'Canal',
+            kind: 'Channel',
             title: 'Canaux',
             data: { agenda: fingerprintOf(key) },
             origin: 'inferred',

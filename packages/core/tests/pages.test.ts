@@ -255,7 +255,7 @@ describe('a page', () => {
       }),
     );
     ids.page = saved.entries[0]!.id;
-    expect(await ama.as((tx) => pagesOf(tx, ama.space, 'finances'))).toEqual([
+    expect(await ama.as((tx) => pagesOf(tx, ama.space, 'finances'))).toMatchObject([
       { id: ids.page, title: 'Vue du mois', app: 'Finances', order: 100 },
     ]);
   });

@@ -6,7 +6,7 @@ import { formulaValue } from './formula';
 import { checkPage } from './pages';
 import { checkRule, runRulesAfterSave, type Changed } from './rules';
 import { checkScript } from './scripts';
-import { dataInNewWords, KIND_RENAMES, modelInNewWords } from './keywords';
+import { dataInNewWords, KIND_RENAMES, modelInNewWords, ROLE_RENAMES } from './keywords';
 import {
   checkAgainst,
   MODEL_KIND,
@@ -405,7 +405,9 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
     for (const end of [from, to]) {
       if (!found.has(end)) throw new Error(`No entry ${end} in this space to link.`);
     }
-    return { from, to, role: link.role };
+    const role = ROLE_RENAMES[link.role.trim().toLowerCase()];
+    if (role) saved.notes.push(`role « ${link.role} » → « ${role} »`);
+    return { from, to, role: role ?? link.role };
   };
 
   for (const link of input.links) {
@@ -495,7 +497,7 @@ export async function find(tx: Tx, spaceId: string, raw: FindInput = {}): Promis
     [
       spaceId,
       input.archived,
-      input.kind ?? null,
+      input.kind ? (KIND_RENAMES[foldKind(input.kind)] ?? input.kind) : null,
       input.from ?? null,
       input.to ?? null,
       words,

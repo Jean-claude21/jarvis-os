@@ -446,8 +446,8 @@ export function apiRoutes(deps: {
           reminders: number;
         }>(
           `select space_id, count(*)::int as entries,
-                  count(*) filter (where data ? 'texte' and length(data->>'texte') > 400)::int as documents,
-                  count(*) filter (where jarvis_fold(kind) = 'rappel'
+                  count(*) filter (where data ? 'text' and length(data->>'text') > 400)::int as documents,
+                  count(*) filter (where jarvis_fold(kind) = 'reminder'
                     and coalesce(data->>'status', '') not in ('done', 'sent', 'cancelled'))::int as reminders
              from entry where space_id = any($1) and archived_at is null group by space_id`,
           [ids],
@@ -514,7 +514,7 @@ export function apiRoutes(deps: {
     const own = spaces.find((one) => one.personal);
     const linked = own
       ? await as(c, async (tx) =>
-          (await find(tx, own.id, { kind: 'Canal', limit: 1 })).some(
+          (await find(tx, own.id, { kind: 'Channel', limit: 1 })).some(
             (one) => typeof one.data.agenda === 'string',
           ),
         )
@@ -560,7 +560,7 @@ export function apiRoutes(deps: {
       })
       .parse(await c.req.json());
     const spaces = c.get('spaces');
-    let title = 'Tableau de bord';
+    let title = 'Dashboard';
     let widgets: Widget[] = input.widgets ?? [];
     if (input.id) {
       const saved = await act(c, (tx, _a, space) => get(tx, space, input.id!));

@@ -1,206 +1,292 @@
 {
   "app": "Finances",
   "version": 1,
-  "description": "Comptes, fonds (enveloppes de budget), mouvements, obligations et rapprochements : soldes et restes calculés, la vue du mois, une alerte quand un fonds est dépassé, un import de relevé CSV.",
+  "description": {
+    "fr": "Comptes, fonds (enveloppes de budget), mouvements, factures et rapprochements : soldes et restes calculés, la vue du mois, une alerte quand un fonds est dépassé, un import de relevé CSV.",
+    "en": "Accounts, funds (budget envelopes), transactions, bills and reconciliations: balances and remainders computed, the month overview, an alert when a fund is overspent, a CSV statement import."
+  },
   "models": [
     {
-      "title": "Compte",
+      "title": "Account",
       "data": {
+        "label": { "fr": "Compte", "en": "Account" },
         "fields": [
           {
             "name": "type",
             "type": "choice",
-            "options": ["espèces", "banque", "mobile money", "épargne"]
+            "options": ["cash", "bank", "mobile_money", "savings"],
+            "label": { "fr": "Type", "en": "Type" },
+            "optionLabels": {
+              "cash": { "fr": "espèces", "en": "cash" },
+              "bank": { "fr": "banque", "en": "bank" },
+              "mobile_money": { "fr": "mobile money", "en": "mobile money" },
+              "savings": { "fr": "épargne", "en": "savings" }
+            }
           },
           {
-            "name": "solde_initial",
+            "name": "opening_balance",
             "type": "amount",
-            "help": "Le solde au jour où elle commence à suivre ce compte."
+            "label": { "fr": "Solde de départ", "en": "Opening balance" },
+            "help": "The balance on the day she starts following this account."
           },
           {
-            "name": "solde",
+            "name": "balance",
             "type": "formula",
-            "formula": "solde_initial + sum(mouvements.montant where sens = 'entrée') - sum(mouvements.montant where sens = 'sortie')"
+            "label": { "fr": "Solde", "en": "Balance" },
+            "formula": "opening_balance + sum(transactions.amount where direction = 'in') - sum(transactions.amount where direction = 'out')"
           },
           {
-            "name": "ecart",
+            "name": "gap",
             "type": "formula",
-            "formula": "if(count(rapprochements) > 0, sum(rapprochements.solde_banque where date = max(rapprochements.date)) - solde, null)"
+            "label": { "fr": "Écart avec la banque", "en": "Gap with the bank" },
+            "formula": "if(count(reconciliations) > 0, sum(reconciliations.bank_balance where date = max(reconciliations.date)) - balance, null)"
           }
         ],
-        "columns": ["type", "solde"],
-        "path": "finances/comptes/{title}.md"
+        "columns": ["type", "balance"],
+        "path": "finances/accounts/{title}.md"
       }
     },
     {
-      "title": "Fonds",
+      "title": "Fund",
       "data": {
+        "label": { "fr": "Fonds", "en": "Fund" },
         "fields": [
-          { "name": "budget_mensuel", "type": "amount" },
           {
-            "name": "depense_du_mois",
-            "type": "formula",
-            "formula": "sum(affectations.montant where sens = 'sortie' and this_month(date))"
+            "name": "monthly_budget",
+            "type": "amount",
+            "label": { "fr": "Budget du mois", "en": "Monthly budget" }
           },
-          { "name": "reste", "type": "formula", "formula": "budget_mensuel - depense_du_mois" }
+          {
+            "name": "spent_this_month",
+            "type": "formula",
+            "label": { "fr": "Dépensé ce mois", "en": "Spent this month" },
+            "formula": "sum(allocations.amount where direction = 'out' and this_month(date))"
+          },
+          {
+            "name": "remaining",
+            "type": "formula",
+            "label": { "fr": "Reste", "en": "Remaining" },
+            "formula": "monthly_budget - spent_this_month"
+          }
         ],
-        "columns": ["budget_mensuel", "depense_du_mois", "reste"],
-        "path": "finances/fonds/{title}.md"
+        "columns": ["monthly_budget", "spent_this_month", "remaining"],
+        "path": "finances/funds/{title}.md"
       }
     },
     {
-      "title": "Mouvement",
+      "title": "Transaction",
       "data": {
+        "label": { "fr": "Mouvement", "en": "Transaction" },
         "fields": [
           {
-            "name": "montant",
+            "name": "amount",
             "type": "amount",
             "required": true,
-            "help": "Toujours positif : le sens dit si l'argent entre ou sort."
+            "label": { "fr": "Montant", "en": "Amount" },
+            "help": "Always positive: the direction says whether money comes in or goes out."
           },
-          { "name": "date", "type": "date", "required": true },
           {
-            "name": "sens",
+            "name": "date",
+            "type": "date",
+            "required": true,
+            "label": { "fr": "Date", "en": "Date" }
+          },
+          {
+            "name": "direction",
             "type": "choice",
-            "options": ["entrée", "sortie", "réaffectation"],
-            "required": true
+            "options": ["in", "out", "transfer"],
+            "required": true,
+            "label": { "fr": "Sens", "en": "Direction" },
+            "optionLabels": {
+              "in": { "fr": "entrée", "en": "in" },
+              "out": { "fr": "sortie", "en": "out" },
+              "transfer": { "fr": "réaffectation", "en": "transfer" }
+            }
           },
           {
-            "name": "compte",
+            "name": "account",
             "type": "link",
-            "target": "Compte",
-            "inverse": "mouvements",
-            "required": true
+            "target": "Account",
+            "inverse": "transactions",
+            "required": true,
+            "label": { "fr": "Compte", "en": "Account" }
           },
-          { "name": "fonds", "type": "link", "target": "Fonds", "inverse": "affectations" },
-          { "name": "obligation", "type": "link", "target": "Obligation", "inverse": "paiements" },
-          { "name": "note", "type": "text" }
+          {
+            "name": "fund",
+            "type": "link",
+            "target": "Fund",
+            "inverse": "allocations",
+            "label": { "fr": "Fonds", "en": "Fund" }
+          },
+          {
+            "name": "bill",
+            "type": "link",
+            "target": "Bill",
+            "inverse": "payments",
+            "label": { "fr": "Facture", "en": "Bill" }
+          },
+          { "name": "note", "type": "text", "label": { "fr": "Note", "en": "Note" } }
         ],
-        "columns": ["date", "sens", "montant"],
-        "total": "montant",
+        "columns": ["date", "direction", "amount"],
+        "total": "amount",
         "groupBy": "date",
         "path": "finances/{year}/{month}/{title}.md"
       }
     },
     {
-      "title": "Obligation",
+      "title": "Bill",
       "data": {
+        "label": { "fr": "Facture", "en": "Bill" },
         "fields": [
-          { "name": "montant", "type": "amount", "required": true },
-          { "name": "due", "type": "date" },
-          { "name": "etat", "type": "choice", "options": ["à payer", "payée", "annulée"] },
-          { "name": "paye", "type": "formula", "formula": "sum(paiements.montant)" },
-          { "name": "reste_a_payer", "type": "formula", "formula": "montant - paye" }
+          {
+            "name": "amount",
+            "type": "amount",
+            "required": true,
+            "label": { "fr": "Montant", "en": "Amount" }
+          },
+          { "name": "due", "type": "date", "label": { "fr": "Échéance", "en": "Due" } },
+          {
+            "name": "state",
+            "type": "choice",
+            "options": ["to_pay", "paid", "cancelled"],
+            "label": { "fr": "État", "en": "State" },
+            "optionLabels": {
+              "to_pay": { "fr": "à payer", "en": "to pay" },
+              "paid": { "fr": "payée", "en": "paid" },
+              "cancelled": { "fr": "annulée", "en": "cancelled" }
+            }
+          },
+          {
+            "name": "paid",
+            "type": "formula",
+            "label": { "fr": "Payé", "en": "Paid" },
+            "formula": "sum(payments.amount)"
+          },
+          {
+            "name": "left_to_pay",
+            "type": "formula",
+            "label": { "fr": "Reste à payer", "en": "Left to pay" },
+            "formula": "amount - paid"
+          }
         ],
-        "columns": ["due", "montant", "etat"],
+        "columns": ["due", "amount", "state"],
         "workflow": {
-          "field": "etat",
-          "initial": "à payer",
+          "field": "state",
+          "initial": "to_pay",
           "transitions": [
-            { "from": "à payer", "to": "payée" },
-            { "from": "à payer", "to": "annulée" },
-            { "from": "payée", "to": "à payer" }
+            { "from": "to_pay", "to": "paid" },
+            { "from": "to_pay", "to": "cancelled" },
+            { "from": "paid", "to": "to_pay" }
           ]
         },
-        "path": "finances/obligations/{title}.md"
+        "path": "finances/bills/{title}.md"
       }
     },
     {
-      "title": "Rapprochement",
+      "title": "Reconciliation",
       "data": {
+        "label": { "fr": "Rapprochement", "en": "Reconciliation" },
         "fields": [
-          { "name": "date", "type": "date", "required": true },
           {
-            "name": "solde_banque",
-            "type": "amount",
+            "name": "date",
+            "type": "date",
             "required": true,
-            "help": "Le solde lu sur le relevé ou l'application de la banque."
+            "label": { "fr": "Date", "en": "Date" }
           },
           {
-            "name": "compte",
+            "name": "bank_balance",
+            "type": "amount",
+            "required": true,
+            "label": { "fr": "Solde lu à la banque", "en": "Balance at the bank" },
+            "help": "The balance read on the bank's statement or app."
+          },
+          {
+            "name": "account",
             "type": "link",
-            "target": "Compte",
-            "inverse": "rapprochements",
-            "required": true
+            "target": "Account",
+            "inverse": "reconciliations",
+            "required": true,
+            "label": { "fr": "Compte", "en": "Account" }
           }
         ],
-        "columns": ["date", "solde_banque"]
+        "columns": ["date", "bank_balance"]
       }
     }
   ],
   "pages": [
     {
-      "title": "Vue du mois",
+      "title": "Month overview",
       "data": {
+        "label": { "fr": "Vue du mois", "en": "Month overview" },
         "order": 1,
-        "filters": [{ "name": "month", "type": "month", "label": "Mois" }],
+        "filters": [{ "name": "month", "type": "month", "label": { "fr": "Mois", "en": "Month" } }],
         "blocks": [
           {
             "block": "stat",
-            "title": "Solde de tous les comptes",
-            "query": { "kind": "Compte", "aggregate": { "total": "sum(solde)" } }
+            "title": { "fr": "Solde de tous les comptes", "en": "Balance of all accounts" },
+            "query": { "kind": "Account", "aggregate": { "total": "sum(balance)" } }
           },
           {
             "block": "stat_delta",
-            "title": "Dépenses du mois",
+            "title": { "fr": "Dépenses du mois", "en": "Spending this month" },
             "query": {
-              "kind": "Mouvement",
-              "where": "sens = 'sortie' and month(date) = {month}",
-              "aggregate": { "total": "sum(montant)" }
+              "kind": "Transaction",
+              "where": "direction = 'out' and month(date) = {month}",
+              "aggregate": { "total": "sum(amount)" }
             }
           },
           {
             "block": "stat",
-            "title": "Entrées du mois",
+            "title": { "fr": "Entrées du mois", "en": "Income this month" },
             "query": {
-              "kind": "Mouvement",
-              "where": "sens = 'entrée' and month(date) = {month}",
-              "aggregate": { "total": "sum(montant)" }
+              "kind": "Transaction",
+              "where": "direction = 'in' and month(date) = {month}",
+              "aggregate": { "total": "sum(amount)" }
             }
           },
           {
             "block": "gauge",
-            "title": "Fonds",
-            "kind": "Fonds",
-            "value": "depense_du_mois",
-            "max": "budget_mensuel"
+            "title": { "fr": "Fonds", "en": "Funds" },
+            "kind": "Fund",
+            "value": "spent_this_month",
+            "max": "monthly_budget"
           },
           {
             "block": "breakdown",
-            "title": "Dépenses par fonds",
+            "title": { "fr": "Dépenses par fonds", "en": "Spending by fund" },
             "query": {
-              "kind": "Mouvement",
-              "where": "sens = 'sortie' and month(date) = {month}",
-              "groupBy": "fonds.title",
-              "aggregate": { "total": "sum(montant)" },
+              "kind": "Transaction",
+              "where": "direction = 'out' and month(date) = {month}",
+              "groupBy": "fund.title",
+              "aggregate": { "total": "sum(amount)" },
               "sort": "-total"
             }
           },
           {
             "block": "line",
-            "title": "Dépenses mois par mois",
+            "title": { "fr": "Dépenses mois par mois", "en": "Spending month by month" },
             "query": {
-              "kind": "Mouvement",
-              "where": "sens = 'sortie'",
+              "kind": "Transaction",
+              "where": "direction = 'out'",
               "groupBy": "month(date)",
-              "aggregate": { "total": "sum(montant)" }
+              "aggregate": { "total": "sum(amount)" }
             }
           },
           {
             "block": "task_list",
-            "title": "À payer",
-            "kind": "Obligation",
-            "where": "etat = 'à payer'",
+            "title": { "fr": "À payer", "en": "To pay" },
+            "kind": "Bill",
+            "where": "state = 'to_pay'",
             "detail": "due",
-            "action": { "label": "Payée", "set": { "etat": "payée" } }
+            "action": { "label": "✓", "set": { "state": "paid" } }
           },
           {
             "block": "table",
-            "title": "Mouvements du mois",
+            "title": { "fr": "Mouvements du mois", "en": "Transactions this month" },
             "query": {
-              "kind": "Mouvement",
+              "kind": "Transaction",
               "where": "month(date) = {month}",
-              "fields": ["date", "sens", "montant", "compte", "fonds"],
+              "fields": ["date", "direction", "amount", "account", "fund"],
               "sort": "-date"
             }
           }
@@ -208,49 +294,54 @@
       }
     },
     {
-      "title": "Comptes",
+      "title": "Accounts",
       "data": {
+        "label": { "fr": "Comptes", "en": "Accounts" },
         "order": 2,
         "blocks": [
           {
             "block": "table",
-            "title": "Comptes",
-            "query": { "kind": "Compte", "fields": ["type", "solde", "ecart"] },
-            "total": "solde"
+            "title": { "fr": "Comptes", "en": "Accounts" },
+            "query": { "kind": "Account", "fields": ["type", "balance", "gap"] },
+            "total": "balance"
           },
           {
             "block": "bar",
-            "title": "Solde par compte",
+            "title": { "fr": "Solde par compte", "en": "Balance by account" },
             "query": {
-              "kind": "Compte",
+              "kind": "Account",
               "groupBy": "title",
-              "aggregate": { "solde": "sum(solde)" },
-              "sort": "-solde"
+              "aggregate": { "balance": "sum(balance)" },
+              "sort": "-balance"
             }
           },
-          { "block": "form", "title": "Noter un mouvement", "kind": "Mouvement" }
+          {
+            "block": "form",
+            "title": { "fr": "Noter un mouvement", "en": "Record a transaction" },
+            "kind": "Transaction"
+          }
         ]
       }
     }
   ],
   "rules": [
     {
-      "title": "Fonds dépassé",
+      "title": "Fund overspent",
       "data": {
-        "when": { "saved": "Mouvement" },
-        "if": "sens = 'sortie' and fonds.reste < 0",
-        "then": [{ "remind": { "text": "Le fonds {fonds.title} est dépassé de {-fonds.reste}" } }]
+        "when": { "saved": "Transaction" },
+        "if": "direction = 'out' and fund.remaining < 0",
+        "then": [{ "remind": { "text": "{fund.title} : {-fund.remaining}" } }]
       }
     }
   ],
   "scripts": [
     {
-      "title": "Import de relevé",
+      "title": "Statement import",
       "data": {
-        "description": "Lit un relevé CSV (date;libellé;montant, une ligne d'en-tête) et crée un mouvement par ligne sur le compte donné en paramètre « compte » ; un montant négatif est une sortie.",
-        "reads": ["Compte"],
-        "writes": ["Mouvement"],
-        "code": "function run(input) {\n  if (!input.file || !input.file.text) throw new Error('Give the statement file.');\n  const compte = input.entries.Compte.find((one) => one.title === input.params.compte);\n  if (!compte) throw new Error('Give the account by its title in params.compte.');\n  const lines = input.file.text.trim().split(/\\r?\\n/).slice(1);\n  return lines.filter((line) => line.trim()).map((line, i) => {\n    const [date, label, amount] = line.split(';').map((part) => part.trim());\n    const value = Number(String(amount).replace(/\\s/g, '').replace(',', '.'));\n    return { create: { ref: 'm' + i, kind: 'Mouvement', title: label, data: { montant: Math.abs(value), date, sens: value < 0 ? 'sortie' : 'entrée', compte: compte.id } } };\n  });\n}"
+        "description": "Reads a CSV statement (date;label;amount, one header line) and creates one transaction per line on the account given as params.account; a negative amount goes out.",
+        "reads": ["Account"],
+        "writes": ["Transaction"],
+        "code": "function run(input) {\n  if (!input.file || !input.file.text) throw new Error('Give the statement file.');\n  const account = input.entries.Account.find((one) => one.title === input.params.account);\n  if (!account) throw new Error('Give the account by its title in params.account.');\n  const lines = input.file.text.trim().split(/\\r?\\n/).slice(1);\n  return lines.filter((line) => line.trim()).map((line, i) => {\n    const [date, label, amount] = line.split(';').map((part) => part.trim());\n    const value = Number(String(amount).replace(/\\s/g, '').replace(',', '.'));\n    return { create: { ref: 't' + i, kind: 'Transaction', title: label, data: { amount: Math.abs(value), date, direction: value < 0 ? 'out' : 'in', account: account.id } } };\n  });\n}"
       }
     }
   ]

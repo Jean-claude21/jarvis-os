@@ -1,3 +1,4 @@
+import { ROLE_RENAMES } from './keywords';
 import { posix } from 'node:path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import type { Actor, Tx } from './db';
@@ -28,11 +29,11 @@ export interface ReadDoc {
 }
 
 /** The role of a link found in a text, when the text does not name one. */
-export const MENTION = 'mentionne';
+export const MENTION = 'mentions';
 /** The role of the link from a file to the file that describes its folder. */
-export const PART_OF = 'fait partie de';
+export const PART_OF = 'part_of';
 /** The field that holds an entry's text, below its title. */
-export const TEXT_FIELD = 'texte';
+export const TEXT_FIELD = 'text';
 /** The field that keeps where an imported entry came from: its path in the folder. */
 export const SOURCE_FIELD = 'source';
 /** The heading under which an export writes an entry's links. */
@@ -122,14 +123,21 @@ export function readMarkdown(doc: MarkdownDoc, named: Record<string, string> = {
   ).slice(0, 300);
   let text = heading && !titled ? body.replace(heading[0], '') : body;
 
-  // The links an export wrote under « Liens » carry their role; any other link « mentionne ».
+  // The links an export wrote under « Liens » carry their role; any other link `mentions`.
   const links: ReadDoc['links'] = [];
   const section = new RegExp(`^## ${LINKS_HEADING}[ \\t]*\\r?\\n((?:[-*] .*(?:\\r?\\n|$))+)`, 'm');
   const written = section.exec(text);
   if (written) {
     for (const line of written[1]!.split(/\r?\n/)) {
       const one = /^[-*] (.+?) : \[[^\]]*\]\(([^)]+)\)/.exec(line);
-      if (one) links.push({ target: safeDecode(one[2]!), role: one[1]!.trim(), wiki: false });
+      if (one) {
+        const role = one[1]!.trim();
+        links.push({
+          target: safeDecode(one[2]!),
+          role: ROLE_RENAMES[role.toLowerCase()] ?? role,
+          wiki: false,
+        });
+      }
     }
     text = text.replace(written[0], '');
   }

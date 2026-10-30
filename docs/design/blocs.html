@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jarvis — page</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Instrument+Sans:wght@400;600&family=JetBrains+Mono:wght@600&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --paper: #fffdf9; --sand: #fbf6f0; --clay: #f4e6da; --rule: #d9c4b4; --rule-strong: #b9a294;
+  --ink: #2a1610; --bark: #6b4e43; --primary: #b83a1b; --primary-strong: #962e14; --ember: #e2572d;
+  --ochre: #c98a2b; --on-primary: #fffdf9;
+  --success: #2f7d4f; --success-surface: #e3f1e8; --verify: #7a4a0b; --verify-surface: #fbebd0;
+  --error: #9b1c3c; --error-surface: #f7e1e7; --info: #2b5c8a; --info-surface: #e2ecf5;
+  --series: #b83a1b, #c98a2b, #2b5c8a, #2f7d4f, #6b4e43;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #17100c; --sand: #221813; --clay: #2c2019; --rule: #4a382e; --rule-strong: #7a6356;
+  --ink: #f4e6da; --bark: #bfa799; --primary: #f08a63; --primary-strong: #e2572d; --ember: #f08a63;
+  --ochre: #d9a04a; --on-primary: #17100c;
+  --success: #4fa873; --success-surface: #1c3025; --verify: #f2cc8a; --verify-surface: #3a2a12;
+  --error: #d0546f; --error-surface: #3e1620; --info: #5c8fc2; --info-surface: #172a3d;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  color-scheme: dark;
+  --paper: #17100c; --sand: #221813; --clay: #2c2019; --rule: #4a382e; --rule-strong: #7a6356;
+  --ink: #f4e6da; --bark: #bfa799; --primary: #f08a63; --primary-strong: #e2572d; --ember: #f08a63;
+  --ochre: #d9a04a; --on-primary: #17100c;
+  --success: #4fa873; --success-surface: #1c3025; --verify: #f2cc8a; --verify-surface: #3a2a12;
+  --error: #d0546f; --error-surface: #3e1620; --info: #5c8fc2; --info-surface: #172a3d;
+} }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--paper); color: var(--ink); }
+body { font: 400 14px/1.5 "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px; }
+h1, h2, h3 { font-family: Archivo, "Instrument Sans", system-ui, sans-serif; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 20px; font-weight: 700; }
+h2 { font-size: 15px; font-weight: 600; }
+.caps { font: 600 11px/1.4 Archivo, system-ui, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; color: var(--bark); }
+.muted { color: var(--bark); }
+.num { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.head .meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.card { background: var(--paper); border: 1px solid var(--rule); border-radius: 2px; padding: 14px 16px; min-width: 0; }
+.card.wide { grid-column: 1 / -1; }
+.card h2 { margin-bottom: 10px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; padding: 1px 8px; border-radius: 2px; font-size: 12px;
+  background: var(--clay); color: var(--ink); white-space: nowrap; }
+.badge.primary { background: var(--primary); color: var(--on-primary); }
+.badge.said { background: var(--success-surface); color: var(--success); }
+.badge.read { background: var(--verify-surface); color: var(--verify); }
+.badge.inferred { background: var(--info-surface); color: var(--info); }
+.badge.error { background: var(--error-surface); color: var(--error); }
+.kpi { font: 600 32px/1.1 "JetBrains Mono", ui-monospace, monospace; letter-spacing: -0.02em; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font: 600 11px/1.4 Archivo, system-ui, sans-serif; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--bark); padding: 6px 8px; border-bottom: 1px solid var(--rule-strong); }
+td { padding: 7px 8px; border-bottom: 1px dotted var(--rule); vertical-align: top; overflow-wrap: anywhere; }
+td.n, th.n { text-align: right; }
+.scroll { overflow-x: auto; }
+button { font: 600 13px/1 "Instrument Sans", system-ui, sans-serif; padding: 8px 12px; border-radius: 2px; cursor: pointer;
+  border: 1px solid var(--ink); background: var(--ink); color: var(--paper); }
+button.quiet { background: transparent; color: var(--ink); border-color: var(--rule-strong); }
+button:disabled { opacity: 0.5; cursor: default; }
+.error-text { color: var(--error); }
+.list { list-style: none; margin: 0; padding: 0; }
+.list li { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; padding: 8px 0; border-bottom: 1px dotted var(--rule); }
+.list li:last-child { border-bottom: 0; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); flex: none; margin-top: 6px; }
+svg text { fill: var(--bark); font: 11px "Instrument Sans", system-ui, sans-serif; }
+.empty { padding: 24px 0; text-align: center; color: var(--bark); }
+@media (max-width: 420px) { body { padding: 12px; } .kpi { font-size: 26px; } }
+</style></head>
+<body><main id="root"><p class="empty">…</p></main>
+<script>
+window.JARVIS_DATA = {"id":"demo","title":"Les 13 blocs d’une page","app":"Démonstration — chiffres fictifs","spaceId":"demo","filters":[{"name":"month","type":"month","value":"2026-10","label":"Mois"}],"params":{"month":"2026-10"},"blocks":[{"block":"stat","title":"1 · stat — Solde de tous les comptes","value":619000,"unit":"XOF"},{"block":"stat_delta","title":"2 · stat_delta — Dépenses du mois","value":71000,"previous":40000,"delta":77.5,"unit":"XOF"},{"block":"gauge","title":"3 · gauge — Fonds du mois","items":[{"id":"a","label":"Courses","value":57000,"max":60000},{"id":"b","label":"Transport","value":8000,"max":30000},{"id":"c","label":"Loisirs","value":26000,"max":20000}]},{"block":"bar","title":"4 · bar — Solde par compte","points":[{"label":"Banque","value":659000},{"label":"Mobile money","value":84000},{"label":"Espèces","value":12000}]},{"block":"breakdown","title":"5 · breakdown — Dépenses par fonds","points":[{"label":"Courses","value":57000},{"label":"Loisirs","value":26000},{"label":"Transport","value":8000},{"label":"Santé","value":5000}]},{"block":"line","title":"6 · line — Dépenses mois par mois","points":[{"label":"2026-05","value":82000},{"label":"2026-06","value":64000},{"label":"2026-07","value":91000},{"label":"2026-08","value":58000},{"label":"2026-09","value":40000},{"label":"2026-10","value":71000}]},{"block":"heatmap","title":"7 · heatmap — Jours de sport pointés","cells":[{"day":"2026-09-26","done":true},{"day":"2026-09-27","done":true},{"day":"2026-09-28","done":false},{"day":"2026-09-29","done":true},{"day":"2026-09-30","done":true},{"day":"2026-10-01","done":false},{"day":"2026-10-02","done":true},{"day":"2026-10-03","done":false},{"day":"2026-10-04","done":true},{"day":"2026-10-05","done":true},{"day":"2026-10-06","done":true},{"day":"2026-10-07","done":false},{"day":"2026-10-08","done":false},{"day":"2026-10-09","done":true},{"day":"2026-10-10","done":false},{"day":"2026-10-11","done":true},{"day":"2026-10-12","done":true},{"day":"2026-10-13","done":true},{"day":"2026-10-14","done":false},{"day":"2026-10-15","done":false},{"day":"2026-10-16","done":true},{"day":"2026-10-17","done":false},{"day":"2026-10-18","done":true},{"day":"2026-10-19","done":true},{"day":"2026-10-20","done":true},{"day":"2026-10-21","done":true},{"day":"2026-10-22","done":false},{"day":"2026-10-23","done":true},{"day":"2026-10-24","done":false},{"day":"2026-10-25","done":true},{"day":"2026-10-26","done":true},{"day":"2026-10-27","done":true},{"day":"2026-10-28","done":false},{"day":"2026-10-29","done":false},{"day":"2026-10-30","done":true}],"done":22},{"block":"table","title":"8 · table — Mouvements du mois","columns":["title","date","sens","montant","compte","fonds"],"rows":[{"id":"1","title":"Cinéma","date":"2026-10-14","sens":"sortie","montant":6000,"compte":"Banque","fonds":"Loisirs"},{"id":"2","title":"Taxi","date":"2026-10-11","sens":"sortie","montant":8000,"compte":"Espèces","fonds":"Transport"},{"id":"3","title":"Supermarché","date":"2026-10-10","sens":"sortie","montant":35000,"compte":"Banque","fonds":"Courses"},{"id":"4","title":"Salaire","date":"2026-10-01","sens":"entrée","montant":450000,"compte":"Banque","fonds":null}],"truncated":false,"total":null,"totalValue":null},{"block":"task_list","title":"9 · task_list — À payer (un geste par ligne)","items":[{"id":"l","title":"Loyer","detail":"2026-11-05"},{"id":"e","title":"Électricité","detail":"2026-11-12"}],"action":{"label":"Payée","set":{"etat":"payée"}}},{"block":"kanban","title":"10 · kanban — Obligations par état","by":"etat","columns":[{"name":"à payer","items":[{"id":"l","title":"Loyer"},{"id":"e","title":"Électricité"}]},{"name":"payée","items":[{"id":"i","title":"Internet"}]},{"name":"annulée","items":[]}]},{"block":"calendar","title":"11 · calendar — Les 7 prochains jours","occurrences":[{"title":"Gym","kind":"Habitude","start":"2026-10-31T17:30:00Z","allDay":false},{"title":"Loyer","kind":"Obligation","start":"2026-11-05T00:00:00Z","allDay":true},{"title":"Dentiste","kind":"Rendez-vous","start":"2026-11-03T13:00:00Z","allDay":false}]},{"block":"form","title":"12 · form — Noter un mouvement (construit depuis le modèle)","kind":"Mouvement","fields":[{"name":"montant","type":"amount","required":true,"unit":"XOF"},{"name":"date","type":"date","required":true},{"name":"sens","type":"choice","options":["entrée","sortie","réaffectation"],"required":true},{"name":"compte","type":"link","target":"Compte"}]},{"block":"record","title":"13 · record — La fiche d’un compte","record":{"id":"b","kind":"Compte","title":"Banque","fields":[{"name":"type","value":"banque","computed":false},{"name":"solde_initial","value":250000,"computed":false},{"name":"solde","value":659000,"computed":true}],"relations":[{"name":"mouvements","columns":["title","date","sens","montant"],"rows":[{"id":"4","title":"Salaire","date":"2026-10-01","sens":"entrée","montant":450000},{"id":"3","title":"Supermarché","date":"2026-10-10","sens":"sortie","montant":35000}]}]}},{"block":"stat","title":"Un bloc en erreur dit pourquoi","error":"Formula « sum(montant »: « ) » expected at 13."}],"computedAt":"2026-10-30T16:08:39.987Z","frame":true};
+const WORDS = {"fr":{"empty":"Rien pour l’instant.","nothing":"Rien à montrer.","failed":"Bloc en erreur : {reason}","total":"Total","titleCol":"Titre","noCompare":"Rien à comparer le mois précédent.","vsPrevious":"par rapport au mois précédent ({value})","daysDone":"{n} jours sur {of}","allDone":"Tout est fait.","add":"Ajouter","linkHint":"id de l’entrée liée","computed":"calculé","opened":"Elle a ouvert l’entrée {id} depuis la page."},"en":{"empty":"Nothing yet.","nothing":"Nothing to show.","failed":"Block failed: {reason}","total":"Total","titleCol":"Title","noCompare":"Nothing to compare last month.","vsPrevious":"against last month ({value})","daysDone":"{n} days out of {of}","allDone":"All done.","add":"Add","linkHint":"id of the linked entry","computed":"computed","opened":"She opened entry {id} from the page."}};
+
+const host = (() => {
+  let next = 0; const pending = new Map(); const handlers = {};
+  window.addEventListener('message', (event) => {
+    const m = event.data;
+    if (!m || m.jsonrpc !== '2.0') return;
+    if (m.id !== undefined && !m.method && pending.has(m.id)) {
+      const p = pending.get(m.id); pending.delete(m.id);
+      if (m.error) p.reject(new Error(m.error.message || 'error')); else p.resolve(m.result);
+      return;
+    }
+    if (m.method && handlers[m.method]) handlers[m.method](m.params || {});
+    if (m.method && m.id !== undefined) parent.postMessage({ jsonrpc: '2.0', id: m.id, result: {} }, '*');
+  });
+  const request = (method, params) => new Promise((resolve, reject) => {
+    const id = ++next; pending.set(id, { resolve, reject });
+    parent.postMessage({ jsonrpc: '2.0', id, method, params }, '*');
+  });
+  const notify = (method, params) => parent.postMessage({ jsonrpc: '2.0', method, params }, '*');
+  return { request, notify, on: (method, fn) => { handlers[method] = fn; }, inside: window.parent !== window };
+})();
+let words = WORDS.fr;
+function context(ctx) {
+  if (!ctx) return;
+  if (ctx.theme) document.documentElement.dataset.theme = ctx.theme;
+  if (ctx.locale) words = String(ctx.locale).toLowerCase().startsWith('en') ? WORDS.en : WORDS.fr;
+}
+async function callTool(name, args) {
+  const result = await host.request('tools/call', { name, arguments: args || {} });
+  if (result && result.isError) {
+    const text = result.content && result.content[0] && result.content[0].text;
+    let message = text; try { message = JSON.parse(text).error || text; } catch {}
+    throw new Error(message);
+  }
+  return result && result.structuredContent;
+}
+function tellModel(text, data) {
+  host.request('ui/update-model-context', { content: [{ type: 'text', text }], structuredContent: data }).catch(() => {});
+}
+function start(render) {
+  host.on('ui/notifications/tool-result', (result) => render(result.structuredContent || null));
+  host.on('ui/notifications/host-context-changed', (ctx) => context(ctx));
+  new ResizeObserver(() => host.notify('ui/notifications/size-changed', {
+    width: Math.ceil(document.documentElement.scrollWidth), height: Math.ceil(document.documentElement.scrollHeight) })).observe(document.body);
+  // A page given its data (outside a host, or framed by her web account) draws it at once.
+  if (!host.inside || window.JARVIS_DATA) { render(window.JARVIS_DATA || null); return; }
+  host.request('ui/initialize', { protocolVersion: '2026-01-26', capabilities: {},
+    clientInfo: { name: 'jarvis-os-view', version: '0.5.0' }, appCapabilities: { availableDisplayModes: ['inline'] } })
+    .then((init) => { context(init && init.hostContext); host.notify('ui/notifications/initialized', {}); })
+    .catch(() => {});
+}
+const esc = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';');
+const say = (text, values) => String(text).replace(/\{(\w+)\}/g, (_, key) => (values && values[key] != null ? values[key] : ''));
+
+
+document.head.insertAdjacentHTML('beforeend', '<style> a { color: var(--primary); text-decoration: none; } a:hover { text-decoration: underline; } .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; } .filters label { display: flex; gap: 6px; align-items: center; } input, select { font: inherit; padding: 6px 8px; border: 1px solid var(--rule-strong); border-radius: 2px; background: var(--paper); color: var(--ink); } .delta.up { color: var(--error); } .delta.down { color: var(--success); } .bars { display: grid; gap: 7px; } .bar { display: grid; grid-template-columns: minmax(70px, 34%) 1fr auto; gap: 10px; align-items: center; } .bar .track, .gauge .track { height: 12px; background: var(--clay); border-radius: 2px; overflow: hidden; } .bar .fill, .gauge .fill { height: 100%; background: var(--primary); } .gauge { margin: 8px 0 12px; } .gauge .fill.over { background: var(--error); } .gauge .top { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 4px; } .share { display: flex; height: 16px; gap: 2px; border-radius: 2px; overflow: hidden; } .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--bark); } .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 2px; vertical-align: -1px; } .heat { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; } .heat span { aspect-ratio: 1; border-radius: 2px; background: var(--clay); } .heat span.on { background: var(--success); } .kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); gap: 10px; overflow-x: auto; } .kanban .col { background: var(--sand); border: 1px solid var(--rule); padding: 8px; min-height: 60px; } .kanban .item { background: var(--paper); border: 1px solid var(--rule); padding: 6px 8px; margin-top: 6px; } .task { display: flex; gap: 10px; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px dotted var(--rule); } .form-grid { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); } .form-grid label { display: grid; gap: 4px; font-size: 12px; color: var(--bark); } tr.go { cursor: pointer; } tr.go:hover td { background: var(--sand); } tr.total td { font-weight: 600; border-top: 1px solid var(--rule-strong); } .field-row { display: grid; grid-template-columns: minmax(90px, 30%) 1fr auto; gap: 10px; padding: 6px 0; border-bottom: 1px dotted var(--rule); } </style>');
+const SERIES = ['var(--primary)', 'var(--ochre)', 'var(--info)', 'var(--success)', 'var(--bark)', 'var(--ember)'];
+let current = null;
+const numeric = (v) => typeof v === 'number' && isFinite(v);
+const fmt = (v) => numeric(v) ? new Intl.NumberFormat(words === WORDS.en ? 'en' : 'fr', { maximumFractionDigits: 2 }).format(v) : (v == null || v === '' ? '—' : esc(Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : v));
+const framed = () => !host.inside || (current && current.frame);
+async function reload(params) {
+  if (!current) return;
+  const next = Object.assign({}, current.params, params || {});
+  if (framed()) {
+    const q = new URLSearchParams(Object.assign({ space: current.spaceId }, next));
+    const res = await fetch('/api/pages/' + encodeURIComponent(current.id) + '?' + q, { credentials: 'same-origin' });
+    const data = await res.json(); if (!res.ok) throw new Error(data.error || res.status);
+    render(Object.assign(data, { frame: true }));
+  } else {
+    render(await callTool('page', { id: current.id, params: next }));
+  }
+}
+async function saveEntries(entries) {
+  if (framed()) {
+    const res = await fetch('/api/save?space=' + encodeURIComponent(current.spaceId), { method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entries }) });
+    const data = await res.json(); if (!res.ok) throw new Error(data.error || res.status);
+    return data;
+  }
+  return callTool('save', { entries, space: current.spaceId });
+}
+function open(id) {
+  if (framed() && window.parent !== window) { try { window.parent.location.hash = '#/entree/' + id; return; } catch {} }
+  if (!framed()) tellModel(say(words.opened, { id }), { id });
+}
+function card(b, inner, wide) {
+  return '<article class="card' + (wide ? ' wide' : '') + '">' + (b.title ? '<h2>' + esc(b.title) + '</h2>' : '') + inner + '</article>';
+}
+function table(columns, rows, extra) {
+  if (!rows.length) return '<p class="empty">' + esc(words.empty) + '</p>';
+  const nums = columns.map((c) => rows.every((r) => r[c] == null || numeric(r[c])));
+  return '<div class="scroll"><table><thead><tr>' + columns.map((c, i) => '<th class="' + (nums[i] ? 'n' : '') + '">' + esc(c === 'title' ? words.titleCol : c === 'group' ? '' : c) + '</th>').join('') + '</tr></thead><tbody>' +
+    rows.map((r) => '<tr class="' + (r.id ? 'go' : '') + '"' + (r.id ? ' data-open="' + esc(r.id) + '"' : '') + '>' + columns.map((c, i) => '<td class="' + (nums[i] ? 'n num' : '') + '">' + fmt(r[c]) + '</td>').join('') + '</tr>').join('') + (extra || '') + '</tbody></table></div>';
+}
+const draw = {
+  stat: (b) => card(b, '<div class="kpi">' + fmt(b.value) + (b.unit ? ' <span class="muted" style="font-size:14px">' + esc(b.unit) + '</span>' : '') + '</div>'),
+  stat_delta: (b) => card(b, '<div class="kpi">' + fmt(b.value) + (b.unit ? ' <span class="muted" style="font-size:14px">' + esc(b.unit) + '</span>' : '') + '</div>' +
+    (b.delta == null ? '<div class="muted">' + esc(words.noCompare) + '</div>' : '<div class="delta ' + (b.delta > 0 ? 'up' : 'down') + '">' + (b.delta > 0 ? '↑ ' : '↓ ') + fmt(Math.abs(b.delta)) + ' % ' + esc(say(words.vsPrevious, { value: fmt(b.previous) })) + '</div>')),
+  gauge: (b) => card(b, b.items.length ? b.items.map((g) => { const p = numeric(g.max) && g.max > 0 && numeric(g.value) ? g.value / g.max * 100 : 0;
+    return '<div class="gauge"><div class="top"><span>' + fmt(g.label) + '</span><span class="num">' + fmt(g.value) + ' / ' + fmt(g.max) + '</span></div><div class="track"><div class="fill' + (p > 100 ? ' over' : '') + '" style="width:' + Math.min(100, Math.max(1, p)) + '%"></div></div></div>'; }).join('') : '<p class="empty">' + esc(words.empty) + '</p>'),
+  bar: (b) => { const max = Math.max(1, ...b.points.map((p) => Math.abs(p.value)));
+    return card(b, b.points.length ? '<div class="bars">' + b.points.map((p) => '<div class="bar"><span>' + fmt(p.label) + '</span><span class="track"><span class="fill" style="display:block;width:' + Math.max(1, Math.abs(p.value) / max * 100) + '%"></span></span><span class="num">' + fmt(p.value) + '</span></div>').join('') + '</div>' : '<p class="empty">' + esc(words.empty) + '</p>'); },
+  breakdown: (b) => { const total = b.points.reduce((t, p) => t + Math.max(0, p.value), 0) || 1;
+    return card(b, b.points.length ? '<div class="share">' + b.points.map((p, i) => '<span style="flex:' + Math.max(0, p.value) + ';background:' + SERIES[i % SERIES.length] + '"></span>').join('') + '</div><div class="legend">' +
+      b.points.map((p, i) => '<span><i style="background:' + SERIES[i % SERIES.length] + '"></i>' + fmt(p.label) + ' ' + Math.round(Math.max(0, p.value) / total * 100) + ' %</span>').join('') + '</div>' : '<p class="empty">' + esc(words.empty) + '</p>', true); },
+  line: (b) => { const v = b.points.map((p) => p.value); if (v.length < 2) return draw.bar(b);
+    const lo = Math.min(...v), hi = Math.max(...v), pad = (hi - lo) * 0.15 || Math.abs(hi) * 0.1 || 1, min = lo - pad, span = hi + pad - min;
+    const W = 600, H = 180, px = (i) => 10 + i * (W - 20) / (v.length - 1), py = (x) => 12 + (1 - (x - min) / span) * (H - 36);
+    return card(b, '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + esc(b.title || '') + '"><polyline fill="none" stroke="var(--primary)" stroke-width="2.5" points="' + v.map((x, i) => px(i).toFixed(1) + ',' + py(x).toFixed(1)).join(' ') + '"/>' +
+      v.map((x, i) => '<circle cx="' + px(i) + '" cy="' + py(x) + '" r="3.5" fill="var(--primary)"><title>' + esc(b.points[i].label) + ' : ' + fmt(x) + '</title></circle>').join('') +
+      '<text x="10" y="' + (H - 6) + '">' + esc(b.points[0].label) + '</text><text x="' + (W - 10) + '" y="' + (H - 6) + '" text-anchor="end">' + esc(b.points[v.length - 1].label) + '</text></svg>', true); },
+  heatmap: (b) => card(b, '<div class="heat">' + b.cells.map((c) => '<span class="' + (c.done ? 'on' : '') + '" title="' + esc(c.day) + '"></span>').join('') + '</div><div class="muted" style="margin-top:6px">' + esc(say(words.daysDone, { n: b.done, of: b.cells.length })) + '</div>'),
+  table: (b) => card(b, table(b.columns, b.rows, b.total ? '<tr class="total">' + b.columns.map((c, i) => '<td class="' + (c === b.total ? 'n num' : '') + '">' + (i === 0 ? esc(words.total) : c === b.total ? fmt(b.totalValue) : '') + '</td>').join('') + '</tr>' : ''), true),
+  task_list: (b) => card(b, b.items.length ? b.items.map((t) => '<div class="task"><span><a href="#" data-open="' + esc(t.id) + '">' + esc(t.title) + '</a>' + (t.detail != null ? ' <span class="muted">· ' + fmt(t.detail) + '</span>' : '') + '</span><button class="quiet" data-set="' + esc(t.id) + '" data-block="' + current.blocks.indexOf(b) + '">' + esc(b.action.label) + '</button></div>').join('') : '<p class="empty">' + esc(words.allDone) + '</p>'),
+  kanban: (b) => card(b, '<div class="kanban">' + b.columns.map((c) => '<div class="col"><div class="caps">' + esc(c.name) + ' · ' + c.items.length + '</div>' + c.items.map((i) => '<div class="item"><a href="#" data-open="' + esc(i.id) + '">' + esc(i.title) + '</a></div>').join('') + '</div>').join('') + '</div>', true),
+  calendar: (b) => card(b, b.occurrences.length ? '<ul class="list">' + b.occurrences.map((o) => '<li><span>' + esc(o.title) + ' <span class="muted">· ' + esc(o.kind) + '</span></span><span class="num muted">' + esc(new Date(o.start).toLocaleString(words === WORDS.en ? 'en' : 'fr', o.allDay ? { weekday: 'short', day: 'numeric', month: 'short' } : { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })) + '</span></li>').join('') + '</ul>' : '<p class="empty">' + esc(words.empty) + '</p>'),
+  form: (b) => card(b, '<form data-form="' + current.blocks.indexOf(b) + '"><div class="form-grid"><label>' + esc(words.titleCol) + ' *<input name="__title" required></label>' +
+    b.fields.map((f) => '<label>' + esc(f.name + (f.required ? ' *' : '') + (f.unit ? ' · ' + f.unit : '')) +
+      (f.type === 'choice' ? '<select name="' + esc(f.name) + '"><option value=""></option>' + f.options.map((o) => '<option>' + esc(o) + '</option>').join('') + '</select>'
+        : f.type === 'boolean' ? '<select name="' + esc(f.name) + '"><option value=""></option><option value="true">✓</option><option value="false">—</option></select>'
+        : '<input name="' + esc(f.name) + '" placeholder="' + esc(f.type === 'link' ? words.linkHint : '') + '" type="' + (f.type === 'date' ? 'date' : f.type === 'datetime' ? 'datetime-local' : ['number', 'amount'].includes(f.type) ? 'number' : 'text') + '" step="any">') + '</label>').join('') +
+    '</div><p class="error-text" data-error></p><button>' + esc(words.add) + '</button></form>', true),
+  record: (b) => { const r = b.record; if (!r) return card(b, '<p class="empty">' + esc(words.empty) + '</p>', true);
+    // Under the entry's own page, its fields are already shown: only what belongs to it.
+    const own = String(current.id).startsWith('record:') ? [] : r.fields;
+    return card(b, own.map((f) => '<div class="field-row"><span class="caps">' + esc(f.name) + '</span><span class="' + (numeric(f.value) ? 'num' : '') + '">' + fmt(f.value) + '</span><span>' + (f.computed ? '<span class="badge">' + esc(words.computed) + '</span>' : '') + '</span></div>').join('') +
+      r.relations.map((rel) => '<h2 style="margin-top:14px">' + esc(rel.name) + ' · ' + rel.rows.length + '</h2>' + table(rel.columns, rel.rows)).join(''), true); },
+};
+function render(data) {
+  const root = document.getElementById('root');
+  if (!data || !data.blocks) { root.innerHTML = '<p class="empty">' + esc(words.nothing) + '</p>'; return; }
+  current = data;
+  const filters = data.filters.length ? '<div class="filters">' + data.filters.map((f) => '<label><span class="caps">' + esc(f.label || f.name) + '</span>' +
+    (f.type === 'month' ? '<input type="month" data-filter="' + esc(f.name) + '" value="' + esc(f.value) + '">'
+      : f.type === 'choice' ? '<select data-filter="' + esc(f.name) + '">' + (f.options || []).map((o) => '<option' + (o === f.value ? ' selected' : '') + '>' + esc(o) + '</option>').join('') + '</select>'
+      : '<input data-filter="' + esc(f.name) + '" value="' + esc(f.value) + '">') + '</label>').join('') + '</div>' : '';
+  // A record page is framed under the entry's own title: no second one.
+  const head = String(data.id).startsWith('record:') ? '' : '<header class="head"><div>' + (data.app ? '<div class="caps">' + esc(data.app) + '</div>' : '') + '<h1>' + esc(data.title) + '</h1></div></header>';
+  root.innerHTML = head + filters +
+    '<section class="grid">' + data.blocks.map((b) => b.error ? card(b, '<p class="error-text">' + esc(say(words.failed, { reason: b.error })) + '</p>') : (draw[b.block] ? draw[b.block](b) : '')).join('') + '</section>';
+  root.querySelectorAll('[data-filter]').forEach((el) => el.addEventListener('change', () => reload({ [el.dataset.filter]: el.value }).catch((e) => alert(e.message))));
+  root.querySelectorAll('[data-open]').forEach((el) => el.addEventListener('click', (event) => { event.preventDefault(); open(el.dataset.open); }));
+  root.querySelectorAll('[data-set]').forEach((el) => el.addEventListener('click', async () => {
+    el.disabled = true;
+    try { await saveEntries([{ id: el.dataset.set, data: current.blocks[Number(el.dataset.block)].action.set }]); await reload(); }
+    catch (e) { el.disabled = false; alert(e.message); }
+  }));
+  root.querySelectorAll('[data-form]').forEach((form) => form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const b = current.blocks[Number(form.dataset.form)];
+    const data = {};
+    for (const f of b.fields) {
+      const v = form.elements[f.name] && form.elements[f.name].value;
+      if (!v) continue;
+      data[f.name] = ['number', 'amount'].includes(f.type) ? Number(v) : f.type === 'boolean' ? v === 'true' : v;
+    }
+    try { await saveEntries([{ kind: b.kind, title: form.elements.__title.value.trim(), data }]); await reload(); }
+    catch (e) { form.querySelector('[data-error]').textContent = e.message; }
+  }));
+}
+start(render);
+
+</script></body></html>

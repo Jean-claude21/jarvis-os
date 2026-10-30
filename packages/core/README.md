@@ -146,8 +146,10 @@ Time is a field any entry may carry; the calendar is computed from them, never s
 ## Type models (specs 012, 014)
 
 A kind's shape, said once: an entry of kind « Model » whose title is the kind and whose data is
-`{ fields: [{ name, type, required?, options?, target?, cardinality?, inverse?, formula?, fields?,
-unit?, help? }], path?, columns?, total?, groupBy?, app?, open?, workflow? }`. Types: text,
+`{ label?, fields: [{ name, type, label?, required?, options?, optionLabels?, target?, cardinality?,
+inverse?, formula?, fields?, unit?, help? }], path?, columns?, total?, groupBy?, app?, open?,
+workflow? }`. Technical names are English; `label` and `optionLabels` (`{ fr, en }`) are what she
+reads. Types: text,
 number, amount, date, datetime, duration, choice, boolean, list, link, formula, lines.
 
 | Function              | What it does                                                                     |

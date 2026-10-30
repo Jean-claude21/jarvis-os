@@ -83,17 +83,17 @@ describe('a dashboard recomputed on each open', () => {
       title: 'Mes dépenses',
       widgets: [
         {
-          titre: 'Total',
-          requete: "select sum((data->>'montant')::int) as total from my_entries",
-          graphe: 'nombre',
+          title: 'Total',
+          query: "select sum((data->>'montant')::int) as total from my_entries",
+          chart: 'number',
         },
         {
-          titre: 'Par poste',
-          requete:
+          title: 'Par poste',
+          query:
             "select data->>'poste' as poste, sum((data->>'montant')::int) as total from my_entries group by 1 order by 2 desc",
-          graphe: 'barres',
+          chart: 'bar',
         },
-        { titre: 'Cassé', requete: 'select nope from my_entries', graphe: 'tableau' },
+        { title: 'Cassé', query: 'select nope from my_entries', chart: 'table' },
       ],
     });
     expect(result.isError).toBeFalsy();
@@ -104,22 +104,22 @@ describe('a dashboard recomputed on each open', () => {
       { poste: 'Transport', total: '2500' },
     ]);
     expect(widgets[2]!.error).toContain('nope');
-    expect(result.content[0]!.text).toContain('## Par poste (barres)');
+    expect(result.content[0]!.text).toContain('## Par poste (bar)');
   });
 
   it('opens a saved dashboard by name, with figures of now', async () => {
     await ama.call('save', {
       entries: [
         {
-          kind: 'Tableau de bord',
+          kind: 'Dashboard',
           title: 'Budget du mois',
           data: {
             widgets: [
               {
-                titre: 'Par mois',
-                requete:
+                title: 'Par mois',
+                query:
                   "select data->>'mois' as mois, sum((data->>'montant')::int) as total from my_entries where kind = 'Dépense' group by 1 order by 1",
-                graphe: 'courbe',
+                chart: 'line',
               },
             ],
           },

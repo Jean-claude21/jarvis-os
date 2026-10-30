@@ -34,9 +34,19 @@ const fieldName = z
   .max(60)
   .regex(/^[\p{L}\d_ -]+$/u, 'A field name is letters, digits, spaces, - or _.');
 
+/** What a person reads instead of a technical name, in her language: `{ fr: 'Montant', en: 'Amount' }`. */
+export const labelSchema = z.object({
+  fr: z.string().trim().min(1).max(80).optional(),
+  en: z.string().trim().min(1).max(80).optional(),
+});
+export type Label = z.infer<typeof labelSchema>;
+
 /** A field of a line (`lines`): no relation, formula or lines inside a line. */
 export const lineFieldSchema = z.object({
   name: fieldName,
+  label: labelSchema.optional(),
+  /** What each option reads as: `{ out: { fr: 'sortie', en: 'out' } }`. */
+  optionLabels: z.record(z.string(), labelSchema).optional(),
   type: z.enum([
     'text',
     'number',
@@ -98,6 +108,8 @@ const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').tri
 export const modelDataSchema = z
   .object({
     fields: z.array(modelFieldSchema).min(1).max(60),
+    /** What the kind reads as in the app: `{ fr: 'Mouvement', en: 'Transaction' }`. */
+    label: labelSchema.optional(),
     /** Fields not in the model are refused, unless the model is open. */
     open: z.boolean().optional(),
     /**
@@ -204,7 +216,6 @@ export interface Model extends ModelData {
 /** Fields every kind may carry: her text, its source, its time, its state (specs 006–011). */
 export const COMMON_FIELDS = new Set([
   'text',
-  'texte',
   'source',
   'status',
   'note',
@@ -407,12 +418,6 @@ export function placeOf(
     date: day,
     title: slug(entry.title),
     id: entry.id,
-    // The words of spec 012.
-    année: year,
-    annee: year,
-    mois: month,
-    jour: date,
-    titre: slug(entry.title),
   };
   const placed = path.replace(/\{([^{}]+)\}/g, (_, name: string) => {
     const key = name.trim();

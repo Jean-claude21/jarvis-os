@@ -70,9 +70,9 @@ describe('the occurrences of one entry', () => {
     expect(gym.map((one) => one.start)).toEqual(['2026-10-27T17:30:00.000Z']);
     expect(gym[0]).toMatchObject({ end: '2026-10-27T19:00:00.000Z', repeated: true, type: 'span' });
     // Every evening at 20:45 but Saturday: six times this week.
-    expect(occurrencesOf(row({ repeat: '45 20 * * 0-5' }, 'Rappel'), from, to, today)).toHaveLength(
-      6,
-    );
+    expect(
+      occurrencesOf(row({ repeat: '45 20 * * 0-5' }, 'Reminder'), from, to, today),
+    ).toHaveLength(6);
     // A repetition that starts on Thursday.
     expect(
       occurrencesOf(row({ repeat: '0 7 * * *', start: '2026-10-29' }), from, to, today).map((one) =>
@@ -128,7 +128,7 @@ describe('her calendar', () => {
           },
           { kind: 'Habitude', title: 'Gym', data: { repeat: '30 18 * * 2,3', duration: 90 } },
           {
-            kind: 'Rappel',
+            kind: 'Reminder',
             title: 'Déjà envoyé',
             data: { at: '2026-10-30T08:00', status: 'sent' },
           },
@@ -145,7 +145,7 @@ describe('her calendar', () => {
       'Habitude:Gym',
       'Habitude:Gym',
       'Événement:Dentiste',
-      'Rappel:Déjà envoyé',
+      'Reminder:Déjà envoyé',
       'Obligation:Frais de dossier',
     ]);
     expect(week[0]?.space).toBe('Ama');
@@ -174,7 +174,7 @@ describe('the private address of her calendar', () => {
     const second = await kofi.as((tx) => renewCalendarKey(tx, kofi.actor, kofi.space));
     expect(await calendarOwner(db, first)).toBeNull();
     expect(await calendarOwner(db, second)).toBe(kofi.id);
-    const [canal] = await kofi.as((tx) => find(tx, kofi.space, { kind: 'Canal' }));
+    const [canal] = await kofi.as((tx) => find(tx, kofi.space, { kind: 'Channel' }));
     expect(JSON.stringify(canal?.data)).not.toContain(second);
     expect(await calendarOwner(db, 'not-a-key')).toBeNull();
   });

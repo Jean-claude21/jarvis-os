@@ -78,7 +78,7 @@ const json = (value: unknown) => ({
   content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }],
 });
 
-/** The text of an entry kept as instructions (a routine's consigne, a charter's texte). */
+/** The text of an entry kept as instructions (a routine's instruction, a charter's text). */
 const textOf = (data: Record<string, unknown>, ...keys: string[]) => {
   for (const key of keys) if (typeof data[key] === 'string' && data[key]) return data[key];
   return JSON.stringify(data);
@@ -92,19 +92,19 @@ async function methodOf(tx: Tx, spaces: Space[]) {
     for (const entry of await find(tx, space.id, { kind: 'Routine', limit: 100 })) {
       routines.push({
         name: entry.title,
-        // A routine she said (when, instruction) or one read from her files (description, texte).
+        // A routine she said (when, instruction) or one read from her files (description, text).
         when: String(
           entry.data.when ?? entry.data.at ?? entry.data.quand ?? entry.data.description ?? '',
         ),
-        text: textOf(entry.data, 'instruction', 'consigne', 'texte', 'text'),
+        text: textOf(entry.data, 'instruction', 'text', 'description'),
         space: space.name,
       });
     }
-    for (const entry of await find(tx, space.id, { kind: 'Charte', limit: 10 })) {
+    for (const entry of await find(tx, space.id, { kind: 'Charter', limit: 10 })) {
       charters.push({
         space: space.name,
         title: entry.title,
-        text: textOf(entry.data, 'texte', 'text'),
+        text: textOf(entry.data, 'text'),
       });
     }
   }
@@ -642,7 +642,7 @@ export async function mcpServerFor(
     'app_install',
     {
       description: [
-        `Install an app in a space: one that ships with Jarvis by \`name\` (${shippedApps.map((one) => `« ${one.app} »: ${one.description ?? ''}`).join(' ')})`,
+        `Install an app in a space: one that ships with Jarvis by \`name\` (${shippedApps.map((one) => `« ${one.app} »: ${typeof one.description === 'object' ? (one.description.en ?? '') : (one.description ?? '')}`).join(' ')})`,
         'or a `bundle` (from `app_export`). `dryRun` (default true) lists what would be created; what',
         'is already there (same kind and title) is kept. Show her, then install with `dryRun: false`.',
       ].join(' '),

@@ -222,12 +222,12 @@ export async function runScript(
     } else if ('link' in change) {
       links.push(change.link);
     } else {
-      if (!allowed.has('rappel'))
+      if (!allowed.has('reminder'))
         throw new Error(
-          `Script « ${row.title} » may not write a « Rappel » (it writes ${script.writes.join(', ')}).`,
+          `Script « ${row.title} » may not write a « Reminder » (it writes ${script.writes.join(', ')}).`,
         );
       toSave.push({
-        kind: 'Rappel',
+        kind: 'Reminder',
         title: change.remind.text,
         data: { at: change.remind.at ?? new Date().toISOString(), status: 'planned' },
         origin: 'inferred',

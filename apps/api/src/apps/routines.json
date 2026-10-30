@@ -1,49 +1,84 @@
 {
   "app": "Routines",
   "version": 1,
-  "description": "Habitudes avec leur cadence dans l'agenda, pointages, séries et taux de régularité ; la semaine et la régularité en un coup d'œil, un rappel quand une habitude non négociable n'est pas pointée.",
+  "description": {
+    "fr": "Habitudes avec leur cadence dans l'agenda, pointages, séries et taux de régularité ; la semaine et la régularité en un coup d'œil, un rappel quand une habitude non négociable n'est pas pointée.",
+    "en": "Habits with their cadence in the calendar, check-ins, streaks and consistency; the week and the consistency at a glance, a reminder when a non-negotiable habit is not checked in."
+  },
   "models": [
     {
-      "title": "Habitude",
+      "title": "Habit",
       "data": {
+        "label": { "fr": "Habitude", "en": "Habit" },
         "fields": [
           {
             "name": "repeat",
             "type": "text",
-            "help": "La cadence en cinq champs (« 30 18 * * 2,3 ») : elle met l'habitude dans l'agenda."
+            "label": { "fr": "Cadence", "en": "Cadence" },
+            "help": "Five fields (« 30 18 * * 2,3 »): it puts the habit in the calendar."
           },
-          { "name": "duration", "type": "duration" },
+          { "name": "duration", "type": "duration", "label": { "fr": "Durée", "en": "Duration" } },
           {
-            "name": "aspect",
+            "name": "facet",
             "type": "choice",
-            "options": ["esprit", "âme", "corps", "relations", "travail"]
+            "options": ["mind", "soul", "body", "relationships", "work"],
+            "label": { "fr": "Aspect", "en": "Facet" },
+            "optionLabels": {
+              "mind": { "fr": "esprit", "en": "mind" },
+              "soul": { "fr": "âme", "en": "soul" },
+              "body": { "fr": "corps", "en": "body" },
+              "relationships": { "fr": "relations", "en": "relationships" },
+              "work": { "fr": "travail", "en": "work" }
+            }
           },
-          { "name": "non_negociable", "type": "boolean" },
-          { "name": "serie", "type": "formula", "formula": "streak(pointages.date)" },
           {
-            "name": "taux_30j",
-            "type": "formula",
-            "formula": "round(count(pointages where last_days(date, 30)) / 30 * 100)"
+            "name": "non_negotiable",
+            "type": "boolean",
+            "label": { "fr": "Non négociable", "en": "Non-negotiable" }
           },
-          { "name": "dernier", "type": "formula", "formula": "max(pointages.date)" }
+          {
+            "name": "streak",
+            "type": "formula",
+            "label": { "fr": "Série", "en": "Streak" },
+            "formula": "streak(check_ins.date)"
+          },
+          {
+            "name": "rate_30d",
+            "type": "formula",
+            "label": { "fr": "Régularité 30 j (%)", "en": "30-day rate (%)" },
+            "formula": "round(count(check_ins where last_days(date, 30)) / 30 * 100)"
+          },
+          {
+            "name": "last",
+            "type": "formula",
+            "label": { "fr": "Dernier pointage", "en": "Last check-in" },
+            "formula": "max(check_ins.date)"
+          }
         ],
-        "columns": ["aspect", "serie", "taux_30j", "dernier"],
-        "path": "routines/habitudes/{title}.md"
+        "columns": ["facet", "streak", "rate_30d", "last"],
+        "path": "routines/habits/{title}.md"
       }
     },
     {
-      "title": "Pointage",
+      "title": "CheckIn",
       "data": {
+        "label": { "fr": "Pointage", "en": "Check-in" },
         "fields": [
-          { "name": "date", "type": "date", "required": true },
           {
-            "name": "habitude",
-            "type": "link",
-            "target": "Habitude",
-            "inverse": "pointages",
-            "required": true
+            "name": "date",
+            "type": "date",
+            "required": true,
+            "label": { "fr": "Date", "en": "Date" }
           },
-          { "name": "note", "type": "text" }
+          {
+            "name": "habit",
+            "type": "link",
+            "target": "Habit",
+            "inverse": "check_ins",
+            "required": true,
+            "label": { "fr": "Habitude", "en": "Habit" }
+          },
+          { "name": "note", "type": "text", "label": { "fr": "Note", "en": "Note" } }
         ],
         "columns": ["date"],
         "path": "routines/{year}/{month}/{date}-{title}.md"
@@ -52,50 +87,56 @@
   ],
   "pages": [
     {
-      "title": "Ma régularité",
+      "title": "Consistency",
       "data": {
+        "label": { "fr": "Ma régularité", "en": "My consistency" },
         "order": 1,
         "blocks": [
-          { "block": "calendar", "title": "Cette semaine", "days": 7 },
+          { "block": "calendar", "title": { "fr": "Cette semaine", "en": "This week" }, "days": 7 },
           {
             "block": "gauge",
-            "title": "Régularité sur 30 jours (%)",
-            "kind": "Habitude",
-            "value": "taux_30j",
+            "title": { "fr": "Régularité sur 30 jours (%)", "en": "30-day consistency (%)" },
+            "kind": "Habit",
+            "value": "rate_30d",
             "max": "100"
           },
-          { "block": "heatmap", "title": "Jours pointés", "kind": "Pointage", "days": 35 },
+          {
+            "block": "heatmap",
+            "title": { "fr": "Jours pointés", "en": "Days checked in" },
+            "kind": "CheckIn",
+            "days": 35
+          },
           {
             "block": "table",
-            "title": "Habitudes",
+            "title": { "fr": "Habitudes", "en": "Habits" },
             "query": {
-              "kind": "Habitude",
-              "fields": ["aspect", "serie", "taux_30j", "dernier"],
-              "sort": "-serie"
+              "kind": "Habit",
+              "fields": ["facet", "streak", "rate_30d", "last"],
+              "sort": "-streak"
             }
           },
-          { "block": "form", "title": "Pointer", "kind": "Pointage" }
+          { "block": "form", "title": { "fr": "Pointer", "en": "Check in" }, "kind": "CheckIn" }
         ]
       }
     }
   ],
   "rules": [
     {
-      "title": "Non négociable oublié",
+      "title": "Non-negotiable missed",
       "data": {
         "when": { "schedule": "0 21 * * *" },
-        "then": [{ "run_script": { "script": "Habitudes du jour" } }]
+        "then": [{ "run_script": { "script": "Habits of the day" } }]
       }
     }
   ],
   "scripts": [
     {
-      "title": "Habitudes du jour",
+      "title": "Habits of the day",
       "data": {
-        "description": "Le soir : un rappel pour chaque habitude non négociable qui n'a pas été pointée aujourd'hui.",
-        "reads": ["Habitude"],
-        "writes": ["Rappel"],
-        "code": "function run(input) {\n  return input.entries.Habitude\n    .filter((h) => h.data.non_negociable && h.computed.dernier !== input.today)\n    .map((h) => ({ remind: { text: 'Pas encore fait aujourd\\'hui : ' + h.title } }));\n}"
+        "description": "In the evening: a reminder for each non-negotiable habit not checked in today.",
+        "reads": ["Habit"],
+        "writes": ["Reminder"],
+        "code": "function run(input) {\n  return input.entries.Habit\n    .filter((h) => h.data.non_negotiable && h.computed.last !== input.today)\n    .map((h) => ({ remind: { text: h.title } }));\n}"
       }
     }
   ]

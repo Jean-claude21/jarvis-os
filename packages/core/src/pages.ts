@@ -3,6 +3,7 @@ import { agenda } from './agenda';
 import { readerOf, type EntryView, type Reader } from './compute';
 import type { Tx } from './db';
 import { evaluate, isScope, parse, todayOf, type Clock } from './formula';
+import { labelSchema, type Label } from './models';
 import { requestSchema, runRequest, withParams } from './request';
 
 // Pages (spec 014): what an app shows, declared — filters and blocks — computed by the core and
@@ -11,7 +12,8 @@ import { requestSchema, runRequest, withParams } from './request';
 
 export const PAGE_KIND = 'Page';
 
-const title = z.string().trim().min(1).max(120).optional();
+/** A title: one text, or one per language `{ fr, en }`. */
+const title = z.union([z.string().trim().min(1).max(120), labelSchema]).optional();
 const formula = z.string().trim().min(1).max(1000);
 const kind = z.string().trim().min(1).max(80);
 
@@ -114,12 +116,14 @@ export const pageDataSchema = z.object({
         type: z.enum(['month', 'choice', 'text', 'record']),
         options: z.array(z.string().min(1).max(80)).max(100).optional(),
         default: z.string().max(80).optional(),
-        label: z.string().max(60).optional(),
+        label: z.union([z.string().max(60), labelSchema]).optional(),
       }),
     )
     .max(6)
     .default([]),
   blocks: z.array(blockSchema).min(1).max(24),
+  /** What the page reads as in the app: `{ fr: 'Vue du mois', en: 'Month overview' }`. */
+  label: labelSchema.optional(),
   /** Its place among the app's pages. */
   order: z.number().int().optional(),
 });
@@ -159,7 +163,8 @@ const previousMonth = (month: string) => {
 /** A block, computed: what the renderer draws. */
 export type DrawnBlock = Record<string, unknown> & {
   block: string;
-  title: string | null;
+  title: string | Label | null;
+  kind?: string;
   error?: string;
 };
 
@@ -170,7 +175,16 @@ export interface DrawnPage {
   spaceId: string;
   filters: (PageData['filters'][number] & { value: string })[];
   params: Record<string, string>;
+  label: Label | null;
   blocks: DrawnBlock[];
+  /** How each kind and its fields read in her language, for the view. */
+  vocabulary: Record<
+    string,
+    {
+      label: Label | null;
+      fields: Record<string, { label: Label | null; options: Record<string, Label> }>;
+    }
+  >;
   computedAt: string;
 }
 
@@ -186,7 +200,17 @@ async function drawBlock(
   block: Block,
   params: Record<string, string>,
 ): Promise<DrawnBlock> {
-  const base = { block: block.block, title: block.title ?? null };
+  const kindOf = 'query' in block ? block.query.kind : 'kind' in block ? block.kind : undefined;
+  const groupField =
+    'query' in block && block.query.groupBy && /^[\p{L}\p{N}_]+$/u.test(block.query.groupBy)
+      ? block.query.groupBy
+      : undefined;
+  const base = {
+    block: block.block,
+    title: block.title ?? null,
+    ...(kindOf ? { kind: kindOf } : {}),
+    ...(groupField ? { groupField } : {}),
+  };
   const filtered = async (kindName: string, where?: string) => {
     const tree = where ? parse(withParams(where, params)) : null;
     const rows = await reader.kindRows(kindName, 2000);
@@ -367,7 +391,12 @@ async function drawBlock(
           for (const column of columns) line[column] = plain(await one.get(column));
           rows.push(line);
         }
-        relations.push({ name, columns: ['title', ...columns], rows });
+        relations.push({
+          name,
+          kind: list[0]?.row.kind ?? null,
+          columns: ['title', ...columns],
+          rows,
+        });
       }
       return {
         ...base,
@@ -425,7 +454,22 @@ export async function renderPage(
     spaceId,
     filters,
     params,
+    label: data.label ?? null,
     blocks,
+    vocabulary: Object.fromEntries(
+      reader.allModels().map((model) => [
+        model.kind,
+        {
+          label: model.label ?? null,
+          fields: Object.fromEntries(
+            model.fields.map((field) => [
+              field.name,
+              { label: field.label ?? null, options: field.optionLabels ?? {} },
+            ]),
+          ),
+        },
+      ]),
+    ),
     computedAt: clock.now.toISOString(),
   };
 }
@@ -435,7 +479,9 @@ export async function pagesOf(
   tx: Tx,
   spaceId: string,
   app?: string,
-): Promise<{ id: string; title: string; app: string | null; order: number }[]> {
+): Promise<
+  { id: string; title: string; label: Label | null; app: string | null; order: number }[]
+> {
   const { rows } = await tx.query<{ id: string; title: string; data: Record<string, unknown> }>(
     `select id, title, data from entry
       where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
@@ -446,6 +492,8 @@ export async function pagesOf(
     .map((row) => ({
       id: row.id,
       title: row.title,
+      label:
+        row.data.label && typeof row.data.label === 'object' ? (row.data.label as Label) : null,
       app: typeof row.data.app === 'string' ? row.data.app : null,
       order: typeof row.data.order === 'number' ? row.data.order : 100,
     }))

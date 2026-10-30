@@ -12,7 +12,7 @@ beforeAll(async () => {
     save(tx, ama.actor, ama.space, {
       entries: [
         {
-          kind: 'Rappel',
+          kind: 'Reminder',
           title: 'Taxe foncière',
           data: { at: '2026-10-30T08:00', status: 'failed' },
         },

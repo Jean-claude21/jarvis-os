@@ -15,22 +15,22 @@ beforeAll(async () => {
       {
         kind: 'Théorie',
         title: 'Théorie du royaume',
-        data: { texte: `# Théorie du royaume\n\n## Fondement\n\n${'Le royaume. '.repeat(50)}` },
+        data: { text: `# Théorie du royaume\n\n## Fondement\n\n${'Le royaume. '.repeat(50)}` },
       },
       {
-        kind: 'Rappel',
+        kind: 'Reminder',
         title: 'Bientôt',
         data: { at: new Date(Date.now() + 86_400_000).toISOString() },
       },
       {
-        kind: 'Tableau de bord',
+        kind: 'Dashboard',
         title: 'Budget',
         data: {
           widgets: [
             {
-              titre: 'Total',
-              graphe: 'nombre',
-              requete:
+              title: 'Total',
+              chart: 'number',
+              query:
                 "select sum((data->>'montant')::numeric) as total from my_entries where kind = 'Dépense'",
             },
           ],

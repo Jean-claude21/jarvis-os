@@ -136,7 +136,7 @@ describe('a rule', () => {
       }),
     );
     ids.Marché = first.entries[0]!.id;
-    expect(await ama.as((tx) => find(tx, ama.space, { kind: 'Rappel' }))).toHaveLength(0);
+    expect(await ama.as((tx) => find(tx, ama.space, { kind: 'Reminder' }))).toHaveLength(0);
     const saved = await ama.as((tx) =>
       save(tx, ama.actor, ama.space, {
         entries: [
@@ -148,7 +148,7 @@ describe('a rule', () => {
         ],
       }),
     );
-    const [reminder] = await ama.as((tx) => find(tx, ama.space, { kind: 'Rappel' }));
+    const [reminder] = await ama.as((tx) => find(tx, ama.space, { kind: 'Reminder' }));
     expect(reminder?.title).toMatch(/^Le fonds Courses est dépassé de 1\s000$/);
     const entry = await ama.as((tx) => get(tx, ama.space, saved.entries[0]!.id));
     expect(entry?.data.confirme).toBe(false);
@@ -168,7 +168,7 @@ describe('a rule', () => {
       'link.add',
       'entry.update',
     ]);
-    expect(await ama.as((tx) => find(tx, ama.space, { kind: 'Rappel' }))).toHaveLength(1);
+    expect(await ama.as((tx) => find(tx, ama.space, { kind: 'Reminder' }))).toHaveLength(1);
   });
 
   it('runs on a schedule, from the watcher', async () => {

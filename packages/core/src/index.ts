@@ -103,6 +103,8 @@ export {
   TYPES,
   placeOf,
   workflowSchema,
+  labelSchema,
+  type Label,
   type FieldType,
   type Model,
   type ModelData,

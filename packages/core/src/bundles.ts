@@ -19,7 +19,12 @@ const piece = z.object({
 export const bundleSchema = z.object({
   app: z.string().trim().min(1).max(60),
   version: z.literal(1).default(1),
-  description: z.string().max(2000).optional(),
+  description: z
+    .union([
+      z.string().max(2000),
+      z.object({ fr: z.string().max(2000).optional(), en: z.string().max(2000).optional() }),
+    ])
+    .optional(),
   models: z.array(piece).max(40).default([]),
   pages: z.array(piece).max(40).default([]),
   rules: z.array(piece).max(40).default([]),

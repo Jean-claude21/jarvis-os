@@ -220,6 +220,11 @@ const ICONS = {
 const script = `
 const W = WORDS;
 const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';');
+// Technical names stay English; what she reads comes from the models' labels, in her language.
+const tr = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v[LANG] || v.en || v.fr || '' : v);
+const kindLabel = (k) => (k && k.model && k.model.label ? tr(k.model.label) : k.kind);
+const fieldLabelOf = (model, name) => { const f = model && model.fields.find((c) => c.name === name); return f && f.label ? tr(f.label) : name; };
+const optionLabelOf = (model, name, v) => { const f = model && model.fields.find((c) => c.name === name); return f && f.optionLabels && typeof v === 'string' && f.optionLabels[v] ? tr(f.optionLabels[v]) : v; };
 const say = (t, v) => String(t).replace(/\\{(\\w+)\\}/g, (_, k) => (v && v[k] != null ? v[k] : ''));
 const locale = LANG === 'en' ? 'en' : 'fr';
 const day = (iso) => iso ? new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -341,7 +346,7 @@ const pages = {
     let detail = '<div class="pane"><div class="pb pad"><p class="empty">' + esc(W.allClear) + '</p></div></div>';
     if (sel) {
       const e = await api('/entries/' + encodeURIComponent(sel.id) + '?space=' + encodeURIComponent(sel.spaceId));
-      const fields = Object.keys(e.data).filter((f) => !['texte', 'source'].includes(f)).slice(0, 8);
+      const fields = Object.keys(e.data).filter((f) => !['text', 'source'].includes(f)).slice(0, 8);
       const value = (v) => v !== null && typeof v === 'object' ? JSON.stringify(v) : String(v);
       const links = e.links.out.concat(e.links.in);
       const acts = [];
@@ -355,7 +360,7 @@ const pages = {
       detail = '<button class="quiet back" data-back>← ' + esc(W.back) + '</button>' +
         '<section class="pane"><div class="ph"><span>' + esc(sel.kind + ' · ' + W['g_' + sel.group]) + '</span><span class="tag ' + esc(sel.group) + '">' + esc(W['r_' + sel.reason] || sel.reason) + '</span></div><div class="pb pad subject">' +
         '<div class="caps">' + esc(sel.space) + '</div><h2>' + esc(e.title) + '</h2>' + (sel.when ? '<p class="muted" style="margin:0 0 10px">' + esc(when(sel)) + '</p>' : '') +
-        (typeof e.data.texte === 'string' ? '<p style="margin:0 0 10px">' + esc(e.data.texte.slice(0, 400)) + (e.data.texte.length > 400 ? '…' : '') + '</p>' : '') +
+        (typeof e.data.text === 'string' ? '<p style="margin:0 0 10px">' + esc(e.data.text.slice(0, 400)) + (e.data.text.length > 400 ? '…' : '') + '</p>' : '') +
         fields.map((f) => '<div class="field-row"><span class="caps">' + esc(f) + '</span><span>' + esc(value(e.data[f])) + '</span>' + originBadge(e.origin[f] || 'said') + '</div>').join('') +
         (links.length ? '<div class="chips" style="margin-top:12px">' + links.map((l) => '<a class="chip" href="#/entree/' + esc(l.entry.id) + '">' + esc(l.entry.title) + '<small>' + esc(l.role) + '</small></a>').join('') + '</div>' : '') +
         '<div class="actions" style="margin-top:12px"><a class="link" href="#/entree/' + esc(e.id) + '">' + esc(W.fullEntry) + ' →</a></div></div></section>' +
@@ -376,15 +381,15 @@ const pages = {
       const shipped = await api('/apps');
       return '<p class="lead">' + esc(W.appsLead) + '</p>' +
         (apps.length ? '<section class="grid">' + apps.map((a) => card(a, '<a class="link" href="#/app/' + esc(encodeURIComponent(a)) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>' : '') +
-        '<h2 style="margin:22px 0 10px">' + esc(W.shippedApps) + '</h2><section class="grid">' + shipped.map((a) => card(a.app, '<p class="muted">' + esc(a.description) + '</p><div class="actions">' +
+        '<h2 style="margin:22px 0 10px">' + esc(W.shippedApps) + '</h2><section class="grid">' + shipped.map((a) => card(a.app, '<p class="muted">' + esc(tr(a.description)) + '</p><div class="actions">' +
           (apps.includes(a.app) ? '<span class="badge said">' + esc(W.installed) + '</span>' : '<button data-install="' + esc(a.app) + '">' + esc(W.install) + '</button>') + '</div>')).join('') + '</section>' +
         card(W.newApp, '<p class="muted">' + esc(W.newAppHow) + '</p>', true);
     }
     const models = kinds.filter((k) => k.model && k.model.app === name);
     const appPages = await api(inSpace('/pages?app=' + encodeURIComponent(name)));
     if (!models.length && !appPages.length) return empty(W.noApp);
-    const pageTabs = appPages.map((p) => '<a class="' + (p.id === params.get('page') || (!params.get('page') && !params.get('kind') && p === appPages[0]) ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?page=' + esc(encodeURIComponent(p.id)) + '">' + esc(p.title) + '</a>').join('');
-    const kindTabs = (on) => models.map((k) => '<a class="' + (k.kind === on ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '">' + esc(k.kind) + ' <span class="muted num">' + k.count + '</span></a>').join('');
+    const pageTabs = appPages.map((p) => '<a class="' + (p.id === params.get('page') || (!params.get('page') && !params.get('kind') && p === appPages[0]) ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?page=' + esc(encodeURIComponent(p.id)) + '">' + esc(tr(p.label) || p.title) + '</a>').join('');
+    const kindTabs = (on) => models.map((k) => '<a class="' + (k.kind === on ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '">' + esc(kindLabel(k)) + ' <span class="muted num">' + k.count + '</span></a>').join('');
     const shownPage = params.get('page') ? appPages.find((p) => p.id === params.get('page')) : !params.get('kind') ? appPages[0] : null;
     if (shownPage) {
       const q = new URLSearchParams(params); q.delete('page'); q.set('space', space);
@@ -401,7 +406,7 @@ const pages = {
       if (v === undefined || v === null) return '<span class="muted">—</span>';
       if (typeof v === 'number' || natureOf(n) === 'amount' || natureOf(n) === 'number') return '<span class="num ' + (v < 0 ? 'neg' : '') + '">' + esc(num(v)) + '</span>';
       if (natureOf(n) === 'boolean' || typeof v === 'boolean') return v ? '✓' : '—';
-      return esc(typeof v === 'object' ? JSON.stringify(v) : v);
+      return esc(typeof v === 'object' ? JSON.stringify(v) : optionLabelOf(model, n, v));
     };
     const groupOf = (e) => {
       if (!model.groupBy) return '';
@@ -419,8 +424,8 @@ const pages = {
         (g && model.total ? totalRow(rows, say(W.subtotal, { group: g })) : '');
     }).join('') + totalRow(list, W.total);
     const tabs = '<nav class="tabs">' + pageTabs + kindTabs(current.kind) + '</nav>';
-    return '<div class="head"><div><p class="lead" style="margin:0">' + esc(say(W.appLead, { n: models.length })) + '</p></div><div class="actions"><button class="quiet" data-model="' + esc(current.kind) + '">' + esc(W.seeModel) + '</button><button data-add="' + esc(current.kind) + '">' + esc(say(W.addOne, { kind: current.kind })) + '</button></div></div>' + tabs +
-      card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th>' + cols.map((c) => '<th class="' + (['amount', 'number'].includes(natureOf(c)) ? 'n' : '') + '">' + esc(c) + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>' : empty(), true);
+    return '<div class="head"><div><p class="lead" style="margin:0">' + esc(say(W.appLead, { n: models.length })) + '</p></div><div class="actions"><button class="quiet" data-model="' + esc(current.kind) + '">' + esc(W.seeModel) + '</button><button data-add="' + esc(current.kind) + '">' + esc(say(W.addOne, { kind: kindLabel(current) })) + '</button></div></div>' + tabs +
+      card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th>' + cols.map((c) => '<th class="' + (['amount', 'number'].includes(natureOf(c)) ? 'n' : '') + '">' + esc(fieldLabelOf(model, c)) + '</th>').join('') + '</tr></thead><tbody>' + body + '</tbody></table></div>' : empty(), true);
   },
 
   // Her files (spec 013): what each is, what Jarvis read of it, what it is linked to.
@@ -478,10 +483,10 @@ const pages = {
   async entree (params, id) {
     const e = await api(inSpace('/entries/' + encodeURIComponent(id)));
     const hist = await api(inSpace('/history?limit=20&target=' + encodeURIComponent(id)));
-    const fields = Object.keys(e.data).filter((f) => f !== 'texte' && f !== 'source');
+    const fields = Object.keys(e.data).filter((f) => f !== 'text' && f !== 'source');
     const value = (v) => v !== null && typeof v === 'object' ? '<code>' + esc(JSON.stringify(v)) + '</code>' : esc(v);
     let text = '';
-    if (typeof e.data.texte === 'string') {
+    if (typeof e.data.text === 'string') {
       const d = await api(inSpace('/documents/' + encodeURIComponent(id)));
       text = card(W.text, '<div class="actions" style="margin-bottom:8px"><a class="link" href="#/document/' + esc(id) + '">' + esc(W.open) + ' →</a></div><div class="doc">' + d.html + '</div>', true);
     }
@@ -501,7 +506,7 @@ const pages = {
   },
 
   async documents () {
-    const r = await api(inSpace('/query'), { method: 'POST', body: { sql: "select id, kind, title, length(data->>'texte') as taille, updated_at from my_entries where length(data->>'texte') > 400 and archived_at is null order by updated_at desc limit 300" } });
+    const r = await api(inSpace('/query'), { method: 'POST', body: { sql: "select id, kind, title, length(data->>'text') as taille, updated_at from my_entries where length(data->>'text') > 400 and archived_at is null order by updated_at desc limit 300" } });
     return card('', r.rows.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th><th>' + esc(W.kind) + '</th><th class="n">' + esc(W.size) + '</th><th>' + esc(W.updated) + '</th></tr></thead><tbody>' +
       r.rows.map((d) => '<tr data-go="#/document/' + esc(d.id) + '"><td>' + esc(d.title) + '</td><td><span class="badge">' + esc(d.kind) + '</span></td><td class="n num">' + esc(say(W.chars, { n: num(d.taille) })) + '</td><td class="muted">' + esc(day(d.updated_at)) + '</td></tr>').join('') +
       '</tbody></table></div>' : empty(), true);
@@ -514,7 +519,7 @@ const pages = {
   async tableaux (params) {
     const id = params.get('id');
     if (id) return '<p><a class="link" href="#/tableaux">← ' + esc(W.back) + '</a></p>' + frame('/app/frame/dashboard/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(space));
-    const list = await api(inSpace('/entries?kind=' + encodeURIComponent('Tableau de bord')));
+    const list = await api(inSpace('/entries?kind=' + encodeURIComponent('Dashboard')));
     return list.length ? '<section class="grid">' + list.map((d) => card(d.title, '<p class="muted">' + esc(day(d.updatedAt)) + '</p><a class="link" href="#/tableaux?id=' + esc(d.id) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>' : card('', empty(W.noDashboards));
   },
 
@@ -563,8 +568,8 @@ const pages = {
   },
 
   async rappels () {
-    const list = await api(inSpace('/entries?limit=200&kind=Rappel'));
-    const canal = await api('/entries?kind=Canal&limit=1&space=' + encodeURIComponent(me.space.id));
+    const list = await api(inSpace('/entries?limit=200&kind=Reminder'));
+    const canal = await api('/entries?kind=Channel&limit=1&space=' + encodeURIComponent(me.space.id));
     return '<p class="badge ' + (canal.length ? 'said' : 'error') + '" style="white-space:normal;margin-bottom:14px">' + esc(canal.length ? W.channelOn : W.channelOff) + '</p>' +
       card('', list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th><th>' + esc(W.when) + '</th><th>' + esc(W.repeats) + '</th><th>' + esc(W.status) + '</th></tr></thead><tbody>' +
         list.map((r) => '<tr data-go="#/entree/' + esc(r.id) + '"><td>' + esc(r.title) + (r.data.message ? '<div class="muted">' + esc(r.data.message) + '</div>' : '') + '</td><td class="num">' + esc(time(r.data.next || r.data.at)) + '</td><td class="num">' + esc(r.data.repeat || '') + '</td><td><span class="badge">' + esc(r.data.status ? W['st_' + r.data.status] || r.data.status : '—') + '</span></td></tr>').join('') +
@@ -590,7 +595,7 @@ const pages = {
         const list = await api('/spaces/' + encodeURIComponent(s.id) + '/invitations');
         invites = list.filter((i) => i.state === 'open').map((i) => '<li><span>' + esc(i.email) + ' <span class="muted">' + esc(day(i.expiresAt)) + '</span></span><button class="quiet" data-withdraw="' + esc(s.id + '/' + i.id) + '">' + esc(W.withdraw) + '</button></li>').join('');
       }
-      const charter = await api('/entries?kind=Charte&limit=5&space=' + encodeURIComponent(s.id));
+      const charter = await api('/entries?kind=Charter&limit=5&space=' + encodeURIComponent(s.id));
       blocks.push(card(s.name, '<p class="muted" style="margin:0 0 8px">' + esc(s.personal ? W.own : W.shared) + ' · ' + esc(W[s.role] || s.role) + '</p>' +
         '<div class="caps">' + esc(W.members) + '</div><ul class="list">' + s.members.map((m) => '<li><span>' + esc(m.name || m.person) + '</span><span class="badge">' + esc(W[m.role] || m.role) + '</span></li>').join('') + '</ul>' +
         '<div class="caps" style="margin-top:10px">' + esc(W.charter) + '</div>' + (charter.length ? '<ul class="list">' + charter.map((c) => '<li><a class="link" href="#/entree/' + esc(c.id) + '" data-space="' + esc(s.id) + '">' + esc(c.title) + '</a></li>').join('') + '</ul>' : '<p class="muted">' + esc(W.noCharter) + '</p>') +
@@ -778,8 +783,8 @@ function bind() {
   root.querySelectorAll('[data-model]').forEach((b) => b.addEventListener('click', async () => {
     const k = (await api(inSpace('/kinds'))).find((one) => one.kind === b.dataset.model);
     if (!k || !k.model) return;
-    openDrawer(say(W.modelOf, { kind: k.kind }), '<p class="muted">' + esc(W.modelLead) + '</p>' + k.model.fields.map((c) =>
-      '<div class="field-row"><span class="caps">' + esc(c.name) + '</span><span>' + esc((W['ty_' + c.type] || c.type) + (c.options ? ' : ' + c.options.join(', ') : '') + (c.target ? ' → ' + c.target : '') + (c.formula ? ' = ' + c.formula : '') + (c.unit ? ' (' + c.unit + ')' : '')) + '</span><span class="badge">' + esc(c.type === 'formula' ? W.computedBadge : c.required ? W.required : W.optional) + '</span></div>').join('') +
+    openDrawer(say(W.modelOf, { kind: kindLabel(k) }), '<p class="muted">' + esc(W.modelLead) + '</p>' + k.model.fields.map((c) =>
+      '<div class="field-row"><span class="caps">' + esc(fieldLabelOf(k.model, c.name)) + '</span><span>' + esc((W['ty_' + c.type] || c.type) + (c.options ? ' : ' + c.options.map((o) => optionLabelOf(k.model, c.name, o)).join(', ') : '') + (c.target ? ' → ' + c.target : '') + (c.formula ? ' = ' + c.formula : '') + (c.unit ? ' (' + c.unit + ')' : '')) + '</span><span class="badge">' + esc(c.type === 'formula' ? W.computedBadge : c.required ? W.required : W.optional) + '</span></div>').join('') +
       (k.model.workflow ? '<p><span class="caps">' + esc(W.workflow) + '</span><br>' + k.model.workflow.transitions.map((t) => esc([t.from].flat().join(' | ') + ' → ' + t.to + (t.if ? ' (' + t.if + ')' : ''))).join('<br>') + '</p>' : '') +
       (k.model.path ? '<p><span class="caps">' + esc(W.rangement) + '</span><br><code class="url">' + esc(k.model.path) + '</code></p>' : ''),
       '<a class="badge" href="#/entree/' + esc(k.model.id) + '">' + esc(W.fullEntry) + '</a>');
@@ -793,13 +798,13 @@ function bind() {
     const input = (c) => {
       const id = 'f_' + c.name;
       if (c.type === 'link') return '<select id="' + id + '"' + (c.cardinality === 'many' ? ' multiple' : '') + '><option value=""></option>' + (targets[c.name] || []).map((o) => '<option value="' + esc(o.id) + '">' + esc(o.title) + '</option>').join('') + '</select>';
-      if (c.type === 'choice') return '<select id="' + id + '"><option value=""></option>' + c.options.map((o) => '<option>' + esc(o) + '</option>').join('') + '</select>';
+      if (c.type === 'choice') return '<select id="' + id + '"><option value=""></option>' + c.options.map((o) => '<option value="' + esc(o) + '">' + esc(optionLabelOf(k.model, c.name, o)) + '</option>').join('') + '</select>';
       if (c.type === 'boolean') return '<select id="' + id + '"><option value=""></option><option value="true">✓</option><option value="false">—</option></select>';
       const type = c.type === 'date' ? 'date' : c.type === 'datetime' ? 'datetime-local' : ['number', 'amount'].includes(c.type) ? 'number' : 'text';
       return '<input id="' + id + '" type="' + type + '"' + (type === 'number' ? ' step="any"' : '') + '>';
     };
-    openDrawer(say(W.addOne, { kind: k.kind }), '<div class="form-field"><label>' + esc(W.title) + ' *</label><input id="f__title"></div>' +
-      fields.map((c) => '<div class="form-field"><label>' + esc(c.name + (c.required ? ' *' : '') + (c.unit ? ' · ' + c.unit : '') + (c.target ? ' → ' + c.target : '')) + '</label>' + input(c) + '</div>').join('') + '<p class="error-text" id="f__error"></p>',
+    openDrawer(say(W.addOne, { kind: kindLabel(k) }), '<div class="form-field"><label>' + esc(W.title) + ' *</label><input id="f__title"></div>' +
+      fields.map((c) => '<div class="form-field"><label>' + esc(fieldLabelOf(k.model, c.name) + (c.required ? ' *' : '') + (c.unit ? ' · ' + c.unit : '')) + '</label>' + input(c) + '</div>').join('') + '<p class="error-text" id="f__error"></p>',
       '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button id="f__save">' + esc(W.save) + '</button>');
     document.getElementById('f__save').addEventListener('click', async () => {
       const data = {};

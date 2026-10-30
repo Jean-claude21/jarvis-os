@@ -143,7 +143,7 @@ describe('a save of a kind with a model', () => {
         date: today,
         nature: 'Sortie',
         confirme: true,
-        texte: 'au marché',
+        text: 'au marché',
         compte: especes,
       },
     });
@@ -338,7 +338,7 @@ describe('her export', () => {
     );
   });
 
-  it('reads the words of a path, new and old', () => {
+  it('reads the words of a path', () => {
     const entry = {
       id: 'ent_1',
       title: 'Gym du soir',
@@ -346,9 +346,6 @@ describe('her export', () => {
       createdAt: '2026-10-01',
     };
     expect(placeOf('vie/{year}-{month}/{day}-{title}.md', entry, slugOf)).toBe(
-      'vie/2026-11/03-gym-du-soir.md',
-    );
-    expect(placeOf('vie/{année}-{mois}/{jour}-{titre}.md', entry, slugOf)).toBe(
       'vie/2026-11/03-gym-du-soir.md',
     );
     expect(placeOf('par-poste/{poste}/{id}.md', entry, slugOf)).toBe('par-poste/sante/ent_1.md');

@@ -17,6 +17,8 @@ export const FIELD_RENAMES: Readonly<Record<string, string>> = {
   prochaine: 'next',
   dernier_envoi: 'last_sent',
   erreur: 'error',
+  texte: 'text',
+  consigne: 'instruction',
 };
 
 /** The states an entry may be in (old value → new value). */
@@ -78,7 +80,20 @@ export const TYPE_RENAMES: Readonly<Record<string, string>> = {
 };
 
 /** The system kinds of the engine (old name → new name). */
-export const KIND_RENAMES: Readonly<Record<string, string>> = { modele: 'Model' };
+export const KIND_RENAMES: Readonly<Record<string, string>> = {
+  modele: 'Model',
+  rappel: 'Reminder',
+  canal: 'Channel',
+  charte: 'Charter',
+  'tableau de bord': 'Dashboard',
+};
+
+/** The link roles Jarvis writes (old → new). */
+export const ROLE_RENAMES: Readonly<Record<string, string>> = {
+  pour: 'for',
+  mentionne: 'mentions',
+  'fait partie de': 'part_of',
+};
 
 const renamed = (
   value: Record<string, unknown>,

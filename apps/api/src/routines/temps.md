@@ -12,13 +12,13 @@ Les mots-clés du temps sont en anglais : `start`, `end`, `duration`, `at`, `due
 1. Une échéance (passeport qui expire, dossier à déposer, loyer) : garde la date dans l'entrée,
    puis calcule « agir avant » = échéance moins le délai réel (renouvellement, traitement). Si tu ne
    connais pas le délai, demande-le ou cherche-le, et dis-le.
-2. Pose un rappel : une entrée de kind « Rappel », titre = ce qu'il faudra faire, `data.at` = date
-   et heure ISO (ex. « 2026-11-03T09:00 »), `data.status` = `planned`, lien « pour » vers la chose.
+2. Pose un rappel : une entrée de kind « Reminder », titre = ce qu'il faudra faire, `data.at` = date
+   et heure ISO (ex. « 2026-11-03T09:00 »), `data.status` = `planned`, link `for` vers la chose.
    Par défaut, rappelle à J-90, J-30 et J-7 d'une échéance importante.
 3. Ce qui l'attend (« qu'ai-je jeudi ? », « ma semaine ») : l'outil `agenda` sur la période —
    jamais de mémoire. Il rassemble toute entrée datée, quel que soit son kind.
 4. Un rendez-vous qui revient (« chaque soir à 20h45 sauf le samedi », « le lundi à 7h15 », « le
-   dernier jour du mois à 19h30 ») : un seul « Rappel » avec `data.repeat` en cinq champs — minute,
+   dernier jour du mois à 19h30 ») : un seul « Reminder » avec `data.repeat` en cinq champs — minute,
    heure, jour du mois, mois, jour de la semaine (0 = dimanche) : « 45 20 * * 0-5 », « 15 7 * * 1 »,
    « 30 19 L * * » (L = dernier jour). `data.message` = ce qu'il faudra lui dire ; `data.timezone`
    si elle n'est pas à l'heure de Paris (« Africa/Abidjan »). Jarvis calcule `data.next` et le lui

@@ -239,13 +239,13 @@ async function act(
         entries: [
           {
             ref: 'r',
-            kind: 'Rappel',
+            kind: 'Reminder',
             title: String(await valueOf(action.remind.text, scope, reader)),
             data: { at, status: 'planned' },
             origin: 'inferred',
           },
         ],
-        links: entryId ? [{ from: 'r', to: entryId, role: 'pour' }] : [],
+        links: entryId ? [{ from: 'r', to: entryId, role: 'for' }] : [],
       });
     } else if ('run_script' in action) {
       await runScript(tx, by, spaceId, {

@@ -52,8 +52,8 @@ describe('reading a Markdown file', () => {
     const journal = readMarkdown(folder[0]!, kinds);
     expect(journal.title).toBe('Journal — 2026-09-01');
     expect(journal.data).toMatchObject({ date: '2026-09-01', source: folder[0]!.path });
-    expect(journal.data.texte).toContain('## Résumé');
-    expect(journal.data.texte).not.toContain('# Journal');
+    expect(journal.data.text).toContain('## Résumé');
+    expect(journal.data.text).not.toContain('# Journal');
     const christian = readMarkdown(folder[1]!, kinds);
     expect(christian.data).toMatchObject({ cercle: 2, 'derniere-interaction': '2026-08-06' });
     expect(Object.values(christian.origin).every((one) => one === 'read')).toBe(true);
@@ -62,7 +62,7 @@ describe('reading a Markdown file', () => {
 
   it('keeps a front matter that is not YAML in the text', () => {
     const odd = readMarkdown({ path: 'a.md', text: '---\n: : [\n---\n# A\n' });
-    expect(odd.data.texte).toContain(': : [');
+    expect(odd.data.text).toContain(': : [');
   });
 });
 
@@ -88,12 +88,12 @@ describe('importing a Markdown folder', () => {
     const card = await ama.as((tx) => get(tx, ama.space, christian!.id));
     expect(card!.links.out.map((one) => one.entry.title)).toEqual(["Toujours s'associer"]);
     expect(card!.links.in.map((one) => [one.role, one.entry.kind])).toEqual([
-      ['mentionne', 'Journal'],
+      ['mentions', 'Journal'],
     ]);
     const [timeline] = await ama.as((tx) => find(tx, ama.space, { text: 'Timeline du permis' }));
     const part = await ama.as((tx) => get(tx, ama.space, timeline!.id));
     expect(part!.links.out.map((one) => [one.role, one.entry.title])).toEqual([
-      ['fait partie de', 'Permis'],
+      ['part_of', 'Permis'],
     ]);
     const counted = await ama.as((tx) =>
       query(tx, {
@@ -130,7 +130,7 @@ describe('importing a Markdown folder', () => {
     const christian = files.find((one) => one.path === 'personnes/famille/christian.md')!;
     expect(christian.content).toMatch(/^---\nkind: personne\nid: ent_/);
     expect(christian.content).toContain(
-      "- mentionne : [Toujours s'associer](../../arbre/resolutions/toujours-s-associer.md)",
+      "- mentions : [Toujours s'associer](../../arbre/resolutions/toujours-s-associer.md)",
     );
 
     // Into another person's space, the export makes the same entries and the same links.

@@ -50,17 +50,17 @@ describe('a pass of the watcher', () => {
       save(tx, ama.actor, ama.space, {
         entries: [
           {
-            kind: 'Rappel',
+            kind: 'Reminder',
             title: 'Renouveler le passeport',
             data: { at: '2026-11-03T09:00', status: 'planned' },
           },
           {
-            kind: 'Rappel',
+            kind: 'Reminder',
             title: 'Dépôt du jour',
             data: { repeat: '45 20 * * 0-5', message: 'Va devant Dieu, puis #soir.' },
           },
-          { kind: 'Rappel', title: 'Plus tard', data: { at: '2026-12-25T09:00' } },
-          { kind: 'Rappel', title: 'Mal écrit', data: { repeat: 'chaque soir' } },
+          { kind: 'Reminder', title: 'Plus tard', data: { at: '2026-12-25T09:00' } },
+          { kind: 'Reminder', title: 'Mal écrit', data: { repeat: 'chaque soir' } },
         ],
       }),
     );
@@ -68,7 +68,7 @@ describe('a pass of the watcher', () => {
 
   const reminders = async () =>
     Object.fromEntries(
-      (await ama.as((tx) => find(tx, ama.space, { kind: 'Rappel' }))).map((one) => [
+      (await ama.as((tx) => find(tx, ama.space, { kind: 'Reminder' }))).map((one) => [
         one.title,
         one.data,
       ]),

@@ -13,8 +13,10 @@ chiffres, journalise chaque changement et peut tout annuler.
    avec Jarvis créerait (Finances, Routines) : propose-la si elle convient, installe après son oui,
    puis ajuste avec elle (un champ, un choix, un fonds). Sinon construis pas à pas : un modèle,
    quelques entrées réelles, une page, puis une règle.
-2. **Une page** : une entrée de kind « Page », titre = son nom, `data` =
-   `{ app, order?, filters?: [{ name, type: month|choice|text, options?, default? }], blocks }`.
+2. **Une page** : une entrée de kind « Page », titre = son nom technique en anglais (« Month
+   overview »), `data` = `{ app, label: { fr, en }, order?, filters?: [{ name, type:
+month|choice|text, options?, default?, label? }], blocks }`. Le `title` d'un block est
+   `{ fr, en }`.
    Les blocs :
    - `stat` (un chiffre), `stat_delta` (un chiffre et son écart avec le mois d'avant), avec une
      `query` ;

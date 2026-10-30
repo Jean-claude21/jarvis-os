@@ -2,7 +2,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import type pg from 'pg';
 import type { Actor, Tx } from './db';
 import { find, save } from './entries';
-import { DEFAULT_ZONE, inZone, nextTime, timeOf } from './time';
+import { DEFAULT_ZONE, inZone, minutesOf, nextTime, TIME_FIELDS, timeOf } from './time';
+
+export { minutesOf, TIME_FIELDS } from './time';
 
 // The calendar (spec 011): time is a property any entry may carry, not a kind. The calendar of a
 // window is computed from the entries that have one — `debut` (and `fin` or `duree`), `quand`,
@@ -28,9 +30,6 @@ export interface Occurrence {
   proposed: boolean;
 }
 
-/** The fields that put an entry in time. */
-export const TIME_FIELDS = ['debut', 'quand', 'repete', 'echeance', 'date'] as const;
-
 /** A window is at most a year; a repetition gives at most this many occurrences in one view. */
 export const AGENDA_MAX_DAYS = 366;
 export const AGENDA_MAX_REPEATS = 200;
@@ -53,17 +52,6 @@ function placed(text: unknown, zone: string): { at: Date; allDay: boolean } | nu
   if (DAY_ONLY.test(trimmed)) return { at: dayStart(trimmed, zone), allDay: true };
   const at = timeOf(trimmed, zone);
   return at ? { at, allDay: false } : null;
-}
-
-/** Minutes she gave as `duree`: a number, or « 90 », « 1h30 », « 45 min ». */
-export function minutesOf(value: unknown): number | null {
-  if (typeof value === 'number' && value > 0) return value;
-  if (typeof value !== 'string') return null;
-  const text = value.trim().toLowerCase();
-  const hm = /^(\d+)\s*h\s*(\d+)?\s*(?:min)?$/.exec(text);
-  if (hm) return Number(hm[1]) * 60 + Number(hm[2] ?? 0);
-  const m = /^(\d+)\s*(?:min|mn|m)?$/.exec(text);
-  return m ? Number(m[1]) : null;
 }
 
 interface Row {

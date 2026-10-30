@@ -115,7 +115,7 @@ id); `query` reads all of them, `my_entries.space` naming each row's.
 
 | Tool             | Core function                                                        |
 | ---------------- | -------------------------------------------------------------------- |
-| `kinds`          | `kinds`                                                              |
+| `kinds`          | `kinds`, with each kind's model (spec 012)                           |
 | `find`           | `find`                                                               |
 | `get`            | `get`                                                                |
 | `save`           | `save`                                                               |

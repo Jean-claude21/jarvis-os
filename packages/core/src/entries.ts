@@ -2,6 +2,15 @@ import type { Actor, Tx } from './db';
 import { prefixedId } from './ids';
 import { record } from './journal';
 import {
+  checkAgainst,
+  MODEL_KIND,
+  modelDataSchema,
+  modelError,
+  modelOf,
+  modelsOf,
+  type Model,
+} from './models';
+import {
   findInputSchema,
   saveInputSchema,
   type EntryInput,
@@ -70,6 +79,41 @@ async function kindAsWritten(tx: Tx, spaceId: string, kind: string): Promise<str
 }
 
 /**
+ * A save follows the model of its kind (spec 012); a « Modèle » itself must be one. Throws the
+ * sentence that says what to fix.
+ */
+async function follow(
+  tx: Tx,
+  spaceId: string,
+  kind: string,
+  given: Record<string, unknown>,
+  data: Record<string, unknown>,
+  creating: boolean,
+): Promise<void> {
+  if (
+    kind
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase() === 'modele'
+  ) {
+    const parsed = modelDataSchema.safeParse(data);
+    if (!parsed.success) {
+      const issues = parsed.error.issues
+        .map((issue) => `${issue.path.join('.') || 'model'}: ${issue.message}`)
+        .join('; ');
+      throw new Error(
+        `A « ${MODEL_KIND} » is { champs: [{ nom, nature, obligatoire?, choix?, vers?, unite? }], rangement?, colonnes?, total?, regroupement?, app?, ouvert? } — ${issues}.`,
+      );
+    }
+    return;
+  }
+  const model = await modelOf(tx, spaceId, kind);
+  if (!model) return;
+  const problems = checkAgainst(model, given, data, creating);
+  if (problems.length) throw modelError(model, problems);
+}
+
+/**
  * One save of what she said: new entries and changes to existing ones, the links among them, the
  * links taken away — every change journaled. A field given `null` is removed.
  */
@@ -86,6 +130,7 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
       const kind = await kindAsWritten(tx, spaceId, one.kind);
       const id = prefixedId('ent');
       const data = Object.fromEntries(kept.map((field) => [field, given[field]]));
+      await follow(tx, spaceId, kind, given, data, true);
       await tx.query(
         'insert into entry (id, space_id, kind, title, data, origin) values ($1, $2, $3, $4, $5, $6)',
         [id, spaceId, kind, one.title, JSON.stringify(data), JSON.stringify(originsFor(one, kept))],
@@ -131,6 +176,9 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
     }
     const kind = one.kind ? await kindAsWritten(tx, spaceId, one.kind) : current.kind;
     const title = one.title ?? current.title;
+    // A change of kind meets the new kind's model as a whole; a change of fields, the fields given.
+    if (kind !== current.kind) await follow(tx, spaceId, kind, data, data, true);
+    else await follow(tx, spaceId, kind, given, data, false);
     await tx.query(
       `update entry set kind = $2, title = $3, data = $4, origin = $5, updated_at = now()
         where id = $1`,
@@ -268,6 +316,8 @@ export interface Kind {
   kind: string;
   count: number;
   fields: string[];
+  /** Its model, when it has one (spec 012): the fields every save of it follows. */
+  model?: Model;
 }
 
 /** The kinds of things in a space, the most used first, with the fields each uses. */
@@ -280,7 +330,20 @@ export async function kinds(tx: Tx, spaceId: string): Promise<Kind[]> {
       group by e.kind order by count desc, e.kind`,
     [spaceId],
   );
-  return rows;
+  // A kind with a model says its shape (spec 012), even before its first entry.
+  const fold = (text: string) =>
+    text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  const models = new Map((await modelsOf(tx, spaceId)).map((model) => [fold(model.kind), model]));
+  const out = rows.map((row) => {
+    const model = models.get(fold(row.kind));
+    models.delete(fold(row.kind));
+    return model ? { ...row, model } : row;
+  });
+  for (const model of models.values()) out.push({ kind: model.kind, count: 0, fields: [], model });
+  return out;
 }
 
 /** Sets an entry aside (never erased); journaled, so undone like any change. */

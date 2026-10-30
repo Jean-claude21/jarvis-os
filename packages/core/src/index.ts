@@ -83,3 +83,17 @@ export {
   TIME_FIELDS,
   type Occurrence,
 } from './agenda';
+export {
+  checkAgainst,
+  COMMON_FIELDS,
+  MODEL_KIND,
+  modelDataSchema,
+  modelFieldSchema,
+  modelOf,
+  modelsOf,
+  NATURES,
+  placeOf,
+  type Model,
+  type ModelData,
+  type ModelField,
+} from './models';

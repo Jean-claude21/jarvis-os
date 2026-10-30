@@ -154,3 +154,17 @@ export function nextTime(repete: string, after: Date, zone = DEFAULT_ZONE): Date
   }
   throw new Error(`« ${repete} » names no time in the next two years.`);
 }
+
+/** The fields that put an entry in time. */
+export const TIME_FIELDS = ['debut', 'quand', 'repete', 'echeance', 'date'] as const;
+
+/** Minutes she gave as `duree`: a number, or « 90 », « 1h30 », « 45 min ». */
+export function minutesOf(value: unknown): number | null {
+  if (typeof value === 'number' && value > 0) return value;
+  if (typeof value !== 'string') return null;
+  const text = value.trim().toLowerCase();
+  const hm = /^(\d+)\s*h\s*(\d+)?\s*(?:min)?$/.exec(text);
+  if (hm) return Number(hm[1]) * 60 + Number(hm[2] ?? 0);
+  const m = /^(\d+)\s*(?:min|mn|m)?$/.exec(text);
+  return m ? Number(m[1]) : null;
+}

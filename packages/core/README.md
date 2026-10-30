@@ -136,6 +136,22 @@ Time is a field any entry may carry; the calendar is computed from them, never s
 
 `jarvis_calendar_owner` (migration 0005) finds whose key a fingerprint is, and nothing else.
 
+## Type models (spec 012)
+
+A kind's shape, said once: an entry of kind « Modèle » whose title is the kind and whose data is
+`{ champs: [{ nom, nature, obligatoire?, choix?, vers?, unite?, aide? }], rangement?, colonnes?,
+total?, regroupement?, app?, ouvert? }`. Natures: texte, nombre, montant, date, moment, duree,
+choix, oui-non, liste, lien (a link whose role is the field's name).
+
+| Function              | What it does                                                                |
+| --------------------- | --------------------------------------------------------------------------- |
+| `modelOf`, `modelsOf` | the model of a kind, every model of a space                                 |
+| `checkAgainst`        | what is wrong with a save: unknown field, wrong nature, required missing    |
+| `placeOf`             | where the export puts an entry: `{année}`, `{mois}`, `{jour}`, `{titre}`, … |
+
+`save` follows the model of each entry's kind and refuses with a sentence that names the fields;
+time fields, `texte`, `source` and `statut` are allowed everywhere. `kinds` returns the models.
+
 ## Database
 
 `db/migrations/` is applied in order by `pnpm db:migrate` (the `dev` branch, or the URL in

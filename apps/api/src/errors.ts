@@ -21,6 +21,10 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     // Spaces (spec 004): what she may not do, said so she can do otherwise.
     /^No space|not hers|stays private|^Only an owner|last member|cannot be left|is not undone|no e-mail address|needs a name|^A space needs/.test(
       message,
+    ) ||
+    // The calendar (spec 011) and the models (spec 012): what to write instead.
+    /must come after its start|covers at most|are ISO days|follows its model|^A « Modèle » is/.test(
+      message,
     )
   ) {
     return { status: 400, message };

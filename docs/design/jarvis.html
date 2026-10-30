@@ -1,0 +1,4071 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jarvis — maquette</title>
+    <!--
+  Maquette de la plateforme (proposition, pas encore le produit). Données fictives : ce dépôt est public.
+  Ce qu'elle montre :
+  - « Maintenant » : ce qui compte, trié par urgence, avec les choix préparés ;
+  - deux apps construites avec Claude, sans code : Finances (comptes, fonds protégés, obligations,
+    rapprochement — la structure du Life OS) et Routines (habitudes, gabarit de journée, régularité) ;
+  - les tableaux de bord, l'agenda, les fichiers, et les modèles de type (champs, relations, calculs,
+    règles, rangement à l'export — configurables).
+  Les textes sont écrits en dur ici ; dans l'app, ils viendront du catalogue de mots.
+-->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: light;
+        --canvas: #efe6dc;
+        --paper: #fffdf9;
+        --sand: #fbf6f0;
+        --clay: #f4e6da;
+        --rule: #e6d6c8;
+        --rule-strong: #c9b3a4;
+        --ink: #2a1610;
+        --bark: #6b4e43;
+        --faint: #9a8276;
+        --primary: #b83a1b;
+        --primary-strong: #962e14;
+        --ochre: #c98a2b;
+        --on-primary: #fffdf9;
+        --on-ink: #fffdf9;
+        --success: #2f7d4f;
+        --success-surface: #e3f1e8;
+        --verify: #7a4a0b;
+        --verify-surface: #fbebd0;
+        --error: #9b1c3c;
+        --error-surface: #f7e1e7;
+        --info: #2b5c8a;
+        --info-surface: #e2ecf5;
+        --heat-0: #f1e7dd;
+        --heat-1: #d6e6da;
+        --heat-2: #9cc7a9;
+        --heat-3: #2f7d4f;
+        --shadow: 0 1px 2px rgba(42, 22, 16, 0.06), 0 4px 16px rgba(42, 22, 16, 0.05);
+      }
+      :root[data-theme='dark'] {
+        color-scheme: dark;
+        --canvas: #0f0a07;
+        --paper: #17100c;
+        --sand: #1d140f;
+        --clay: #2c2019;
+        --rule: #3a2b23;
+        --rule-strong: #5e4a3e;
+        --ink: #f4e6da;
+        --bark: #bfa799;
+        --faint: #8c7568;
+        --primary: #f08a63;
+        --primary-strong: #e2572d;
+        --ochre: #d9a04a;
+        --on-primary: #17100c;
+        --on-ink: #17100c;
+        --success: #4fa873;
+        --success-surface: #1c3025;
+        --verify: #f2cc8a;
+        --verify-surface: #3a2a12;
+        --error: #d0546f;
+        --error-surface: #3e1620;
+        --info: #5c8fc2;
+        --info-surface: #172a3d;
+        --heat-0: #251b15;
+        --heat-1: #1f3a2a;
+        --heat-2: #2e6544;
+        --heat-3: #4fa873;
+        --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          color-scheme: dark;
+          --canvas: #0f0a07;
+          --paper: #17100c;
+          --sand: #1d140f;
+          --clay: #2c2019;
+          --rule: #3a2b23;
+          --rule-strong: #5e4a3e;
+          --ink: #f4e6da;
+          --bark: #bfa799;
+          --faint: #8c7568;
+          --primary: #f08a63;
+          --primary-strong: #e2572d;
+          --ochre: #d9a04a;
+          --on-primary: #17100c;
+          --on-ink: #17100c;
+          --success: #4fa873;
+          --success-surface: #1c3025;
+          --verify: #f2cc8a;
+          --verify-surface: #3a2a12;
+          --error: #d0546f;
+          --error-surface: #3e1620;
+          --info: #5c8fc2;
+          --info-surface: #172a3d;
+          --heat-0: #251b15;
+          --heat-1: #1f3a2a;
+          --heat-2: #2e6544;
+          --heat-3: #4fa873;
+          --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+      }
+      body {
+        background: var(--canvas);
+        color: var(--ink);
+        font:
+          400 14px/1.5 'Instrument Sans',
+          system-ui,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      button,
+      select,
+      input {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        background: none;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+      }
+      a {
+        color: inherit;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: Archivo, system-ui, sans-serif;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      h2 {
+        font-size: 15px;
+        font-weight: 600;
+      }
+      svg.i {
+        width: 16px;
+        height: 16px;
+        flex: none;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      .mono {
+        font-family: 'JetBrains Mono', ui-monospace, monospace;
+        font-variant-numeric: tabular-nums;
+      }
+      .caps {
+        font:
+          500 11px/1.4 'JetBrains Mono',
+          ui-monospace,
+          monospace;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--bark);
+      }
+      .muted {
+        color: var(--bark);
+      }
+      .faint {
+        color: var(--faint);
+      }
+      .pos {
+        color: var(--success);
+      }
+      .neg {
+        color: var(--error);
+      }
+
+      /* Shell */
+      .app {
+        display: grid;
+        grid-template-columns: 252px 1fr;
+        height: 100vh;
+        padding: 12px;
+      }
+      aside.side {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        padding: 4px 12px 4px 4px;
+        min-height: 0;
+        overflow-y: auto;
+      }
+      main {
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+      }
+      .switcher,
+      .me {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        width: 100%;
+        text-align: left;
+      }
+      .logo {
+        width: 30px;
+        height: 30px;
+        border-radius: 2px;
+        background: var(--primary);
+        color: var(--on-primary);
+        display: grid;
+        place-items: center;
+        font:
+          700 15px/1 Archivo,
+          sans-serif;
+        flex: none;
+      }
+      .switcher b,
+      .me b {
+        display: block;
+        font:
+          600 14px/1.2 Archivo,
+          sans-serif;
+      }
+      .me b {
+        font:
+          600 13px/1.2 'Instrument Sans',
+          sans-serif;
+      }
+      .switcher small,
+      .me small {
+        color: var(--bark);
+        font-size: 12px;
+      }
+      .switcher > .i,
+      .me > .i {
+        margin-left: auto;
+        color: var(--faint);
+      }
+      .search {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        background: var(--paper);
+        color: var(--faint);
+      }
+      .search input {
+        border: 0;
+        outline: 0;
+        background: none;
+        flex: 1;
+        min-width: 0;
+        color: var(--ink);
+      }
+      .kbd {
+        font:
+          500 11px/1 'JetBrains Mono',
+          monospace;
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        padding: 3px 5px;
+        color: var(--bark);
+      }
+      .nav-group {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .nav-group > .caps {
+        padding: 6px 8px 4px;
+        color: var(--faint);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 7px 8px;
+        border-radius: 2px;
+        border: 1px solid transparent;
+        width: 100%;
+        text-align: left;
+        text-decoration: none;
+      }
+      .nav-item:hover {
+        background: rgba(255, 253, 249, 0.55);
+      }
+      .nav-item[aria-current='page'] {
+        background: var(--paper);
+        border-color: var(--rule);
+        box-shadow: var(--shadow);
+        font-weight: 600;
+      }
+      .nav-item .count {
+        margin-left: auto;
+        font:
+          500 11px/1 'JetBrains Mono',
+          monospace;
+        color: var(--faint);
+      }
+      .nav-item .count.hot {
+        background: var(--primary);
+        color: var(--on-primary);
+        padding: 3px 6px;
+        border-radius: 2px;
+      }
+      .app-icon {
+        width: 20px;
+        height: 20px;
+        border-radius: 2px;
+        display: grid;
+        place-items: center;
+        flex: none;
+        color: #fffdf9;
+      }
+      .app-icon .i {
+        width: 13px;
+        height: 13px;
+      }
+      .nav-item.ghost {
+        color: var(--faint);
+        border: 1px dashed var(--rule-strong);
+      }
+      .space-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        flex: none;
+        margin: 0 6px;
+      }
+      .grow {
+        flex: 1;
+      }
+      .avatar {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        flex: none;
+        font:
+          600 12px/1 Archivo,
+          sans-serif;
+        background: var(--clay);
+      }
+      .menu {
+        display: none;
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        box-shadow: var(--shadow);
+        padding: 4px;
+      }
+      .menu.open {
+        display: block;
+      }
+      .menu button {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+        padding: 8px;
+        border-radius: 2px;
+        text-align: left;
+      }
+      .menu button:hover {
+        background: var(--sand);
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--rule);
+      }
+      .crumbs {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--bark);
+        font-size: 13px;
+        min-width: 0;
+      }
+      .crumbs b {
+        color: var(--ink);
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      .chip-now {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 10px;
+        border: 1px solid var(--rule);
+        border-radius: 999px;
+        background: var(--sand);
+        white-space: nowrap;
+      }
+      .live {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--success);
+        box-shadow: 0 0 0 3px var(--success-surface);
+        flex: none;
+      }
+      .icon-btn {
+        width: 32px;
+        height: 32px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        position: relative;
+        background: var(--paper);
+        flex: none;
+      }
+      .icon-btn:hover {
+        background: var(--sand);
+      }
+      .icon-btn .pip {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--primary);
+        border: 1.5px solid var(--paper);
+      }
+      .only-mobile {
+        display: none;
+      }
+
+      /* Page */
+      .page {
+        padding: 20px 24px 28px;
+        overflow-y: auto;
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .page-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+      }
+      .page-head h1 {
+        font-size: 24px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .page-head h1 .app-icon {
+        width: 28px;
+        height: 28px;
+      }
+      .page-head h1 .app-icon .i {
+        width: 16px;
+        height: 16px;
+      }
+      .page-head p {
+        margin: 2px 0 0;
+        color: var(--bark);
+        font-size: 13px;
+      }
+      .head-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .built {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font:
+          500 11px/1.4 'JetBrains Mono',
+          monospace;
+        color: var(--info);
+        background: var(--info-surface);
+        padding: 2px 7px;
+        border-radius: 2px;
+        margin-left: 4px;
+        vertical-align: 3px;
+      }
+      .tabs {
+        display: flex;
+        gap: 2px;
+        border-bottom: 1px solid var(--rule);
+        overflow-x: auto;
+        margin-top: -4px;
+      }
+      .tabs a {
+        padding: 8px 12px;
+        text-decoration: none;
+        color: var(--bark);
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        white-space: nowrap;
+        font-size: 13.5px;
+      }
+      .tabs a[aria-current='page'] {
+        color: var(--ink);
+        border-color: var(--primary);
+        font-weight: 600;
+      }
+      .tabs a .n {
+        font:
+          500 11px/1 'JetBrains Mono',
+          monospace;
+        color: var(--faint);
+        margin-left: 4px;
+      }
+      .segmented {
+        display: inline-flex;
+        padding: 3px;
+        gap: 2px;
+        background: var(--sand);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        max-width: 100%;
+        overflow-x: auto;
+      }
+      .segmented button {
+        padding: 5px 10px;
+        border-radius: 2px;
+        color: var(--bark);
+        font-size: 13px;
+        white-space: nowrap;
+      }
+      .segmented button[aria-pressed='true'] {
+        background: var(--paper);
+        color: var(--ink);
+        font-weight: 600;
+        box-shadow: var(--shadow);
+      }
+      .segmented .n {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        margin-left: 4px;
+        color: var(--faint);
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 2px;
+        border: 1px solid var(--rule-strong);
+        background: var(--paper);
+        font-weight: 600;
+        font-size: 13px;
+        white-space: nowrap;
+        text-decoration: none;
+      }
+      .btn:hover {
+        background: var(--sand);
+      }
+      .btn.solid {
+        background: var(--ink);
+        color: var(--on-ink);
+        border-color: var(--ink);
+      }
+      .btn.solid:hover {
+        background: var(--primary-strong);
+        border-color: var(--primary-strong);
+        color: #fffdf9;
+      }
+      .btn.small {
+        padding: 5px 9px;
+        font-size: 12.5px;
+      }
+      .btn.wide {
+        width: 100%;
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+      }
+      .g4 {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .g3 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .g2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .g21 {
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+      }
+      .g12 {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+      }
+      .span2 {
+        grid-column: span 2;
+      }
+      .panel {
+        background: var(--sand);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 9px 12px;
+        min-height: 40px;
+      }
+      .panel-head .left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--bark);
+        min-width: 0;
+      }
+      .panel-body {
+        background: var(--paper);
+        border-top: 1px solid var(--rule);
+        flex: 1;
+        min-width: 0;
+      }
+      .pad {
+        padding: 14px 16px;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        border: 1px solid var(--rule);
+        background: var(--paper);
+        white-space: nowrap;
+      }
+      .kpi {
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        padding: 12px 14px;
+        min-width: 0;
+      }
+      .kpi .v {
+        font:
+          600 26px/1.15 'JetBrains Mono',
+          monospace;
+        letter-spacing: -0.02em;
+        margin-top: 6px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .kpi .v small {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--bark);
+        margin-left: 4px;
+      }
+      .kpi .s {
+        color: var(--bark);
+        font-size: 12.5px;
+        margin-top: 2px;
+      }
+      .kpi.alert {
+        border-color: var(--verify);
+        background: var(--verify-surface);
+      }
+      .kpi.alert .v,
+      .kpi.alert .caps {
+        color: var(--verify);
+      }
+
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 7px;
+        border-radius: 2px;
+        font:
+          500 11.5px/1.4 'JetBrains Mono',
+          monospace;
+        white-space: nowrap;
+      }
+      .tag::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+      .tag.error {
+        background: var(--error-surface);
+        color: var(--error);
+      }
+      .tag.late {
+        background: var(--verify-surface);
+        color: var(--verify);
+      }
+      .tag.info {
+        background: var(--info-surface);
+        color: var(--info);
+      }
+      .tag.ok {
+        background: var(--success-surface);
+        color: var(--success);
+      }
+      .tag.neutral {
+        background: var(--clay);
+        color: var(--bark);
+      }
+      .tag.plain {
+        color: var(--bark);
+        padding-left: 0;
+      }
+      .tag.plain::before,
+      .tag.bare::before {
+        display: none;
+      }
+      .origin {
+        font:
+          500 10.5px/1 'JetBrains Mono',
+          monospace;
+        padding: 2px 5px;
+        border-radius: 2px;
+        vertical-align: 1px;
+        margin-left: 2px;
+      }
+      .origin.said {
+        background: var(--success-surface);
+        color: var(--success);
+      }
+      .origin.read {
+        background: var(--verify-surface);
+        color: var(--verify);
+      }
+      .origin.inferred {
+        background: var(--info-surface);
+        color: var(--info);
+      }
+      .quote {
+        background: var(--success-surface);
+        color: var(--success);
+        padding: 0 4px;
+        border-radius: 2px;
+      }
+      .lock {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font:
+          500 11px/1.4 'JetBrains Mono',
+          monospace;
+        color: var(--bark);
+      }
+      .lock .i {
+        width: 12px;
+        height: 12px;
+      }
+
+      /* Tables */
+      .scroll {
+        overflow-x: auto;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th {
+        text-align: left;
+        font:
+          500 10.5px/1.4 'JetBrains Mono',
+          monospace;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--faint);
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--rule);
+        white-space: nowrap;
+        background: var(--paper);
+      }
+      td {
+        padding: 9px 10px;
+        border-bottom: 1px dotted var(--rule);
+        vertical-align: middle;
+      }
+      tr:last-child td {
+        border-bottom: 0;
+      }
+      td.n,
+      th.n {
+        text-align: right;
+        font-family: 'JetBrains Mono', monospace;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      tr.group td {
+        background: var(--sand);
+        font:
+          500 11px/1.4 'JetBrains Mono',
+          monospace;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--bark);
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--rule);
+      }
+      tr.total td {
+        border-top: 1px solid var(--rule-strong);
+        font-weight: 600;
+        background: var(--sand);
+      }
+      tbody tr.row-click {
+        cursor: pointer;
+      }
+      tbody tr.row-click:hover td {
+        background: var(--sand);
+      }
+      tr.flash td {
+        animation: flash 1.6s ease;
+      }
+      @keyframes flash {
+        from {
+          background: var(--success-surface);
+        }
+        to {
+          background: transparent;
+        }
+      }
+      .cell-title {
+        font-weight: 600;
+      }
+      .cell-sub {
+        color: var(--bark);
+        font-size: 12px;
+      }
+      .bar {
+        height: 6px;
+        background: var(--clay);
+        border-radius: 1px;
+        position: relative;
+        overflow: hidden;
+        min-width: 60px;
+      }
+      .bar > i {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: var(--ink);
+        border-radius: 1px;
+      }
+      .bar.ok > i {
+        background: var(--success);
+      }
+      .bar.warn > i {
+        background: var(--ochre);
+      }
+      .bar.info > i {
+        background: var(--info);
+      }
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 8px;
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        font-size: 12.5px;
+        background: var(--paper);
+        text-decoration: none;
+        white-space: nowrap;
+      }
+      .chip small {
+        color: var(--faint);
+        font:
+          500 11px 'JetBrains Mono',
+          monospace;
+      }
+      .chip[aria-pressed='true'] {
+        border-color: var(--ink);
+        font-weight: 600;
+      }
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: space-between;
+      }
+      .banner {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 14px;
+        border: 1px solid var(--verify);
+        background: var(--verify-surface);
+        color: var(--verify);
+        border-radius: 2px;
+        flex-wrap: wrap;
+      }
+      .banner b {
+        color: var(--ink);
+      }
+      .banner .btn {
+        margin-left: auto;
+      }
+      .hint {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 10px 14px;
+        border: 1px dashed var(--info);
+        background: var(--info-surface);
+        color: var(--info);
+        border-radius: 2px;
+        font-size: 13px;
+      }
+      .hint em {
+        font-style: normal;
+        color: var(--ink);
+      }
+
+      /* Charts */
+      .chart {
+        width: 100%;
+        height: auto;
+        display: block;
+      }
+      .chart text {
+        fill: var(--faint);
+        font:
+          500 10.5px 'JetBrains Mono',
+          monospace;
+      }
+      .legend {
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        color: var(--bark);
+        font-size: 12px;
+      }
+      .legend i {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        margin-right: 6px;
+        vertical-align: -1px;
+      }
+      .hbar {
+        display: grid;
+        grid-template-columns: 110px 1fr 92px;
+        gap: 10px;
+        align-items: center;
+        padding: 6px 0;
+        font-size: 13px;
+      }
+      .hbar .track {
+        position: relative;
+        height: 10px;
+        background: var(--clay);
+        border-radius: 1px;
+      }
+      .hbar .fill {
+        position: absolute;
+        inset: 0 auto 0 0;
+        background: var(--ink);
+        border-radius: 1px;
+      }
+      .hbar .fill.over {
+        background: var(--error);
+      }
+      .hbar .budget {
+        position: absolute;
+        top: -3px;
+        bottom: -3px;
+        width: 2px;
+        background: var(--primary);
+      }
+      .heat {
+        display: grid;
+        gap: 3px;
+        align-items: center;
+      }
+      .heat .lbl {
+        font-size: 12.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-right: 8px;
+      }
+      .heat .c {
+        aspect-ratio: 1;
+        border-radius: 2px;
+        background: var(--heat-0);
+        min-width: 8px;
+      }
+      .heat .c.l1 {
+        background: var(--heat-1);
+      }
+      .heat .c.l2 {
+        background: var(--heat-2);
+      }
+      .heat .c.l3 {
+        background: var(--heat-3);
+      }
+      .heat .c.off {
+        background: transparent;
+        border: 1px dashed var(--rule);
+      }
+      .heat .c.today {
+        outline: 1.5px solid var(--ink);
+        outline-offset: 1px;
+      }
+      .heat .day {
+        font:
+          500 9.5px/1 'JetBrains Mono',
+          monospace;
+        color: var(--faint);
+        text-align: center;
+      }
+
+      /* Maintenant */
+      .board {
+        display: grid;
+        grid-template-columns: minmax(290px, 340px) 1fr;
+        gap: 16px;
+      }
+      .list {
+        padding: 6px;
+      }
+      .group-title {
+        padding: 12px 8px 6px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .group-title .n {
+        color: var(--faint);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 30px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+        text-align: left;
+        padding: 8px;
+        border: 1px solid transparent;
+        border-radius: 2px;
+      }
+      .row:hover {
+        background: var(--sand);
+      }
+      .row[aria-selected='true'] {
+        border-color: var(--ink);
+        background: var(--paper);
+        box-shadow: var(--shadow);
+      }
+      .row > div {
+        min-width: 0;
+      }
+      .row .t {
+        font-weight: 600;
+        font-size: 13.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .row .s {
+        color: var(--bark);
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .kind {
+        width: 30px;
+        height: 30px;
+        border-radius: 2px;
+        display: grid;
+        place-items: center;
+        background: var(--clay);
+        color: var(--bark);
+      }
+      .kind.proposed {
+        background: var(--info-surface);
+        color: var(--info);
+        border: 1px dashed var(--info);
+      }
+      .detail {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        min-width: 0;
+      }
+      .subject {
+        padding: 14px 16px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .subject-top {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+      .subject-top h2 {
+        font-size: 18px;
+      }
+      .context {
+        margin: 0;
+        line-height: 1.6;
+        max-width: 76ch;
+      }
+      .timeline {
+        position: relative;
+        height: 58px;
+        margin: 6px 4px 0;
+      }
+      .track {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 26px;
+        height: 6px;
+        background: var(--clay);
+        border-radius: 1px;
+      }
+      .span {
+        position: absolute;
+        top: 26px;
+        height: 6px;
+        border-radius: 1px;
+      }
+      .span.past {
+        background: var(--rule-strong);
+      }
+      .span.late {
+        background: var(--ochre);
+      }
+      .span.ahead {
+        background: repeating-linear-gradient(90deg, var(--info) 0 6px, transparent 6px 10px);
+        opacity: 0.7;
+      }
+      .mark {
+        position: absolute;
+        top: 0;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        white-space: nowrap;
+      }
+      .mark .lbl {
+        font:
+          500 10.5px/1.2 'JetBrains Mono',
+          monospace;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--bark);
+      }
+      .mark .stem {
+        width: 1.5px;
+        height: 18px;
+        background: var(--ink);
+        margin-top: 3px;
+      }
+      .mark.below {
+        top: 24px;
+        flex-direction: column-reverse;
+      }
+      .mark.below .stem {
+        margin: 0 0 3px;
+        height: 14px;
+      }
+      .mark.now .lbl {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .mark.due .lbl {
+        color: var(--primary);
+        font-weight: 600;
+      }
+      .mark.due .stem {
+        background: var(--primary);
+      }
+      .mark.edge-l {
+        transform: none;
+        align-items: flex-start;
+      }
+      .mark.edge-r {
+        transform: translateX(-100%);
+        align-items: flex-end;
+      }
+      .dayband {
+        position: relative;
+        margin: 10px 16px 0;
+        height: 74px;
+      }
+      .hours {
+        position: absolute;
+        inset: 0;
+        display: grid;
+      }
+      .hours span {
+        border-left: 1px dotted var(--rule);
+        font:
+          500 10.5px/1 'JetBrains Mono',
+          monospace;
+        color: var(--faint);
+        padding-left: 4px;
+      }
+      .block {
+        position: absolute;
+        top: 20px;
+        height: 44px;
+        border-radius: 2px;
+        padding: 5px 7px;
+        overflow: hidden;
+        font-size: 12px;
+        line-height: 1.25;
+        border: 1px solid var(--rule-strong);
+        background: var(--sand);
+      }
+      .block b {
+        display: block;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .block small {
+        font:
+          10.5px 'JetBrains Mono',
+          monospace;
+        color: var(--bark);
+        white-space: nowrap;
+      }
+      .block.event {
+        background: var(--paper);
+        border-color: var(--ink);
+      }
+      .block.proposed {
+        background: var(--info-surface);
+        border: 1px dashed var(--info);
+        color: var(--info);
+      }
+      .block.proposed small {
+        color: var(--info);
+      }
+      .block.focus {
+        box-shadow: 0 0 0 2px var(--primary);
+      }
+      .now-line {
+        position: absolute;
+        top: 12px;
+        bottom: 0;
+        width: 1.5px;
+        background: var(--primary);
+      }
+      .now-line::before {
+        content: '';
+        position: absolute;
+        top: -4px;
+        left: -3.5px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--primary);
+      }
+      .choices {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+      }
+      .choice {
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .choice.recommended {
+        border: 1.5px solid var(--ink);
+        box-shadow: var(--shadow);
+      }
+      .choice-head {
+        display: flex;
+        flex-direction: column-reverse;
+        align-items: flex-start;
+        gap: 8px;
+      }
+      .choice-head h3 {
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .why {
+        font:
+          500 10.5px/1.3 'JetBrains Mono',
+          monospace;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 3px 6px;
+        border-radius: 2px;
+        background: var(--info-surface);
+        color: var(--info);
+      }
+      .choice p {
+        margin: 0;
+        color: var(--bark);
+        font-size: 13px;
+      }
+      .checks {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 13px;
+      }
+      .checks li {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+      }
+      .checks .i {
+        margin-top: 2px;
+        width: 15px;
+        height: 15px;
+      }
+      .checks .good .i {
+        color: var(--success);
+      }
+      .checks .warn {
+        color: var(--verify);
+      }
+      .choice-foot {
+        margin-top: auto;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        padding-top: 6px;
+      }
+      .choice-foot .btn {
+        flex: 1;
+      }
+      .empty {
+        padding: 40px 16px;
+        text-align: center;
+        color: var(--bark);
+      }
+
+      /* Routines */
+      .template {
+        list-style: none;
+        margin: 0;
+        padding: 6px 0;
+      }
+      .template li {
+        display: grid;
+        grid-template-columns: 92px 1fr auto;
+        gap: 10px;
+        padding: 7px 16px;
+        align-items: center;
+        font-size: 13px;
+        border-left: 3px solid transparent;
+      }
+      .template li .h {
+        font:
+          500 12px 'JetBrains Mono',
+          monospace;
+        color: var(--faint);
+      }
+      .template li.past {
+        color: var(--faint);
+      }
+      .template li.current {
+        border-left-color: var(--primary);
+        background: var(--sand);
+        font-weight: 600;
+      }
+      .template li.current .h {
+        color: var(--primary);
+      }
+      .check-row {
+        display: grid;
+        grid-template-columns: 22px 1fr auto;
+        gap: 10px;
+        align-items: center;
+        padding: 9px 16px;
+        border-bottom: 1px dotted var(--rule);
+        width: 100%;
+        text-align: left;
+      }
+      .check-row:last-child {
+        border-bottom: 0;
+      }
+      .box {
+        width: 18px;
+        height: 18px;
+        border: 1.5px solid var(--rule-strong);
+        border-radius: 2px;
+        display: grid;
+        place-items: center;
+        background: var(--paper);
+      }
+      .box .i {
+        width: 13px;
+        height: 13px;
+        stroke-width: 2.4;
+        opacity: 0;
+      }
+      .check-row.done .box {
+        background: var(--success);
+        border-color: var(--success);
+        color: #fffdf9;
+      }
+      .check-row.done .box .i {
+        opacity: 1;
+      }
+      .check-row.done .t {
+        color: var(--faint);
+        text-decoration: line-through;
+      }
+      .check-row.off {
+        opacity: 0.55;
+      }
+      .check-row .t {
+        font-weight: 500;
+      }
+      .ring {
+        --p: 50;
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: conic-gradient(var(--success) calc(var(--p) * 1%), var(--clay) 0);
+        display: grid;
+        place-items: center;
+        flex: none;
+      }
+      .ring span {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: var(--paper);
+        display: grid;
+        place-items: center;
+        font:
+          600 13px 'JetBrains Mono',
+          monospace;
+      }
+
+      /* Agenda */
+      .week {
+        display: grid;
+        grid-template-columns: 44px repeat(7, minmax(0, 1fr));
+        position: relative;
+      }
+      .week .wh {
+        font:
+          500 11px 'JetBrains Mono',
+          monospace;
+        color: var(--bark);
+        text-align: center;
+        padding: 8px 4px;
+        border-bottom: 1px solid var(--rule);
+      }
+      .week .wh b {
+        display: block;
+        font:
+          600 16px 'JetBrains Mono',
+          monospace;
+        color: var(--ink);
+      }
+      .week .wh.today b {
+        color: var(--on-primary);
+        background: var(--primary);
+        border-radius: 2px;
+        display: inline-block;
+        padding: 0 6px;
+      }
+      .week .gutter {
+        position: relative;
+      }
+      .week .gutter span {
+        position: absolute;
+        right: 6px;
+        font:
+          500 10px 'JetBrains Mono',
+          monospace;
+        color: var(--faint);
+        transform: translateY(-50%);
+      }
+      .week .col {
+        position: relative;
+        border-left: 1px solid var(--rule);
+        background-image: repeating-linear-gradient(
+          to bottom,
+          transparent 0 39px,
+          var(--rule) 39px 40px
+        );
+      }
+      .week .col.today {
+        background-color: var(--sand);
+      }
+      .week .ev {
+        position: absolute;
+        left: 3px;
+        right: 3px;
+        border-radius: 2px;
+        padding: 3px 5px;
+        font-size: 11.5px;
+        line-height: 1.2;
+        overflow: hidden;
+        border: 1px solid var(--rule-strong);
+        background: var(--paper);
+      }
+      .week .ev small {
+        display: block;
+        font:
+          10px 'JetBrains Mono',
+          monospace;
+        color: var(--bark);
+      }
+      .week .ev.routine {
+        background: var(--clay);
+        border-color: transparent;
+        color: var(--bark);
+      }
+      .week .ev.event {
+        border-color: var(--ink);
+      }
+      .week .ev.due {
+        border-color: var(--primary);
+        background: var(--paper);
+        color: var(--primary);
+      }
+      .week .ev.proposed {
+        background: var(--info-surface);
+        border: 1px dashed var(--info);
+        color: var(--info);
+      }
+      .week .nowline {
+        position: absolute;
+        left: 0;
+        right: 0;
+        height: 1.5px;
+        background: var(--primary);
+        z-index: 2;
+      }
+
+      /* Files */
+      .ficon {
+        width: 32px;
+        height: 38px;
+        border: 1px solid var(--rule-strong);
+        border-radius: 2px;
+        display: grid;
+        place-items: end center;
+        font:
+          600 8.5px/1 'JetBrains Mono',
+          monospace;
+        padding-bottom: 5px;
+        background: var(--paper);
+        flex: none;
+        position: relative;
+      }
+      .ficon::before {
+        content: '';
+        position: absolute;
+        top: -1px;
+        right: -1px;
+        width: 9px;
+        height: 9px;
+        background: linear-gradient(225deg, var(--paper) 50%, var(--rule-strong) 50%);
+      }
+      .ficon.pdf {
+        color: var(--error);
+      }
+      .ficon.img {
+        color: var(--info);
+      }
+      .ficon.csv {
+        color: var(--success);
+      }
+      .ficon.md {
+        color: var(--bark);
+      }
+      .fname {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        min-width: 0;
+      }
+      .preview {
+        border: 1px solid var(--rule);
+        background: var(--sand);
+        border-radius: 2px;
+        aspect-ratio: 3 / 4;
+        display: flex;
+        flex-direction: column;
+        padding: 18px;
+        gap: 8px;
+        overflow: hidden;
+      }
+      .preview .ln {
+        height: 7px;
+        background: var(--rule);
+        border-radius: 1px;
+      }
+      .preview.img {
+        aspect-ratio: 4 / 3;
+        background: linear-gradient(160deg, var(--clay), var(--rule-strong));
+        align-items: center;
+        justify-content: center;
+        color: var(--bark);
+      }
+      dl.meta {
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        gap: 6px 12px;
+        margin: 0;
+        font-size: 13px;
+      }
+      dl.meta dt {
+        color: var(--faint);
+        font:
+          500 11px/1.8 'JetBrains Mono',
+          monospace;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      dl.meta dd {
+        margin: 0;
+      }
+
+      /* Models */
+      .model-card {
+        display: grid;
+        grid-template-columns: 34px 1fr auto;
+        gap: 12px;
+        align-items: center;
+        padding: 10px 14px;
+        border-bottom: 1px dotted var(--rule);
+        text-decoration: none;
+      }
+      .model-card:hover {
+        background: var(--sand);
+      }
+      .model-card:last-child {
+        border-bottom: 0;
+      }
+      .nature {
+        font:
+          500 11.5px 'JetBrains Mono',
+          monospace;
+        padding: 2px 6px;
+        border-radius: 2px;
+        background: var(--clay);
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      .nature.ref {
+        background: var(--info-surface);
+        color: var(--info);
+      }
+      .nature.calc {
+        background: var(--success-surface);
+        color: var(--success);
+      }
+      .radio {
+        display: grid;
+        grid-template-columns: 20px 1fr;
+        gap: 10px;
+        padding: 12px 14px;
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        cursor: pointer;
+        background: var(--paper);
+      }
+      .radio:has(input:checked) {
+        border-color: var(--ink);
+        box-shadow: var(--shadow);
+      }
+      .radio input {
+        accent-color: var(--primary);
+        margin-top: 3px;
+      }
+      .path {
+        font:
+          500 12.5px 'JetBrains Mono',
+          monospace;
+        background: var(--sand);
+        border: 1px solid var(--rule);
+        padding: 2px 6px;
+        border-radius: 2px;
+        overflow-wrap: anywhere;
+      }
+      .rule-line {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 10px 16px;
+        border-bottom: 1px dotted var(--rule);
+        font-size: 13px;
+      }
+      .rule-line:last-child {
+        border-bottom: 0;
+      }
+      .kw {
+        font:
+          600 11px 'JetBrains Mono',
+          monospace;
+        text-transform: uppercase;
+        color: var(--primary);
+        letter-spacing: 0.04em;
+        margin-right: 4px;
+      }
+
+      /* Forms, drawer, toast */
+      .form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        padding: 16px;
+        overflow-y: auto;
+      }
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .field label {
+        font:
+          500 11px 'JetBrains Mono',
+          monospace;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--bark);
+        display: flex;
+        justify-content: space-between;
+      }
+      .field label small {
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--faint);
+      }
+      .field input,
+      .field select {
+        padding: 8px 10px;
+        border: 1px solid var(--rule-strong);
+        border-radius: 2px;
+        background: var(--paper);
+        width: 100%;
+      }
+      .field-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .warnbox {
+        padding: 10px 12px;
+        border: 1px solid var(--verify);
+        background: var(--verify-surface);
+        color: var(--verify);
+        border-radius: 2px;
+        font-size: 13px;
+        display: none;
+      }
+      .warnbox.show {
+        display: block;
+      }
+      .scrim {
+        position: fixed;
+        inset: 0;
+        background: rgba(23, 16, 12, 0.32);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+        z-index: 20;
+      }
+      .scrim.open {
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .drawer {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        bottom: 12px;
+        width: min(420px, calc(100vw - 24px));
+        background: var(--paper);
+        border: 1px solid var(--rule);
+        border-radius: 2px;
+        box-shadow: var(--shadow);
+        z-index: 21;
+        transform: translateX(calc(100% + 24px));
+        transition: transform 0.25s ease;
+        display: flex;
+        flex-direction: column;
+      }
+      .drawer.open {
+        transform: none;
+      }
+      .drawer-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--rule);
+      }
+      .drawer-head h2 {
+        font-size: 16px;
+      }
+      .drawer-foot {
+        padding: 12px 16px;
+        border-top: 1px solid var(--rule);
+        display: flex;
+        gap: 8px;
+      }
+      .drawer-foot .btn {
+        flex: 1;
+      }
+      .journal {
+        list-style: none;
+        margin: 0;
+        padding: 4px 16px;
+        overflow-y: auto;
+      }
+      .journal li {
+        display: grid;
+        grid-template-columns: 46px 1fr auto;
+        gap: 10px;
+        padding: 10px 0;
+        border-bottom: 1px dotted var(--rule);
+        font-size: 13px;
+        align-items: start;
+      }
+      .journal time {
+        font:
+          500 11.5px/1.6 'JetBrains Mono',
+          monospace;
+        color: var(--faint);
+      }
+      .journal small {
+        display: block;
+        color: var(--bark);
+        font-size: 12px;
+      }
+      .journal .undo {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--primary);
+      }
+      .journal li.undone {
+        opacity: 0.45;
+        text-decoration: line-through;
+      }
+      .toast {
+        position: fixed;
+        left: 50%;
+        bottom: 24px;
+        transform: translate(-50%, 120px);
+        opacity: 0;
+        pointer-events: none;
+        background: var(--ink);
+        color: var(--on-ink);
+        padding: 10px 12px 10px 16px;
+        border-radius: 2px;
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        z-index: 30;
+        transition:
+          transform 0.25s ease,
+          opacity 0.25s;
+        box-shadow: var(--shadow);
+        font-size: 13px;
+        max-width: calc(100vw - 32px);
+      }
+      .toast.show {
+        transform: translate(-50%, 0);
+        opacity: 1;
+        pointer-events: auto;
+      }
+      .toast button {
+        font-weight: 600;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 1180px) {
+        .g4 {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .g3,
+        .g21,
+        .g12 {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .span2 {
+          grid-column: auto;
+        }
+      }
+      @media (max-width: 980px) {
+        .board {
+          grid-template-columns: 1fr;
+        }
+        .board.reading .list-panel {
+          display: none;
+        }
+        .board:not(.reading) .detail {
+          display: none;
+        }
+        .back {
+          display: inline-flex !important;
+        }
+        .g2 {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      @media (max-width: 760px) {
+        .app {
+          grid-template-columns: 1fr;
+          padding: 0;
+        }
+        main {
+          border: 0;
+          border-radius: 0;
+          box-shadow: none;
+        }
+        aside.side {
+          position: fixed;
+          z-index: 22;
+          inset: 0 auto 0 0;
+          width: 280px;
+          background: var(--canvas);
+          padding: 12px;
+          transform: translateX(-100%);
+          transition: transform 0.25s ease;
+        }
+        aside.side.open {
+          transform: none;
+        }
+        .only-mobile {
+          display: grid;
+        }
+        .page {
+          padding: 16px;
+        }
+        .hide-s {
+          display: none !important;
+        }
+        .g4 {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+          gap: 10px;
+        }
+        .kpi .v {
+          font-size: 20px;
+        }
+        .head-actions {
+          width: 100%;
+        }
+        .hbar {
+          grid-template-columns: 84px 1fr 74px;
+        }
+        .week {
+          min-width: 640px;
+        }
+        .field-row {
+          grid-template-columns: 1fr;
+        }
+      }
+      .back {
+        display: none;
+        align-items: center;
+        gap: 6px;
+        color: var(--bark);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <symbol id="i-now" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8.5" />
+        <path d="M12 7.5V12l3 2" />
+      </symbol>
+      <symbol id="i-cal" viewBox="0 0 24 24">
+        <rect x="3.5" y="5" width="17" height="15" rx="1" />
+        <path d="M3.5 10h17M8 3v4M16 3v4" />
+      </symbol>
+      <symbol id="i-life" viewBox="0 0 24 24">
+        <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H19v14H5.5A1.5 1.5 0 0 0 4 19.5z" />
+        <path d="M4 19.5A1.5 1.5 0 0 0 5.5 21H19v-3" />
+      </symbol>
+      <symbol id="i-doc" viewBox="0 0 24 24">
+        <path d="M6 3h8l4 4v14H6z" />
+        <path d="M14 3v4h4M9 12h6M9 16h6" />
+      </symbol>
+      <symbol id="i-file" viewBox="0 0 24 24">
+        <path d="M6 3h8l4 4v14H6z" />
+        <path d="M14 3v4h4" />
+      </symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24">
+        <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" />
+        <path d="M10 20.5a2 2 0 0 0 4 0" />
+      </symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24">
+        <path d="M4 20V4M4 20h16" />
+        <path d="M8 16v-4M12 16V8M16 16v-6" />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="6.5" />
+        <path d="m16 16 4 4" />
+      </symbol>
+      <symbol id="i-updown" viewBox="0 0 24 24"><path d="m8 9 4-4 4 4M8 15l4 4 4-4" /></symbol>
+      <symbol id="i-panel" viewBox="0 0 24 24">
+        <rect x="3.5" y="4.5" width="17" height="15" rx="1" />
+        <path d="M9 4.5v15" />
+      </symbol>
+      <symbol id="i-history" viewBox="0 0 24 24">
+        <path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5" />
+        <path d="M4 4v4.5h4.5M12 8v4.5l3 1.5" />
+      </symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5" /></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24">
+        <path d="M12 4 2.8 19.5h18.4z" />
+        <path d="M12 10v4M12 17v.01" />
+      </symbol>
+      <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6" /></symbol>
+      <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" /></symbol>
+      <symbol id="i-spark" viewBox="0 0 24 24">
+        <path
+          d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"
+        />
+      </symbol>
+      <symbol id="i-link" viewBox="0 0 24 24">
+        <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7L11.5 7" />
+        <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1.5-1.5" />
+      </symbol>
+      <symbol id="i-person" viewBox="0 0 24 24">
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5 20a7 7 0 0 1 14 0" />
+      </symbol>
+      <symbol id="i-plug" viewBox="0 0 24 24">
+        <path d="M9 3v5M15 3v5M6 8h12v3a6 6 0 0 1-12 0zM12 17v4" />
+      </symbol>
+      <symbol id="i-box" viewBox="0 0 24 24">
+        <path d="M4 7.5 12 4l8 3.5v9L12 20l-8-3.5z" />
+        <path d="M4 7.5 12 11l8-3.5M12 11v9" />
+      </symbol>
+      <symbol id="i-gear" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3" />
+        <path
+          d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8"
+        />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24">
+        <path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z" />
+      </symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16" /></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></symbol>
+      <symbol id="i-routine" viewBox="0 0 24 24">
+        <path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9" />
+        <path d="M18.5 3v4.5H14M5.5 21v-4.5H10" />
+      </symbol>
+      <symbol id="i-wallet" viewBox="0 0 24 24">
+        <path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3" />
+        <rect x="4" y="8" width="16" height="11" rx="1" />
+        <path d="M15.5 13.5h.01" />
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24">
+        <rect x="5" y="11" width="14" height="9" rx="1" />
+        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+      </symbol>
+      <symbol id="i-hand" viewBox="0 0 24 24">
+        <path
+          d="M8 13V6.5a1.5 1.5 0 0 1 3 0V12M11 11V5a1.5 1.5 0 0 1 3 0v6M14 11V6.5a1.5 1.5 0 0 1 3 0V14a6 6 0 0 1-6 6h-1a5 5 0 0 1-4.2-2.3L4 15"
+        />
+      </symbol>
+      <symbol id="i-down" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24">
+        <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+        <circle cx="12" cy="12" r="2.5" />
+      </symbol>
+      <symbol id="i-scale" viewBox="0 0 24 24">
+        <path d="M12 4v16M5 20h14M6 8h12M6 8l-3 6a3 3 0 0 0 6 0zM18 8l-3 6a3 3 0 0 0 6 0z" />
+      </symbol>
+      <symbol id="i-shape" viewBox="0 0 24 24">
+        <rect x="4" y="4" width="7" height="7" rx="1" />
+        <circle cx="17.5" cy="7.5" r="3.5" />
+        <path d="M4 20l3.5-6 3.5 6zM14 14h7v7h-7z" />
+      </symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M5 5h14v10H9l-4 4z" /></symbol>
+    </svg>
+
+    <div class="app">
+      <aside class="side" id="side">
+        <button class="switcher" title="Changer d'espace">
+          <span class="logo">J</span><span><b>Jarvis</b><small>Tous mes espaces</small></span>
+          <svg class="i"><use href="#i-updown" /></svg>
+        </button>
+        <label class="search"
+          ><svg class="i"><use href="#i-search" /></svg
+          ><input id="search" placeholder="Chercher dans ma vie" aria-label="Chercher" /><span
+            class="kbd"
+            >Ctrl K</span
+          ></label
+        >
+        <nav id="nav"></nav>
+        <div class="grow"></div>
+        <div class="menu" id="me-menu" role="menu">
+          <button data-go="modeles">
+            <svg class="i"><use href="#i-shape" /></svg>Modèles de type
+          </button>
+          <button>
+            <svg class="i"><use href="#i-plug" /></svg>Connexions (Claude, ChatGPT)
+          </button>
+          <button>
+            <svg class="i"><use href="#i-box" /></svg>Mes données
+          </button>
+          <button>
+            <svg class="i"><use href="#i-gear" /></svg>Compte
+          </button>
+          <button id="theme">
+            <svg class="i"><use href="#i-moon" /></svg>Thème clair / sombre
+          </button>
+        </div>
+        <button class="me" id="me" aria-haspopup="menu">
+          <span class="avatar">JC</span
+          ><span><b>J-C</b><small>Claude connecté · il y a 2 h</small></span
+          ><svg class="i"><use href="#i-updown" /></svg>
+        </button>
+      </aside>
+
+      <main>
+        <header class="topbar">
+          <button class="icon-btn only-mobile" id="open-side" aria-label="Menu">
+            <svg class="i"><use href="#i-menu" /></svg>
+          </button>
+          <div class="crumbs" id="crumbs"></div>
+          <span class="chip-now mono"
+            ><span class="live"></span><span class="hide-s">VEN. 30 OCT ·</span> 10:41</span
+          >
+          <button class="icon-btn" id="open-journal" aria-label="Journal">
+            <svg class="i"><use href="#i-history" /></svg>
+          </button>
+          <button class="icon-btn" aria-label="Notifications">
+            <svg class="i"><use href="#i-bell" /></svg><span class="pip"></span>
+          </button>
+        </header>
+        <div class="page" id="page"></div>
+      </main>
+    </div>
+
+    <div class="scrim" id="scrim"></div>
+    <aside class="drawer" id="drawer" aria-modal="true" role="dialog"></aside>
+    <div class="toast" id="toast" role="status">
+      <span id="toast-text"></span><button id="toast-undo">Annuler</button>
+    </div>
+
+    <script>
+      // ——— Helpers ———
+      const $ = (id) => document.getElementById(id);
+      const icon = (n, style = '') =>
+        `<svg class="i"${style ? ` style="${style}"` : ''}><use href="#${n}"/></svg>`;
+      const nf = new Intl.NumberFormat('fr-FR');
+      const money = (v, cur = 'XOF', signed = false) => {
+        const s = nf.format(Math.abs(v)).replace(/ | /g, ' ');
+        const unit = cur === 'XOF' ? 'F' : '€';
+        const sign = signed ? (v < 0 ? '−' : v > 0 ? '+' : '') : v < 0 ? '−' : '';
+        return `${sign}${s} ${unit}`;
+      };
+      const signedCell = (v, cur) =>
+        `<span class="${v < 0 ? 'neg' : 'pos'}">${money(v, cur, true)}</span>`;
+      const esc = (s) =>
+        String(s).replace(
+          /[&<>"]/g,
+          (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c],
+        );
+
+      // ——— Data (fictitious; the structure is the Life OS's) ———
+      const ACCOUNTS = [
+        {
+          id: 'cash',
+          name: 'Espèces',
+          type: 'espèces',
+          cur: 'XOF',
+          calc: 72150,
+          seen: 72150,
+          seenAt: '28 oct.',
+        },
+        {
+          id: 'mma',
+          name: 'Mobile money A',
+          type: 'mobile money',
+          cur: 'XOF',
+          calc: 18400,
+          seen: 15900,
+          seenAt: '29 oct.',
+        },
+        {
+          id: 'mmb',
+          name: 'Mobile money B',
+          type: 'mobile money',
+          cur: 'XOF',
+          calc: 4000,
+          seen: null,
+        },
+        {
+          id: 'bank',
+          name: 'Banque',
+          type: 'banque',
+          cur: 'XOF',
+          calc: 236500,
+          seen: 236500,
+          seenAt: '25 oct.',
+        },
+        {
+          id: 'eur',
+          name: 'Banque EUR',
+          type: 'banque',
+          cur: 'EUR',
+          calc: 120,
+          seen: 120,
+          seenAt: '1 oct.',
+        },
+      ];
+      const FUNDS = [
+        {
+          id: 'libre',
+          name: 'Libre',
+          status: 'actif',
+          object: 'argent personnel réellement libre',
+          total: 48350,
+          reserved: 0,
+        },
+        {
+          id: 'dime',
+          name: 'Dîme et dons',
+          status: 'protégé',
+          object: 'dîme, prémices et générosité déjà affectées',
+          total: 21300,
+          reserved: 15000,
+        },
+        {
+          id: 'voyage',
+          name: 'Projet voyage',
+          status: 'protégé',
+          object: 'préparation du voyage : dossier, billet, logement',
+          total: 182000,
+          reserved: 120000,
+        },
+        {
+          id: 'pro',
+          name: 'Activité pro',
+          status: 'confié',
+          object: 'opérations et engagements de l’activité',
+          total: 79400,
+          reserved: 26000,
+        },
+      ];
+      const OBLIGATIONS = [
+        {
+          id: 'avance',
+          title: 'Rembourser l’avance de Paul',
+          prio: 'haute',
+          due: '29 oct.',
+          late: true,
+          total: 100000,
+          paid: 60000,
+          fund: 'libre',
+        },
+        {
+          id: 'serveur',
+          title: 'Hébergement serveur',
+          prio: 'normale',
+          due: '5 nov.',
+          total: 26000,
+          paid: 0,
+          fund: 'pro',
+        },
+        {
+          id: 'dossier',
+          title: 'Frais de dossier visa',
+          prio: 'critique',
+          due: '14 nov.',
+          total: 120000,
+          paid: 0,
+          fund: 'voyage',
+        },
+      ];
+      let MOVES = [
+        {
+          d: '30 oct.',
+          h: '08:12',
+          label: 'Petit-déjeuner',
+          cat: 'Repas',
+          acc: 'cash',
+          fund: 'libre',
+          amt: -650,
+          st: 'confirmé',
+          o: 'said',
+        },
+        {
+          d: '30 oct.',
+          h: '07:40',
+          label: 'Moto pour le bureau',
+          cat: 'Transport',
+          acc: 'cash',
+          fund: 'libre',
+          amt: -500,
+          st: 'confirmé',
+          o: 'said',
+        },
+        {
+          d: '29 oct.',
+          h: '19:05',
+          label: 'Remboursement partiel — Paul',
+          cat: 'Remboursement',
+          acc: 'mma',
+          fund: 'libre',
+          amt: -20000,
+          st: 'confirmé',
+          o: 'said',
+          tiers: 'Paul',
+        },
+        {
+          d: '29 oct.',
+          h: '12:30',
+          label: 'Déjeuner',
+          cat: 'Repas',
+          acc: null,
+          fund: 'libre',
+          amt: -1500,
+          st: 'à réconcilier',
+          o: 'said',
+          note: 'compte à préciser',
+        },
+        {
+          d: '28 oct.',
+          h: '18:00',
+          label: 'Abonnements IA',
+          cat: 'Abonnements',
+          acc: 'mma',
+          fund: 'pro',
+          amt: -13000,
+          st: 'à réconcilier',
+          o: 'read',
+          note: 'lu sur le relevé ; doublon possible',
+        },
+        {
+          d: '28 oct.',
+          h: '09:15',
+          label: 'Salaire d’octobre',
+          cat: 'Revenu',
+          acc: 'bank',
+          fund: 'libre',
+          amt: 185000,
+          st: 'confirmé',
+          o: 'read',
+        },
+        {
+          d: '28 oct.',
+          h: '09:16',
+          label: 'Dîme — 10 % du salaire',
+          cat: 'Réaffectation',
+          acc: 'bank',
+          fund: 'dime',
+          amt: 18500,
+          st: 'confirmé',
+          o: 'inferred',
+          note: 'règle : la dîme sort en premier',
+        },
+        {
+          d: '28 oct.',
+          h: '09:16',
+          label: 'Dîme — sortie du fonds Libre',
+          cat: 'Réaffectation',
+          acc: 'bank',
+          fund: 'libre',
+          amt: -18500,
+          st: 'confirmé',
+          o: 'inferred',
+        },
+        {
+          d: '27 oct.',
+          h: '20:40',
+          label: 'Offrande — culte',
+          cat: 'Offrandes',
+          acc: 'cash',
+          fund: 'dime',
+          amt: -2000,
+          st: 'confirmé',
+          o: 'said',
+        },
+        {
+          d: '27 oct.',
+          h: '13:10',
+          label: 'Retrait',
+          cat: 'Transfert',
+          acc: 'mma',
+          fund: 'libre',
+          amt: -2500,
+          st: 'à réconcilier',
+          o: 'read',
+          note: 'peut expliquer l’écart de Mobile money A',
+        },
+        {
+          d: '26 oct.',
+          h: '17:20',
+          label: 'Courses du marché',
+          cat: 'Repas',
+          acc: 'cash',
+          fund: 'libre',
+          amt: -6200,
+          st: 'confirmé',
+          o: 'said',
+        },
+        {
+          d: '26 oct.',
+          h: '10:00',
+          label: 'Frais de dépôt — dossier',
+          cat: 'Procédure',
+          acc: 'cash',
+          fund: 'voyage',
+          amt: -6000,
+          st: 'confirmé',
+          o: 'said',
+          tiers: 'Centre de visa',
+        },
+      ];
+      const CATEGORIES = [
+        { name: 'Repas', spent: 18450, budget: 20000 },
+        { name: 'Transport', spent: 9800, budget: 8000 },
+        { name: 'Abonnements', spent: 43000, budget: 45000 },
+        { name: 'Offrandes', spent: 12000, budget: null },
+        { name: 'Santé', spent: 3500, budget: 10000 },
+        { name: 'Divers', spent: 6200, budget: 5000 },
+      ];
+      const FLOWS = [
+        [0, 38],
+        [120, 52],
+        [0, 29],
+        [15, 61],
+        [185, 47],
+        [0, 33],
+        [262, 71],
+        [185, 64],
+      ];
+
+      const HABITS = [
+        {
+          id: 'priere',
+          name: 'Prière du matin',
+          aspect: 'esprit',
+          cad: '7/7',
+          time: '04:30',
+          nn: true,
+          streak: 23,
+          rate: 96,
+          today: 'done',
+        },
+        {
+          id: 'parole',
+          name: 'Méditation de la Parole',
+          aspect: 'esprit',
+          cad: '7/7',
+          time: '05:30',
+          nn: true,
+          streak: 23,
+          rate: 93,
+          today: 'done',
+        },
+        {
+          id: 'sport',
+          name: 'Sport matinal',
+          aspect: 'corps',
+          cad: 'lun–ven',
+          time: '06:00',
+          nn: true,
+          streak: 4,
+          rate: 71,
+          today: 'done',
+        },
+        {
+          id: 'adg',
+          name: 'Action de grâce · 3 temps',
+          aspect: 'esprit',
+          cad: '7/7',
+          time: '09:30 · 12:00 · 17:30',
+          nn: true,
+          streak: 9,
+          rate: 80,
+          today: 'partial',
+          part: '1/3',
+        },
+        {
+          id: 'anglais',
+          name: 'Anglais (1 h + écoute)',
+          aspect: 'âme',
+          cad: 'lun–ven',
+          time: '14:00',
+          nn: true,
+          streak: 2,
+          rate: 64,
+          today: 'todo',
+        },
+        {
+          id: 'ia',
+          name: 'Apprentissage IA',
+          aspect: 'âme',
+          cad: 'lun–ven',
+          time: '15:30',
+          nn: true,
+          streak: 6,
+          rate: 78,
+          today: 'todo',
+        },
+        {
+          id: 'verset',
+          name: 'Mémoriser un verset',
+          aspect: 'esprit',
+          cad: '7/7',
+          time: '—',
+          nn: true,
+          streak: 0,
+          rate: 52,
+          today: 'todo',
+        },
+        {
+          id: 'depenses',
+          name: 'Dépenses notées',
+          aspect: 'intendance',
+          cad: '7/7',
+          time: '21:00',
+          nn: true,
+          streak: 11,
+          rate: 88,
+          today: 'todo',
+        },
+        {
+          id: 'coucher',
+          name: 'Coucher à 22 h',
+          aspect: 'corps',
+          cad: '7/7',
+          time: '22:00',
+          nn: true,
+          streak: 0,
+          rate: 46,
+          today: 'todo',
+        },
+        {
+          id: 'gym',
+          name: 'Gym',
+          aspect: 'corps',
+          cad: 'mar · mer · sam',
+          time: '18:30',
+          nn: false,
+          streak: 3,
+          rate: 83,
+          today: 'off',
+        },
+      ];
+      const TEMPLATE = [
+        ['04:00', 'Ouverture : étirements, lit, eau', 'Ouverture'],
+        ['04:30', 'Prière de présence', 'Spirituel'],
+        ['05:30', 'Méditation de la Parole', 'Spirituel'],
+        ['06:00', 'Sport matinal léger', 'Corps'],
+        ['06:30', 'Douche, habillement, trajet', 'Préparation'],
+        ['07:30', 'Travaux intenses', 'Deep work'],
+        ['09:30', '1er temps d’action de grâce', 'Spirituel'],
+        ['09:45', 'Travaux intenses (suite)', 'Deep work'],
+        ['12:00', '2e temps d’action de grâce', 'Spirituel'],
+        ['12:15', 'Repas · écoute anglais', 'Repas'],
+        ['12:45', 'Sieste', 'Récupération'],
+        ['14:00', 'Admin · anglais · IA', 'Apprentissage'],
+        ['17:30', '3e temps d’action de grâce', 'Spirituel'],
+        ['19:00', 'Soir libre (vendredi)', 'Soir'],
+        ['21:30', 'Suivi du soir', 'Bilan'],
+        ['22:00', 'Coucher', 'Repos'],
+      ];
+
+      const FILES = [
+        {
+          name: 'releve-mobile-money-A-octobre.pdf',
+          type: 'pdf',
+          size: '184 Ko',
+          date: '29 oct.',
+          by: 'toi',
+          space: 'J-C',
+          links: [
+            ['Mobile money A', 'Compte'],
+            ['Rapprochement 29 oct.', 'Rapprochement'],
+          ],
+          text: '12 mouvements lus · 3 à réconcilier',
+        },
+        {
+          name: 'recu-frais-de-depot.jpg',
+          type: 'img',
+          size: '1,2 Mo',
+          date: '26 oct.',
+          by: 'Claude',
+          space: 'J-C',
+          links: [
+            ['Frais de dépôt — dossier', 'Mouvement'],
+            ['Projet voyage', 'Fonds'],
+          ],
+          text: 'Montant lu : 6 000 F',
+        },
+        {
+          name: 'export-banque-sept.csv',
+          type: 'csv',
+          size: '22 Ko',
+          date: '3 oct.',
+          by: 'toi',
+          space: 'J-C',
+          links: [['Banque', 'Compte']],
+          text: '41 lignes importées · 0 doublon',
+        },
+        {
+          name: 'contrat-hebergement.pdf',
+          type: 'pdf',
+          size: '96 Ko',
+          date: '1 oct.',
+          by: 'Claude',
+          space: 'Travail',
+          links: [['Hébergement serveur', 'Obligation']],
+          text: 'Échéance mensuelle : 5 du mois',
+        },
+        {
+          name: 'theorie-de-la-finance.md',
+          type: 'md',
+          size: '38 Ko',
+          date: '12 sept.',
+          by: 'import',
+          space: 'J-C',
+          links: [['Intendance', 'Mandat']],
+          text: 'Document · 14 sections',
+        },
+        {
+          name: 'photo-tableau-reunion.jpg',
+          type: 'img',
+          size: '2,4 Mo',
+          date: '18 sept.',
+          by: 'toi',
+          space: 'Travail',
+          links: [['Réunion du 18 sept.', 'Note']],
+          text: 'Texte lu : 9 lignes',
+        },
+        {
+          name: 'passeport-scan.pdf',
+          type: 'pdf',
+          size: '640 Ko',
+          date: '2 sept.',
+          by: 'toi',
+          space: 'J-C',
+          links: [
+            ['Frais de dossier visa', 'Obligation'],
+            ['Projet voyage', 'Projet'],
+          ],
+          text: 'Pièce d’identité',
+        },
+      ];
+
+      // ——— Maintenant ———
+      const GROUPS = [
+        ['fix', 'À corriger'],
+        ['late', 'En retard'],
+        ['today', 'Aujourd’hui'],
+        ['week', 'Cette semaine'],
+        ['proposed', 'Proposé par Jarvis'],
+      ];
+      const NOWITEMS = [
+        {
+          id: 'ecart',
+          group: 'fix',
+          icon: 'i-scale',
+          title: 'Écart sur Mobile money A',
+          sub: 'Rapprochement · Finances · constaté hier',
+          tag: ['error', '−2 500 F'],
+          kind: 'Rapprochement',
+          context: `Le solde calculé est <b class="mono">18 400 F</b>, tu as constaté <b class="mono">15 900 F</b> hier soir <span class="origin said">dit</span>. Le relevé du 29 octobre montre un <b>retrait de 2 500 F</b> le 27 qui n’est rattaché à rien <span class="origin read">lu</span>. Ta règle : <span class="quote">« réconcilier seulement quand le calculé diffère de l’observé »</span><span class="origin said">dit</span>.`,
+          tl: {
+            marks: [
+              [0, 'Constat 25 oct.', ''],
+              [0.4, 'Retrait 27 oct.', 'due'],
+              [0.75, 'Constat 29 oct.', ''],
+              [1, 'Maintenant', 'now'],
+            ],
+            spans: [
+              [0, 0.4, 'past'],
+              [0.4, 1, 'late'],
+            ],
+          },
+          links: [
+            ['Mobile money A', 'Compte'],
+            ['releve-mobile-money-A-octobre.pdf', 'Fichier'],
+            ['Retrait du 27 oct.', 'Mouvement'],
+          ],
+          choices: [
+            {
+              rec: true,
+              why: 'Déduit par Claude · ce matin',
+              title: 'Confirmer le retrait de 2 500 F',
+              text: 'Le mouvement lu sur le relevé passe en « confirmé », dans le fonds Libre. L’écart tombe à zéro.',
+              checks: [
+                ['good', 'Même montant, même compte, même semaine'],
+                ['good', 'Le relevé reste attaché comme justificatif'],
+              ],
+              actions: [
+                [
+                  'solid',
+                  'Confirmer le retrait',
+                  'Retrait de 2 500 F confirmé ; Mobile money A rapproché',
+                ],
+              ],
+            },
+            {
+              title: 'Chercher avec Claude',
+              text: 'Claude te demande ce que tu as fait de cet argent avant de classer quoi que ce soit.',
+              checks: [['warn', 'L’écart reste ouvert en attendant']],
+              actions: [
+                ['', 'Ouvrir dans Claude', 'Conversation ouverte sur l’écart de Mobile money A'],
+              ],
+            },
+          ],
+        },
+        {
+          id: 'avance',
+          group: 'late',
+          icon: 'i-hand',
+          title: 'Rembourser l’avance de Paul',
+          sub: 'Obligation · haute · échéance hier',
+          tag: ['late', '1 j de retard'],
+          kind: 'Obligation',
+          context: `Il reste <b class="mono">40 000 F</b> sur 100 000 F <span class="origin inferred">calculé</span>. Tu avais promis le solde pour le 29 octobre <span class="origin said">dit</span>. Ta charte : <span class="quote">« La parole est une dette : l’échéance se tient, ou se renégocie avant le terme par un message honnête »</span><span class="origin said">dit</span>. Le fonds Libre contient <b class="mono">48 350 F</b>.`,
+          tl: {
+            marks: [
+              [0, 'Avance 2 oct.', ''],
+              [0.55, '60 000 F rendus', ''],
+              [0.93, 'Échéance 29 oct.', 'due below'],
+              [1, 'Maintenant', 'now'],
+            ],
+            spans: [
+              [0, 0.93, 'past'],
+              [0.93, 1, 'late'],
+            ],
+          },
+          links: [
+            ['Paul', 'Personne'],
+            ['Fonds Libre', 'Fonds'],
+            ['Remboursement du 29 oct.', 'Mouvement'],
+          ],
+          choices: [
+            {
+              rec: true,
+              why: 'Possible aujourd’hui',
+              title: 'Payer les 40 000 F depuis Libre',
+              text: 'Le mouvement est préparé ; tu confirmes une fois le transfert fait de ton côté.',
+              checks: [
+                ['good', 'Libre couvre le montant (reste 8 350 F)'],
+                ['good', 'Aucun fonds protégé touché'],
+                ['warn', 'Libre sera presque vide jusqu’au prochain salaire'],
+              ],
+              actions: [
+                [
+                  'solid',
+                  'Préparer le paiement',
+                  'Paiement de 40 000 F à Paul préparé (à confirmer)',
+                ],
+              ],
+            },
+            {
+              title: 'Renégocier honnêtement',
+              text: 'Claude rédige un message à Paul avec une nouvelle date ; rien ne part sans toi.',
+              checks: [
+                ['good', 'Fidèle à ta charte : prévenir avant de laisser glisser'],
+                ['warn', 'Le terme est déjà passé d’un jour'],
+              ],
+              actions: [['', 'Rédiger le message', 'Brouillon de message à Paul préparé']],
+            },
+          ],
+        },
+        {
+          id: 'apprentissage',
+          group: 'today',
+          icon: 'i-routine',
+          title: 'Admin · anglais · IA',
+          sub: 'Gabarit lun–ven · 14:00 – 17:30',
+          tag: ['plain', '14:00'],
+          kind: 'Routine',
+          context: `Bloc dense de l’après-midi : admin (~1 h 30), anglais (1 h), IA (1 h) <span class="origin said">dit</span>. Ta règle : <span class="quote">« l’ordre de passage se reçoit le matin »</span><span class="origin said">dit</span>. L’anglais a glissé deux jours cette semaine <span class="origin inferred">calculé</span>.`,
+          tl: {
+            marks: [
+              [0, '04:00', ''],
+              [0.36, 'Maintenant', 'now'],
+              [0.56, 'Bloc 14:00', 'due'],
+              [1, '22:00', ''],
+            ],
+            spans: [[0, 0.36, 'past']],
+          },
+          links: [
+            ['Anglais', 'Habitude'],
+            ['Apprentissage IA', 'Habitude'],
+            ['Lundi — Vendredi', 'Gabarit'],
+          ],
+          choices: [
+            {
+              rec: true,
+              why: 'Suggéré par Claude',
+              title: 'Anglais d’abord, à 14:00',
+              text: 'Il a glissé deux fois ; l’admin passe en dernier aujourd’hui.',
+              checks: [
+                ['good', 'Remet la série d’anglais en route'],
+                ['good', 'L’admin du vendredi est léger'],
+              ],
+              actions: [['solid', 'Garder cet ordre', 'Ordre du bloc : anglais, IA, admin']],
+            },
+            {
+              title: 'L’ordre habituel',
+              text: 'Admin, anglais, IA.',
+              checks: [['warn', 'Risque que l’anglais glisse une troisième fois']],
+              actions: [['', 'Ordre habituel', 'Ordre du bloc : admin, anglais, IA']],
+            },
+          ],
+        },
+        {
+          id: 'serveur',
+          group: 'week',
+          icon: 'i-wallet',
+          title: 'Hébergement serveur — 26 000 F',
+          sub: 'Obligation · Activité pro · 5 nov.',
+          tag: ['plain', 'Jeu.'],
+          kind: 'Obligation',
+          context: `Échéance mensuelle du 5 <span class="origin read">lu</span> sur le contrat. Le fonds Activité pro (confié) a <b class="mono">79 400 F</b>, dont 26 000 F déjà réservés pour elle <span class="origin inferred">calculé</span>.`,
+          tl: {
+            marks: [
+              [0, 'Aujourd’hui', 'now'],
+              [0.5, 'Prélèvement 5 nov.', 'due'],
+              [1, '10 nov.', ''],
+            ],
+            spans: [[0, 0.5, 'ahead']],
+          },
+          links: [
+            ['contrat-hebergement.pdf', 'Fichier'],
+            ['Activité pro', 'Fonds'],
+          ],
+          choices: [
+            {
+              rec: true,
+              why: 'Déjà réservé',
+              title: 'Laisser passer le prélèvement',
+              text: 'Jarvis te prévient le 5 au matin pour confirmer le mouvement.',
+              checks: [['good', 'Réserve suffisante dans un fonds confié']],
+              actions: [
+                [
+                  'solid',
+                  'Rappel le 5 à 8:00',
+                  'Rappel « Confirmer l’hébergement » le 5 nov. à 8:00',
+                ],
+              ],
+            },
+            {
+              title: 'Payer maintenant',
+              text: 'Le mouvement est noté aujourd’hui.',
+              checks: [['warn', 'Le prélèvement automatique pourrait doubler']],
+              actions: [['', 'Noter le paiement', 'Paiement de 26 000 F (hébergement) noté']],
+            },
+          ],
+        },
+        {
+          id: 'coucher',
+          group: 'proposed',
+          icon: 'i-spark',
+          title: 'Avancer le suivi du soir à 21:00',
+          sub: 'Proposition · Routines · à partir de ce soir',
+          tag: ['info', 'Proposé'],
+          kind: 'Proposition',
+          proposed: true,
+          context: `« Coucher à 22 h » n’a tenu que <b>46 %</b> des soirs sur 30 jours <span class="origin inferred">calculé</span>, et le suivi du soir finit en moyenne à <b class="mono">22:24</b> <span class="origin inferred">calculé</span>. Ta règle : <span class="quote">« l’heure du lever tient à celle du coucher »</span><span class="origin said">dit</span>.`,
+          tl: {
+            marks: [
+              [0, '19:00', ''],
+              [0.5, 'Suivi 21:00', 'due'],
+              [0.75, 'Coucher 22:00', ''],
+              [1, '23:00', ''],
+            ],
+            spans: [[0, 0.5, 'ahead']],
+          },
+          links: [
+            ['Coucher à 22 h', 'Habitude'],
+            ['Suivi du soir', 'Routine'],
+            ['Lundi — Vendredi', 'Gabarit'],
+          ],
+          choices: [
+            {
+              rec: true,
+              why: 'Déduit par Claude · cette nuit',
+              title: 'Essayer 21:00 pendant 2 semaines',
+              text: 'Le gabarit change pour 14 jours ; Jarvis compare ensuite le taux de coucher.',
+              checks: [
+                ['good', '30 min de marge avant 22:00'],
+                ['good', 'Un essai, pas une règle : il se défait seul'],
+              ],
+              actions: [
+                ['solid', 'Essayer 2 semaines', 'Suivi du soir avancé à 21:00 pour 14 jours'],
+              ],
+            },
+            {
+              title: 'Garder 21:30',
+              text: 'Rien ne change.',
+              checks: [['warn', 'Le taux reste sous 50 %']],
+              actions: [['', 'Garder', 'Proposition refusée : suivi du soir à 21:30']],
+            },
+          ],
+        },
+      ];
+
+      // ——— State ———
+      const state = {
+        route: 'maintenant',
+        selected: 'ecart',
+        done: new Set(),
+        journal: [],
+        filter: 'all',
+        moveFilter: 'all',
+        fileFilter: 'all',
+        checks: {},
+        model: 'Mouvement',
+        rangement: 'table',
+        toastUndo: null,
+      };
+      HABITS.forEach((h) => {
+        state.checks[h.id] = h.today;
+      });
+
+      // ——— Navigation ———
+      const NAV = [
+        [
+          'Au quotidien',
+          [
+            [
+              'maintenant',
+              'Maintenant',
+              'i-now',
+              () => NOWITEMS.filter((x) => !state.done.has(x.id)).length,
+              true,
+            ],
+            ['agenda', 'Agenda', 'i-cal'],
+          ],
+        ],
+        [
+          'Apps',
+          [
+            ['finances', 'Finances', 'i-wallet', null, false, 'var(--primary)'],
+            ['routines', 'Routines', 'i-routine', null, false, 'var(--success)'],
+            ['nouvelle', 'Nouvelle app', 'i-plus', null, false, null, true],
+          ],
+        ],
+        [
+          'Ma vie',
+          [
+            ['entrees', 'Entrées', 'i-life', () => '1 284'],
+            ['documents', 'Documents', 'i-doc', () => 46],
+            ['fichiers', 'Fichiers', 'i-file', () => FILES.length],
+            ['tableaux', 'Tableaux de bord', 'i-chart', () => 4],
+          ],
+        ],
+      ];
+      function drawNav() {
+        const top = state.route.split('/')[0];
+        $('nav').innerHTML =
+          NAV.map(
+            ([title, items]) =>
+              `<div class="nav-group"><div class="caps">${title}</div>${items
+                .map(([id, label, ic, count, hot, color, ghost]) => {
+                  const n = count ? count() : null;
+                  const lead = color
+                    ? `<span class="app-icon" style="background:${color}">${icon(ic)}</span>`
+                    : icon(ic);
+                  return `<a class="nav-item${ghost ? ' ghost' : ''}" href="#${id}" ${top === id ? 'aria-current="page"' : ''}>${lead}${label}${n !== null ? `<span class="count${hot ? ' hot' : ''}">${n}</span>` : ''}</a>`;
+                })
+                .join('')}</div>`,
+          ).join('') +
+          `<div class="nav-group"><div class="caps">Espaces ${icon('i-plus', 'width:14px;height:14px')}</div>
+     <a class="nav-item" href="#entrees"><span class="space-dot" style="background:var(--primary)"></span>J-C<span class="count">4</span></a>
+     <a class="nav-item" href="#entrees"><span class="space-dot" style="background:var(--ochre)"></span>Nous<span class="count">1</span></a>
+     <a class="nav-item" href="#entrees"><span class="space-dot" style="background:var(--info)"></span>Travail<span class="count">0</span></a></div>`;
+      }
+      function crumbs(parts) {
+        $('crumbs').innerHTML =
+          `<span class="hide-s">${icon('i-panel')}</span><span class="hide-s">Jarvis</span>` +
+          parts
+            .map((p, i) =>
+              i === parts.length - 1
+                ? `<span class="hide-s">›</span><b>${p}</b>`
+                : `<span class="hide-s">›</span><span class="hide-s">${p}</span>`,
+            )
+            .join('');
+      }
+      function head(title, sub, actions = '', lead = '') {
+        return `<div class="page-head"><div><h1>${lead}${title}</h1><p>${sub}</p></div><div class="head-actions">${actions}</div></div>`;
+      }
+      function tabs(base, list, current) {
+        return `<nav class="tabs">${list.map(([id, label, n]) => `<a href="#${base}/${id}" ${current === id ? 'aria-current="page"' : ''}>${label}${n !== undefined ? `<span class="n">${n}</span>` : ''}</a>`).join('')}</nav>`;
+      }
+      const panel = (title, body, right = '', ic = '') =>
+        `<section class="panel"><div class="panel-head"><span class="left caps">${ic ? icon(ic) : ''}${title}</span>${right}</div><div class="panel-body">${body}</div></section>`;
+      const kpi = (label, v, s, cls = '') =>
+        `<div class="kpi ${cls}"><div class="caps">${label}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
+
+      // ——— Maintenant ———
+      function pageMaintenant() {
+        crumbs(['Maintenant']);
+        const live = NOWITEMS.filter((x) => !state.done.has(x.id));
+        const n = (g) => live.filter((x) => x.group === g).length;
+        const vis = live.filter((x) => state.filter === 'all' || x.group === state.filter);
+        if (!vis.some((x) => x.id === state.selected) && vis.length) state.selected = vis[0].id;
+        const filters = [
+          ['all', 'Tout', live.length],
+          ['fix', 'À corriger', n('fix')],
+          ['late', 'En retard', n('late')],
+          ['today', 'Aujourd’hui', n('today')],
+          ['proposed', 'Proposé', n('proposed')],
+        ];
+        const list = vis.length
+          ? GROUPS.map(([g, title]) => {
+              const rows = vis.filter((x) => x.group === g);
+              return rows.length
+                ? `<div class="group-title caps">${title} <span class="n">${rows.length}</span></div>` +
+                    rows
+                      .map(
+                        (x) => `
+      <button class="row" data-pick="${x.id}" aria-selected="${x.id === state.selected}"><span class="kind ${x.proposed ? 'proposed' : ''}">${icon(x.icon)}</span>
+      <div><div class="t">${x.title}</div><div class="s">${x.sub}</div></div><span class="tag ${x.tag[0]}">${x.tag[1]}</span></button>`,
+                      )
+                      .join('')
+                : '';
+            }).join('')
+          : `<div class="empty">Tout est à jour.</div>`;
+        const it = vis.find((x) => x.id === state.selected);
+        return (
+          head(
+            'Maintenant',
+            `Vendredi 30 octobre · ${n('fix')} à corriger · ${n('late')} en retard · ${n('today')} aujourd’hui · ${n('proposed')} proposition`,
+            `<div class="segmented">${filters.map(([id, l, c]) => `<button data-filter="${id}" aria-pressed="${state.filter === id}">${l}<span class="n">${c}</span></button>`).join('')}</div><a class="btn hide-s" href="#agenda">${icon('i-cal')}Ouvrir l’agenda</a>`,
+          ) +
+          `<div class="board ${state.reading ? 'reading' : ''}" id="board">
+      <section class="panel list-panel"><div class="panel-head"><span class="left caps">${icon('i-now')}Maintenant · 10:41</span><span class="pill"><span class="live"></span>En direct</span></div>
+        <div class="panel-body list">${list}</div></section>
+      <section class="detail">${it ? detail(it) : `<div class="panel"><div class="panel-body empty">Rien à décider. Profite.</div></div>`}</section></div>`
+        );
+      }
+      function timeline(tl) {
+        return `<div class="timeline" aria-hidden="true"><div class="track"></div>${tl.spans.map(([a, b, t]) => `<div class="span ${t}" style="left:${a * 100}%;width:${(b - a) * 100}%"></div>`).join('')}${tl.marks.map(([at, l, c]) => `<div class="mark ${c} ${at <= 0.05 ? 'edge-l' : at >= 0.95 ? 'edge-r' : ''}" style="left:${at * 100}%"><span class="lbl">${l}</span><span class="stem"></span></div>`).join('')}</div>`;
+      }
+      function dayBand(focus) {
+        const from = 6,
+          to = 23,
+          p = (h) => ((h - from) / (to - from)) * 100;
+        const blocks = [
+          [7.5, 12, 'Deep work', 'routine'],
+          [14, 17.5, 'Admin · anglais · IA', 'routine', 'apprentissage'],
+          [17.75, 18.25, 'Rapprocher', 'proposed', 'ecart'],
+          [19, 20.5, 'Soir libre', 'routine'],
+          [21, 21.5, 'Suivi', 'proposed', 'coucher'],
+          [21.5, 22, 'Suivi', 'routine'],
+        ];
+        const fmt = (h) =>
+          `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+        return panel(
+          'Ta journée · vendredi 30',
+          `<div class="dayband"><div class="hours" style="grid-template-columns:repeat(${to - from},1fr)">${Array.from({ length: to - from }, (_, i) => `<span>${i % 2 ? '' : String(from + i).padStart(2, '0')}</span>`).join('')}</div>
+    ${blocks.map(([a, b, t, k, id]) => `<div class="block ${k} ${id === focus ? 'focus' : ''}" style="left:${p(a)}%;width:calc(${p(b) - p(a)}% - 3px)" title="${t}"><b>${t}</b><small>${fmt(a)}</small></div>`).join('')}
+    <div class="now-line" style="left:${p(10 + 41 / 60)}%"></div></div>
+    <div class="legend pad" style="padding-top:10px;padding-bottom:12px"><span><i style="background:var(--sand);border:1px solid var(--rule-strong)"></i>Gabarit de la journée</span><span><i style="background:var(--info-surface);border:1px dashed var(--info)"></i>Proposé, à accepter</span></div>`,
+          `<span class="muted" style="font-size:12px">Gabarit lun–ven</span>`,
+          'i-cal',
+        );
+      }
+      function detail(it) {
+        const group = GROUPS.find(([g]) => g === it.group)[1];
+        return `<button class="back" data-back>${icon('i-left')}Retour à la liste</button>
+  <section class="panel"><div class="panel-head"><span class="left caps">${icon(it.icon)}${it.kind} · ${group}</span><span class="tag ${it.tag[0]}">${it.tag[1]}</span></div>
+    <div class="panel-body subject"><div class="subject-top"><div><h2>${it.title}</h2><div class="muted" style="font-size:13px">${it.sub}</div></div><button class="btn small">${icon('i-life')}Fiche complète</button></div>
+      <p class="context">${it.context}</p>${timeline(it.tl)}
+      <div class="chips">${it.links.map(([t, k]) => `<a class="chip" href="#">${icon(k === 'Personne' ? 'i-person' : k === 'Fichier' ? 'i-file' : 'i-link')}${t}<small>${k}</small></a>`).join('')}</div></div></section>
+  ${dayBand(it.id)}
+  <div class="choices">${it.choices
+    .map(
+      (
+        c,
+        ci,
+      ) => `<article class="choice ${c.rec ? 'recommended' : ''}"><div class="choice-head"><h3>${c.title}</h3>${c.why ? `<span class="why">${c.why}</span>` : ''}</div><p>${c.text}</p>
+    <ul class="checks">${c.checks.map(([t, s]) => `<li class="${t}">${icon(t === 'good' ? 'i-check' : 'i-alert')}<span>${s}</span></li>`).join('')}</ul>
+    <div class="choice-foot">${c.actions.map(([st, l, log], ai) => `<button class="btn ${st}" data-act="${it.id}:${ci}:${ai}">${st ? icon('i-check') : ''}${l}</button>`).join('')}</div></article>`,
+    )
+    .join('')}</div>`;
+      }
+
+      // ——— Finances ———
+      const fundOf = (id) => FUNDS.find((f) => f.id === id);
+      const accOf = (id) => ACCOUNTS.find((a) => a.id === id);
+      const lockTag = (f) =>
+        f.status === 'actif'
+          ? ''
+          : `<span class="lock" title="${f.status}">${icon('i-lock')}${f.status}</span>`;
+      function financesHead(sub) {
+        crumbs(['Apps', 'Finances', sub]);
+        const pending = MOVES.filter((m) => m.st !== 'confirmé').length;
+        return (
+          head(
+            'Finances <span class="built">créée avec Claude · 7 types</span>',
+            'Base zéro du 12 septembre 2026 · un compte dit <b>où</b> est l’argent, un fonds dit <b>pour quoi</b>',
+            `<div class="segmented"><button aria-pressed="true">XOF</button><button>EUR</button></div><button class="btn solid" data-add-move>${icon('i-plus')}Ajouter un mouvement</button>`,
+            `<span class="app-icon" style="background:var(--primary)">${icon('i-wallet')}</span>`,
+          ) +
+          tabs(
+            'finances',
+            [
+              ['apercu', 'Vue d’ensemble'],
+              ['mouvements', 'Mouvements', MOVES.length],
+              ['fonds', 'Fonds', FUNDS.length],
+              ['obligations', 'Obligations', OBLIGATIONS.length],
+              ['rapprochement', 'Rapprochement', pending ? '!' : ''],
+            ],
+            sub === 'Vue d’ensemble'
+              ? 'apercu'
+              : sub === 'Mouvements'
+                ? 'mouvements'
+                : sub === 'Fonds'
+                  ? 'fonds'
+                  : sub === 'Obligations'
+                    ? 'obligations'
+                    : 'rapprochement',
+          )
+        );
+      }
+      function pageFinances(tab) {
+        const pending = MOVES.filter((m) => m.st !== 'confirmé');
+        const libre = fundOf('libre').total;
+        const protectedSum = FUNDS.filter((f) => f.status !== 'actif').reduce(
+          (s, f) => s + f.total,
+          0,
+        );
+        const oblig = OBLIGATIONS.reduce((s, o) => s + o.total - o.paid, 0);
+        if (tab === 'mouvements') return financesHead('Mouvements') + pageMoves();
+        if (tab === 'fonds')
+          return (
+            financesHead('Fonds') +
+            panel('Fonds et disponible', fundsTable(), '', 'i-lock') +
+            `<div class="hint">${icon('i-chat')}<span>Règle de ce modèle : <em>un fonds protégé ou confié ne finance pas un autre objet sans exception explicite et plan de restauration.</em> Jarvis la vérifie à chaque mouvement.</span></div>`
+          );
+        if (tab === 'obligations')
+          return (
+            financesHead('Obligations') +
+            panel(
+              'Obligations actives',
+              obligTable(),
+              `<span class="muted mono" style="font-size:12px">restant ${money(oblig)}</span>`,
+              'i-hand',
+            )
+          );
+        if (tab === 'rapprochement')
+          return (
+            financesHead('Rapprochement') +
+            panel('Calculé contre constaté', reconTable(), '', 'i-scale') +
+            `<div class="hint">${icon('i-chat')}<span>Dis à Claude <em>« j’ai 15 900 sur Mobile money A »</em> : le constat s’enregistre ici, l’écart se calcule, et Claude cherche les mouvements qui l’expliquent.</span></div>`
+          );
+        return (
+          financesHead('Vue d’ensemble') +
+          (pending.length
+            ? `<div class="banner">${icon('i-alert')}<span><b>${pending.length} mouvements à réconcilier</b> — compte ou catégorie à préciser, ou doublon possible. Ils ne comptent dans aucun solde.</span><a class="btn small" href="#finances/mouvements" data-mf="pending">Les voir</a></div>`
+            : '') +
+          `<div class="grid g4">${kpi('Disponible libre', money(libre), 'fonds Libre, rien de réservé')}${kpi('Protégé et confié', money(protectedSum), '3 fonds · 161 000 F réservés')}${kpi('Obligations actives', money(oblig), '3 · dont 1 en retard', 'alert')}${kpi('Dépensé en octobre', money(92950), '−8 % sur septembre')}</div>
+    <div class="grid g21">
+      ${panel('Fonds et disponible', fundsTable(), `<a class="btn small" href="#finances/fonds">Détail</a>`, 'i-lock')}
+      ${panel('Comptes réels', `<div class="scroll"><table><tbody>${ACCOUNTS.map((a) => `<tr><td><div class="cell-title">${a.name}</div><div class="cell-sub">${a.type} · ${a.cur}</div></td><td class="n">${money(a.calc, a.cur)}${a.seen !== null && a.seen !== a.calc ? `<div><span class="tag error">écart ${money(a.seen - a.calc, a.cur, true)}</span></div>` : ''}</td></tr>`).join('')}</tbody></table></div>`, `<a class="btn small" href="#finances/rapprochement">Rapprocher</a>`, 'i-wallet')}
+    </div>
+    <div class="grid g2">
+      ${panel(
+        'Dépenses d’octobre par catégorie',
+        `<div class="pad">${CATEGORIES.map((c) => {
+          const max = 50000;
+          const over = c.budget && c.spent > c.budget;
+          return `<div class="hbar"><span>${c.name}</span><div class="track"><div class="fill ${over ? 'over' : ''}" style="width:${(c.spent / max) * 100}%"></div>${c.budget ? `<div class="budget" style="left:${(c.budget / max) * 100}%" title="budget ${money(c.budget)}"></div>` : ''}</div><span class="mono" style="text-align:right;font-size:12.5px">${money(c.spent)}</span></div>`;
+        }).join('')}
+        <div class="legend" style="margin-top:10px"><span><i style="background:var(--ink)"></i>Dépensé</span><span><i style="background:var(--error)"></i>Au-delà du budget</span><span><i style="background:var(--primary);width:3px"></i>Budget</span></div></div>`,
+        '<span class="muted" style="font-size:12px">recalculé à l’ouverture</span>',
+        'i-chart',
+      )}
+      ${panel('Entrées et sorties · 8 semaines', `<div class="pad">${flowChart()}<div class="legend" style="margin-top:8px"><span><i style="background:var(--success)"></i>Entrées</span><span><i style="background:var(--ochre)"></i>Sorties</span></div></div>`, '<span class="muted mono" style="font-size:12px">milliers de F</span>', 'i-chart')}
+    </div>
+    ${panel('Obligations actives', obligTable(), `<a class="btn small" href="#finances/obligations">Toutes</a>`, 'i-hand')}`
+        );
+      }
+      function fundsTable() {
+        return `<div class="scroll"><table><thead><tr><th>Fonds</th><th class="n">Total</th><th class="n">Réservé</th><th class="n">Disponible</th><th style="width:22%">Réservé / total</th></tr></thead><tbody>${FUNDS.map((f) => `<tr><td><div class="cell-title">${f.name} ${lockTag(f)}</div><div class="cell-sub">${f.object}</div></td><td class="n">${money(f.total)}</td><td class="n faint">${money(f.reserved)}</td><td class="n"><b>${money(f.total - f.reserved)}</b></td><td><div class="bar ${f.status === 'actif' ? 'ok' : 'info'}"><i style="width:${(f.reserved / f.total) * 100}%"></i></div></td></tr>`).join('')}
+  <tr class="total"><td>Total</td><td class="n">${money(FUNDS.reduce((s, f) => s + f.total, 0))}</td><td class="n">${money(FUNDS.reduce((s, f) => s + f.reserved, 0))}</td><td class="n">${money(FUNDS.reduce((s, f) => s + f.total - f.reserved, 0))}</td><td class="muted" style="font-size:12px">= somme des comptes XOF</td></tr></tbody></table></div>`;
+      }
+      function obligTable() {
+        const prio = { critique: 'error', haute: 'late', normale: 'neutral' };
+        return `<div class="scroll"><table><thead><tr><th>Obligation</th><th>Priorité</th><th>Échéance</th><th>Fonds</th><th style="width:18%">Payé</th><th class="n">Restant</th></tr></thead><tbody>${OBLIGATIONS.map((o) => `<tr class="row-click"><td class="cell-title">${o.title}</td><td><span class="tag ${prio[o.prio]}">${o.prio}</span></td><td class="mono ${o.late ? 'neg' : ''}">${o.due}${o.late ? ' · retard' : ''}</td><td>${fundOf(o.fund).name} ${lockTag(fundOf(o.fund))}</td><td><div class="bar ok"><i style="width:${(o.paid / o.total) * 100}%"></i></div></td><td class="n"><b>${money(o.total - o.paid)}</b></td></tr>`).join('')}</tbody></table></div>`;
+      }
+      function reconTable() {
+        return `<div class="scroll"><table><thead><tr><th>Compte</th><th class="n">Calculé</th><th class="n">Constaté</th><th class="n">Écart</th><th>Dernier constat</th><th></th></tr></thead><tbody>${ACCOUNTS.map(
+          (a) => {
+            const gap = a.seen === null ? null : a.seen - a.calc;
+            return `<tr><td><div class="cell-title">${a.name}</div><div class="cell-sub">${a.type}</div></td><td class="n">${money(a.calc, a.cur)}</td><td class="n">${a.seen === null ? '<span class="faint">—</span>' : money(a.seen, a.cur)}</td><td class="n">${gap === null ? '<span class="tag neutral">jamais constaté</span>' : gap === 0 ? '<span class="tag ok">0</span>' : `<span class="tag error">${money(gap, a.cur, true)}</span>`}</td><td class="mono faint">${a.seenAt || '—'}</td><td style="text-align:right"><button class="btn small">Constater</button></td></tr>`;
+          },
+        ).join('')}</tbody></table></div>`;
+      }
+      function flowChart() {
+        const W = 520,
+          H = 170,
+          b = 22,
+          max = 270,
+          bw = 20,
+          gap = (W - 30) / FLOWS.length;
+        const y = (v) => H - b - (v / max) * (H - b - 10);
+        let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Entrées et sorties sur 8 semaines">`;
+        [0, 100, 200].forEach((v) => {
+          s += `<line x1="30" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--rule)" stroke-dasharray="2 3"/><text x="24" y="${y(v) + 3}" text-anchor="end">${v}</text>`;
+        });
+        FLOWS.forEach(([inn, out], i) => {
+          const x = 34 + i * gap;
+          s += `<rect x="${x}" y="${y(inn)}" width="${bw}" height="${H - b - y(inn)}" fill="var(--success)" rx="1"><title>Entrées ${inn} 000 F</title></rect>`;
+          s += `<rect x="${x + bw + 3}" y="${y(out)}" width="${bw}" height="${H - b - y(out)}" fill="var(--ochre)" rx="1"><title>Sorties ${out} 000 F</title></rect>`;
+          s += `<text x="${x + bw + 1}" y="${H - 6}" text-anchor="middle">S${37 + i}</text>`;
+        });
+        return s + '</svg>';
+      }
+      function pageMoves() {
+        const f = state.moveFilter;
+        const rows = MOVES.filter(
+          (m) => f === 'all' || (f === 'pending' ? m.st !== 'confirmé' : m.st === 'confirmé'),
+        );
+        const days = [...new Set(rows.map((m) => m.d))];
+        const inSum = rows.filter((m) => m.amt > 0).reduce((s, m) => s + m.amt, 0),
+          outSum = rows.filter((m) => m.amt < 0).reduce((s, m) => s + m.amt, 0);
+        const pending = MOVES.filter((m) => m.st !== 'confirmé').length;
+        return (
+          `<div class="toolbar"><div class="segmented">${[
+            ['all', 'Tous', MOVES.length],
+            ['ok', 'Confirmés', MOVES.length - pending],
+            ['pending', 'À réconcilier', pending],
+          ]
+            .map(
+              ([id, l, n]) =>
+                `<button data-mf="${id}" aria-pressed="${f === id}">${l}<span class="n">${n}</span></button>`,
+            )
+            .join('')}</div>
+    <div class="chips"><button class="chip" aria-pressed="true">Octobre</button><button class="chip">Fonds : tous</button><button class="chip">Compte : tous</button><button class="chip">${icon('i-down')}Exporter</button></div></div>` +
+          panel(
+            `${rows.length} mouvements`,
+            `<div class="scroll"><table><thead><tr><th>Heure</th><th>Libellé</th><th>Catégorie</th><th>Compte</th><th>Fonds</th><th>Statut</th><th class="n">Montant</th></tr></thead><tbody>${days
+              .map((d) => {
+                const r = rows.filter((m) => m.d === d);
+                const tot = r.reduce((s, m) => s + m.amt, 0);
+                return (
+                  `<tr class="group"><td colspan="6">${d}</td><td class="n">${money(tot, 'XOF', true)}</td></tr>` +
+                  r
+                    .map((m) => {
+                      const fd = fundOf(m.fund);
+                      return `<tr class="${m.fresh ? 'flash' : ''}"><td class="mono faint">${m.h}</td><td><div class="cell-title">${esc(m.label)} <span class="origin ${m.o}">${{ said: 'dit', read: 'lu', inferred: 'déduit' }[m.o]}</span></div>${m.note ? `<div class="cell-sub">${esc(m.note)}</div>` : ''}</td><td>${m.cat}</td><td>${m.acc ? accOf(m.acc).name : '<span class="tag late bare">à préciser</span>'}</td><td>${fd.name} ${lockTag(fd)}</td><td>${m.st === 'confirmé' ? '<span class="tag ok">confirmé</span>' : '<span class="tag late">à réconcilier</span>'}</td><td class="n">${signedCell(m.amt)}</td></tr>`;
+                    })
+                    .join('')
+                );
+              })
+              .join(
+                '',
+              )}<tr class="total"><td colspan="4">Entrées ${money(inSum)} · Sorties ${money(outSum)}</td><td colspan="2"></td><td class="n">${money(inSum + outSum, 'XOF', true)}</td></tr></tbody></table></div>`,
+            `<span class="muted" style="font-size:12px">regroupé par jour · modèle « Mouvement »</span>`,
+            'i-wallet',
+          )
+        );
+      }
+
+      // ——— Routines ———
+      function routinesHead(sub, cur) {
+        crumbs(['Apps', 'Routines', sub]);
+        return (
+          head(
+            'Routines <span class="built">créée avec Claude · 4 types</span>',
+            'Vendredi 30 octobre · gabarit Lundi — Vendredi · réveil 4:00, coucher 22:00',
+            `<button class="btn">${icon('i-routine')}Changer de gabarit</button>`,
+            `<span class="app-icon" style="background:var(--success)">${icon('i-routine')}</span>`,
+          ) +
+          tabs(
+            'routines',
+            [
+              ['aujourdhui', 'Aujourd’hui'],
+              ['habitudes', 'Habitudes', HABITS.length],
+              ['regularite', 'Régularité'],
+            ],
+            cur,
+          )
+        );
+      }
+      function pageRoutines(tab) {
+        if (tab === 'habitudes')
+          return (
+            routinesHead('Habitudes', 'habitudes') +
+            panel(
+              'Habitudes actives',
+              `<div class="scroll"><table><thead><tr><th>Habitude</th><th>Aspect</th><th>Cadence</th><th>Horaire</th><th>Non négociable</th><th class="n">Série</th><th style="width:16%">30 jours</th></tr></thead><tbody>${HABITS.map((h) => `<tr class="row-click"><td class="cell-title">${h.name}</td><td><span class="tag neutral bare">${h.aspect}</span></td><td class="mono">${h.cad}</td><td class="mono faint">${h.time}</td><td>${h.nn ? '<span class="tag ok bare">oui</span>' : '<span class="faint">non</span>'}</td><td class="n">${h.streak} j</td><td><div style="display:flex;gap:8px;align-items:center"><div class="bar ${h.rate >= 80 ? 'ok' : h.rate >= 60 ? 'warn' : ''}" style="flex:1"><i style="width:${h.rate}%"></i></div><span class="mono" style="font-size:12px;width:34px;text-align:right">${h.rate}%</span></div></td></tr>`).join('')}</tbody></table></div>`,
+              '',
+              'i-routine',
+            ) +
+            `<div class="hint">${icon('i-chat')}<span>Chaque habitude garde sa fiche : pourquoi, cadre et règles, stratégie en cours. Dis à Claude <em>« à partir de lundi, la gym passe à 6:00 »</em> : l’habitude, le gabarit et les rappels changent ensemble, et tout s’annule.</span></div>`
+          );
+        if (tab === 'regularite') return routinesHead('Régularité', 'regularite') + regularity();
+        const todays = HABITS.filter((h) => state.checks[h.id] !== 'off');
+        const done = todays.filter((h) => state.checks[h.id] === 'done').length;
+        const nowIdx = TEMPLATE.findIndex(([t]) => t > '10:41') - 1;
+        return (
+          routinesHead('Aujourd’hui', 'aujourdhui') +
+          `<div class="grid g4">${kpi('Non-négociables tenus', `${done}<small>/ ${todays.length}</small>`, 'aujourd’hui, à 10:41')}${kpi('Régularité 7 jours', '82 %', '+6 points sur la semaine passée')}${kpi('Plus longue série', '23 j', 'Prière et Parole')}${kpi('Coucher moyen', '22:24', '24 min après la cible', 'alert')}</div>
+    <div class="grid g12">
+      ${panel('Gabarit lundi — vendredi', `<ol class="template">${TEMPLATE.map(([t, l, b], i) => `<li class="${i < nowIdx ? 'past' : i === nowIdx ? 'current' : ''}"><span class="h">${t}</span><span>${l}</span><span class="tag neutral bare">${b}</span></li>`).join('')}</ol>`, '<span class="pill"><span class="live"></span>En ce moment</span>', 'i-cal')}
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        ${panel(
+          'Non-négociables du jour',
+          `<div style="display:flex;gap:16px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--rule)"><div class="ring" style="--p:${Math.round((done / todays.length) * 100)}"><span>${done}/${todays.length}</span></div><div><b>Encore ${todays.length - done} aujourd’hui</b><div class="muted" style="font-size:13px">Coche ici, ou dis-le à Claude : « prière faite, 4h35 ». L’heure que tu donnes est celle qui est notée.</div></div></div>
+          ${HABITS.map((h) => {
+            const st = state.checks[h.id];
+            return `<button class="check-row ${st === 'done' ? 'done' : ''} ${st === 'off' ? 'off' : ''}" data-check="${h.id}" ${st === 'off' ? 'disabled' : ''}><span class="box">${icon('i-check')}</span><span><span class="t">${h.name}</span><div class="cell-sub">${h.time !== '—' ? h.time + ' · ' : ''}${h.cad}${st === 'partial' ? ` · ${h.part} fait` : ''}${st === 'off' ? ' · pas aujourd’hui' : ''}</div></span><span class="mono faint" style="font-size:12px">${h.streak ? `série ${h.streak} j` : '<span class="neg">série 0</span>'}</span></button>`;
+          }).join('')}`,
+          '',
+          'i-check',
+        )}
+        ${panel('Suivi du soir', `<div class="form" style="padding:14px 16px"><div class="field-row"><div class="field"><label>Coucher <small>hier</small></label><input value="22:40"></div><div class="field"><label>Réveil <small>ce matin</small></label><input value="04:10"></div></div><div class="hint">${icon('i-spark')}<span>Proposition en attente dans <a href="#maintenant" style="color:inherit"><em>Maintenant</em></a> : avancer le suivi à 21:00 pendant deux semaines.</span></div></div>`, '<span class="mono faint" style="font-size:12px">21:30</span>', 'i-moon')}
+      </div></div>`
+        );
+      }
+      function regularity() {
+        const days = 28,
+          todayIdx = 27;
+        const seed = (s) => {
+          let x = 0;
+          for (const c of s) x = (x * 31 + c.charCodeAt(0)) % 9973;
+          return x;
+        };
+        const cell = (h, d) => {
+          const dow = (d + 4) % 7; // day 0 = Saturday 3 Oct… keeps the pattern stable
+          const off =
+            (h.cad === 'lun–ven' && (dow === 0 || dow === 1)) ||
+            (h.cad.startsWith('mar') && ![3, 4, 0].includes(dow));
+          if (off) return 'off';
+          if (d > todayIdx) return '';
+          if (d === todayIdx)
+            return state.checks[h.id] === 'done'
+              ? 'l3'
+              : state.checks[h.id] === 'partial'
+                ? 'l1'
+                : '';
+          const r = seed(h.id + d) % 100;
+          return r < h.rate - 15 ? 'l3' : r < h.rate ? 'l2' : r < h.rate + 10 ? 'l1' : '';
+        };
+        const cols = `150px repeat(${days}, minmax(8px, 1fr))`;
+        const daynums = Array.from({ length: days }, (_, i) => {
+          const n = i + 3;
+          return n <= 31 ? n : n - 31;
+        });
+        const heat = `<div class="pad scroll"><div class="heat" style="grid-template-columns:${cols};min-width:560px"><span></span>${daynums.map((n, i) => `<span class="day">${i % 3 === 0 || i === todayIdx ? n : ''}</span>`).join('')}
+    ${HABITS.map((h) => `<span class="lbl">${h.name}</span>${Array.from({ length: days }, (_, d) => `<span class="c ${cell(h, d)} ${d === todayIdx ? 'today' : ''}" title="${h.name} · ${daynums[d]}"></span>`).join('')}`).join('')}</div>
+    <div class="legend" style="margin-top:12px"><span><i style="background:var(--heat-3)"></i>Fait à l’heure</span><span><i style="background:var(--heat-2)"></i>Fait</span><span><i style="background:var(--heat-1)"></i>En partie</span><span><i style="background:var(--heat-0)"></i>Manqué</span><span><i style="border:1px dashed var(--rule-strong)"></i>Pas prévu</span></div></div>`;
+        const pts = [
+          62, 70, 68, 75, 71, 79, 82, 77, 74, 80, 83, 78, 81, 85, 79, 82, 84, 80, 76, 82, 86, 83,
+          81, 85, 79, 84, 88, 82,
+        ];
+        const W = 520,
+          H = 150,
+          x = (i) => 28 + (i / (pts.length - 1)) * (W - 36),
+          y = (v) => H - 20 - ((v - 50) / 50) * (H - 34);
+        const line = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Taux quotidien sur 28 jours">${[50, 75, 100].map((v) => `<line x1="28" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="var(--rule)" stroke-dasharray="2 3"/><text x="22" y="${y(v) + 3}" text-anchor="end">${v}</text>`).join('')}
+    <path d="M${pts.map((v, i) => `${x(i)},${y(v)}`).join(' L')}" fill="none" stroke="var(--success)" stroke-width="2"/><circle cx="${x(pts.length - 1)}" cy="${y(pts.at(-1))}" r="3.5" fill="var(--success)"/>
+    <text x="${x(0)}" y="${H - 4}">3 oct.</text><text x="${x(pts.length - 1)}" y="${H - 4}" text-anchor="end">30 oct.</text></svg>`;
+        return (
+          panel(
+            '28 derniers jours',
+            heat,
+            '<span class="muted" style="font-size:12px">tiré des exécutions notées</span>',
+            'i-routine',
+          ) +
+          `<div class="grid g2">${panel('Taux quotidien des non-négociables', `<div class="pad">${line}</div>`, '<span class="muted mono" style="font-size:12px">%</span>', 'i-chart')}
+    ${panel(
+      'Ce qui glisse',
+      `<div>${HABITS.filter((h) => h.rate < 70)
+        .map(
+          (h) =>
+            `<div class="rule-line"><span class="tag ${h.rate < 50 ? 'error' : 'late'}">${h.rate}%</span><span><b>${h.name}</b><div class="cell-sub">${h.id === 'coucher' ? 'manqué surtout le lundi et le jeudi (soirées longues)' : h.id === 'verset' ? 'sans horaire fixe : à placer dans le gabarit ?' : 'glisse quand le bloc de 14:00 commence par l’admin'}</div></span></div>`,
+        )
+        .join('')}</div>`,
+      '<span class="origin inferred">déduit</span>',
+      'i-alert',
+    )}</div>`
+        );
+      }
+
+      // ——— Agenda ———
+      function pageAgenda() {
+        crumbs(['Agenda']);
+        const from = 4,
+          to = 23,
+          hh = 40,
+          top = (h) => (h - from) * hh;
+        const days = [
+          ['LUN', 26],
+          ['MAR', 27],
+          ['MER', 28],
+          ['JEU', 29],
+          ['VEN', 30],
+          ['SAM', 31],
+          ['DIM', 1],
+        ];
+        const ev = {
+          0: [
+            [4.5, 6, 'Prière · Parole', 'routine'],
+            [7.5, 12, 'Deep work', 'routine'],
+            [19, 21.5, 'Session à deux', 'event'],
+          ],
+          1: [
+            [4.5, 6, 'Prière · Parole', 'routine'],
+            [7.5, 12, 'Deep work', 'routine'],
+            [18.5, 20, 'Gym', 'event'],
+          ],
+          2: [
+            [4.5, 6, 'Prière · Parole', 'routine'],
+            [7.5, 12, 'Deep work', 'routine'],
+            [18.5, 20, 'Gym', 'event'],
+          ],
+          3: [
+            [4.5, 6, 'Prière · Parole', 'routine'],
+            [7.5, 12, 'Deep work', 'routine'],
+            [19, 21.5, 'Session à deux', 'event'],
+            [0, 0, 'Remboursement Paul', 'due'],
+          ],
+          4: [
+            [4.5, 6, 'Prière · Parole', 'routine'],
+            [7.5, 12, 'Deep work', 'routine'],
+            [14, 17.5, 'Anglais · IA · admin', 'routine'],
+            [17.75, 18.25, 'Rapprocher', 'proposed'],
+            [21, 21.5, 'Suivi 21:00 ?', 'proposed'],
+          ],
+          5: [
+            [5, 6.5, 'Prière', 'routine'],
+            [9, 10.5, 'Gym', 'event'],
+            [15, 16, 'Revue de la semaine', 'event'],
+          ],
+          6: [
+            [6, 7, 'Jeûne · prière', 'routine'],
+            [9, 12.5, 'Culte', 'event'],
+          ],
+        };
+        const fmt = (h) =>
+          `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.round((h % 1) * 60)).padStart(2, '0')}`;
+        const H = (to - from) * hh;
+        return (
+          head(
+            'Agenda',
+            'Semaine 44 · du 26 octobre au 1er novembre · tes événements, ton gabarit, tes échéances et les propositions',
+            `<div class="segmented"><button>Jour</button><button aria-pressed="true">Semaine</button><button>Mois</button></div><button class="btn">${icon('i-link')}Ajouter à mon agenda (iCal)</button>`,
+          ) +
+          `<div class="legend"><span><i style="background:var(--paper);border:1px solid var(--ink)"></i>Événement</span><span><i style="background:var(--clay)"></i>Gabarit et habitudes</span><span><i style="border:1px solid var(--primary)"></i>Échéance</span><span><i style="background:var(--info-surface);border:1px dashed var(--info)"></i>Proposé, à accepter</span></div>` +
+          panel(
+            'Semaine 44',
+            `<div class="scroll"><div class="week"><div></div>${days.map(([d, n], i) => `<div class="wh ${i === 4 ? 'today' : ''}">${d}<b>${n}</b></div>`).join('')}
+      <div class="gutter" style="height:${H}px">${Array.from({ length: to - from }, (_, i) => (i % 2 === 0 ? `<span style="top:${i * hh}px">${String(from + i).padStart(2, '0')}</span>` : '')).join('')}</div>
+      ${days.map((_, i) => `<div class="col ${i === 4 ? 'today' : ''}" style="height:${H}px">${(ev[i] || []).map(([a, b, t, k]) => (k === 'due' ? `<div class="ev due" style="top:2px;height:22px"><b>⚑ ${t}</b></div>` : `<div class="ev ${k}" style="top:${top(a) + 1}px;height:${Math.max(top(b) - top(a) - 2, 18)}px"><b>${t}</b><small>${fmt(a)}–${fmt(b)}</small></div>`)).join('')}${i === 4 ? `<div class="nowline" style="top:${top(10 + 41 / 60)}px"></div>` : ''}</div>`).join('')}</div></div>`,
+            '<span class="muted" style="font-size:12px">4:00 – 23:00</span>',
+            'i-cal',
+          )
+        );
+      }
+
+      // ——— Dashboards ———
+      function pageTableaux() {
+        crumbs(['Tableaux de bord']);
+        const card = (t, app, color, ic, body, meta) =>
+          `<section class="panel"><div class="panel-head"><span class="left">${`<span class="app-icon" style="background:${color}">${icon(ic)}</span>`}<b style="color:var(--ink);font-size:13.5px">${t}</b></span><a class="btn small" href="#${app}">Ouvrir</a></div><div class="panel-body pad">${body}<div class="cell-sub" style="margin-top:10px">${meta}</div></div></section>`;
+        const mini = (vals, color) =>
+          `<svg class="chart" viewBox="0 0 200 60">${vals.map((v, i) => `<rect x="${i * 25 + 4}" y="${56 - v * 0.5}" width="16" height="${v * 0.5}" fill="${color}" rx="1"/>`).join('')}</svg>`;
+        return (
+          head(
+            'Tableaux de bord',
+            '4 tableaux · chacun est recalculé à l’ouverture, dans l’app comme dans Claude',
+            `<button class="btn">${icon('i-chat')}Demander un tableau à Claude</button>`,
+          ) +
+          `<div class="grid g2">
+      ${card('Finances — vue d’ensemble', 'finances/apercu', 'var(--primary)', 'i-wallet', `<div class="grid g2" style="gap:10px">${kpi('Disponible libre', money(48350), 'fonds Libre')}${kpi('Obligations', money(186000), '1 en retard', 'alert')}</div>`, 'Créé par Claude le 14 sept. · 6 blocs · modèle Finances')}
+      ${card('Régularité des routines', 'routines/regularite', 'var(--success)', 'i-routine', mini([62, 70, 75, 79, 82, 84, 86, 88], 'var(--success)'), 'Créé par Claude le 2 oct. · taux quotidien, carte de 28 jours')}
+      ${card(
+        'Dépenses par catégorie',
+        'finances/apercu',
+        'var(--primary)',
+        'i-chart',
+        CATEGORIES.slice(0, 3)
+          .map(
+            (c) =>
+              `<div class="hbar" style="grid-template-columns:90px 1fr 80px"><span>${c.name}</span><div class="track"><div class="fill" style="width:${(c.spent / 50000) * 100}%"></div></div><span class="mono" style="text-align:right;font-size:12px">${money(c.spent)}</span></div>`,
+          )
+          .join(''),
+        'Créé par toi depuis Claude le 20 oct. · budget comparé au réel',
+      )}
+      ${card('Sommeil', 'routines/aujourdhui', 'var(--success)', 'i-moon', mini([58, 52, 66, 40, 72, 48, 60, 46], 'var(--ochre)'), 'Créé par Claude le 25 oct. · coucher et réveil notés chaque soir')}
+    </div>
+    <div class="hint">${icon('i-chat')}<span>Un tableau est une entrée : ses blocs déclarent quoi calculer, jamais du code. Dis à Claude <em>« ajoute la part de la dîme sur 6 mois »</em> et le bloc apparaît ici aussi.</span></div>`
+        );
+      }
+
+      // ——— Files ———
+      function pageFichiers() {
+        crumbs(['Fichiers']);
+        const types = { pdf: 'PDF', img: 'Image', csv: 'Tableur', md: 'Texte' };
+        const f = state.fileFilter;
+        const rows = FILES.filter((x) => f === 'all' || x.type === f);
+        return (
+          head(
+            'Fichiers',
+            `${FILES.length} fichiers · 5,2 Mo · rangés à part, privés, jamais dans la conversation`,
+            `<button class="btn solid">${icon('i-plus')}Déposer des fichiers</button>`,
+          ) +
+          `<div class="toolbar"><div class="segmented">${[
+            ['all', 'Tous', FILES.length],
+            ['pdf', 'PDF', 3],
+            ['img', 'Images', 2],
+            ['csv', 'Tableurs', 1],
+            ['md', 'Textes', 1],
+          ]
+            .map(
+              ([id, l, n]) =>
+                `<button data-ff="${id}" aria-pressed="${f === id}">${l}<span class="n">${n}</span></button>`,
+            )
+            .join(
+              '',
+            )}</div><div class="chips"><button class="chip">Espace : tous</button><button class="chip">Ajouté par : tous</button></div></div>` +
+          panel(
+            `${rows.length} fichiers`,
+            `<div class="scroll"><table><thead><tr><th>Nom</th><th>Lié à</th><th>Ajouté</th><th>Espace</th><th class="n">Taille</th><th></th></tr></thead><tbody>${rows.map((x) => `<tr class="row-click" data-file="${x.name}"><td><div class="fname"><span class="ficon ${x.type}">${x.type.toUpperCase()}</span><div style="min-width:0"><div class="cell-title" style="overflow-wrap:anywhere">${x.name}</div><div class="cell-sub">${types[x.type]} · ${x.text}</div></div></div></td><td><div class="chips">${x.links.map(([t, k]) => `<span class="chip">${t}<small>${k}</small></span>`).join('')}</div></td><td><span class="mono" style="font-size:12.5px">${x.date}</span><div class="cell-sub">par ${x.by}</div></td><td>${x.space}</td><td class="n faint">${x.size}</td><td style="text-align:right;white-space:nowrap"><button class="btn small" data-file="${x.name}">${icon('i-eye')}<span class="hide-s">Aperçu</span></button> <button class="btn small" data-dl="${x.name}" aria-label="Télécharger">${icon('i-down')}</button></td></tr>`).join('')}</tbody></table></div>`,
+            '<span class="muted" style="font-size:12px">les plus récents d’abord</span>',
+            'i-file',
+          )
+        );
+      }
+      function fileDrawer(name) {
+        const x = FILES.find((f) => f.name === name);
+        openDrawer(`<div class="drawer-head"><div style="min-width:0"><h2 style="overflow-wrap:anywhere">${x.name}</h2><span class="muted" style="font-size:12px">${x.size} · ajouté le ${x.date} par ${x.by}</span></div><button class="icon-btn" data-close aria-label="Fermer">${icon('i-x')}</button></div>
+    <div class="form">${x.type === 'img' ? `<div class="preview img">${icon('i-eye', 'width:28px;height:28px')}<span style="font-size:12px">aperçu de l’image</span></div>` : `<div class="preview"><div class="ln" style="width:55%;height:10px;background:var(--rule-strong)"></div>${Array.from({ length: 11 }, (_, i) => `<div class="ln" style="width:${[92, 86, 95, 70, 88, 60, 93, 81, 90, 66, 40][i]}%"></div>`).join('')}</div>`}
+      <dl class="meta"><dt>Type</dt><dd>${{ pdf: 'PDF', img: 'Image', csv: 'Tableur CSV', md: 'Markdown' }[x.type]}</dd><dt>Espace</dt><dd>${x.space}</dd><dt>Lu par Jarvis</dt><dd>${x.text} <span class="origin read">lu</span></dd><dt>Lié à</dt><dd><div class="chips">${x.links.map(([t, k]) => `<a class="chip" href="#">${icon('i-link')}${t}<small>${k}</small></a>`).join('')}</div></dd><dt>Rangement</dt><dd><span class="path">fichiers/${x.date.includes('sept') ? '2026-09' : '2026-10'}/${x.name}</span></dd></dl></div>
+    <div class="drawer-foot"><button class="btn">${icon('i-link')}Lien de 24 h</button><button class="btn solid" data-dl="${x.name}">${icon('i-down')}Télécharger</button></div>`);
+      }
+
+      // ——— Models ———
+      const MODELS = [
+        [
+          'Finances',
+          'var(--primary)',
+          'i-wallet',
+          [
+            ['Mouvement', 12, 16],
+            ['Compte', 5, 6],
+            ['Fonds', 4, 7],
+            ['Obligation', 3, 10],
+            ['Rapprochement', 9, 8],
+            ['Catégorie', 11, 3],
+            ['Entité', 3, 3],
+          ],
+        ],
+        [
+          'Routines',
+          'var(--success)',
+          'i-routine',
+          [
+            ['Habitude', 10, 12],
+            ['Exécution', 812, 5],
+            ['Gabarit', 3, 4],
+            ['Routine', 15, 4],
+          ],
+        ],
+        [
+          'Sans app',
+          'var(--bark)',
+          'i-life',
+          [
+            ['Journal', 214, 6],
+            ['Personne', 48, 7],
+            ['Document', 46, 3],
+            ['Fichier', 7, 5],
+          ],
+        ],
+      ];
+      function pageModeles(which) {
+        if (which) return pageModel(which);
+        crumbs(['Modèles de type']);
+        return (
+          head(
+            'Modèles de type',
+            'Ce que chaque type contient, comment il se relie, ce qu’il calcule, où il se range. Claude les crée avec toi ; tu les ajustes ici ou en le disant.',
+            `<button class="btn">${icon('i-chat')}Créer un type avec Claude</button>`,
+          ) +
+          `<div class="grid g3">${MODELS.map(([app, color, ic, list]) => panel(app, list.map(([n, count, fields]) => `<a class="model-card" href="#modeles/${n}"><span class="kind">${icon('i-shape')}</span><span><b>${n}</b><div class="cell-sub">${fields} champs · ${nf.format(count)} entrées</div></span>${icon('i-right')}</a>`).join(''), '', ic)).join('')}</div>`
+        );
+      }
+      function pageModel(name) {
+        crumbs(['Modèles de type', name]);
+        const fields = [
+          ['montant', 'montant signé', 'oui', '+ entrée, − sortie'],
+          ['devise', 'choix', 'oui', 'XOF · EUR'],
+          ['date', 'date et heure', 'oui', 'l’heure que tu dis, pas celle de la saisie'],
+          ['nature', 'choix', 'oui', 'entrée · sortie · réaffectation · ajustement'],
+          ['compte', '→ Compte', 'oui*', '* « à préciser » laisse le mouvement à réconcilier'],
+          ['fonds', '→ Fonds', 'oui', 'pour quoi et pour qui'],
+          ['catégorie', '→ Catégorie', 'non', ''],
+          ['tiers', '→ Personne', 'non', ''],
+          ['statut', 'choix', 'oui', 'confirmé · à réconcilier · en attente'],
+          ['justificatif', '→ Fichier', 'non', 'reçu, relevé, capture'],
+          ['obligation', '→ Obligation', 'non', 'quand il paie une obligation'],
+          ['note', 'texte', 'non', ''],
+        ];
+        const tpl =
+          state.rangement === 'table'
+            ? 'vie/{année}/{année}-{mois}/registre.md'
+            : 'finances/mouvements/{année}/{mois}/{date}-{titre}.md';
+        return (
+          head(
+            `${name} <span class="built">version 4 · modifié par Claude le 12 sept.</span>`,
+            'App Finances · 12 entrées · utilisé par 3 tableaux de bord',
+            `<button class="btn">${icon('i-history')}Versions</button><button class="btn solid">${icon('i-chat')}Modifier avec Claude</button>`,
+            `<span class="app-icon" style="background:var(--primary)">${icon('i-wallet')}</span>`,
+          ) +
+          `<div class="grid g21"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+      ${panel('Champs', `<div class="scroll"><table><thead><tr><th>Champ</th><th>Nature</th><th>Obligatoire</th><th>Précision</th></tr></thead><tbody>${fields.map(([n, t, r, d]) => `<tr><td class="mono"><b>${n}</b></td><td><span class="nature ${t.startsWith('→') ? 'ref' : ''}">${t}</span></td><td>${r}</td><td class="cell-sub">${d}</td></tr>`).join('')}</tbody></table></div>`, '<span class="muted" style="font-size:12px">vérifiés à chaque enregistrement</span>', 'i-shape')}
+      ${panel(
+        'Calculs qui utilisent ce type',
+        `<div>${[
+          ['Compte', 'solde', 'somme des montants confirmés, par compte'],
+          ['Fonds', 'total', 'somme des montants confirmés, par fonds'],
+          ['Fonds', 'disponible', 'total − réservé'],
+          ['Catégorie', 'dépensé ce mois', 'somme des sorties du mois en cours'],
+          ['Obligation', 'payé', 'somme des mouvements liés'],
+        ]
+          .map(
+            ([t, n, d]) =>
+              `<div class="rule-line"><span class="nature calc">${t}.${n}</span><span class="muted">= ${d}</span></div>`,
+          )
+          .join('')}</div>`,
+        '',
+        'i-chart',
+      )}
+      ${panel(
+        'Règles',
+        `<div>${[
+          [
+            'si',
+            'le fonds est protégé ou confié et la nature est « sortie » hors de son objet',
+            'alors',
+            'exiger une exception et un plan de restauration',
+          ],
+          [
+            'si',
+            'le compte est « à préciser »',
+            'alors',
+            'statut « à réconcilier », hors de tout solde',
+          ],
+          [
+            'quand',
+            'un revenu est confirmé',
+            'alors',
+            'proposer la dîme (10 %) vers « Dîme et dons »',
+          ],
+          [
+            'quand',
+            'un écart de rapprochement apparaît',
+            'alors',
+            'chercher les mouvements lus qui l’expliquent',
+          ],
+        ]
+          .map(
+            ([a, b, c, d]) =>
+              `<div class="rule-line"><span><span class="kw">${a}</span>${b} <span class="kw">${c}</span>${d}</span></div>`,
+          )
+          .join('')}</div>`,
+        '<span class="muted" style="font-size:12px">exécutées par Jarvis, notées, annulables</span>',
+        'i-scale',
+      )}
+    </div><div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+      ${panel(
+        'Rangement à l’export',
+        `<div class="form"><label class="radio"><input type="radio" name="rg" value="table" ${state.rangement === 'table' ? 'checked' : ''}><span><b>Une table par mois</b><div class="cell-sub">comme ton Life OS : tous les mouvements du mois dans un registre</div></span></label>
+        <label class="radio"><input type="radio" name="rg" value="file" ${state.rangement === 'file' ? 'checked' : ''}><span><b>Un fichier par mouvement</b><div class="cell-sub">chaque mouvement est un .md, ses liens dedans</div></span></label>
+        <div class="field"><label>Chemin <small>modifiable</small></label><input class="mono" value="${tpl}" id="tpl"></div>
+        <div class="cell-sub">Exemple : <span class="path">${tpl.replace('{année}-{mois}', '2026-10').replace('{année}', '2026').replace('{mois}', '10').replace('{date}', '2026-10-30').replace('{titre}', 'petit-dejeuner')}</span></div>
+        <div class="cell-sub">Réimporter ce dossier retrouve les mêmes mouvements : rien n’est créé deux fois.</div></div>`,
+        '',
+        'i-box',
+      )}
+      ${panel(
+        'Affichage dans l’app',
+        `<div class="form"><div class="field"><label>Colonnes</label><div class="chips">${['heure', 'libellé', 'catégorie', 'compte', 'fonds', 'statut', 'montant'].map((c) => `<span class="chip" aria-pressed="true">${c}</span>`).join('')}<span class="chip">tiers</span><span class="chip">justificatif</span></div></div>
+        <div class="field-row"><div class="field"><label>Regrouper par</label><select><option>jour</option><option>semaine</option><option>catégorie</option></select></div><div class="field"><label>Totaliser</label><select><option>montant</option></select></div></div>
+        <div class="field"><label>Formulaire de saisie</label><div class="cell-sub">généré depuis les champs ; <a href="#finances/mouvements" data-add-move>voir le formulaire</a></div></div></div>`,
+        '',
+        'i-eye',
+      )}
+      <div class="hint">${icon('i-chat')}<span>Tout changement ici passe par le journal et s’annule. Tu peux aussi dire à Claude : <em>« ajoute un champ “moyen de paiement” aux mouvements »</em>.</span></div>
+    </div></div>`
+        );
+      }
+
+      // ——— New app ———
+      function pageNouvelle() {
+        crumbs(['Apps', 'Nouvelle app']);
+        return (
+          head(
+            'Nouvelle app',
+            'Une app, ce sont des types, leurs liens, leurs calculs, leurs règles et leurs pages. Claude la construit avec toi ; rien n’est du code.',
+          ) +
+          `<div class="grid g3">${[
+            ['Santé', 'rendez-vous, traitements, mesures, ordonnances'],
+            ['Projets', 'objectifs, jalons, tâches, revues'],
+            ['Relations', 'personnes, rencontres, dates, engagements'],
+            ['Lecture', 'livres, notes, citations, révélations'],
+            ['Maison', 'achats, entretien, garanties, factures'],
+            ['Partir de zéro', 'décris ce que tu veux suivre à Claude'],
+          ]
+            .map(([t, d], i) =>
+              panel(
+                t,
+                `<div class="pad"><p class="muted" style="margin:0 0 12px">${d}</p><button class="btn ${i === 5 ? 'solid' : ''} wide">${icon(i === 5 ? 'i-chat' : 'i-plus')}${i === 5 ? 'Ouvrir dans Claude' : 'Installer et adapter'}</button></div>`,
+                '',
+                i === 5 ? 'i-spark' : 'i-box',
+              ),
+            )
+            .join('')}</div>
+    <div class="hint">${icon('i-chat')}<span>Installer une app crée ses types, ses pages et ses tableaux dans ton espace, en une seule ligne du journal : <em>l’installation s’annule d’un coup</em>.</span></div>`
+        );
+      }
+      function pageSimple(title, sub) {
+        crumbs([title]);
+        return (
+          head(title, sub) +
+          `<div class="panel"><div class="panel-body empty">Hors de cette maquette — déjà dans l’app actuelle.</div></div>`
+        );
+      }
+
+      // ——— Add movement form (generated from the model) ———
+      function moveDrawer() {
+        openDrawer(`<div class="drawer-head"><div><h2>Ajouter un mouvement</h2><span class="muted" style="font-size:12px">formulaire tiré du modèle « Mouvement »</span></div><button class="icon-btn" data-close aria-label="Fermer">${icon('i-x')}</button></div>
+  <form class="form" id="move-form">
+    <div class="field-row"><div class="field"><label>Montant</label><input id="m-amt" class="mono" inputmode="numeric" value="2500"></div><div class="field"><label>Nature</label><select id="m-nat"><option value="-1">sortie</option><option value="1">entrée</option></select></div></div>
+    <div class="field"><label>Libellé</label><input id="m-label" value="Crédit téléphone"></div>
+    <div class="field-row"><div class="field"><label>Compte <small>où</small></label><select id="m-acc"><option value="">à préciser</option>${ACCOUNTS.filter(
+      (a) => a.cur === 'XOF',
+    )
+      .map((a) => `<option value="${a.id}" ${a.id === 'cash' ? 'selected' : ''}>${a.name}</option>`)
+      .join('')}</select></div>
+      <div class="field"><label>Fonds <small>pour quoi</small></label><select id="m-fund">${FUNDS.map((f) => `<option value="${f.id}">${f.name}${f.status !== 'actif' ? ' · ' + f.status : ''}</option>`).join('')}</select></div></div>
+    <div class="warnbox" id="m-warn"><b>Fonds ${'protégé'}.</b> Ta règle : il ne finance pas un autre objet sans exception explicite et plan de restauration. Indique l’exception, ou change de fonds.</div>
+    <div class="field-row"><div class="field"><label>Catégorie</label><select id="m-cat">${['Divers', 'Repas', 'Transport', 'Abonnements', 'Offrandes', 'Santé'].map((c) => `<option>${c}</option>`).join('')}</select></div><div class="field"><label>Date et heure</label><input class="mono" value="30/10/2026 10:41"></div></div>
+    <div class="field"><label>Justificatif <small>facultatif</small></label><input type="file"></div>
+  </form>
+  <div class="drawer-foot"><button class="btn" data-close>Annuler</button><button class="btn solid" id="m-save">${icon('i-check')}Enregistrer</button></div>`);
+        const sync = () => {
+          const f = fundOf($('m-fund').value);
+          const warn = f.status !== 'actif' && $('m-nat').value === '-1';
+          $('m-warn').classList.toggle('show', warn);
+          $('m-warn').querySelector('b').textContent = `Fonds ${f.status}.`;
+        };
+        $('m-fund').addEventListener('change', sync);
+        $('m-nat').addEventListener('change', sync);
+      }
+
+      // ——— Drawer, journal, toast ———
+      function openDrawer(html) {
+        $('drawer').innerHTML = html;
+        $('drawer').classList.add('open');
+        $('scrim').classList.add('open');
+      }
+      function closeAll() {
+        ['drawer', 'scrim', 'side', 'me-menu'].forEach((id) => $(id).classList.remove('open'));
+      }
+      function journalDrawer() {
+        openDrawer(`<div class="drawer-head"><div><h2>Journal</h2><span class="muted" style="font-size:12px">Chaque changement, qui l’a fait, et son annulation</span></div><button class="icon-btn" data-close aria-label="Fermer">${icon('i-x')}</button></div>
+  <ul class="journal">${state.journal.map((j, i) => `<li class="${j.undone ? 'undone' : ''}"><time>${j.at}</time><span>${esc(j.text)}<small>par toi · depuis l’app</small></span>${j.undone ? '' : `<button class="undo" data-undo="${i}">Annuler</button>`}</li>`).join('')}
+  ${[
+    ['09:16', 'Dîme de 18 500 F proposée et confirmée', 'par Claude · règle du modèle Mouvement'],
+    ['08:12', 'Petit-déjeuner, 650 F', 'par Claude · tu l’as dit sur Telegram'],
+    ['04:35', 'Prière du matin faite à 4:35', 'par Claude · « prière faite, 4h35 »'],
+    ['00:00', 'Rappels de la journée planifiés', 'par le veilleur'],
+  ]
+    .map(
+      ([t, a, b]) =>
+        `<li><time>${t}</time><span>${a}<small>${b}</small></span><button class="undo">Annuler</button></li>`,
+    )
+    .join('')}</ul>`);
+      }
+      let toastTimer;
+      function log(text, undo) {
+        state.journal.unshift({ at: '10:41', text, undo, undone: false });
+        $('toast-text').textContent = text;
+        $('toast-undo').style.display = '';
+        state.toastUndo = 0;
+        $('toast').classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => $('toast').classList.remove('show'), 5000);
+      }
+      function undo(i) {
+        const j = state.journal[i];
+        if (!j || j.undone) return;
+        j.undone = true;
+        j.undo && j.undo();
+        render();
+        $('toast-text').textContent = 'Annulé : ' + j.text;
+        $('toast-undo').style.display = 'none';
+        $('toast').classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => $('toast').classList.remove('show'), 4000);
+        if ($('drawer').classList.contains('open') && $('drawer').querySelector('.journal'))
+          journalDrawer();
+      }
+      function download(name) {
+        const blob = new Blob(
+          [
+            `Fichier de démonstration : ${name}\n(dans l’app, le vrai fichier arrive depuis le stockage privé)\n`,
+          ],
+          { type: 'text/plain' },
+        );
+        const a = Object.assign(document.createElement('a'), {
+          href: URL.createObjectURL(blob),
+          download: name + '.txt',
+        });
+        document.body.append(a);
+        a.click();
+        a.remove();
+      }
+
+      // ——— Router ———
+      // Routes live in `state.route`; the hash follows when the page allows it.
+      function go(route) {
+        state.route = route || 'maintenant';
+        state.reading = false;
+        try {
+          history.replaceState(null, '', '#' + state.route);
+        } catch {
+          /* a sandboxed preview */
+        }
+        render();
+        $('page').scrollTop = 0;
+        closeAll();
+      }
+      function render() {
+        const [top, sub] = state.route.split('/');
+        drawNav();
+        const pages = {
+          maintenant: pageMaintenant,
+          agenda: pageAgenda,
+          tableaux: pageTableaux,
+          fichiers: pageFichiers,
+          nouvelle: pageNouvelle,
+          finances: () => pageFinances(sub || 'apercu'),
+          routines: () => pageRoutines(sub || 'aujourdhui'),
+          modeles: () => pageModeles(sub && decodeURIComponent(sub)),
+          entrees: () => pageSimple('Entrées', 'Toutes tes entrées, par type et par espace'),
+          documents: () => pageSimple('Documents', 'Tes théories et documents complets'),
+        };
+        $('page').innerHTML = (pages[top] || pageMaintenant)();
+      }
+      window.addEventListener('hashchange', () => go(location.hash.slice(1)));
+
+      document.addEventListener('click', (e) => {
+        const t = e.target.closest('button, a, tr[data-file]');
+        if (!t) {
+          $('me-menu').classList.remove('open');
+          return;
+        }
+        const d = t.dataset;
+        if (d.filter) {
+          state.filter = d.filter;
+          render();
+        } else if (d.pick) {
+          state.selected = d.pick;
+          state.reading = true;
+          render();
+        } else if ('back' in d) {
+          state.reading = false;
+          render();
+        } else if (d.act) {
+          const [id, ci, ai] = d.act.split(':');
+          const it = NOWITEMS.find((x) => x.id === id);
+          state.done.add(id);
+          state.reading = false;
+          render();
+          log(it.choices[ci].actions[ai][2], () => {
+            state.done.delete(id);
+            state.selected = id;
+          });
+        } else if (d.mf) {
+          state.moveFilter = d.mf;
+          if (t.tagName === 'A') {
+            e.preventDefault();
+            go('finances/mouvements');
+            return;
+          }
+          render();
+        } else if (d.ff) {
+          state.fileFilter = d.ff;
+          render();
+        } else if (d.check) {
+          const h = d.check,
+            before = state.checks[h];
+          state.checks[h] = before === 'done' ? 'todo' : 'done';
+          render();
+          const name = HABITS.find((x) => x.id === h).name;
+          log(state.checks[h] === 'done' ? `${name} : fait à 10:41` : `${name} : décoché`, () => {
+            state.checks[h] = before;
+          });
+        } else if ('addMove' in d) {
+          e.preventDefault();
+          moveDrawer();
+        } else if (t.id === 'm-save') {
+          const amt = Number($('m-amt').value.replace(/\D/g, '')) * Number($('m-nat').value);
+          const fund = $('m-fund').value,
+            acc = $('m-acc').value || null;
+          const mv = {
+            d: '30 oct.',
+            h: '10:41',
+            label: $('m-label').value || 'Mouvement',
+            cat: $('m-cat').value,
+            acc,
+            fund,
+            amt,
+            st: acc ? 'confirmé' : 'à réconcilier',
+            o: 'said',
+            fresh: true,
+            note: acc ? '' : 'compte à préciser',
+          };
+          MOVES.unshift(mv);
+          go('finances/mouvements');
+          log(`${mv.label}, ${money(amt, 'XOF', true)} noté`, () => {
+            MOVES = MOVES.filter((m) => m !== mv);
+          });
+          mv.fresh = false;
+        } else if (d.dl) {
+          e.stopPropagation();
+          download(d.dl);
+          log(`${d.dl} téléchargé`);
+        } else if (d.file) {
+          fileDrawer(d.file);
+        } else if (d.undo) {
+          undo(Number(d.undo));
+        } else if (t.id === 'toast-undo') {
+          undo(state.toastUndo);
+        } else if ('close' in d) {
+          closeAll();
+        } else if (t.id === 'open-journal') {
+          journalDrawer();
+        } else if (t.id === 'open-side') {
+          $('side').classList.add('open');
+          $('scrim').classList.add('open');
+          return;
+        } else if (t.id === 'me') {
+          $('me-menu').classList.toggle('open');
+          return;
+        } else if (d.go) {
+          go(d.go);
+        } else if (t.id === 'theme') {
+          const r = document.documentElement;
+          const dark = r.dataset.theme
+            ? r.dataset.theme === 'dark'
+            : matchMedia('(prefers-color-scheme: dark)').matches;
+          r.dataset.theme = dark ? 'light' : 'dark';
+        } else if (
+          t.tagName === 'A' &&
+          (t.getAttribute('href') || '').startsWith('#') &&
+          t.getAttribute('href').length > 1
+        ) {
+          e.preventDefault();
+          go(t.getAttribute('href').slice(1));
+        }
+        if (t.getAttribute && t.getAttribute('href') === '#') e.preventDefault();
+        $('me-menu').classList.remove('open');
+      });
+      document.addEventListener('change', (e) => {
+        if (e.target.name === 'rg') {
+          state.rangement = e.target.value;
+          render();
+        }
+      });
+      $('scrim').addEventListener('click', closeAll);
+      document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          $('search').focus();
+        }
+        if (e.key === 'Escape') closeAll();
+      });
+      state.route = location.hash.slice(1) || 'maintenant';
+      render();
+    </script>
+  </body>
+</html>

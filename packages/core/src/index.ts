@@ -209,3 +209,30 @@ export {
   type ShareData,
   type SharedPage,
 } from './shares';
+export {
+  bulkSchema,
+  changeEntries,
+  dayOf,
+  folderOf,
+  groupKind,
+  listEntries,
+  listInputSchema,
+  listStats,
+  renameKind,
+  type BulkInput,
+  type DayOf,
+  type ListInput,
+  type ListRow,
+  type ListStats,
+} from './lists';
+export { AREA_KIND, checkArea } from './areas';
+export {
+  planOf,
+  rateOf,
+  weekdaysOf,
+  WEEKDAYS,
+  type HabitPlan,
+  type HabitRate,
+  type Weekday,
+} from './habits';
+export { preferencesOf, preferencesSchema, setPreferences, type Preferences } from './prefs';

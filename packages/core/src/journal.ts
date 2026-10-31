@@ -12,6 +12,9 @@ export type Command =
   // A migration of a kind's entries, an app installed (spec 014): undone at once, like an import.
   | 'migration.run'
   | 'app.install'
+  // Many entries filed, retyped or set aside, a kind renamed (spec 017): undone at once.
+  | 'entries.change'
+  | 'kind.rename'
   // Who belongs to a space (spec 004): journaled, never undone through `undo`.
   | 'space.create'
   | 'space.rename'
@@ -142,7 +145,9 @@ export async function undo(
   if (
     line.command === 'import.run' ||
     line.command === 'migration.run' ||
-    line.command === 'app.install'
+    line.command === 'app.install' ||
+    line.command === 'entries.change' ||
+    line.command === 'kind.rename'
   ) {
     // Its changes, the latest first; those already undone stay as they are.
     const done = ((line.after?.lines as number[] | undefined) ?? []).slice().sort((a, b) => b - a);

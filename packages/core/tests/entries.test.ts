@@ -126,6 +126,8 @@ describe('finding, and the kinds she has (story 2)', () => {
       kind: 'Dépense',
       count: 2,
       fields: ['date', 'montant', 'poste'],
+      group: null,
+      system: false,
     });
     expect(all.find((one) => one.kind === 'Passeport')).toMatchObject({ count: 1 });
   });

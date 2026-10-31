@@ -180,6 +180,18 @@ stored in English and reported in `notes`; migration 0006 renamed what was store
 
 `jarvis_due_rules` (migration 0007) finds the rules that may be due, and nothing else.
 
+## Lists, groups, changes at once (spec 017)
+
+| Function                          | What it does                                                                    |
+| --------------------------------- | ------------------------------------------------------------------------------- |
+| `dayOf`, `folderOf`               | an entry's own day (field, source path, title, made) and folder                 |
+| `listEntries`, `listStats`        | any entries filtered and sorted; their statistics (streak, days, hours, splits) |
+| `changeEntries`                   | many entries filed, retyped or set aside: one change, undone at once            |
+| `renameKind`                      | a kind renamed or merged, with its model, views and groups                      |
+| `groupKind`, `checkArea`          | a kind in one of her groups (an « Area » entry)                                 |
+| `weekdaysOf`, `planOf`, `rateOf`  | a habit's days (from her words), its plan, how it was kept                      |
+| `preferencesOf`, `setPreferences` | her preferences of display, kept in her « Channel »                             |
+
 ## Collections, shares, viewers (spec 016)
 
 | Function                                              | What it does                                               |

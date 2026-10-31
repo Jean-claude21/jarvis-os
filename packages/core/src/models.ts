@@ -273,6 +273,8 @@ export interface Model extends ModelData {
 export const COMMON_FIELDS = new Set([
   'text',
   'source',
+  // Where she filed it (spec 017): « Bilans/Mensuels ».
+  'folder',
   'status',
   'note',
   'timezone',

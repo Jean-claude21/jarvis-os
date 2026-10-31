@@ -200,6 +200,39 @@ flowchart LR
   BT[button · rule update.on] --> S
 ```
 
+## Entries she can find, file and count (spec 017)
+
+- **Her day and folder** (`lists.ts`): an entry's day is its own (`date`, `at`, `start`, `due`),
+  else a day, an ISO week (« W33 ») or a month read in its source path or title, else the day it
+  was made. Its folder is `folder` (a field every kind may carry), else its source's folder.
+- **Lists**: `listEntries` filters any entries by kind, words, period and folder and sorts them by
+  day, title or change; the Entries page shows them flat, by period (year › month) or by folder (a
+  tree), with its own scroll areas and a selection.
+- **Statistics of any list** (`listStats`), with or without a model: this month, twelve weeks day
+  by day, the current and best streak, the active days, the hours, the repeated values, the
+  averages. Collections use them too; Claude reads them through `stats`.
+- **Her groups of kinds**: an « Area » entry names the kinds it groups (`areas.ts`); else a model's
+  `area`, else its app; Jarvis's own kinds apart. `kinds` gives each its `group`.
+- **At once**: `changeEntries` (filed, retyped, set aside, linked) and `renameKind` are one journal
+  line (`entries.change`, `kind.rename`) over their entries' lines, undone at once. On the page,
+  entries are dragged onto a folder and kinds onto a group.
+- **Habits** (`habits.ts`): a habit says its days (`days`: mon…sun, or her words in `jours` /
+  `cadence` — « 7/7 », « lun-ven », « mar,mer,sam ») and `since`; the entries linked to it are the
+  days she did it. The statistics give its rate (planned days against done, thirty days and since
+  the start) and the days missed. Words not understood give no rate: nothing is guessed.
+- **Her preferences of display** (`prefs.ts`): kinds flat or grouped, how each list opens — kept
+  in her « Channel », so every device shows them alike.
+
+```mermaid
+flowchart LR
+  E[(entries)] --> D[dayOf · folderOf]
+  D --> L[listEntries] --> P[Entries: flat · period · folder]
+  D --> S[listStats: streak · days · hours · splits] --> P & C[Collections] & M[MCP stats]
+  A[Area] --> K[kinds.group] --> P
+  P -->|select| B[changeEntries] --> J[journal: undone at once]
+  R[renameKind] --> J
+```
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |

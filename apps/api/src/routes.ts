@@ -50,6 +50,13 @@ import {
   zoneOf,
   collectionsOf,
   collectionStats,
+  preferencesOf,
+  setPreferences,
+  changeEntries,
+  groupKind,
+  listEntries,
+  listStats,
+  renameKind,
   createShare,
   press,
   setRole,
@@ -329,6 +336,51 @@ export function apiRoutes(deps: {
   api.get('/collections/:kind/stats', async (c) =>
     c.json(await act(c, (tx, _a, space) => collectionStats(tx, space, c.req.param('kind')))),
   );
+
+  // Any list (spec 017): entries with their own day and folder, filtered and sorted; its statistics.
+  const listOf = (c: Context) => {
+    const q = c.req.query();
+    return {
+      ...(q.kind ? { kind: q.kind } : {}),
+      ...(q.text ? { text: q.text } : {}),
+      ...(q.from ? { from: q.from } : {}),
+      ...(q.to ? { to: q.to } : {}),
+      ...(q.folder ? { folder: q.folder } : {}),
+      ...(q.sort ? { sort: q.sort as 'day' } : {}),
+      ...(q.desc ? { desc: q.desc !== 'false' } : {}),
+      ...(q.limit ? { limit: Number(q.limit) } : {}),
+    };
+  };
+  api.get('/list', async (c) =>
+    c.json(await act(c, (tx, _a, space) => listEntries(tx, space, listOf(c)))),
+  );
+  api.get('/list/stats', async (c) =>
+    c.json(await act(c, (tx, _a, space) => listStats(tx, space, listOf(c)))),
+  );
+  // Many entries filed, retyped or set aside at once; a kind renamed; a kind in one of her groups.
+  api.post('/entries/bulk', async (c) => {
+    const body = await c.req.json();
+    return c.json(await act(c, (tx, actor, space) => changeEntries(tx, actor, space, body)));
+  });
+  api.post('/kinds/rename', async (c) => {
+    const body = (await c.req.json()) as { from?: string; to?: string };
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        renameKind(tx, actor, space, { from: String(body.from ?? ''), to: String(body.to ?? '') }),
+      ),
+    );
+  });
+  api.post('/kinds/group', async (c) => {
+    const body = (await c.req.json()) as { kind?: string; group?: string | null };
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        groupKind(tx, actor, space, {
+          kind: String(body.kind ?? ''),
+          group: typeof body.group === 'string' ? body.group : null,
+        }),
+      ),
+    );
+  });
 
   // A button pressed (spec 016): its action on its entry.
   api.post('/entries/:id/press', async (c) => {
@@ -655,6 +707,13 @@ export function apiRoutes(deps: {
   });
 
   // Her time zone (spec 015): read and changed from her profile.
+  // Her preferences of display (spec 017), kept in her account.
+  api.get('/me/prefs', async (c) => c.json(await as(c, (tx) => preferencesOf(tx))));
+  api.post('/me/prefs', async (c) => {
+    const body = await c.req.json();
+    return c.json(await as(c, (tx, actor) => setPreferences(tx, actor, body)));
+  });
+
   api.get('/me/zone', async (c) => c.json({ zone: await as(c, (tx) => zoneOf(tx)) }));
   api.post('/me/zone', async (c) => {
     const body = (await c.req.json()) as { zone?: string };

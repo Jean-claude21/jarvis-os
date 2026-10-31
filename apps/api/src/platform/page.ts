@@ -36,6 +36,30 @@ body { padding: 0; }
 .kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 16px; }
 .kpi-card .kpi { margin-top: 6px; }
 .split { display: grid; gap: 16px; grid-template-columns: 220px 1fr; align-items: start; }
+.ent { display: grid; gap: 16px; grid-template-columns: 250px minmax(0, 1fr); align-items: start; }
+.ent-kinds { position: sticky; top: 76px; max-height: calc(100vh - 100px); display: flex; flex-direction: column; padding: 12px; }
+.ent-kinds .kscroll { overflow-y: auto; min-height: 0; flex: 1; margin: 8px -4px 0; padding: 0 4px; }
+.ent-kinds details { margin-bottom: 6px; } .ent-kinds summary { cursor: pointer; padding: 6px 4px; display: flex; justify-content: space-between; }
+.ent-main { min-width: 0; padding: 14px 16px; }
+.ent-scroll { max-height: calc(100vh - 250px); overflow: auto; border-top: 1px solid var(--rule); }
+.ent-scroll thead th { position: sticky; top: 0; background: var(--paper); z-index: 1; }
+.ent-scroll td.pick, .ent-scroll th.pick { width: 28px; }
+.ent-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+.ent-tools .grow { flex: 1; }
+.ent-tools input[type=search] { flex: 1; min-width: 160px; }
+.ent-tools input, .ent-tools select, .ent-kinds input { padding: 6px 8px; border: 1px solid var(--rule-strong); border-radius: 2px; background: var(--paper); color: var(--ink); font: 13px "Instrument Sans", sans-serif; }
+.ent-sel { display: none; position: sticky; top: 64px; z-index: 2; gap: 8px; align-items: center; flex-wrap: wrap; padding: 8px 10px; margin: 0 0 10px; background: var(--ink); color: var(--paper); border-radius: 2px; }
+.ent-sel.on { display: flex; } .ent-sel button { padding: 5px 9px; } .ent-sel .grow { flex: 1; }
+.ent tr.period td { background: var(--sand); font: 600 12px "JetBrains Mono", monospace; letter-spacing: .04em; text-transform: uppercase; color: var(--bark); }
+.ent tr.period.year td { background: var(--clay); color: var(--ink); }
+.ftree { padding: 4px 0; } .ftree details { margin-left: 14px; } .ftree > details { margin-left: 0; }
+.ftree summary { cursor: pointer; padding: 5px 4px; display: flex; gap: 8px; align-items: center; }
+.ftree summary .grow { flex: 1; } .ftree .fe { display: flex; gap: 8px; align-items: center; padding: 3px 4px 3px 22px; font-size: 14px; }
+.ftree .fe a { color: var(--ink); text-decoration: none; } .ftree .fe a:hover { text-decoration: underline; }
+.heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 9px); gap: 2px; margin-top: 10px; }
+.heat i { width: 9px; height: 9px; border-radius: 1px; background: var(--clay); }
+.heat i.l1 { background: color-mix(in srgb, var(--primary) 40%, var(--clay)); } .heat i.l2 { background: color-mix(in srgb, var(--primary) 70%, var(--clay)); } .heat i.l3 { background: var(--primary); }
+.heat i.today { outline: 1.5px solid var(--ink); }
 .facets a { display: flex; justify-content: space-between; padding: 6px 8px; color: var(--ink); text-decoration: none; border-radius: 2px; font-size: 14px; }
 .facets a:hover { background: var(--clay); } .facets a.on { background: var(--clay); font-weight: 600; }
 .rows tr { cursor: pointer; } .rows tr:hover td { background: var(--sand); }
@@ -61,6 +85,7 @@ a.link { color: var(--primary); text-decoration: none; } a.link:hover { text-dec
   .top { padding: 12px 16px; } .top input { width: 42vw; }
   .page { padding: 16px; }
   .split { grid-template-columns: 1fr; }
+  .ent { grid-template-columns: 1fr; } .ent-kinds { position: static; max-height: 280px; } .ent-scroll { max-height: none; }
   .field-row { grid-template-columns: 1fr; gap: 2px; }
 }
 `;
@@ -521,6 +546,37 @@ async function drawMap() {
   map.fitBounds(L.featureGroup(marks).getBounds().pad(0.2), { maxZoom: 14 });
 }
 
+// The statistics of a list (spec 017): how many, the streak, the active days, twelve weeks day by
+// day, the hours, the splits and the figures. Shared by the Entries page and a collection.
+const SERIES = ['var(--primary)', 'var(--info)', 'var(--ochre)', 'var(--success)', 'var(--bark)', 'var(--error)'];
+function statsHtml(s) {
+  const optionLabel = (o) => (o.label ? tr(o.label) : o.option);
+  const max = Math.max(1, ...s.weeks.points.map((p) => p.n));
+  const top = Math.max(1, ...s.days.map((d) => d.n));
+  const today = s.days.length ? s.days[s.days.length - 1].day : '';
+  const level = (n) => (n === 0 ? '' : n >= top * 0.75 ? 'l3' : n >= top * 0.4 ? 'l2' : 'l1');
+  const hmax = s.hours ? Math.max(1, ...s.hours) : 1;
+  return '<section class="stats">' +
+    '<div class="kpi-card"><div class="caps">' + esc(W.total) + '</div><div class="kpi">' + num(s.total) + '</div><div class="muted">' + esc(say(W.thisMonthN, { n: s.thisMonth })) + '</div></div>' +
+    (s.streak.best > 1 ? '<div class="kpi-card"><div class="caps">' + esc(W.streak) + '</div><div class="kpi">' + esc(say(W.streakN, { n: s.streak.current })) + '</div><div class="muted">' + esc(say(W.streakBest, { n: s.streak.best })) + '</div></div>' +
+      '<div class="kpi-card"><div class="caps">' + esc(W.active30) + '</div><div class="kpi">' + esc(say(W.active30N, { n: s.active30 })) + '</div></div>' +
+      '<div class="kpi-card"><div class="caps">' + esc(W.daysGrid) + '</div><div class="heat">' + s.days.map((d) => '<i class="' + level(d.n) + (d.day === today ? ' today' : '') + '" title="' + esc(day(d.day + 'T12:00:00') + ' : ' + d.n) + '"></i>').join('') + '</div></div>' : '') +
+    (s.hours ? '<div class="kpi-card"><div class="caps">' + esc(W.hoursTitle) + '</div><div class="spark">' + s.hours.map((n, h) => '<span title="' + esc(String(h).padStart(2, '0') + ' h : ' + n) + '" style="height:' + Math.max(3, Math.round(n / hmax * 100)) + '%"></span>').join('') + '</div></div>' : '') +
+    s.splits.filter((sp) => sp.counts.some((c) => c.n)).map((sp) => {
+      return '<div class="kpi-card"><div class="caps">' + esc(say(W.byField, { field: tr(sp.label) || sp.field })) + '</div><div class="stack">' +
+        sp.counts.filter((c) => c.n).map((c, i) => '<span title="' + esc(optionLabel(c) + ' : ' + c.n) + '" style="flex:' + c.n + ';background:' + SERIES[i % SERIES.length] + '"></span>').join('') + '</div><div class="legend">' +
+        sp.counts.filter((c) => c.n).map((c, i) => '<span><i style="background:' + SERIES[i % SERIES.length] + '"></i>' + esc(optionLabel(c)) + ' ' + c.n + '</span>').join('') + '</div></div>';
+    }).join('') +
+    '<div class="kpi-card"><div class="caps">' + esc(say(W.perWeek, { field: tr(s.weeks.label) || (s.weeks.field === 'day' ? W.dayWord : s.weeks.field) })) + '</div><div class="spark">' +
+      s.weeks.points.map((p) => '<span title="' + esc(p.week + ' : ' + p.n) + '" style="height:' + Math.max(3, Math.round(p.n / max * 100)) + '%"></span>').join('') + '</div></div>' +
+    s.figures.map((f) => '<div class="kpi-card"><div class="caps">' + esc(say(f.kind === 'sum' ? W.sumOf : W.avgOf, { field: tr(f.label) || f.field })) + '</div><div class="kpi">' + num(f.value) + (f.unit ? '<small> ' + esc(f.unit) + '</small>' : '') + '</div></div>').join('') +
+    '</section>';
+}
+// An entry's own day: « 31 août 2026 », or « août 2026 » when only the month is known.
+const ownDay = (d) => d.length === 7 ? new Date(d + '-15T12:00:00').toLocaleDateString(locale, { month: 'long', year: 'numeric' }) : day(d + 'T12:00:00');
+// How she shows her kinds (flat or in groups), kept on this device only.
+const kindsMode = () => { try { return localStorage.getItem('jos.kinds') || 'grouped'; } catch { return 'grouped'; } };
+
 // Pages, by the hash: #/vie?kind=…, #/entree/<id>, …
 const pages = {
   // « Maintenant » (spec 013): what needs her, the chosen thing, her day, what she can do.
@@ -656,21 +712,7 @@ const pages = {
     const k = knownKinds.find((one) => one.kind === name) || (await api(inSpace('/kinds'))).find((one) => one.kind === name);
     if (!k || !k.model) return empty(W.noCollections);
     const s = await api(inSpace('/collections/' + encodeURIComponent(name) + '/stats'));
-    const optionLabel = (split, o) => (o.label ? tr(o.label) : o.option);
-    const SERIES = ['var(--primary)', 'var(--info)', 'var(--ochre)', 'var(--success)', 'var(--bark)', 'var(--error)'];
-    const max = Math.max(1, ...s.weeks.points.map((p) => p.n));
-    const stats = '<section class="stats">' +
-      '<div class="kpi-card"><div class="caps">' + esc(W.total) + '</div><div class="kpi">' + num(s.total) + '</div><div class="muted">' + esc(say(W.thisMonthN, { n: s.thisMonth })) + '</div></div>' +
-      s.splits.filter((sp) => sp.counts.some((c) => c.n)).map((sp) => {
-        const total = sp.counts.reduce((t, c) => t + c.n, 0) || 1;
-        return '<div class="kpi-card"><div class="caps">' + esc(say(W.byField, { field: tr(sp.label) || sp.field })) + '</div><div class="stack">' +
-          sp.counts.filter((c) => c.n).map((c, i) => '<span title="' + esc(optionLabel(sp, c) + ' : ' + c.n) + '" style="flex:' + c.n + ';background:' + SERIES[i % SERIES.length] + '"></span>').join('') + '</div><div class="legend">' +
-          sp.counts.filter((c) => c.n).map((c, i) => '<span><i style="background:' + SERIES[i % SERIES.length] + '"></i>' + esc(optionLabel(sp, c)) + ' ' + c.n + '</span>').join('') + '</div></div>';
-      }).join('') +
-      '<div class="kpi-card"><div class="caps">' + esc(say(W.perWeek, { field: tr(s.weeks.label) || s.weeks.field })) + '</div><div class="spark">' +
-        s.weeks.points.map((p) => '<span title="' + esc(p.week + ' : ' + p.n) + '" style="height:' + Math.max(3, Math.round(p.n / max * 100)) + '%"></span>').join('') + '</div></div>' +
-      s.figures.map((f) => '<div class="kpi-card"><div class="caps">' + esc(say(f.kind === 'sum' ? W.sumOf : W.avgOf, { field: tr(f.label) || f.field })) + '</div><div class="kpi">' + num(f.value) + (f.unit ? '<small> ' + esc(f.unit) + '</small>' : '') + '</div></div>').join('') +
-      '</section>';
+    const stats = statsHtml(s);
     const views = await api(inSpace('/views?kind=' + encodeURIComponent(name)));
     const saved = params.get('view') ? views.find((v) => v.id === params.get('view')) : null;
     const fallback = saved ? null : views.find((v) => v.default);
@@ -684,16 +726,88 @@ const pages = {
       stats + tabs + card('', html, true);
   },
 
+  // Her entries (spec 017): the kinds flat or in her groups; the list searched, filtered by period
+  // and folder, flat, by period or by folder; entries selected and filed at once; its statistics.
   async vie (params) {
     const kinds = await api(inSpace('/kinds'));
+    knownKinds = kinds;
     const kind = params.get('kind') || ''; const q = params.get('q') || '';
-    const list = await api(inSpace('/entries?limit=200' + (kind ? '&kind=' + encodeURIComponent(kind) : '') + (q ? '&text=' + encodeURIComponent(q) : '')));
-    return '<div class="split"><nav class="card facets"><div class="caps" style="margin-bottom:6px">' + esc(W.kinds) + '</div>' +
-      '<a href="#/vie' + (q ? '?q=' + encodeURIComponent(q) : '') + '" class="' + (kind ? '' : 'on') + '"><span>' + esc(W.all) + '</span></a>' +
-      kinds.map((k) => '<a href="#/vie?kind=' + encodeURIComponent(k.kind) + '" class="' + (k.kind === kind ? 'on' : '') + '"><span>' + esc(k.kind) + '</span><span class="muted num">' + k.count + '</span></a>').join('') +
-      '</nav>' + card(kind || (q ? '« ' + q + ' »' : W.all), list.length ? '<div class="scroll"><table class="rows"><thead><tr><th>' + esc(W.title) + '</th><th>' + esc(W.kind) + '</th><th>' + esc(W.updated) + '</th></tr></thead><tbody>' +
-        list.map((e) => '<tr data-go="#/entree/' + esc(e.id) + '"><td>' + esc(e.title) + '</td><td><span class="badge">' + esc(e.kind) + '</span></td><td class="muted">' + esc(day(e.updatedAt)) + '</td></tr>').join('') +
-        '</tbody></table></div>' : empty()) + '</div>';
+    const from = params.get('from') || ''; const to = params.get('to') || ''; const folder = params.get('folder') || '';
+    const sort = params.get('sort') || 'day'; const desc = params.get('desc') !== 'false';
+    const mode = params.get('mode') || 'flat';
+    const qs = new URLSearchParams();
+    for (const [k, v] of [['kind', kind], ['text', q], ['from', from], ['to', to], ['folder', folder], ['sort', sort], ['desc', String(desc)]]) if (v) qs.set(k, v);
+    qs.set('limit', '1000');
+    const list = await api(inSpace('/list?' + qs.toString()));
+    const stats = kind ? await api(inSpace('/list/stats?' + qs.toString())) : null;
+    const link = (over) => { const p = new URLSearchParams(params); for (const [k, v] of Object.entries(over)) { if (v === null || v === '') p.delete(k); else p.set(k, v); } const t = p.toString(); return '#/vie' + (t ? '?' + t : ''); };
+
+    // The kinds: flat (the most used first) or in her groups, Jarvis's own last.
+    const kmode = kindsMode();
+    const SYS = '~system';
+    const kindRow = (k) => '<a href="' + esc(link({ kind: k.kind, folder: null })) + '" data-kname="' + esc((kindLabel(k) + ' ' + k.kind).toLowerCase()) + '" class="' + (k.kind === kind ? 'on' : '') + '"><span>' + esc(kindLabel(k)) + '</span><span class="muted num">' + k.count + '</span></a>';
+    let kindsHtml;
+    if (kmode === 'flat') kindsHtml = kinds.filter((k) => k.count).map(kindRow).join('');
+    else {
+      const groups = {};
+      for (const k of kinds.filter((one) => one.count)) { const g = k.system && !k.group ? SYS : k.group || ''; (groups[g] = groups[g] || []).push(k); }
+      const names = Object.keys(groups).sort((x, y) => (x === SYS) - (y === SYS) || (x === '') - (y === '') || x.localeCompare(y));
+      kindsHtml = names.map((n) => '<details' + (n === SYS ? '' : ' open') + '><summary class="caps"><span>' + esc(n === SYS ? W.systemGroup : n || W.noGroup) + '</span><span class="num">' + groups[n].reduce((t, k) => t + k.count, 0) + '</span></summary>' + groups[n].map(kindRow).join('') + '</details>').join('');
+    }
+    const nav = '<nav class="card facets ent-kinds"><div class="head" style="margin:0;align-items:center"><span class="caps">' + esc(W.kinds) + '</span>' +
+      '<div class="seg"><button class="' + (kmode === 'flat' ? 'on' : 'quiet') + '" data-kmode="flat">' + esc(W.kindsFlat) + '</button><button class="' + (kmode === 'flat' ? 'quiet' : 'on') + '" data-kmode="grouped">' + esc(W.kindsGrouped) + '</button></div></div>' +
+      '<input type="search" data-kq placeholder="' + esc(W.kindSearch) + '" style="margin-top:8px">' +
+      '<div class="kscroll"><a href="' + esc(link({ kind: null, folder: null })) + '" class="' + (kind ? '' : 'on') + '"><span>' + esc(W.all) + '</span></a>' + kindsHtml + '</div></nav>';
+
+    // The list: flat, by period (year › month) or by folder (a tree).
+    const k = kinds.find((one) => one.kind === kind);
+    const check = (e) => '<td class="pick"><input type="checkbox" data-row="' + esc(e.id) + '"></td>';
+    const dayCell = (e) => '<td class="muted" style="white-space:nowrap"' + (e.dayFrom === 'made' ? ' title="' + esc(W.madeHint) + '"' : '') + '>' + esc(ownDay(e.day)) + (e.dayFrom === 'made' ? ' *' : '') + '</td>';
+    const line = (e, withFolder) => '<tr data-go="#/entree/' + esc(e.id) + '">' + check(e) + '<td>' + esc(e.title) + '</td>' + (kind ? '' : '<td><span class="badge">' + esc(kindName(e.kind)) + '</span></td>') + dayCell(e) +
+      (withFolder ? '<td class="muted">' + (e.folder ? '<a class="link" href="' + esc(link({ folder: e.folder })) + '">' + esc(e.folder.split('/').slice(-2).join('/')) + '</a>' : '') + '</td>' : '') + '</tr>';
+    const headRow = (withFolder) => '<tr><th class="pick"><input type="checkbox" data-all></th><th>' + esc(W.title) + '</th>' + (kind ? '' : '<th>' + esc(W.kind) + '</th>') + '<th>' + esc(W.dayCol) + '</th>' + (withFolder ? '<th>' + esc(W.folderCol) + '</th>' : '') + '</tr>';
+    const span = kind ? 3 : 4;
+    let body = '';
+    if (!list.rows.length) body = empty();
+    else if (mode === 'period') {
+      let year = null; let month = null; const out = [];
+      for (const e of list.rows) {
+        const y = e.day.slice(0, 4); const m = e.day.slice(0, 7);
+        if (y !== year) { year = y; month = null; out.push('<tr class="period year"><td colspan="' + span + '">' + esc(y) + ' · ' + list.rows.filter((x) => x.day.slice(0, 4) === y).length + '</td></tr>'); }
+        if (m !== month) { month = m; out.push('<tr class="period"><td colspan="' + span + '">' + esc(new Date(m + '-15T12:00:00').toLocaleDateString(locale, { month: 'long' })) + ' · ' + list.rows.filter((x) => x.day.slice(0, 7) === m).length + '</td></tr>'); }
+        out.push(line(e, false));
+      }
+      body = '<div class="ent-scroll"><table class="rows"><thead>' + headRow(false) + '</thead><tbody>' + out.join('') + '</tbody></table></div>';
+    } else if (mode === 'folder') {
+      const root = { name: '', path: '', kids: {}, rows: [] };
+      for (const e of list.rows) {
+        let at = root;
+        for (const part of (e.folder || '').split('/').filter(Boolean)) { const path = at.path ? at.path + '/' + part : part; at = at.kids[part] || (at.kids[part] = { name: part, path, kids: {}, rows: [] }); }
+        at.rows.push(e);
+      }
+      const count = (n) => n.rows.length + Object.values(n.kids).reduce((t, c) => t + count(c), 0);
+      const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true });
+      const entryRow = (e) => '<div class="fe"><input type="checkbox" data-row="' + esc(e.id) + '"><a href="#/entree/' + esc(e.id) + '">' + esc(e.title) + '</a><span class="muted" style="margin-left:auto;white-space:nowrap">' + esc(ownDay(e.day)) + '</span></div>';
+      const node = (n, depth, only) => '<details' + (depth < 1 || only ? ' open' : '') + '><summary><span>' + esc(n.name) + '</span><span class="grow"></span><span class="muted num">' + count(n) + '</span><a class="link" href="' + esc(link({ folder: n.path, mode: null })) + '">→</a></summary>' +
+        Object.values(n.kids).sort(byName).map((c, _, all) => node(c, depth + 1, all.length === 1)).join('') + n.rows.map(entryRow).join('') + '</details>';
+      body = '<div class="ent-scroll ftree">' + Object.values(root.kids).sort(byName).map((c) => node(c, 0, false)).join('') +
+        (root.rows.length ? '<details open><summary><span>' + esc(W.noFolder) + '</span><span class="grow"></span><span class="muted num">' + root.rows.length + '</span></summary>' + root.rows.map(entryRow).join('') + '</details>' : '') + '</div>';
+    } else {
+      body = '<div class="ent-scroll"><table class="rows"><thead>' + headRow(true) + '</thead><tbody>' + list.rows.map((e) => line(e, true)).join('') + '</tbody></table></div>';
+    }
+    const opt = (v, label, on) => '<option value="' + v + '"' + (v === on ? ' selected' : '') + '>' + esc(label) + '</option>';
+    const tools = '<form class="ent-tools" data-entform>' +
+      '<input type="search" name="q" value="' + esc(q) + '" placeholder="' + esc(W.listSearch) + '">' +
+      '<label class="vsel">' + esc(W.fromDay) + ' <input type="date" name="from" value="' + esc(from) + '"></label><label class="vsel">' + esc(W.toDay) + ' <input type="date" name="to" value="' + esc(to) + '"></label>' +
+      '<select name="sort">' + opt('day', W.sortDay, sort) + opt('title', W.sortTitle, sort) + opt('updated', W.sortUpdated, sort) + '</select>' +
+      '<button type="button" class="quiet" data-desc="' + (desc ? 'false' : 'true') + '">' + (desc ? '↓' : '↑') + '</button><button>' + esc(W.apply) + '</button></form>' +
+      '<div class="ent-tools"><div class="actions">' + [['flat', W.modeFlat], ['period', W.modePeriod], ['folder', W.modeFolder]].map(([m, label]) => '<a class="badge' + (m === mode ? ' primary' : '') + '" href="' + esc(link({ mode: m === 'flat' ? null : m })) + '">' + esc(label) + '</a>').join('') + '</div>' +
+      (folder ? '<span class="chip">' + esc(say(W.inFolder, { folder })) + ' <a class="x" href="' + esc(link({ folder: null })) + '" aria-label="' + esc(W.remove) + '">✕</a></span>' : '') +
+      '<span class="grow"></span><span class="muted">' + esc(list.truncated ? say(W.shownOf, { n: list.rows.length, total: list.total }) : String(list.total)) + '</span></div>';
+    const sel = '<div class="ent-sel" id="entsel"><b id="entsel-n"></b><span class="grow"></span><button class="quiet" data-bulk="folder">' + esc(W.fileInFolder) + '</button><button class="quiet" data-bulk="kind">' + esc(W.retype) + '</button><button class="quiet" data-bulk="archive">' + esc(W.setAside) + '</button><button class="quiet" data-bulk="none">' + esc(W.unselect) + '</button></div>';
+    const head = '<div class="head" style="margin:0"><div>' + (k && k.group ? '<div class="caps">' + esc(k.group) + '</div>' : '') + '<h2 style="margin:0">' + esc(kind ? kindName(kind) : q ? '« ' + q + ' »' : W.all) + '</h2></div>' +
+      (kind ? '<div class="actions"><button class="quiet" data-kgroup="' + esc(kind) + '" data-current="' + esc((k && k.group) || '') + '">' + esc(W.groupKind) + '</button><button class="quiet" data-krename="' + esc(kind) + '">' + esc(W.renameKind) + '</button></div>' : '') + '</div>';
+    return '<div class="ent">' + nav + '<section class="card ent-main">' + head + (stats ? statsHtml(stats) : '') + tools + sel + body + '</section></div>';
   },
 
   async entree (params, id) {
@@ -884,9 +998,52 @@ async function show() {
   } catch (error) { if (ticket === drawing) fail(error); }
 }
 
+// The Entries page (spec 017): her kinds found as she types, the list's form, its selection.
+function bindEntries(root) {
+  const params = () => new URLSearchParams((location.hash.split('?')[1]) || '');
+  const go = (over) => { const p = params(); for (const [k, v] of Object.entries(over)) { if (v === null || v === '') p.delete(k); else p.set(k, v); } location.hash = '#/vie' + (p.toString() ? '?' + p.toString() : ''); };
+  root.querySelectorAll('[data-kmode]').forEach((b) => b.addEventListener('click', () => { try { localStorage.setItem('jos.kinds', b.dataset.kmode); } catch {} show(); }));
+  const kq = root.querySelector('[data-kq]');
+  if (kq) kq.addEventListener('input', () => {
+    const t = kq.value.trim().toLowerCase();
+    root.querySelectorAll('[data-kname]').forEach((a) => { a.style.display = !t || a.dataset.kname.includes(t) ? '' : 'none'; });
+    root.querySelectorAll('.ent-kinds details').forEach((d) => { const any = [...d.querySelectorAll('[data-kname]')].some((a) => a.style.display !== 'none'); d.style.display = any ? '' : 'none'; if (t) d.open = true; });
+  });
+  const form = root.querySelector('[data-entform]');
+  if (form) {
+    form.addEventListener('submit', (event) => { event.preventDefault(); const f = new FormData(form); go({ q: f.get('q'), from: f.get('from'), to: f.get('to'), sort: f.get('sort') === 'day' ? null : f.get('sort') }); });
+    form.querySelector('[data-desc]').addEventListener('click', (event) => go({ desc: event.target.dataset.desc === 'true' ? null : 'false' }));
+  }
+  root.querySelectorAll('[data-krename]').forEach((b) => b.addEventListener('click', async () => {
+    const to = prompt(say(W.renameKindAsk, { kind: b.dataset.krename }), b.dataset.krename); if (!to || !to.trim() || to.trim() === b.dataset.krename) return;
+    try { const r = await api(inSpace('/kinds/rename'), { method: 'POST', body: { from: b.dataset.krename, to: to.trim() } }); toast(say(W.renamedToast, { kind: r.kind }), { id: r.kind, spaceId: space }); go({ kind: r.kind }); } catch (error) { fail(error); }
+  }));
+  root.querySelectorAll('[data-kgroup]').forEach((b) => b.addEventListener('click', async () => {
+    const g = prompt(say(W.groupKindAsk, { kind: b.dataset.kgroup }), b.dataset.current); if (g === null) return;
+    try { await api(inSpace('/kinds/group'), { method: 'POST', body: { kind: b.dataset.kgroup, group: g.trim() || null } }); toast(say(W.groupedToast, { kind: b.dataset.kgroup, group: g.trim() || W.noGroup }), null); show(); } catch (error) { fail(error); }
+  }));
+  const bar = root.querySelector('#entsel');
+  if (!bar) return;
+  const picked = () => [...root.querySelectorAll('[data-row]:checked')].map((c) => c.dataset.row);
+  const refresh = () => { const n = picked().length; bar.classList.toggle('on', n > 0); root.querySelector('#entsel-n').textContent = say(W.selectedN, { n }); };
+  root.querySelectorAll('[data-row]').forEach((c) => c.addEventListener('change', refresh));
+  const all = root.querySelector('[data-all]');
+  if (all) all.addEventListener('change', () => { root.querySelectorAll('[data-row]').forEach((c) => { c.checked = all.checked; }); refresh(); });
+  root.querySelectorAll('[data-bulk]').forEach((b) => b.addEventListener('click', async () => {
+    const ids = picked(); const what = b.dataset.bulk;
+    if (what === 'none') { root.querySelectorAll('[data-row], [data-all]').forEach((c) => { c.checked = false; }); refresh(); return; }
+    let body; let said;
+    if (what === 'folder') { const f = prompt(W.folderAsk, params().get('folder') || ''); if (f === null) return; body = { ids, folder: f.trim() || null }; said = W.filedToast; }
+    else if (what === 'kind') { const k = prompt(W.kindAsk, params().get('kind') || ''); if (!k || !k.trim()) return; body = { ids, kind: k.trim() }; said = W.retypedToast; }
+    else { if (!confirm(say(W.asideAsk, { n: ids.length }))) return; body = { ids, archive: true }; said = W.asideToast; }
+    try { await api(inSpace('/entries/bulk'), { method: 'POST', body }); toast(say(said, { n: ids.length }), { id: ids[0], spaceId: space }); show(); } catch (error) { fail(error); }
+  }));
+}
+
 function bind() {
   const root = page();
-  root.querySelectorAll('[data-go]').forEach((row) => row.addEventListener('click', () => { location.hash = row.dataset.go; }));
+  root.querySelectorAll('[data-go]').forEach((row) => row.addEventListener('click', (event) => { if (event.target.closest('input, a, button')) return; location.hash = row.dataset.go; }));
+  bindEntries(root);
   root.querySelectorAll('a[data-space]').forEach((a) => a.addEventListener('click', () => choose(a.dataset.space, false)));
   root.querySelectorAll('[data-undo]').forEach((b) => b.addEventListener('click', async () => {
     b.disabled = true;

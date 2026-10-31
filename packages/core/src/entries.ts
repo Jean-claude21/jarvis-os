@@ -9,6 +9,7 @@ import { checkRule, runRulesAfterSave, type Changed } from './rules';
 import { checkScript } from './scripts';
 import { checkView } from './views';
 import { checkShare } from './shares';
+import { checkArea } from './areas';
 import { dataInNewWords, KIND_RENAMES, modelInNewWords, ROLE_RENAMES } from './keywords';
 import {
   checkAgainst,
@@ -53,7 +54,7 @@ const columns = `id, kind, title, data, origin,
   to_char(archived_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "archivedAt"`;
 
 /** What the journal keeps of an entry: enough to put it back. */
-const snapshotOf = async (tx: Tx, id: string) =>
+export const snapshotOf = async (tx: Tx, id: string) =>
   (
     await tx.query<Record<string, unknown>>(
       'select kind, title, data, origin, archived_at from entry where id = $1',
@@ -100,6 +101,7 @@ const SYSTEM_CHECKS: Record<string, (data: Record<string, unknown>) => unknown> 
   script: checkScript,
   view: checkView,
   share: checkShare,
+  area: checkArea,
 };
 const checkSystem = (kind: string, data: Record<string, unknown>) =>
   SYSTEM_CHECKS[foldKind(kind)]?.(data);
@@ -577,11 +579,24 @@ export interface Kind {
   fields: string[];
   /** Its model, when it has one (spec 012): the fields every save of it follows. */
   model?: Model;
+  /**
+   * The group it shows in (spec 017): her « Area » that names it, else its model's area, else its
+   * app; Jarvis's own kinds in « system ».
+   */
+  group: string | null;
+  system: boolean;
 }
+
+/** Jarvis's own kinds: the engine and her method, grouped apart from her life. */
+export const SYSTEM_KINDS = new Set(
+  ['Model', 'Page', 'Rule', 'Script', 'View', 'Share', 'Area', 'Charter', 'Routine', 'Channel'].map(
+    (kind) => kind.toLowerCase(),
+  ),
+);
 
 /** The kinds of things in a space, the most used first, with the fields each uses. */
 export async function kinds(tx: Tx, spaceId: string): Promise<Kind[]> {
-  const { rows } = await tx.query<Kind>(
+  const { rows } = await tx.query<Omit<Kind, 'group' | 'system'>>(
     `select e.kind, count(distinct e.id)::int as count,
             coalesce(array_agg(distinct f.key) filter (where f.key is not null), '{}') as fields
        from entry e left join lateral jsonb_object_keys(e.data) as f(key) on true
@@ -596,12 +611,29 @@ export async function kinds(tx: Tx, spaceId: string): Promise<Kind[]> {
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase();
   const models = new Map((await modelsOf(tx, spaceId)).map((model) => [fold(model.kind), model]));
-  const out = rows.map((row) => {
+  const { rows: areas } = await tx.query<{ title: string; data: { kinds?: unknown } }>(
+    `select title, data from entry where space_id = $1 and archived_at is null
+        and jarvis_fold(kind) = 'area' order by (data->>'order')::int nulls last, title`,
+    [spaceId],
+  );
+  const areaOf = new Map<string, string>();
+  for (const area of areas)
+    for (const kind of Array.isArray(area.data.kinds) ? area.data.kinds : [])
+      if (typeof kind === 'string' && !areaOf.has(fold(kind))) areaOf.set(fold(kind), area.title);
+  const placed = (kind: string, model?: Model) => {
+    const system = SYSTEM_KINDS.has(fold(kind));
+    return {
+      group: areaOf.get(fold(kind)) ?? model?.area ?? model?.app ?? null,
+      system,
+    };
+  };
+  const out: Kind[] = rows.map((row) => {
     const model = models.get(fold(row.kind));
     models.delete(fold(row.kind));
-    return model ? { ...row, model } : row;
+    return model ? { ...row, model, ...placed(row.kind, model) } : { ...row, ...placed(row.kind) };
   });
-  for (const model of models.values()) out.push({ kind: model.kind, count: 0, fields: [], model });
+  for (const model of models.values())
+    out.push({ kind: model.kind, count: 0, fields: [], model, ...placed(model.kind, model) });
   return out;
 }
 

@@ -37,6 +37,9 @@ import {
   runView,
   collectionsOf,
   collectionStats,
+  groupKind,
+  listStats,
+  renameKind,
   createShare,
   press,
   setRole,
@@ -596,6 +599,80 @@ export async function mcpServerFor(
       act<unknown>((tx) =>
         kind ? collectionStats(tx, at(space), kind) : collectionsOf(tx, at(space)),
       ),
+    ),
+  );
+
+  // Any list, its kinds and their groups (spec 017).
+  server.registerTool(
+    'stats',
+    {
+      description:
+        'The statistics of any of her lists, a kind with or without a model, by words, period or folder: how many, this month, day by day over twelve weeks, the current and best streak of days, the active days of the last thirty, the hours, the repeated values, the averages. Each entry counts on its own day (its date, else the day in its source or title). Use it for « how many prayers this week », « my streak ».',
+      inputSchema: {
+        kind: z.string().min(1).optional(),
+        text: z.string().optional(),
+        from: z.string().optional().describe('YYYY-MM-DD'),
+        to: z.string().optional().describe('YYYY-MM-DD'),
+        folder: z.string().optional(),
+        space: spaceArg,
+      },
+      annotations: { readOnlyHint: true },
+    },
+    tool(
+      async ({
+        space,
+        ...input
+      }: {
+        kind?: string | undefined;
+        text?: string | undefined;
+        from?: string | undefined;
+        to?: string | undefined;
+        folder?: string | undefined;
+        space?: string | undefined;
+      }) =>
+        act((tx) =>
+          listStats(
+            tx,
+            at(space),
+            Object.fromEntries(Object.entries(input).filter(([, value]) => value)),
+          ),
+        ),
+    ),
+  );
+
+  server.registerTool(
+    'rename_kind',
+    {
+      description:
+        'Rename one of her kinds (« document » → « Document »), or merge it into another: every entry follows, with its model, views and groups; one change, undone at once. Only when she asks.',
+      inputSchema: { from: z.string().min(1), to: z.string().min(1), space: spaceArg },
+    },
+    tool(async ({ from, to, space }: { from: string; to: string; space?: string | undefined }) =>
+      act((tx) => renameKind(tx, actor, at(space), { from, to })),
+    ),
+  );
+
+  server.registerTool(
+    'group_kind',
+    {
+      description:
+        'File one of her kinds in one of her groups (an « Area » entry, created if new), as she names it — « Spirituel », « Pilotage » — or in none (group null). The Entries page shows her kinds by these groups.',
+      inputSchema: {
+        kind: z.string().min(1),
+        group: z.string().min(1).nullable(),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async ({
+        kind,
+        group,
+        space,
+      }: {
+        kind: string;
+        group: string | null;
+        space?: string | undefined;
+      }) => act((tx) => groupKind(tx, actor, at(space), { kind, group })),
     ),
   );
 

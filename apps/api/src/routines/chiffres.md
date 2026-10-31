@@ -5,6 +5,9 @@ when: elle demande un total, un reste, une moyenne, une évolution, « combien �
 
 # Répondre avec des chiffres
 
+0. Pour un nombre, une régularité ou une série sur une liste (« combien de prières cette semaine »,
+   « ma série », « à quelle heure »), appelle d'abord `stats` (kind, période, dossier) : chaque
+   entrée y compte à sa propre date.
 1. Appelle `kinds` pour connaître les types et les champs (ex. « Dépense » : montant, date, poste).
 2. Écris un seul `select` sur `my_entries` (colonnes : id, kind, title, data, origin, created_at,
    updated_at, archived_at), `my_links` (from_id, to_id, role) ou `my_files`. Les champs se lisent

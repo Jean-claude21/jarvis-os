@@ -47,7 +47,19 @@ file (`vie/2026/2026-08/bilans/W33.md`): her own folders. A prayer is one entry 
    the hours (when entries have a time), the splits of short repeated values, the averages.
 2. Claude reads them through `stats`: « how many prayers this week? ».
 
-### User Story 5 — Said once, done each time (Priority: P2)
+### User Story 5 — A habit kept (Priority: P1)
+
+1. A habit says its days (`days`, or her words: « 7/7 », « lun-ven ») and since when; what she
+   did is linked to it. The statistics give its rate and the days missed; words not understood
+   give no rate.
+2. She links selected entries to a habit (« Link to… »), at once, undone at once.
+
+### User Story 6 — Her page, her way (Priority: P2)
+
+1. She drags entries onto a folder and kinds onto a group.
+2. How she shows her kinds and opens each list is kept in her account, on every device.
+
+### User Story 7 — Said once, done each time (Priority: P2)
 
 1. She tells Claude how to file; Claude writes it in her « Charter », sets `folder` on each new
    entry, and keeps a « Area » for the kinds she groups.

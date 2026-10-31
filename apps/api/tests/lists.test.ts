@@ -69,3 +69,38 @@ describe('her kinds', () => {
     expect(kinds.body.map((one) => one.kind)).toContain('Document');
   });
 });
+
+describe('her preferences and links at once', () => {
+  it('keeps how she shows her lists, on every device', async () => {
+    expect((await ama.json('/api/me/prefs')).body).toEqual({});
+    await ama.json('/api/me/prefs', { kinds: 'flat' });
+    await ama.json('/api/me/prefs', { modes: { Bilan: 'folder' } });
+    expect((await ama.json('/api/me/prefs')).body).toEqual({
+      kinds: 'flat',
+      modes: { Bilan: 'folder' },
+    });
+    expect((await ama.json('/api/me/prefs', { kinds: 'sideways' })).status).toBe(400);
+  });
+
+  it('links entries to a habit, which gives its rate', async () => {
+    const saved = await ama.json<{ entries: { id: string }[] }>('/api/save', {
+      entries: [
+        {
+          kind: 'Habitude',
+          title: 'Prière',
+          data: { days: ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] },
+        },
+      ],
+    });
+    const list = await ama.json<{ rows: { id: string }[] }>('/api/list?kind=Pri%C3%A8re');
+    const linked = await ama.json('/api/entries/bulk', {
+      ids: list.body.rows.map((one) => one.id),
+      link: { to: saved.body.entries[0]!.id, role: 'for' },
+    });
+    expect(linked.status).toBe(200);
+    const stats = await ama.json<{ habits: { title: string; done: number }[] }>(
+      '/api/list/stats?kind=Pri%C3%A8re',
+    );
+    expect(stats.body.habits).toEqual([expect.objectContaining({ title: 'Prière', done: 2 })]);
+  });
+});

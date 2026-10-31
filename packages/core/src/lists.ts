@@ -6,6 +6,7 @@ import { isScope, todayOf, type Clock } from './formula';
 import { record, recordMany } from './journal';
 import type { Label, Model } from './models';
 import { AREA_KIND } from './areas';
+import { planOf, rateOf, type HabitRate } from './habits';
 
 // Lists (spec 017): any entries — a kind with or without a model, filtered or not — read for what
 // they already hold: the day each is about, the folder it sits in, and the statistics of the list.
@@ -263,6 +264,8 @@ export interface ListStats {
     value: number;
     unit: string | null;
   }[];
+  /** The habits these entries are linked to, and how they were kept (planned days against done). */
+  habits: HabitRate[];
 }
 
 const SKIPPED = new Set(['text', 'source', 'folder', 'title', 'note', 'message', 'error', 'id']);
@@ -442,14 +445,82 @@ export async function listStats(
     splits,
     weeks: { field: dated?.name ?? 'day', label: dated?.label ?? null, points: weeks },
     figures,
+    habits: await habitsOf(tx, spaceId, found, today),
   };
+}
+
+/** The habits a list's entries are linked to (either way), each with how it was kept. */
+async function habitsOf(
+  tx: Tx,
+  spaceId: string,
+  found: { id: string; day: string; title: string; data: Record<string, unknown> }[],
+  today: string,
+): Promise<HabitRate[]> {
+  if (!found.length) return [];
+  // The list is of habits themselves: each with the entries linked to it, on their own day.
+  const planned = found.flatMap((row) => {
+    const plan = planOf(row.data);
+    return plan ? [{ row, plan }] : [];
+  });
+  if (planned.length) {
+    const { rows } = await tx.query<EntryRow & { habit: string }>(
+      `select case when l.from_id = any($2) then l.from_id else l.to_id end as habit,
+              e.id, e.kind, e.title, e.data - 'text' as data,
+              to_char(e.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
+              to_char(e.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "updatedAt"
+         from link l
+         join entry e on e.id = case when l.from_id = any($2) then l.to_id else l.from_id end
+        where l.space_id = $1 and (l.from_id = any($2) or l.to_id = any($2)) and e.archived_at is null`,
+      [spaceId, planned.map((one) => one.row.id)],
+    );
+    return planned
+      .map(({ row, plan }) =>
+        rateOf(
+          { id: row.id, title: row.title, plan },
+          rows.filter((one) => one.habit === row.id).map((one) => dayOf(one).day),
+          today,
+        ),
+      )
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }
+  const ids = found.map((row) => row.id);
+  const { rows } = await tx.query<{
+    entry: string;
+    id: string;
+    title: string;
+    data: Record<string, unknown>;
+  }>(
+    `select case when l.from_id = any($2) then l.from_id else l.to_id end as entry,
+            e.id, e.title, e.data - 'text' as data
+       from link l
+       join entry e on e.id = case when l.from_id = any($2) then l.to_id else l.from_id end
+      where l.space_id = $1 and (l.from_id = any($2) or l.to_id = any($2))
+        and e.archived_at is null and not (e.id = any($2))`,
+    [spaceId, ids],
+  );
+  const dayOfEntry = new Map(found.map((row) => [row.id, row.day]));
+  const habits = new Map<
+    string,
+    { id: string; title: string; data: Record<string, unknown>; days: string[] }
+  >();
+  for (const row of rows) {
+    const habit = habits.get(row.id) ?? { id: row.id, title: row.title, data: row.data, days: [] };
+    habit.days.push(dayOfEntry.get(row.entry) ?? '');
+    habits.set(row.id, habit);
+  }
+  const out: HabitRate[] = [];
+  for (const habit of habits.values()) {
+    const plan = planOf(habit.data);
+    if (plan) out.push(rateOf({ id: habit.id, title: habit.title, plan }, habit.days, today));
+  }
+  return out.sort((a, b) => a.title.localeCompare(b.title));
 }
 
 /** The journal lines this person wrote in this space after `since`: one change, grouped. */
 async function linesSince(tx: Tx, actor: Actor, spaceId: string, since: number) {
   const { rows } = await tx.query<{ id: string }>(
     `select id from journal where space_id = $1 and id > $2 and actor = $3 and undone_by is null
-        and command like 'entry.%'`,
+        and (command like 'entry.%' or command like 'link.%')`,
     [spaceId, since, actor.person],
   );
   return rows.map((row) => Number(row.id));
@@ -471,9 +542,13 @@ export const bulkSchema = z
     kind: z.string().trim().min(1).max(80).optional(),
     /** Set aside, never erased. */
     archive: z.boolean().optional(),
+    /** Each linked to this entry (« for » her habit « Prière »). */
+    link: z
+      .object({ to: z.string().trim().min(1).max(64), role: z.string().trim().min(1).max(80) })
+      .optional(),
   })
-  .refine((input) => input.folder !== undefined || input.kind || input.archive, {
-    message: 'Say what to do: folder, kind or archive.',
+  .refine((input) => input.folder !== undefined || input.kind || input.archive || input.link, {
+    message: 'Say what to do: folder, kind, archive or link.',
   });
 export type BulkInput = z.input<typeof bulkSchema>;
 
@@ -500,13 +575,22 @@ export async function changeEntries(
               .map((part) => part.trim())
               .filter(Boolean)
               .join('/');
+    const changing = !!input.kind || folder !== undefined;
     for (let at = 0; at < ids.length; at += 50) {
+      const some = ids.slice(at, at + 50);
       await save(tx, actor, spaceId, {
-        entries: ids.slice(at, at + 50).map((id) => ({
-          id,
-          ...(input.kind ? { kind: input.kind } : {}),
-          ...(folder !== undefined ? { data: { folder } } : {}),
-        })),
+        entries: changing
+          ? some.map((id) => ({
+              id,
+              ...(input.kind ? { kind: input.kind } : {}),
+              ...(folder !== undefined ? { data: { folder } } : {}),
+            }))
+          : [],
+        links: input.link
+          ? some
+              .filter((id) => id !== input.link!.to)
+              .map((id) => ({ from: id, to: input.link!.to, role: input.link!.role }))
+          : [],
       });
     }
   }
@@ -521,6 +605,7 @@ export async function changeEntries(
       ...(input.folder !== undefined ? { folder: input.folder } : {}),
       ...(input.kind ? { kind: input.kind } : {}),
       ...(input.archive ? { archive: true } : {}),
+      ...(input.link ? { link: input.link } : {}),
       lines,
     },
   });

@@ -213,8 +213,15 @@ flowchart LR
   averages. Collections use them too; Claude reads them through `stats`.
 - **Her groups of kinds**: an « Area » entry names the kinds it groups (`areas.ts`); else a model's
   `area`, else its app; Jarvis's own kinds apart. `kinds` gives each its `group`.
-- **At once**: `changeEntries` (filed, retyped, set aside) and `renameKind` are one journal line
-  (`entries.change`, `kind.rename`) over their entries' lines, undone at once.
+- **At once**: `changeEntries` (filed, retyped, set aside, linked) and `renameKind` are one journal
+  line (`entries.change`, `kind.rename`) over their entries' lines, undone at once. On the page,
+  entries are dragged onto a folder and kinds onto a group.
+- **Habits** (`habits.ts`): a habit says its days (`days`: mon…sun, or her words in `jours` /
+  `cadence` — « 7/7 », « lun-ven », « mar,mer,sam ») and `since`; the entries linked to it are the
+  days she did it. The statistics give its rate (planned days against done, thirty days and since
+  the start) and the days missed. Words not understood give no rate: nothing is guessed.
+- **Her preferences of display** (`prefs.ts`): kinds flat or grouped, how each list opens — kept
+  in her « Channel », so every device shows them alike.
 
 ```mermaid
 flowchart LR

@@ -60,6 +60,13 @@ body { padding: 0; }
 .heat i { width: 9px; height: 9px; border-radius: 1px; background: var(--clay); }
 .heat i.l1 { background: color-mix(in srgb, var(--primary) 40%, var(--clay)); } .heat i.l2 { background: color-mix(in srgb, var(--primary) 70%, var(--clay)); } .heat i.l3 { background: var(--primary); }
 .heat i.today { outline: 1.5px solid var(--ink); }
+.drop-on { outline: 2px dashed var(--primary); outline-offset: -2px; background: var(--clay); }
+[draggable=true] { cursor: grab; }
+.habit .kpi small { font-size: 14px; }
+.habit .bar { height: 6px; background: var(--clay); border-radius: 1px; margin-top: 8px; overflow: hidden; }
+.habit .bar i { display: block; height: 100%; background: var(--success); }
+.linkpick { display: grid; gap: 4px; margin-top: 10px; }
+.linkpick button { text-align: left; }
 .facets a { display: flex; justify-content: space-between; padding: 6px 8px; color: var(--ink); text-decoration: none; border-radius: 2px; font-size: 14px; }
 .facets a:hover { background: var(--clay); } .facets a.on { background: var(--clay); font-weight: 600; }
 .rows tr { cursor: pointer; } .rows tr:hover td { background: var(--sand); }
@@ -569,13 +576,21 @@ function statsHtml(s) {
     }).join('') +
     '<div class="kpi-card"><div class="caps">' + esc(say(W.perWeek, { field: tr(s.weeks.label) || (s.weeks.field === 'day' ? W.dayWord : s.weeks.field) })) + '</div><div class="spark">' +
       s.weeks.points.map((p) => '<span title="' + esc(p.week + ' : ' + p.n) + '" style="height:' + Math.max(3, Math.round(p.n / max * 100)) + '%"></span>').join('') + '</div></div>' +
+    (s.habits || []).map((h) => '<div class="kpi-card habit"><div class="caps">' + esc(h.title) + '</div><div class="kpi">' + (h.rate30 === null ? '—' : esc(num(h.rate30)) + '<small> %</small>') + '</div>' +
+      '<div class="bar"><i style="width:' + (h.rate30 || 0) + '%"></i></div><div class="muted">' + esc(say(W.habitDone, { done: h.done30, planned: h.planned30 })) + '</div>' +
+      (h.rate !== null ? '<div class="muted">' + esc(say(W.habitSince, { rate: num(h.rate), done: h.done, planned: h.planned })) + '</div>' : '') +
+      (h.missed.length ? '<div class="muted" style="font-size:12px">' + esc(say(W.habitMissed, { days: h.missed.slice(0, 5).map((d) => day(d + 'T12:00:00')).join(', ') + (h.missed.length > 5 ? '…' : '') })) + '</div>' : '') +
+      '<div class="muted" style="font-size:12px">' + esc(say(W.habitFrom, { text: h.plan.text })) + '</div></div>').join('') +
     s.figures.map((f) => '<div class="kpi-card"><div class="caps">' + esc(say(f.kind === 'sum' ? W.sumOf : W.avgOf, { field: tr(f.label) || f.field })) + '</div><div class="kpi">' + num(f.value) + (f.unit ? '<small> ' + esc(f.unit) + '</small>' : '') + '</div></div>').join('') +
     '</section>';
 }
 // An entry's own day: « 31 août 2026 », or « août 2026 » when only the month is known.
 const ownDay = (d) => d.length === 7 ? new Date(d + '-15T12:00:00').toLocaleDateString(locale, { month: 'long', year: 'numeric' }) : day(d + 'T12:00:00');
-// How she shows her kinds (flat or in groups), kept on this device only.
-const kindsMode = () => { try { return localStorage.getItem('jos.kinds') || 'grouped'; } catch { return 'grouped'; } };
+// Her preferences of display (spec 017), kept in her account: kinds flat or grouped, how lists open.
+let prefs = null;
+async function prefsNow() { if (!prefs) { try { prefs = await api('/me/prefs'); } catch { prefs = {}; } } return prefs; }
+const kindsMode = () => (prefs && prefs.kinds) || 'grouped';
+function keepPrefs(patch) { prefs = Object.assign({}, prefs, patch, patch.modes ? { modes: Object.assign({}, prefs && prefs.modes, patch.modes) } : {}); api('/me/prefs', { method: 'POST', body: patch }).catch(() => {}); }
 
 // Pages, by the hash: #/vie?kind=…, #/entree/<id>, …
 const pages = {
@@ -734,7 +749,8 @@ const pages = {
     const kind = params.get('kind') || ''; const q = params.get('q') || '';
     const from = params.get('from') || ''; const to = params.get('to') || ''; const folder = params.get('folder') || '';
     const sort = params.get('sort') || 'day'; const desc = params.get('desc') !== 'false';
-    const mode = params.get('mode') || 'flat';
+    const pref = await prefsNow();
+    const mode = params.get('mode') || (pref.modes && pref.modes[kind || '*']) || 'flat';
     const qs = new URLSearchParams();
     for (const [k, v] of [['kind', kind], ['text', q], ['from', from], ['to', to], ['folder', folder], ['sort', sort], ['desc', String(desc)]]) if (v) qs.set(k, v);
     qs.set('limit', '1000');
@@ -745,14 +761,14 @@ const pages = {
     // The kinds: flat (the most used first) or in her groups, Jarvis's own last.
     const kmode = kindsMode();
     const SYS = '~system';
-    const kindRow = (k) => '<a href="' + esc(link({ kind: k.kind, folder: null })) + '" data-kname="' + esc((kindLabel(k) + ' ' + k.kind).toLowerCase()) + '" class="' + (k.kind === kind ? 'on' : '') + '"><span>' + esc(kindLabel(k)) + '</span><span class="muted num">' + k.count + '</span></a>';
+    const kindRow = (k) => '<a href="' + esc(link({ kind: k.kind, folder: null })) + '" draggable="' + (kmode === 'flat' ? 'false' : 'true') + '" data-dragkind="' + esc(k.kind) + '" data-kname="' + esc((kindLabel(k) + ' ' + k.kind).toLowerCase()) + '" class="' + (k.kind === kind ? 'on' : '') + '"><span>' + esc(kindLabel(k)) + '</span><span class="muted num">' + k.count + '</span></a>';
     let kindsHtml;
     if (kmode === 'flat') kindsHtml = kinds.filter((k) => k.count).map(kindRow).join('');
     else {
       const groups = {};
       for (const k of kinds.filter((one) => one.count)) { const g = k.system && !k.group ? SYS : k.group || ''; (groups[g] = groups[g] || []).push(k); }
       const names = Object.keys(groups).sort((x, y) => (x === SYS) - (y === SYS) || (x === '') - (y === '') || x.localeCompare(y));
-      kindsHtml = names.map((n) => '<details' + (n === SYS ? '' : ' open') + '><summary class="caps"><span>' + esc(n === SYS ? W.systemGroup : n || W.noGroup) + '</span><span class="num">' + groups[n].reduce((t, k) => t + k.count, 0) + '</span></summary>' + groups[n].map(kindRow).join('') + '</details>').join('');
+      kindsHtml = names.map((n) => '<details' + (n === SYS ? '' : ' open') + '><summary class="caps"' + (n === SYS ? '' : ' data-dropgroup="' + esc(n) + '"') + '><span>' + esc(n === SYS ? W.systemGroup : n || W.noGroup) + '</span><span class="num">' + groups[n].reduce((t, k) => t + k.count, 0) + '</span></summary>' + groups[n].map(kindRow).join('') + '</details>').join('');
     }
     const nav = '<nav class="card facets ent-kinds"><div class="head" style="margin:0;align-items:center"><span class="caps">' + esc(W.kinds) + '</span>' +
       '<div class="seg"><button class="' + (kmode === 'flat' ? 'on' : 'quiet') + '" data-kmode="flat">' + esc(W.kindsFlat) + '</button><button class="' + (kmode === 'flat' ? 'quiet' : 'on') + '" data-kmode="grouped">' + esc(W.kindsGrouped) + '</button></div></div>' +
@@ -763,7 +779,7 @@ const pages = {
     const k = kinds.find((one) => one.kind === kind);
     const check = (e) => '<td class="pick"><input type="checkbox" data-row="' + esc(e.id) + '"></td>';
     const dayCell = (e) => '<td class="muted" style="white-space:nowrap"' + (e.dayFrom === 'made' ? ' title="' + esc(W.madeHint) + '"' : '') + '>' + esc(ownDay(e.day)) + (e.dayFrom === 'made' ? ' *' : '') + '</td>';
-    const line = (e, withFolder) => '<tr data-go="#/entree/' + esc(e.id) + '">' + check(e) + '<td>' + esc(e.title) + '</td>' + (kind ? '' : '<td><span class="badge">' + esc(kindName(e.kind)) + '</span></td>') + dayCell(e) +
+    const line = (e, withFolder) => '<tr draggable="true" data-drag="' + esc(e.id) + '" data-go="#/entree/' + esc(e.id) + '">' + check(e) + '<td>' + esc(e.title) + '</td>' + (kind ? '' : '<td><span class="badge">' + esc(kindName(e.kind)) + '</span></td>') + dayCell(e) +
       (withFolder ? '<td class="muted">' + (e.folder ? '<a class="link" href="' + esc(link({ folder: e.folder })) + '">' + esc(e.folder.split('/').slice(-2).join('/')) + '</a>' : '') + '</td>' : '') + '</tr>';
     const headRow = (withFolder) => '<tr><th class="pick"><input type="checkbox" data-all></th><th>' + esc(W.title) + '</th>' + (kind ? '' : '<th>' + esc(W.kind) + '</th>') + '<th>' + esc(W.dayCol) + '</th>' + (withFolder ? '<th>' + esc(W.folderCol) + '</th>' : '') + '</tr>';
     const span = kind ? 3 : 4;
@@ -787,11 +803,11 @@ const pages = {
       }
       const count = (n) => n.rows.length + Object.values(n.kids).reduce((t, c) => t + count(c), 0);
       const byName = (a, b) => a.name.localeCompare(b.name, undefined, { numeric: true });
-      const entryRow = (e) => '<div class="fe"><input type="checkbox" data-row="' + esc(e.id) + '"><a href="#/entree/' + esc(e.id) + '">' + esc(e.title) + '</a><span class="muted" style="margin-left:auto;white-space:nowrap">' + esc(ownDay(e.day)) + '</span></div>';
-      const node = (n, depth, only) => '<details' + (depth < 1 || only ? ' open' : '') + '><summary><span>' + esc(n.name) + '</span><span class="grow"></span><span class="muted num">' + count(n) + '</span><a class="link" href="' + esc(link({ folder: n.path, mode: null })) + '">→</a></summary>' +
+      const entryRow = (e) => '<div class="fe" draggable="true" data-drag="' + esc(e.id) + '"><input type="checkbox" data-row="' + esc(e.id) + '"><a href="#/entree/' + esc(e.id) + '">' + esc(e.title) + '</a><span class="muted" style="margin-left:auto;white-space:nowrap">' + esc(ownDay(e.day)) + '</span></div>';
+      const node = (n, depth, only) => '<details' + (depth < 1 || only ? ' open' : '') + '><summary data-dropfolder="' + esc(n.path) + '"><span>' + esc(n.name) + '</span><span class="grow"></span><span class="muted num">' + count(n) + '</span><a class="link" href="' + esc(link({ folder: n.path, mode: null })) + '">→</a></summary>' +
         Object.values(n.kids).sort(byName).map((c, _, all) => node(c, depth + 1, all.length === 1)).join('') + n.rows.map(entryRow).join('') + '</details>';
       body = '<div class="ent-scroll ftree">' + Object.values(root.kids).sort(byName).map((c) => node(c, 0, false)).join('') +
-        (root.rows.length ? '<details open><summary><span>' + esc(W.noFolder) + '</span><span class="grow"></span><span class="muted num">' + root.rows.length + '</span></summary>' + root.rows.map(entryRow).join('') + '</details>' : '') + '</div>';
+        (root.rows.length ? '<details open><summary data-dropfolder=""><span>' + esc(W.noFolder) + '</span><span class="grow"></span><span class="muted num">' + root.rows.length + '</span></summary>' + root.rows.map(entryRow).join('') + '</details>' : '') + '</div>';
     } else {
       body = '<div class="ent-scroll"><table class="rows"><thead>' + headRow(true) + '</thead><tbody>' + list.rows.map((e) => line(e, true)).join('') + '</tbody></table></div>';
     }
@@ -801,10 +817,10 @@ const pages = {
       '<label class="vsel">' + esc(W.fromDay) + ' <input type="date" name="from" value="' + esc(from) + '"></label><label class="vsel">' + esc(W.toDay) + ' <input type="date" name="to" value="' + esc(to) + '"></label>' +
       '<select name="sort">' + opt('day', W.sortDay, sort) + opt('title', W.sortTitle, sort) + opt('updated', W.sortUpdated, sort) + '</select>' +
       '<button type="button" class="quiet" data-desc="' + (desc ? 'false' : 'true') + '">' + (desc ? '↓' : '↑') + '</button><button>' + esc(W.apply) + '</button></form>' +
-      '<div class="ent-tools"><div class="actions">' + [['flat', W.modeFlat], ['period', W.modePeriod], ['folder', W.modeFolder]].map(([m, label]) => '<a class="badge' + (m === mode ? ' primary' : '') + '" href="' + esc(link({ mode: m === 'flat' ? null : m })) + '">' + esc(label) + '</a>').join('') + '</div>' +
+      '<div class="ent-tools"><div class="actions">' + [['flat', W.modeFlat], ['period', W.modePeriod], ['folder', W.modeFolder]].map(([m, label]) => '<a class="badge' + (m === mode ? ' primary' : '') + '" data-mode="' + m + '" data-modekey="' + esc(kind || '*') + '" href="' + esc(link({ mode: m })) + '">' + esc(label) + '</a>').join('') + '</div>' +
       (folder ? '<span class="chip">' + esc(say(W.inFolder, { folder })) + ' <a class="x" href="' + esc(link({ folder: null })) + '" aria-label="' + esc(W.remove) + '">✕</a></span>' : '') +
       '<span class="grow"></span><span class="muted">' + esc(list.truncated ? say(W.shownOf, { n: list.rows.length, total: list.total }) : String(list.total)) + '</span></div>';
-    const sel = '<div class="ent-sel" id="entsel"><b id="entsel-n"></b><span class="grow"></span><button class="quiet" data-bulk="folder">' + esc(W.fileInFolder) + '</button><button class="quiet" data-bulk="kind">' + esc(W.retype) + '</button><button class="quiet" data-bulk="archive">' + esc(W.setAside) + '</button><button class="quiet" data-bulk="none">' + esc(W.unselect) + '</button></div>';
+    const sel = '<div class="ent-sel" id="entsel"><b id="entsel-n"></b><span class="grow"></span><button class="quiet" data-bulk="folder">' + esc(W.fileInFolder) + '</button><button class="quiet" data-bulk="kind">' + esc(W.retype) + '</button><button class="quiet" data-bulk="link">' + esc(W.linkTo) + '</button><button class="quiet" data-bulk="archive">' + esc(W.setAside) + '</button><button class="quiet" data-bulk="none">' + esc(W.unselect) + '</button></div>';
     const head = '<div class="head" style="margin:0"><div>' + (k && k.group ? '<div class="caps">' + esc(k.group) + '</div>' : '') + '<h2 style="margin:0">' + esc(kind ? kindName(kind) : q ? '« ' + q + ' »' : W.all) + '</h2></div>' +
       (kind ? '<div class="actions"><button class="quiet" data-kgroup="' + esc(kind) + '" data-current="' + esc((k && k.group) || '') + '">' + esc(W.groupKind) + '</button><button class="quiet" data-krename="' + esc(kind) + '">' + esc(W.renameKind) + '</button></div>' : '') + '</div>';
     return '<div class="ent">' + nav + '<section class="card ent-main">' + head + (stats ? statsHtml(stats) : '') + tools + sel + body + '</section></div>';
@@ -1002,7 +1018,28 @@ async function show() {
 function bindEntries(root) {
   const params = () => new URLSearchParams((location.hash.split('?')[1]) || '');
   const go = (over) => { const p = params(); for (const [k, v] of Object.entries(over)) { if (v === null || v === '') p.delete(k); else p.set(k, v); } location.hash = '#/vie' + (p.toString() ? '?' + p.toString() : ''); };
-  root.querySelectorAll('[data-kmode]').forEach((b) => b.addEventListener('click', () => { try { localStorage.setItem('jos.kinds', b.dataset.kmode); } catch {} show(); }));
+  root.querySelectorAll('[data-kmode]').forEach((b) => b.addEventListener('click', () => { keepPrefs({ kinds: b.dataset.kmode }); show(); }));
+  root.querySelectorAll('[data-mode]').forEach((a) => a.addEventListener('click', () => keepPrefs({ modes: { [a.dataset.modekey]: a.dataset.mode } })));
+  // Drag and drop: a kind onto one of her groups; entries (the one dragged, or all those selected) onto a folder.
+  const dropOn = (els, take) => els.forEach((el) => {
+    el.addEventListener('dragover', (event) => { if (dragging) { event.preventDefault(); el.classList.add('drop-on'); } });
+    el.addEventListener('dragleave', () => el.classList.remove('drop-on'));
+    el.addEventListener('drop', async (event) => { event.preventDefault(); el.classList.remove('drop-on'); const what = dragging; dragging = null; if (what) await take(what, el); });
+  });
+  let dragging = null;
+  root.querySelectorAll('[data-dragkind]').forEach((a) => a.addEventListener('dragstart', () => { dragging = { kind: a.dataset.dragkind }; }));
+  root.querySelectorAll('[data-drag]').forEach((r) => r.addEventListener('dragstart', () => {
+    const chosen = [...root.querySelectorAll('[data-row]:checked')].map((c) => c.dataset.row);
+    dragging = { ids: chosen.includes(r.dataset.drag) ? chosen : [r.dataset.drag] };
+  }));
+  dropOn(root.querySelectorAll('[data-dropgroup]'), async (what, el) => {
+    if (!what.kind) return;
+    try { await api(inSpace('/kinds/group'), { method: 'POST', body: { kind: what.kind, group: el.dataset.dropgroup || null } }); toast(say(W.groupedToast, { kind: what.kind, group: el.dataset.dropgroup || W.noGroup }), null); show(); } catch (error) { fail(error); }
+  });
+  dropOn(root.querySelectorAll('[data-dropfolder]'), async (what, el) => {
+    if (!what.ids) return;
+    try { await api(inSpace('/entries/bulk'), { method: 'POST', body: { ids: what.ids, folder: el.dataset.dropfolder || null } }); toast(say(W.filedToast, { n: what.ids.length }), { id: what.ids[0], spaceId: space }); show(); } catch (error) { fail(error); }
+  });
   const kq = root.querySelector('[data-kq]');
   if (kq) kq.addEventListener('input', () => {
     const t = kq.value.trim().toLowerCase();
@@ -1032,6 +1069,19 @@ function bindEntries(root) {
   root.querySelectorAll('[data-bulk]').forEach((b) => b.addEventListener('click', async () => {
     const ids = picked(); const what = b.dataset.bulk;
     if (what === 'none') { root.querySelectorAll('[data-row], [data-all]').forEach((c) => { c.checked = false; }); refresh(); return; }
+    if (what === 'link') {
+      openDrawer(W.linkTo, '<input type="search" class="field" id="lk_q" placeholder="' + esc(W.linkSearch) + '" style="width:100%"><div class="linkpick" id="lk_list"></div>');
+      const q = document.getElementById('lk_q'); let timer;
+      const find = async () => {
+        const found = q.value.trim() ? await api(inSpace('/list?limit=15&sort=title&desc=false&text=' + encodeURIComponent(q.value.trim()))) : { rows: [] };
+        document.getElementById('lk_list').innerHTML = found.rows.filter((e) => !ids.includes(e.id)).map((e) => '<button class="quiet" data-linkto="' + esc(e.id) + '" data-linktitle="' + esc(e.title) + '">' + esc(e.title) + ' <span class="muted">' + esc(kindName(e.kind)) + '</span></button>').join('') || empty();
+        document.querySelectorAll('[data-linkto]').forEach((x) => x.addEventListener('click', async () => {
+          try { await api(inSpace('/entries/bulk'), { method: 'POST', body: { ids, link: { to: x.dataset.linkto, role: 'for' } } }); closeDrawer(); toast(say(W.linkedToast, { n: ids.length, title: x.dataset.linktitle }), { id: ids[0], spaceId: space }); show(); } catch (error) { fail(error); }
+        }));
+      };
+      q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(find, 250); }); q.focus();
+      return;
+    }
     let body; let said;
     if (what === 'folder') { const f = prompt(W.folderAsk, params().get('folder') || ''); if (f === null) return; body = { ids, folder: f.trim() || null }; said = W.filedToast; }
     else if (what === 'kind') { const k = prompt(W.kindAsk, params().get('kind') || ''); if (!k || !k.trim()) return; body = { ids, kind: k.trim() }; said = W.retypedToast; }

@@ -17,5 +17,10 @@ when: elle raconte quelque chose de sa vie, donne un document, une dépense, une
    dans sa « Charter », et range celles qui existent déjà (`/entries/bulk` côté app, ou `save`
    avec `folder`). Pour grouper ses types (« Prière et Réflexion dans Spirituel »), `group_kind`.
    Donne toujours une `date` à ce qui en a une : c'est elle qui compte dans les statistiques.
+   Ce qu'elle fait pour une habitude (une prière, une séance de sport) est relié à cette habitude
+   (lien `for`) : c'est ce qui donne son taux. Si l'habitude n'a pas encore de jours lisibles,
+   propose-lui `days` (mon…sun) et `since`, et écris-les après son oui. Pour que ce soit fait à
+   chaque fois sans toi, propose une « Rule » : quand une « Prière » est enregistrée, la relier à
+   l'habitude.
 7. Réponds en une ligne par chose rangée : « Gardé : taxi 2 000 F (Transport) · passeport, expire
    le 14 janv. 2027 ». Ce que tu n'as pas pu ranger, dis-le.

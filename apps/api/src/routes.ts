@@ -50,6 +50,8 @@ import {
   zoneOf,
   collectionsOf,
   collectionStats,
+  preferencesOf,
+  setPreferences,
   changeEntries,
   groupKind,
   listEntries,
@@ -705,6 +707,13 @@ export function apiRoutes(deps: {
   });
 
   // Her time zone (spec 015): read and changed from her profile.
+  // Her preferences of display (spec 017), kept in her account.
+  api.get('/me/prefs', async (c) => c.json(await as(c, (tx) => preferencesOf(tx))));
+  api.post('/me/prefs', async (c) => {
+    const body = await c.req.json();
+    return c.json(await as(c, (tx, actor) => setPreferences(tx, actor, body)));
+  });
+
   api.get('/me/zone', async (c) => c.json({ zone: await as(c, (tx) => zoneOf(tx)) }));
   api.post('/me/zone', async (c) => {
     const body = (await c.req.json()) as { zone?: string };

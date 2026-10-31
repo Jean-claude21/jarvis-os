@@ -9,4 +9,6 @@
       its actions, kinds flat or grouped, statistics on top
 - [x] T006 Routines « Ranger », « Chiffres »; docs and diagrams
 - [x] T007 Tests: core and API
+- [x] T009 Habits: `weekdaysOf`, `planOf`, `rateOf`; their rate in `listStats`; links at once
+- [x] T010 Preferences in her « Channel » (`/me/prefs`); drag and drop to folders and groups
 - [x] T008 In a browser, on her data: Prière's streak, Bilan by folder and period, groups, rename

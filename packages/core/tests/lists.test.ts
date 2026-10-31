@@ -12,6 +12,7 @@ import {
   renameKind,
   save,
   undo,
+  weekdaysOf,
 } from '../src';
 import { person, type Person } from './people';
 
@@ -159,5 +160,50 @@ describe('her kinds', () => {
     await ama.as((tx) => undo(tx, ama.actor, { spaceId: ama.space, journalId: line!.id }));
     const back = await ama.as((tx) => get(tx, ama.space, ids[0]!));
     expect(back?.data.folder).toBeUndefined();
+  });
+});
+
+describe('a habit', () => {
+  it('reads its days in her words, or gives none', () => {
+    expect(weekdaysOf('7/7')).toHaveLength(7);
+    expect(weekdaysOf('lun-ven')).toEqual(['mon', 'tue', 'wed', 'thu', 'fri']);
+    expect(weekdaysOf('mar,mer,sam')).toEqual(['tue', 'wed', 'sat']);
+    expect(weekdaysOf(['mon', 'sun'])).toEqual(['mon', 'sun']);
+    expect(weekdaysOf('quotidien')).toHaveLength(7);
+    expect(weekdaysOf('5/7')).toBeNull();
+    expect(weekdaysOf('coucher 22:00')).toBeNull();
+  });
+
+  it('is kept as planned against the entries linked to it', async () => {
+    const saved = await saving({
+      entries: [
+        {
+          kind: 'Habitude',
+          title: 'Prière',
+          data: { jours: '7/7', depuis: '2026-10-24', text: 'Chaque matin.' },
+        },
+      ],
+    });
+    const habit = saved.entries[0]!.id;
+    const prayers = await ama.as((tx) => listEntries(tx, ama.space, { kind: 'Prière' }, clock));
+    await ama.as((tx) =>
+      changeEntries(tx, ama.actor, ama.space, {
+        ids: prayers.rows.map((one) => one.id),
+        link: { to: habit, role: 'for' },
+      }),
+    );
+    // From 24 Oct to today (30 Oct, done): seven days planned; done 24, 25, 28, 29, 30.
+    const stats = await ama.as((tx) => listStats(tx, ama.space, { kind: 'Prière' }, clock));
+    expect(stats.habits).toEqual([
+      expect.objectContaining({
+        title: 'Prière',
+        planned: 7,
+        done: 5,
+        rate: 71.4,
+        missed: ['2026-10-27', '2026-10-26'],
+      }),
+    ]);
+    const ofHabits = await ama.as((tx) => listStats(tx, ama.space, { kind: 'Habitude' }, clock));
+    expect(ofHabits.habits[0]).toEqual(expect.objectContaining({ done: 5, planned: 7 }));
   });
 });

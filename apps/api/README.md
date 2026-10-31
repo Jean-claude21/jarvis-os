@@ -61,7 +61,8 @@ all. Run it again to take a change.
 | GET    | `/api/me/zone`, POST `/api/me/zone` (`zone`)                                            | her time zone                                                                           |
 | GET    | `/api/collections`, `/api/collections/:kind/stats`                                      | her collections and their statistics (spec 016)                                         |
 | GET    | `/api/list`, `/api/list/stats` (`kind`, `text`, `from`, `to`, `folder`, `sort`, `desc`) | any list with each entry's day and folder; its statistics (spec 017)                    |
-| POST   | `/api/entries/bulk` (`ids`, `folder` · `kind` · `archive`)                              | many entries at once, undone at once                                                    |
+| GET    | `/api/me/prefs`, POST `/api/me/prefs` (`kinds`, `modes`)                                | her preferences of display                                                              |
+| POST   | `/api/entries/bulk` (`ids`, `folder` · `kind` · `archive` · `link`)                     | many entries at once, undone at once                                                    |
 | POST   | `/api/kinds/rename` (`from`, `to`), `/api/kinds/group` (`kind`, `group`)                | a kind renamed; a kind in one of her groups                                             |
 | POST   | `/api/entries/:id/press` (`field`)                                                      | a button pressed                                                                        |
 | GET    | `/api/shares`, POST `/api/shares` (`name`, `data`)                                      | her public links; a new one (its link, once)                                            |

@@ -226,3 +226,13 @@ export {
   type ListStats,
 } from './lists';
 export { AREA_KIND, checkArea } from './areas';
+export {
+  planOf,
+  rateOf,
+  weekdaysOf,
+  WEEKDAYS,
+  type HabitPlan,
+  type HabitRate,
+  type Weekday,
+} from './habits';
+export { preferencesOf, preferencesSchema, setPreferences, type Preferences } from './prefs';

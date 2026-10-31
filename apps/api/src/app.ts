@@ -18,6 +18,9 @@ import {
   renderRecord,
   useScriptRunner,
   zoneOf,
+  shareOf,
+  sharedPage,
+  submitShare,
 } from '@jarvis-os/core';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { Hono } from 'hono';
@@ -36,6 +39,7 @@ import { appPage } from './platform/page';
 import { spaceFor } from './spaces';
 import { computeDashboard, dashboardView, widgetsOf } from './views/dashboard';
 import { pageView } from './views/page';
+import { sharedView } from './views/shared';
 import {
   DOCUMENT_HOURS,
   documentShown,
@@ -235,6 +239,44 @@ export function makeApp(settings: Settings) {
       return c.html(messagePage(lang, (error as Error).message), 400);
     }
     return c.notFound();
+  });
+
+  // A public link (spec 016): a form or a view she shared, for someone without an account. It acts
+  // as her, under row-level security, and takes at most 30 answers an hour.
+  const answers = new Map<string, number[]>();
+  const shared = async (key: string) => {
+    const found = await shareOf(db, key);
+    if (!found) return null;
+    return {
+      ...found,
+      page: await asPerson(db, found.person, (tx) => sharedPage(tx, found.spaceId, found.entryId)),
+    };
+  };
+  app.get('/p/:key', async (c) => {
+    const found = await shared(c.req.param('key')).catch(() => null);
+    return c.html(sharedView(found ? found.page : { error: 'closed' }), found ? 200 : 404);
+  });
+  app.post('/p/:key', async (c) => {
+    const key = c.req.param('key');
+    const now = Date.now();
+    const recent = (answers.get(key) ?? []).filter((at) => now - at < 3_600_000);
+    if (recent.length >= 30)
+      return c.json({ error: 'Too many answers for now; try again later.' }, 429);
+    const found = await shareOf(db, key);
+    if (!found) return c.json({ error: 'This link is closed.' }, 404);
+    try {
+      const body = (await c.req.json()) as { title?: string; data?: Record<string, unknown> };
+      const sent = await asPerson(db, found.person, (tx) =>
+        submitShare(tx, found.spaceId, found.person, found.entryId, {
+          title: String(body.title ?? ''),
+          data: body.data ?? {},
+        }),
+      );
+      answers.set(key, [...recent, now]);
+      return c.json({ sent: true, id: sent.id }, 201);
+    } catch (error) {
+      return c.json({ error: (error as Error).message }, 400);
+    }
   });
 
   // A reading link (spec 008): the document as a page to read and print, or its Markdown file.

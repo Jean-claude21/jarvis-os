@@ -95,7 +95,7 @@ describe('a view', () => {
         clock,
       ),
     );
-    expect(result.types).toEqual(['table', 'kanban', 'calendar']);
+    expect(result.types).toEqual(['table', 'kanban', 'calendar', 'timeline']);
     expect(result.rows.map((row) => [row.title, row.fund])).toEqual([
       ['Marché', 'Courses'],
       ['Épicerie', 'Courses'],

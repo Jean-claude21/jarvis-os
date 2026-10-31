@@ -4,7 +4,7 @@ import { readerOf, type EntryView, type Reader } from './compute';
 import { asPerson, type Actor, type Tx } from './db';
 import { save } from './entries';
 import type { SaveInput } from './schemas';
-import { evaluate, isScope, parse, todayOf } from './formula';
+import { evaluate, isScope, parse, todayOf, type Scope } from './formula';
 import { runScript } from './scripts';
 import { DEFAULT_ZONE, nextTime } from './time';
 import { zoneOf } from './zone';
@@ -31,7 +31,13 @@ export const actionSchema = z.union([
       link: z.string().trim().min(1).max(80).optional(),
     }),
   }),
-  z.object({ update: z.object({ set: z.record(z.string(), value) }) }),
+  /** Fields set on the entry — or, with `on` (« product », « account »), on the entries it links to. */
+  z.object({
+    update: z.object({
+      set: z.record(z.string(), value),
+      on: z.string().trim().min(1).max(120).optional(),
+    }),
+  }),
   z.object({
     link: z.object({
       to: z.string().trim().min(1).max(64),
@@ -129,7 +135,11 @@ const plain = (one: unknown): unknown =>
       : (one ?? null);
 
 /** A value written by a rule, its formulas computed for the entry (or for nothing). */
-async function valueOf(raw: unknown, scope: EntryView | null, reader: Reader): Promise<unknown> {
+async function valueOf(
+  raw: unknown,
+  scope: EntryView | Scope | null,
+  reader: Reader,
+): Promise<unknown> {
   if (typeof raw !== 'string') return raw;
   const at = scope ?? { get: () => null };
   if (raw.startsWith('=')) return plain(await evaluate(parse(raw.slice(1)), at, reader.clock));
@@ -222,10 +232,29 @@ async function act(
         throw new Error(
           `Rule « ${rule.title} »: « update » needs an entry, and a schedule gives none.`,
         );
-      const data: Record<string, unknown> = {};
-      for (const [name, raw] of Object.entries(action.update.set))
-        data[name] = await valueOf(raw, scope, reader);
-      await call({ entries: [{ id: entryId, data, origin: 'inferred' }] });
+      if (!action.update.on) {
+        const data: Record<string, unknown> = {};
+        for (const [name, raw] of Object.entries(action.update.set))
+          data[name] = await valueOf(raw, scope, reader);
+        await call({ entries: [{ id: entryId, data, origin: 'inferred' }] });
+      } else {
+        // The entries it links to: their own names first, then the entry's (« =stock - quantity »).
+        const reached = [await evaluate(parse(action.update.on), scope!, reader.clock)]
+          .flat()
+          .filter(isScope) as unknown as EntryView[];
+        for (const target of reached) {
+          const both: Scope = {
+            get: async (name) => {
+              const own = await target.get(name);
+              return own !== null && own !== undefined ? own : scope!.get(name);
+            },
+          };
+          const data: Record<string, unknown> = {};
+          for (const [name, raw] of Object.entries(action.update.set))
+            data[name] = await valueOf(raw, both, reader);
+          await call({ entries: [{ id: target.row.id, data, origin: 'inferred' }] });
+        }
+      }
     } else if ('link' in action) {
       if (!entryId)
         throw new Error(
@@ -379,4 +408,43 @@ export async function runDueRules(
     }
   }
   return report;
+}
+
+/**
+ * A button pressed (spec 016): its action on its entry — fields set (« =formula » computed), a rule
+ * run on it (its condition still holds or not), or a script given it. Journaled like any change.
+ */
+export async function press(
+  tx: Tx,
+  actor: Actor,
+  spaceId: string,
+  input: { entryId: string; field: string },
+): Promise<{ pressed: string }> {
+  const reader = await readerOf(tx, spaceId);
+  const [row] = await reader.rowsOf([input.entryId]);
+  if (!row) throw new Error(`No entry ${input.entryId} in this space.`);
+  const field = reader
+    .model(row.kind)
+    ?.fields.find((one) => one.name === input.field && one.type === 'button');
+  if (!field?.action) throw new Error(`« ${input.field} » is not a button of « ${row.kind} ».`);
+  await reader.around([row.id]);
+  const scope = reader.view(row);
+  const by: Actor = { ...actor, client: actor.client ?? `button:${field.name}` };
+  if (field.action.set) {
+    const data: Record<string, unknown> = {};
+    for (const [name, raw] of Object.entries(field.action.set))
+      data[name] = await valueOf(raw, scope, reader);
+    await save(tx, by, spaceId, { entries: [{ id: row.id, data }] });
+  }
+  if (field.action.rule) {
+    const rule = (await rulesOf(tx, spaceId)).find(
+      (one) => fold(one.title) === fold(field.action!.rule!),
+    );
+    if (!rule) throw new Error(`No rule « ${field.action.rule} » in this space.`);
+    await act(tx, by, spaceId, rule, row.id);
+  }
+  if (field.action.script) {
+    await runScript(tx, by, spaceId, { script: field.action.script, entryId: row.id });
+  }
+  return { pressed: field.name };
 }

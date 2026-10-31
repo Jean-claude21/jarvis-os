@@ -12,6 +12,8 @@ import { TIME_FIELDS } from './time';
 
 export const VIEW_KIND = 'View';
 
+export type ViewType = 'table' | 'kanban' | 'calendar' | 'map' | 'gallery' | 'timeline' | 'tree';
+
 export const OPERATORS = [
   'eq',
   'ne',
@@ -32,7 +34,9 @@ const path = z.string().trim().min(1).max(120);
 
 export const viewDataSchema = z.object({
   kind: z.string().trim().min(1).max(80),
-  type: z.enum(['table', 'kanban', 'calendar']).default('table'),
+  type: z
+    .enum(['table', 'kanban', 'calendar', 'map', 'gallery', 'timeline', 'tree'])
+    .default('table'),
   filters: z
     .array(
       z.object({
@@ -54,6 +58,15 @@ export const viewDataSchema = z.object({
   by: path.optional(),
   /** A calendar's day: a date field. */
   date: path.optional(),
+  /** A map's place: a location field. */
+  location: path.optional(),
+  /** A gallery's picture: a file field. */
+  image: path.optional(),
+  /** A timeline's start and end: date or datetime fields (the end may be missing). */
+  start: path.optional(),
+  end: path.optional(),
+  /** A tree's parent: a link to the same kind. */
+  parent: path.optional(),
   app: z.string().trim().min(1).max(60).optional(),
   label: labelSchema.optional(),
   /** The view an app opens first for its kind. */
@@ -188,15 +201,26 @@ function fieldsOf(reader: Reader, kind: string): ViewField[] {
 
 export interface ViewResult {
   kind: string;
-  type: 'table' | 'kanban' | 'calendar';
+  type: ViewType;
   /** What this kind can be shown as, from its model. */
-  types: ('table' | 'kanban' | 'calendar')[];
+  types: ViewType[];
   fields: ViewField[];
   columns: string[];
   rows: Record<string, unknown>[];
   groups?: { name: string; rows: Record<string, unknown>[] }[];
   kanban?: { by: string; columns: { name: string; items: { id: string; title: string }[] }[] };
   calendar?: { date: string; items: { id: string; title: string; day: string }[] };
+  map?: {
+    field: string;
+    items: { id: string; title: string; lat: number; lng: number; address: string | null }[];
+  };
+  gallery?: { field: string; items: { id: string; title: string; file: string | null }[] };
+  timeline?: {
+    start: string;
+    end: string | null;
+    items: { id: string; title: string; start: string; end: string }[];
+  };
+  tree?: { parent: string; rows: (Record<string, unknown> & { depth: number })[] };
   /** Columns that are amounts or numbers, totalled. */
   totals: Record<string, number>;
   truncated: boolean;
@@ -217,13 +241,39 @@ export async function runView(
   const types: ViewResult['types'] = ['table'];
   if (fields.some((field) => field.type === 'choice' && !field.via)) types.push('kanban');
   if (fields.some((field) => ['date', 'datetime'].includes(field.type) && !field.via))
-    types.push('calendar');
+    types.push('calendar', 'timeline');
+  if (fields.some((field) => field.type === 'location' && !field.via)) types.push('map');
+  if (fields.some((field) => field.type === 'file' && !field.via)) types.push('gallery');
+  const selfLink = reader
+    .model(view.kind)
+    ?.fields.find(
+      (field) =>
+        field.type === 'link' &&
+        field.target &&
+        field.target.toLowerCase() === view.kind.toLowerCase(),
+    );
+  if (selfLink) types.push('tree');
 
   const type = types.includes(view.type) ? view.type : 'table';
   const by = view.by ?? fields.find((field) => field.type === 'choice' && !field.via)?.path;
   const date =
     view.date ??
     fields.find((field) => ['date', 'datetime'].includes(field.type) && !field.via)?.path;
+  const own = (types: string[]) =>
+    fields.find((field) => types.includes(field.type) && !field.via)?.path;
+  const location = view.location ?? own(['location']);
+  const image = view.image ?? own(['file']);
+  const start = view.start ?? own(['date', 'datetime']);
+  const end =
+    view.end ??
+    fields.find(
+      (field) =>
+        ['date', 'datetime'].includes(field.type) &&
+        !field.via &&
+        field.path !== start &&
+        /end|fin|until/i.test(field.path),
+    )?.path;
+  const parent = view.parent ?? selfLink?.name;
   const where = view.filters.map((filter) => parse(filterFormula(filter)));
   const rows = await reader.kindRows(view.kind, view.limit ?? 2000);
   await reader.around(rows.map((row) => row.id));
@@ -257,6 +307,10 @@ export async function runView(
         view.groupBy,
         type === 'kanban' ? by : undefined,
         type === 'calendar' ? date : undefined,
+        type === 'map' ? location : undefined,
+        type === 'gallery' ? image : undefined,
+        type === 'timeline' ? start : undefined,
+        type === 'timeline' ? end : undefined,
       ].filter((one): one is string => !!one),
     ),
   ];
@@ -350,8 +404,79 @@ export async function runView(
     });
     result.calendar = { date, items };
   }
+  if (type === 'map' && location) {
+    const items = lines.flatMap((line) => {
+      const place = line[location] as { lat?: unknown; lng?: unknown; address?: unknown } | null;
+      return place && typeof place.lat === 'number' && typeof place.lng === 'number'
+        ? [
+            {
+              id: String(line.id),
+              title: String(line.title),
+              lat: place.lat,
+              lng: place.lng,
+              address: typeof place.address === 'string' ? place.address : null,
+            },
+          ]
+        : [];
+    });
+    result.map = { field: location, items };
+  }
+  if (type === 'gallery' && image) {
+    result.gallery = {
+      field: image,
+      items: lines.map((line) => ({
+        id: String(line.id),
+        title: String(line.title),
+        file:
+          ([line[image]].flat().find((one) => typeof one === 'string') as string | null) ?? null,
+      })),
+    };
+  }
+  if (type === 'timeline' && start) {
+    const items = lines.flatMap((line) => {
+      const from = typeof line[start] === 'string' ? String(line[start]).slice(0, 10) : null;
+      if (!from || !/^\d{4}-\d{2}-\d{2}$/.test(from)) return [];
+      const to = end && typeof line[end] === 'string' ? String(line[end]).slice(0, 10) : from;
+      return [
+        { id: String(line.id), title: String(line.title), start: from, end: to < from ? from : to },
+      ];
+    });
+    items.sort((a, b) => a.start.localeCompare(b.start));
+    result.timeline = { start, end: end ?? null, items };
+  }
+  if (type === 'tree' && parent) {
+    // Each entry under the one its parent link names; those without a parent at the top.
+    const parentOf = new Map<string, string | null>();
+    for (const one of matching) {
+      const up = await one.get(parent);
+      parentOf.set(one.row.id, isScopeLike(up) ? up.row.id : null);
+    }
+    const byId = new Map(lines.map((line) => [String(line.id), line]));
+    const children = new Map<string | null, Record<string, unknown>[]>();
+    for (const line of lines) {
+      const up = parentOf.get(String(line.id)) ?? null;
+      const key = up && byId.has(up) ? up : null;
+      children.set(key, [...(children.get(key) ?? []), line]);
+    }
+    const rows: (Record<string, unknown> & { depth: number })[] = [];
+    const walk = (key: string | null, depth: number) => {
+      for (const line of children.get(key) ?? []) {
+        if (rows.length > 1000 || depth > 12) return;
+        rows.push({ ...line, depth });
+        walk(String(line.id), depth + 1);
+      }
+    };
+    walk(null, 0);
+    result.tree = { parent, rows };
+  }
   return result;
 }
+
+const isScopeLike = (value: unknown): value is EntryView =>
+  !!value &&
+  typeof value === 'object' &&
+  'row' in value &&
+  typeof (value as EntryView).get === 'function';
 
 /** The views kept in a space (of one kind, of one app). */
 export async function viewsOf(

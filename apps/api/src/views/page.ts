@@ -11,6 +11,10 @@ a { color: var(--primary); text-decoration: none; } a:hover { text-decoration: u
 .filters { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
 .filters label { display: flex; gap: 6px; align-items: center; }
 input, select { font: inherit; padding: 6px 8px; border: 1px solid var(--rule-strong); border-radius: 2px; background: var(--paper); color: var(--ink); }
+.tl { display: grid; gap: 4px; } .tl-row { display: grid; grid-template-columns: minmax(110px, 28%) 1fr; gap: 10px; align-items: center; }
+.tl-track { position: relative; height: 18px; background: var(--sand); } .tl-bar { position: absolute; top: 3px; bottom: 3px; background: var(--ink); border-radius: 2px; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; } .gcard { border: 1px solid var(--rule); color: var(--ink); text-decoration: none; }
+.gimg { aspect-ratio: 4 / 3; background: var(--clay); display: grid; place-items: center; font: 700 22px Archivo, sans-serif; color: var(--bark); } .gmeta { padding: 6px 8px; font-weight: 600; }
 .delta.up { color: var(--error); } .delta.down { color: var(--success); }
 .bars { display: grid; gap: 7px; }
 .bar { display: grid; grid-template-columns: minmax(70px, 34%) 1fr auto; gap: 10px; align-items: center; }
@@ -101,12 +105,46 @@ const draw = {
   breakdown: (b) => { const total = b.points.reduce((t, p) => t + Math.max(0, p.value), 0) || 1;
     return card(b, b.points.length ? '<div class="share">' + b.points.map((p, i) => '<span style="flex:' + Math.max(0, p.value) + ';background:' + SERIES[i % SERIES.length] + '"></span>').join('') + '</div><div class="legend">' +
       b.points.map((p, i) => '<span><i style="background:' + SERIES[i % SERIES.length] + '"></i>' + fmt(b.groupField ? optionLabel(b.kind, b.groupField, p.label) : p.label) + ' ' + Math.round(Math.max(0, p.value) / total * 100) + ' %</span>').join('') + '</div>' : '<p class="empty">' + esc(words.empty) + '</p>', true); },
-  line: (b) => { const v = b.points.map((p) => p.value); if (v.length < 2) return draw.bar(b);
-    const lo = Math.min(...v), hi = Math.max(...v), pad = (hi - lo) * 0.15 || Math.abs(hi) * 0.1 || 1, min = lo - pad, span = hi + pad - min;
-    const W = 600, H = 180, px = (i) => 10 + i * (W - 20) / (v.length - 1), py = (x) => 12 + (1 - (x - min) / span) * (H - 36);
-    return card(b, '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + esc(b.title || '') + '"><polyline fill="none" stroke="var(--primary)" stroke-width="2.5" points="' + v.map((x, i) => px(i).toFixed(1) + ',' + py(x).toFixed(1)).join(' ') + '"/>' +
-      v.map((x, i) => '<circle cx="' + px(i) + '" cy="' + py(x) + '" r="3.5" fill="var(--primary)"><title>' + esc(b.points[i].label) + ' : ' + fmt(x) + '</title></circle>').join('') +
-      '<text x="10" y="' + (H - 6) + '">' + esc(b.points[0].label) + '</text><text x="' + (W - 10) + '" y="' + (H - 6) + '" text-anchor="end">' + esc(b.points[v.length - 1].label) + '</text></svg>', true); },
+  line: (b) => {
+    // Several series when the query gives several numbers (spec 016): entrées and sorties side by side.
+    const series = b.series && b.series.length ? b.series : [{ name: '', points: b.points }];
+    const labels = series[0].points.map((p) => p.label);
+    if (labels.length < 2) return draw.bar(b);
+    const all = series.flatMap((s) => s.points.map((p) => p.value));
+    const lo = Math.min(...all), hi = Math.max(...all), pad = (hi - lo) * 0.15 || Math.abs(hi) * 0.1 || 1, min = lo - pad, span = hi + pad - min;
+    const W = 600, H = 180, px = (i) => 10 + i * (W - 20) / (labels.length - 1), py = (x) => 12 + (1 - (x - min) / span) * (H - 36);
+    const lines = series.map((s, n) => '<polyline fill="none" stroke="' + SERIES[n % SERIES.length] + '" stroke-width="2.5" points="' + s.points.map((p, i) => px(i).toFixed(1) + ',' + py(p.value).toFixed(1)).join(' ') + '"/>' +
+      s.points.map((p, i) => '<circle cx="' + px(i) + '" cy="' + py(p.value) + '" r="3" fill="' + SERIES[n % SERIES.length] + '"><title>' + esc((s.name ? s.name + ' · ' : '') + p.label) + ' : ' + fmt(p.value) + '</title></circle>').join('')).join('');
+    return card(b, '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%" role="img" aria-label="' + esc(tr(b.title) || '') + '">' + lines +
+      '<text x="10" y="' + (H - 6) + '">' + esc(labels[0]) + '</text><text x="' + (W - 10) + '" y="' + (H - 6) + '" text-anchor="end">' + esc(labels[labels.length - 1]) + '</text></svg>' +
+      (series.length > 1 ? '<div class="legend">' + series.map((s, n) => '<span><i style="background:' + SERIES[n % SERIES.length] + '"></i>' + esc(fieldLabel(b.kind, s.name)) + '</span>').join('') + '</div>' : ''), true);
+  },
+  view: (b) => {
+    // A view inside a page (spec 016).
+    const r = b.result;
+    const head = (cols) => cols.map((c) => c === 'title' ? words.titleCol : fieldLabel(b.kind, c));
+    if (r.type === 'kanban') return draw.kanban({ title: b.title, kind: b.kind, by: r.kanban.by, columns: r.kanban.columns });
+    if (r.type === 'calendar' || r.type === 'timeline') {
+      const items = r.type === 'calendar' ? r.calendar.items.map((i) => ({ id: i.id, title: i.title, start: i.day, end: i.day })) : r.timeline.items;
+      if (!items.length) return card(b, '<p class="empty">' + esc(words.empty) + '</p>', true);
+      const dayN = (d) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) / 86400000;
+      const lo = Math.min(...items.map((i) => dayN(i.start))), hi = Math.max(...items.map((i) => dayN(i.end))) + 1, span = Math.max(1, hi - lo);
+      const pct = (n) => ((n - lo) / span) * 100;
+      return card(b, '<div class="tl">' + items.map((i) => '<div class="tl-row"><a href="#" data-open="' + esc(i.id) + '">' + esc(i.title) + '</a><div class="tl-track"><span class="tl-bar" title="' + esc(i.start + ' → ' + i.end) + '" style="left:' + pct(dayN(i.start)) + '%;width:' + Math.max(0.8, pct(dayN(i.end) + 1) - pct(dayN(i.start))) + '%"></span></div></div>').join('') + '</div><div class="muted" style="margin-top:6px">' + esc(items[0].start + ' → ' + new Date((hi - 1) * 86400000).toISOString().slice(0, 10)) + '</div>', true);
+    }
+    if (r.type === 'map') {
+      const pts = r.map.items;
+      if (!pts.length) return card(b, '<p class="empty">' + esc(words.empty) + '</p>', true);
+      const lats = pts.map((p) => p.lat), lngs = pts.map((p) => p.lng);
+      const la0 = Math.min(...lats), la1 = Math.max(...lats), lo0 = Math.min(...lngs), lo1 = Math.max(...lngs);
+      const x = (lng) => 30 + ((lng - lo0) / ((lo1 - lo0) || 1)) * 540, y = (lat) => 20 + (1 - (lat - la0) / ((la1 - la0) || 1)) * 200;
+      return card(b, '<svg viewBox="0 0 600 240" width="100%" role="img" aria-label="' + esc(tr(b.title) || '') + '"><rect width="600" height="240" fill="var(--clay)"/>' +
+        pts.map((p) => '<g><circle cx="' + x(p.lng) + '" cy="' + y(p.lat) + '" r="6" fill="var(--primary)"/><text x="' + (x(p.lng) + 9) + '" y="' + (y(p.lat) + 4) + '" fill="var(--ink)">' + esc(p.title) + '</text></g>').join('') + '</svg>', true);
+    }
+    if (r.type === 'gallery') return card(b, '<div class="gallery">' + r.gallery.items.map((i) => '<a href="#" data-open="' + esc(i.id) + '" class="gcard"><div class="gimg"><span>' + esc(i.title.slice(0, 2).toUpperCase()) + '</span></div><div class="gmeta">' + esc(i.title) + '</div></a>').join('') + '</div>', true);
+    const rows = r.type === 'tree' ? r.tree.rows.map((row) => Object.assign({}, row, { title: '\u00a0'.repeat(row.depth * 4) + (row.depth ? '└ ' : '') + row.title })) : r.rows;
+    return card(b, table(r.columns, rows, '', b.kind), true);
+  },
   heatmap: (b) => card(b, '<div class="heat">' + b.cells.map((c) => '<span class="' + (c.done ? 'on' : '') + '" title="' + esc(c.day) + '"></span>').join('') + '</div><div class="muted" style="margin-top:6px">' + esc(say(words.daysDone, { n: b.done, of: b.cells.length })) + '</div>'),
   table: (b) => card(b, table(b.columns, b.rows, (b.total ? '<tr class="total">' + b.columns.map((c, i) => '<td class="' + (c === b.total ? 'n num' : '') + '">' + (i === 0 ? esc(words.total) : c === b.total ? fmt(b.totalValue) : '') + '</td>').join('') + '</tr>' : ''), b.kind), true),
   task_list: (b) => card(b, b.items.length ? b.items.map((t) => '<div class="task"><span><a href="#" data-open="' + esc(t.id) + '">' + esc(t.title) + '</a>' + (t.detail != null ? ' <span class="muted">· ' + fmt(t.detail) + '</span>' : '') + '</span><button class="quiet" data-set="' + esc(t.id) + '" data-block="' + current.blocks.indexOf(b) + '">' + esc(b.action.label) + '</button></div>').join('') : '<p class="empty">' + esc(words.allDone) + '</p>'),

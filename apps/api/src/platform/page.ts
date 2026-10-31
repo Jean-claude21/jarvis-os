@@ -167,6 +167,33 @@ body { background: var(--clay); }
 .toast { position: fixed; left: 50%; bottom: 20px; transform: translate(-50%, 120px); opacity: 0; transition: .2s; background: var(--ink); color: var(--paper); padding: 10px 14px; border-radius: 2px; display: flex; gap: 14px; align-items: center; z-index: 30; font-size: 13px; max-width: calc(100vw - 32px); }
 .toast.show { transform: translate(-50%, 0); opacity: 1; }
 .toast button { background: none; border: 0; color: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; padding: 0; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin: 6px 0 14px; }
+.kpi-card { background: var(--paper); border: 1px solid var(--rule); border-radius: 2px; padding: 12px 14px; min-width: 0; }
+.kpi-card .kpi { margin-top: 6px; } .kpi-card small { font-size: 13px; color: var(--bark); }
+.stack { display: flex; height: 10px; gap: 2px; margin-top: 10px; border-radius: 1px; overflow: hidden; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 8px; font-size: 12px; color: var(--bark); }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 1px; margin-right: 4px; vertical-align: -1px; }
+.kpi-card .spark { display: flex; align-items: flex-end; gap: 3px; height: 38px; margin-top: 10px; }
+.kpi-card .spark span { flex: 1; background: var(--ink); border-radius: 1px 1px 0 0; }
+.tag { display: inline-block; padding: 1px 7px; border-radius: 2px; font-size: 12px; margin: 1px 3px 1px 0; background: var(--clay); }
+.stars { color: var(--ochre); letter-spacing: 1px; white-space: nowrap; } .stars .off { color: var(--rule-strong); }
+.pbar { height: 6px; background: var(--clay); border-radius: 1px; overflow: hidden; min-width: 70px; } .pbar i { display: block; height: 100%; background: var(--ink); }
+.vmap { height: 420px; border: 1px solid var(--rule); background: var(--clay); }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.gcard { display: block; background: var(--paper); border: 1px solid var(--rule); color: var(--ink); text-decoration: none; }
+.gimg { position: relative; aspect-ratio: 4 / 3; background: var(--clay); display: grid; place-items: center; overflow: hidden; }
+.gimg span { font: 700 26px Archivo, sans-serif; color: var(--bark); } .gimg img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.gmeta { padding: 8px 10px; font-weight: 600; }
+.tl { display: grid; gap: 4px; overflow-x: auto; }
+.tl-head, .tl-row { display: grid; grid-template-columns: minmax(120px, 22%) 1fr; gap: 10px; align-items: center; min-width: 560px; }
+.tl-scale { position: relative; height: 20px; border-bottom: 1px solid var(--rule-strong); }
+.tl-scale span { position: absolute; top: 0; font-size: 11px; color: var(--bark); white-space: nowrap; }
+.tl-now { position: absolute; top: 0; bottom: -400px; width: 2px; background: var(--primary); opacity: 0.6; }
+.tl-track { position: relative; height: 22px; background: var(--sand); }
+.tl-bar { position: absolute; top: 3px; bottom: 3px; background: var(--ink); border-radius: 2px; }
+.checks { display: grid; gap: 2px; } .loc { display: grid; grid-template-columns: 1fr 90px 90px auto; gap: 6px; }
+button.mini { padding: 4px 8px; font-size: 12px; }
+@media (max-width: 640px) { .loc { grid-template-columns: 1fr 1fr; } .vmap { height: 320px; } }
 .vbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
 .vbar .grow { flex: 1; }
 .vbar .vsel { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--bark); }
@@ -367,6 +394,133 @@ function dayBand(occ, focus) {
     (n >= from && n <= to ? '<div class="nowl" style="left:' + pct(n) + '%"></div>' : '') + '</div></div></section>';
 }
 
+// Her views (specs 015, 016): the entries of a kind, filtered, sorted, as a table, a kanban, a
+// calendar, a map, a gallery, a timeline or a tree. Shared by an app and a collection opened alone.
+async function explore(key, st, ctx) {
+  const r = await api(inSpace('/views/run'), { method: 'POST', body: { id: st.id || undefined, view: st.view } });
+  explorerNow = { key, st, r, name: ctx.app, kind: ctx.kind, model: ctx.model };
+  const fieldAt = (path) => r.fields.find((x) => x.path === path);
+  const fl = (path) => {
+    const f = fieldAt(path);
+    if (path === 'title') return W.title;
+    if (!f) return path;
+    if (f.via && path.indexOf('.') > 0) {
+      const link = fieldAt(path.split('.')[0]);
+      const head = link && link.label ? tr(link.label) : path.split('.')[0];
+      return path.endsWith('.title') ? head : head + ' › ' + (f.label ? tr(f.label) : path.split('.').slice(1).join('.'));
+    }
+    return f.label ? tr(f.label) : path;
+  };
+  const ol = (path, v) => { const f = fieldAt(path); return f && f.optionLabels && typeof v === 'string' && f.optionLabels[v] ? tr(f.optionLabels[v]) : v; };
+  const show = (path, v, row) => {
+    const f = fieldAt(path) || {};
+    if (f.type === 'button') return '<button class="quiet mini" data-press="' + esc(path) + '" data-id="' + esc(row.id) + '">' + esc(fl(path)) + '</button>';
+    if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) return '<span class="muted">—</span>';
+    switch (f.type) {
+      case 'url': return '<a class="link" target="_blank" rel="noopener" href="' + esc(v) + '">' + esc(String(v).replace(/^https?:\\/\\//, '').split('/')[0]) + ' ↗</a>';
+      case 'email': return '<a class="link" href="mailto:' + esc(v) + '">' + esc(v) + '</a>';
+      case 'phone': return '<a class="link" href="tel:' + esc(String(v).replace(/[^+\\d]/g, '')) + '">' + esc(v) + '</a>';
+      case 'multi_choice': case 'list': return [v].flat().map((one) => '<span class="tag">' + esc(ol(path, one)) + '</span>').join('');
+      case 'rating': return '<span class="stars">' + '★'.repeat(v) + '<span class="off">' + '★'.repeat(Math.max(0, (typeof f.max === 'number' ? f.max : 5) - v)) + '</span></span>';
+      case 'progress': return '<div class="pbar" title="' + esc(v) + ' %"><i style="width:' + Math.max(0, Math.min(100, v)) + '%"></i></div>';
+      case 'file': return [v].flat().map((one) => '<a class="link" href="#" data-file="' + esc(one) + '">' + esc(W.fileShort) + '</a>').join(' ');
+      case 'location': return '<a class="link" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=' + esc(v.lat) + '&mlon=' + esc(v.lng) + '#map=15/' + esc(v.lat) + '/' + esc(v.lng) + '">' + esc(v.address || (v.lat.toFixed(3) + ', ' + v.lng.toFixed(3))) + ' ↗</a>';
+      case 'long_text': return '<span class="muted">' + esc(String(v).slice(0, 80)) + (String(v).length > 80 ? '…' : '') + '</span>';
+    }
+    if (typeof v === 'number') return '<span class="num ' + (v < 0 ? 'neg' : '') + '">' + esc(num(v)) + '</span>';
+    if (typeof v === 'boolean') return v ? '✓' : '—';
+    if (typeof v === 'object' && !Array.isArray(v)) return '<span class="muted">' + esc(v.address || JSON.stringify(v)) + '</span>';
+    return esc(Array.isArray(v) ? v.join(', ') : ol(path, v));
+  };
+  const v = r.view;
+  const isNum = (c) => c in r.totals || r.rows.some((row) => typeof row[c] === 'number');
+  const types = '<div class="seg">' + r.types.map((t) => '<button class="' + (t === r.type ? 'on' : 'quiet') + '" data-vtype="' + t + '">' + esc(W['vt_' + t]) + '</button>').join('') + '</div>';
+  const chips = v.filters.map((f, i) => '<span class="chip">' + esc(fl(f.field)) + ' <small>' + esc(W['op_' + f.op]) + '</small> ' + (['empty', 'not_empty', 'this_month'].includes(f.op) ? '' : esc(ol(f.field, f.value))) + ' <button class="x" data-vdel="' + i + '" aria-label="' + esc(W.remove) + '">✕</button></span>').join('');
+  const sortField = v.sort[0] ? v.sort[0].field : '';
+  const options = (sel, withNone) => (withNone ? '<option value="">' + esc(W.none) + '</option>' : '') + r.fields.filter((f) => !(f.via && f.path.endsWith('.title')) && f.type !== 'button').map((f) => '<option value="' + esc(f.path) + '"' + (f.path === sel ? ' selected' : '') + '>' + esc(fl(f.path)) + '</option>').join('');
+  const bar = '<div class="vbar">' + types +
+    '<button class="quiet" data-vfilter>+ ' + esc(W.filter) + '</button>' + chips +
+    '<label class="vsel">' + esc(W.sortBy) + ' <select data-vsort>' + options(sortField, true) + '</select></label>' +
+    (sortField ? '<button class="quiet" data-vdir>' + (v.sort[0].desc ? '↓' : '↑') + '</button>' : '') +
+    (r.type === 'table' ? '<label class="vsel">' + esc(W.groupBy) + ' <select data-vgroup>' + options(v.groupBy || '', true) + '</select></label><button class="quiet" data-vcols>' + esc(W.columns) + '</button>' : '') +
+    '<span class="grow"></span>' +
+    (st.id ? '<button class="quiet" data-vupdate>' + esc(W.updateView) + '</button>' : '') + '<button class="quiet" data-vsave>' + esc(W.saveView) + '</button></div>';
+  const cols = r.columns;
+  const line = (row, depth) => '<tr data-go="#/entree/' + esc(row.id) + '">' + cols.map((c) => '<td class="' + (isNum(c) ? 'n' : '') + '">' + (c === 'title' ? '<span style="padding-left:' + ((depth || 0) * 18) + 'px">' + (depth ? '└ ' : '') + esc(row.title) + '</span>' : show(c, row[c], row)) + '</td>').join('') + '</tr>';
+  const head = '<tr>' + cols.map((c) => '<th class="sortable ' + (isNum(c) ? 'n' : '') + '" data-vhead="' + esc(c) + '">' + esc(fl(c)) + (c === sortField ? (v.sort[0].desc ? ' ↓' : ' ↑') : '') + '</th>').join('') + '</tr>';
+  let body = '';
+  if (r.type === 'table' || r.type === 'tree') {
+    const total = (rows, label) => Object.keys(r.totals).length ? '<tr class="total">' + cols.map((c, i) => '<td class="' + (isNum(c) ? 'n num' : '') + '">' + (i === 0 ? esc(label) : c in r.totals ? esc(num(rows.reduce((t, x) => t + (typeof x[c] === 'number' ? x[c] : 0), 0))) : '') + '</td>').join('') + '</tr>' : '';
+    const rowsHtml = r.type === 'tree' ? r.tree.rows.map((row) => line(row, row.depth)).join('')
+      : r.groups ? r.groups.map((g) => '<tr class="group"><td colspan="' + cols.length + '">' + esc(ol(v.groupBy, g.name)) + ' · ' + g.rows.length + '</td></tr>' + g.rows.map((row) => line(row)).join('') + total(g.rows, say(W.subtotal, { group: ol(v.groupBy, g.name) }))).join('')
+      : r.rows.map((row) => line(row)).join('');
+    body = r.rows.length ? '<div class="scroll"><table class="rows"><thead>' + head + '</thead><tbody>' + rowsHtml + (r.type === 'table' ? total(r.rows, W.total) : '') + '</tbody></table></div>' + (r.truncated ? '<p class="muted">' + esc(W.more) + '</p>' : '') : empty();
+  } else if (r.type === 'kanban') {
+    body = '<div class="kanban">' + r.kanban.columns.map((c) => '<div class="kcol" data-vdrop="' + esc(c.name) + '"><div class="caps">' + esc(ol(r.kanban.by, c.name)) + ' · ' + c.items.length + '</div>' +
+      c.items.map((i) => '<a class="kcard" draggable="true" data-vcard="' + esc(i.id) + '" href="#/entree/' + esc(i.id) + '">' + esc(i.title) + '</a>').join('') + '</div>').join('') + '</div><p class="muted">' + esc(W.dragHint) + '</p>';
+  } else if (r.type === 'calendar') {
+    const [y, m] = st.month.split('-').map(Number);
+    const first = new Date(Date.UTC(y, m - 1, 1));
+    const lead = (first.getUTCDay() + 6) % 7;
+    const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const cells = [];
+    for (let i = 0; i < lead; i++) cells.push('<div class="cday off"></div>');
+    for (let d = 1; d <= days; d++) {
+      const day = st.month + '-' + String(d).padStart(2, '0');
+      const items = r.calendar.items.filter((i) => i.day === day);
+      cells.push('<div class="cday' + (day === new Date().toISOString().slice(0, 10) ? ' today' : '') + '"><span class="num muted">' + d + '</span>' + items.map((i) => '<a class="cev" href="#/entree/' + esc(i.id) + '">' + esc(i.title) + '</a>').join('') + '</div>');
+    }
+    body = '<div class="vbar"><button class="quiet" data-vmonth="-1">←</button><b>' + esc(first.toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })) + '</b><button class="quiet" data-vmonth="1">→</button></div>' +
+      '<div class="cal">' + W.weekdays.split(',').map((d) => '<div class="caps">' + esc(d) + '</div>').join('') + cells.join('') + '</div>';
+  } else if (r.type === 'map') {
+    body = r.map.items.length ? '<div id="vmap" class="vmap"></div><p class="muted">' + esc(say(W.mapCount, { n: r.map.items.length, of: r.rows.length })) + '</p>' : empty(W.mapEmpty);
+  } else if (r.type === 'gallery') {
+    body = '<div class="gallery">' + r.gallery.items.map((i) => '<a class="gcard" href="#/entree/' + esc(i.id) + '"><div class="gimg">' + (i.file ? '<img alt="" loading="lazy" src="/api/files/' + esc(encodeURIComponent(i.file)) + '?space=' + esc(encodeURIComponent(space)) + '" onerror="this.remove()">' : '') + '<span>' + esc(i.title.slice(0, 2).toUpperCase()) + '</span></div><div class="gmeta">' + esc(i.title) + '</div></a>').join('') + '</div>';
+  } else if (r.type === 'timeline') {
+    const items = r.timeline.items;
+    if (!items.length) body = empty();
+    else {
+      const dayN = (d) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10)) / 86400000;
+      const lo = Math.min(...items.map((i) => dayN(i.start))), hi = Math.max(...items.map((i) => dayN(i.end))) + 1;
+      const span = Math.max(1, hi - lo);
+      const pct = (n) => ((n - lo) / span) * 100;
+      const months = [];
+      for (let n = lo; n < hi; n++) { const d = new Date(n * 86400000); if (d.getUTCDate() === 1 || n === lo) months.push('<span style="left:' + pct(n) + '%">' + esc(d.toLocaleDateString(locale, { month: 'short', year: '2-digit', timeZone: 'UTC' })) + '</span>'); }
+      const today = dayN(new Date().toISOString().slice(0, 10));
+      body = '<div class="tl"><div class="tl-head"><span></span><div class="tl-scale">' + months.join('') + (today >= lo && today < hi ? '<i class="tl-now" style="left:' + pct(today) + '%"></i>' : '') + '</div></div>' +
+        items.map((i) => '<div class="tl-row"><a class="link" href="#/entree/' + esc(i.id) + '">' + esc(i.title) + '</a><div class="tl-track"><a class="tl-bar" href="#/entree/' + esc(i.id) + '" title="' + esc(i.start + ' → ' + i.end) + '" style="left:' + pct(dayN(i.start)) + '%;width:' + Math.max(0.8, pct(dayN(i.end) + 1) - pct(dayN(i.start))) + '%"></a></div></div>').join('') + '</div>';
+    }
+  }
+  return { r, html: bar + body };
+}
+
+// The map of a view: OpenStreetMap tiles through Leaflet, loaded the first time a map is opened.
+let leaflet = null;
+function ensureLeaflet() {
+  if (leaflet) return leaflet;
+  leaflet = new Promise((resolve, reject) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet'; css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+    const js = document.createElement('script');
+    js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    js.onload = () => resolve(window.L); js.onerror = reject;
+    document.head.appendChild(js);
+  });
+  return leaflet;
+}
+async function drawMap() {
+  const el = document.getElementById('vmap');
+  if (!el || !explorerNow || !explorerNow.r.map) return;
+  const L = await ensureLeaflet();
+  const map = L.map(el, { scrollWheelZoom: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
+  const items = explorerNow.r.map.items;
+  const marks = items.map((i) => L.circleMarker([i.lat, i.lng], { radius: 7, color: '#b83a1b', weight: 2, fillOpacity: 0.8 })
+    .bindPopup('<b>' + esc(i.title) + '</b>' + (i.address ? '<br>' + esc(i.address) : '') + '<br><a href="#/entree/' + esc(i.id) + '">' + esc(W.open) + ' →</a>').addTo(map));
+  map.fitBounds(L.featureGroup(marks).getBounds().pad(0.2), { maxZoom: 14 });
+}
+
 // Pages, by the hash: #/vie?kind=…, #/entree/<id>, …
 const pages = {
   // « Maintenant » (spec 013): what needs her, the chosen thing, her day, what she can do.
@@ -441,68 +595,10 @@ const pages = {
     const fallback = !saved && !params.get('kind') ? null : views.find((v) => v.kind === current.kind && v.default);
     const key = saved ? 'v:' + saved.id : 'k:' + current.kind;
     const st = explorers[key] || (explorers[key] = { id: saved ? saved.id : fallback ? fallback.id : null, view: saved || fallback ? {} : { kind: current.kind }, month: new Date().toISOString().slice(0, 7) });
-    const r = await api(inSpace('/views/run'), { method: 'POST', body: { id: st.id || undefined, view: st.view } });
-    explorerNow = { key, st, r, name, kind: current.kind, model: current.model };
-    const fl = (path) => {
-      const f = r.fields.find((x) => x.path === path);
-      if (path === 'title') return W.title;
-      if (!f) return path;
-      if (f.via && path.indexOf('.') > 0) {
-        const link = r.fields.find((x) => x.path === path.split('.')[0]);
-        const head = link && link.label ? tr(link.label) : path.split('.')[0];
-        return path.endsWith('.title') ? head : head + ' › ' + (f.label ? tr(f.label) : path.split('.').slice(1).join('.'));
-      }
-      return f.label ? tr(f.label) : path;
-    };
-    const ol = (path, v) => { const f = r.fields.find((x) => x.path === path); return f && f.optionLabels && typeof v === 'string' && f.optionLabels[v] ? tr(f.optionLabels[v]) : v; };
-    const show = (path, v) => {
-      if (v === undefined || v === null || v === '') return '<span class="muted">—</span>';
-      if (typeof v === 'number') return '<span class="num ' + (v < 0 ? 'neg' : '') + '">' + esc(num(v)) + '</span>';
-      if (typeof v === 'boolean') return v ? '✓' : '—';
-      return esc(Array.isArray(v) ? v.join(', ') : ol(path, v));
-    };
-    const v = r.view;
-    const isNum = (c) => c in r.totals || r.rows.some((row) => typeof row[c] === 'number');
-    const types = '<div class="seg">' + r.types.map((t) => '<button class="' + (t === r.type ? 'on' : 'quiet') + '" data-vtype="' + t + '">' + esc(W['vt_' + t]) + '</button>').join('') + '</div>';
-    const chips = v.filters.map((f, i) => '<span class="chip">' + esc(fl(f.field)) + ' <small>' + esc(W['op_' + f.op]) + '</small> ' + (['empty', 'not_empty', 'this_month'].includes(f.op) ? '' : esc(ol(f.field, f.value))) + ' <button class="x" data-vdel="' + i + '" aria-label="' + esc(W.remove) + '">✕</button></span>').join('');
-    const sortField = v.sort[0] ? v.sort[0].field : '';
-    const options = (sel, withNone) => (withNone ? '<option value="">' + esc(W.none) + '</option>' : '') + r.fields.filter((f) => !(f.via && f.path.endsWith('.title'))).map((f) => '<option value="' + esc(f.path) + '"' + (f.path === sel ? ' selected' : '') + '>' + esc(fl(f.path)) + '</option>').join('');
-    const bar = '<div class="vbar">' + types +
-      '<button class="quiet" data-vfilter>+ ' + esc(W.filter) + '</button>' + chips +
-      '<label class="vsel">' + esc(W.sortBy) + ' <select data-vsort>' + options(sortField, true) + '</select></label>' +
-      (sortField ? '<button class="quiet" data-vdir>' + (v.sort[0].desc ? '↓' : '↑') + '</button>' : '') +
-      (r.type === 'table' ? '<label class="vsel">' + esc(W.groupBy) + ' <select data-vgroup>' + options(v.groupBy || '', true) + '</select></label><button class="quiet" data-vcols>' + esc(W.columns) + '</button>' : '') +
-      '<span class="grow"></span>' +
-      (st.id ? '<button class="quiet" data-vupdate>' + esc(W.updateView) + '</button>' : '') + '<button class="quiet" data-vsave>' + esc(W.saveView) + '</button></div>';
-    let body = '';
-    if (r.type === 'table') {
-      const cols = r.columns;
-      const head = '<tr>' + cols.map((c) => '<th class="sortable ' + (isNum(c) ? 'n' : '') + '" data-vhead="' + esc(c) + '">' + esc(fl(c)) + (c === sortField ? (v.sort[0].desc ? ' ↓' : ' ↑') : '') + '</th>').join('') + '</tr>';
-      const line = (row) => '<tr data-go="#/entree/' + esc(row.id) + '">' + cols.map((c) => '<td class="' + (isNum(c) ? 'n' : '') + '">' + (c === 'title' ? esc(row.title) : show(c, row[c])) + '</td>').join('') + '</tr>';
-      const total = (rows, label) => Object.keys(r.totals).length ? '<tr class="total">' + cols.map((c, i) => '<td class="' + (isNum(c) ? 'n num' : '') + '">' + (i === 0 ? esc(label) : c in r.totals ? esc(num(rows.reduce((t, x) => t + (typeof x[c] === 'number' ? x[c] : 0), 0))) : '') + '</td>').join('') + '</tr>' : '';
-      const rowsHtml = r.groups ? r.groups.map((g) => '<tr class="group"><td colspan="' + cols.length + '">' + esc(ol(v.groupBy, g.name)) + ' · ' + g.rows.length + '</td></tr>' + g.rows.map(line).join('') + total(g.rows, say(W.subtotal, { group: ol(v.groupBy, g.name) }))).join('') : r.rows.map(line).join('');
-      body = r.rows.length ? '<div class="scroll"><table class="rows"><thead>' + head + '</thead><tbody>' + rowsHtml + total(r.rows, W.total) + '</tbody></table></div>' + (r.truncated ? '<p class="muted">' + esc(W.more) + '</p>' : '') : empty();
-    } else if (r.type === 'kanban') {
-      body = '<div class="kanban">' + r.kanban.columns.map((c) => '<div class="kcol" data-vdrop="' + esc(c.name) + '"><div class="caps">' + esc(ol(r.kanban.by, c.name)) + ' · ' + c.items.length + '</div>' +
-        c.items.map((i) => '<a class="kcard" draggable="true" data-vcard="' + esc(i.id) + '" href="#/entree/' + esc(i.id) + '">' + esc(i.title) + '</a>').join('') + '</div>').join('') + '</div><p class="muted">' + esc(W.dragHint) + '</p>';
-    } else {
-      const [y, m] = st.month.split('-').map(Number);
-      const first = new Date(Date.UTC(y, m - 1, 1));
-      const lead = (first.getUTCDay() + 6) % 7;
-      const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
-      const cells = [];
-      for (let i = 0; i < lead; i++) cells.push('<div class="cday off"></div>');
-      for (let d = 1; d <= days; d++) {
-        const day = st.month + '-' + String(d).padStart(2, '0');
-        const items = r.calendar.items.filter((i) => i.day === day);
-        cells.push('<div class="cday' + (day === new Date().toISOString().slice(0, 10) ? ' today' : '') + '"><span class="num muted">' + d + '</span>' + items.map((i) => '<a class="cev" href="#/entree/' + esc(i.id) + '">' + esc(i.title) + '</a>').join('') + '</div>');
-      }
-      body = '<div class="vbar"><button class="quiet" data-vmonth="-1">←</button><b>' + esc(first.toLocaleDateString(locale, { month: 'long', year: 'numeric', timeZone: 'UTC' })) + '</b><button class="quiet" data-vmonth="1">→</button></div>' +
-        '<div class="cal">' + W.weekdays.split(',').map((d) => '<div class="caps">' + esc(d) + '</div>').join('') + cells.join('') + '</div>';
-    }
+    const { r, html } = await explore(key, st, { app: name, kind: current.kind, model: current.model });
     const tabs = '<nav class="tabs">' + pageTabs + kindTabs(saved ? null : current.kind) + viewTabs(saved ? saved.id : null) + '</nav>';
     return '<div class="head"><div><p class="lead" style="margin:0">' + esc(saved ? tr(saved.label) || saved.title : kindLabel(current)) + ' · ' + r.rows.length + '</p></div><div class="actions"><button class="quiet" data-model="' + esc(current.kind) + '">' + esc(W.seeModel) + '</button><button data-add="' + esc(current.kind) + '">' + esc(say(W.addOne, { kind: kindLabel(current) })) + '</button></div></div>' + tabs +
-      card('', bar + body, true);
+      card('', html, true);
   },
 
   // Her files (spec 013): what each is, what Jarvis read of it, what it is linked to.
@@ -543,6 +639,49 @@ const pages = {
         return '<li><span>' + esc(what) + ' <span class="muted">' + esc(said(r.command)) + ' · ' + esc(r.space) + '</span></span><span class="muted">' + esc(time(r.at)) + '</span></li>';
       }).join('') + '</ul>' : empty()) +
       '</section>';
+  },
+
+  // Her collections (spec 016): every kind with a model, opened on its own, its statistics on top.
+  async collections (params, kind) {
+    if (!kind) {
+      const list = await api(inSpace('/collections'));
+      if (!list.length) return '<p class="lead">' + esc(W.collectionsLead) + '</p>' + card('', empty(W.noCollections), true);
+      const groups = {};
+      for (const c of list) (groups[c.area || ''] = groups[c.area || ''] || []).push(c);
+      const names = Object.keys(groups).sort((x, y) => (x === '') - (y === '') || x.localeCompare(y));
+      return '<p class="lead">' + esc(W.collectionsLead) + '</p>' + names.map((n) => '<h2 style="margin:18px 0 8px">' + esc(n || W.unfiled) + '</h2><section class="grid">' +
+        groups[n].map((c) => card(tr(c.label) || c.kind, '<div class="kpi">' + num(c.count) + '</div><p class="muted">' + esc(c.app ? say(W.inApp, { app: c.app }) : W.noAppYet) + '</p><a class="link" href="#/collections/' + esc(encodeURIComponent(c.kind)) + '">' + esc(W.open) + ' →</a>')).join('') + '</section>').join('');
+    }
+    const name = decodeURIComponent(kind);
+    const k = knownKinds.find((one) => one.kind === name) || (await api(inSpace('/kinds'))).find((one) => one.kind === name);
+    if (!k || !k.model) return empty(W.noCollections);
+    const s = await api(inSpace('/collections/' + encodeURIComponent(name) + '/stats'));
+    const optionLabel = (split, o) => (o.label ? tr(o.label) : o.option);
+    const SERIES = ['var(--primary)', 'var(--info)', 'var(--ochre)', 'var(--success)', 'var(--bark)', 'var(--error)'];
+    const max = Math.max(1, ...s.weeks.points.map((p) => p.n));
+    const stats = '<section class="stats">' +
+      '<div class="kpi-card"><div class="caps">' + esc(W.total) + '</div><div class="kpi">' + num(s.total) + '</div><div class="muted">' + esc(say(W.thisMonthN, { n: s.thisMonth })) + '</div></div>' +
+      s.splits.filter((sp) => sp.counts.some((c) => c.n)).map((sp) => {
+        const total = sp.counts.reduce((t, c) => t + c.n, 0) || 1;
+        return '<div class="kpi-card"><div class="caps">' + esc(say(W.byField, { field: tr(sp.label) || sp.field })) + '</div><div class="stack">' +
+          sp.counts.filter((c) => c.n).map((c, i) => '<span title="' + esc(optionLabel(sp, c) + ' : ' + c.n) + '" style="flex:' + c.n + ';background:' + SERIES[i % SERIES.length] + '"></span>').join('') + '</div><div class="legend">' +
+          sp.counts.filter((c) => c.n).map((c, i) => '<span><i style="background:' + SERIES[i % SERIES.length] + '"></i>' + esc(optionLabel(sp, c)) + ' ' + c.n + '</span>').join('') + '</div></div>';
+      }).join('') +
+      '<div class="kpi-card"><div class="caps">' + esc(say(W.perWeek, { field: tr(s.weeks.label) || s.weeks.field })) + '</div><div class="spark">' +
+        s.weeks.points.map((p) => '<span title="' + esc(p.week + ' : ' + p.n) + '" style="height:' + Math.max(3, Math.round(p.n / max * 100)) + '%"></span>').join('') + '</div></div>' +
+      s.figures.map((f) => '<div class="kpi-card"><div class="caps">' + esc(say(f.kind === 'sum' ? W.sumOf : W.avgOf, { field: tr(f.label) || f.field })) + '</div><div class="kpi">' + num(f.value) + (f.unit ? '<small> ' + esc(f.unit) + '</small>' : '') + '</div></div>').join('') +
+      '</section>';
+    const views = await api(inSpace('/views?kind=' + encodeURIComponent(name)));
+    const saved = params.get('view') ? views.find((v) => v.id === params.get('view')) : null;
+    const fallback = saved ? null : views.find((v) => v.default);
+    const key = saved ? 'v:' + saved.id : 'c:' + name;
+    const st = explorers[key] || (explorers[key] = { id: saved ? saved.id : fallback ? fallback.id : null, view: saved || fallback ? {} : { kind: name }, month: new Date().toISOString().slice(0, 7) });
+    const { html } = await explore(key, st, { app: k.model.app || null, kind: name, model: k.model });
+    const tabs = '<nav class="tabs"><a class="' + (saved ? '' : 'on') + '" href="#/collections/' + esc(encodeURIComponent(name)) + '">' + esc(W.allEntries) + '</a>' +
+      views.map((v) => '<a class="' + (saved && v.id === saved.id ? 'on' : '') + '" href="#/collections/' + esc(encodeURIComponent(name)) + '?view=' + esc(encodeURIComponent(v.id)) + '">' + esc(tr(v.label) || v.title) + '</a>').join('') + '</nav>';
+    return '<div class="head"><div><div class="caps">' + esc(k.model.area || W.unfiled) + (k.model.app ? ' · ' + esc(k.model.app) : '') + '</div><h1>' + esc(kindLabel(k)) + '</h1></div><div class="actions">' +
+      '<button class="quiet" data-model="' + esc(name) + '">' + esc(W.seeModel) + '</button><button class="quiet" data-share="' + esc(name) + '">' + esc(W.share) + '</button><button data-add="' + esc(name) + '">' + esc(say(W.addOne, { kind: kindLabel(k) })) + '</button></div></div>' +
+      stats + tabs + card('', html, true);
   },
 
   async vie (params) {
@@ -674,7 +813,7 @@ const pages = {
       }
       const charter = await api('/entries?kind=Charter&limit=5&space=' + encodeURIComponent(s.id));
       blocks.push(card(s.name, '<p class="muted" style="margin:0 0 8px">' + esc(s.personal ? W.own : W.shared) + ' · ' + esc(W[s.role] || s.role) + '</p>' +
-        '<div class="caps">' + esc(W.members) + '</div><ul class="list">' + s.members.map((m) => '<li><span>' + esc(m.name || m.person) + '</span><span class="badge">' + esc(W[m.role] || m.role) + '</span></li>').join('') + '</ul>' +
+        '<div class="caps">' + esc(W.members) + '</div><ul class="list">' + s.members.map((m) => '<li><span>' + esc(m.name || m.person) + '</span>' + (mine && !s.personal && m.person !== me.person.id ? '<select data-role="' + esc(s.id + '/' + m.person) + '">' + ['owner', 'member', 'viewer'].map((r) => '<option value="' + r + '"' + (r === m.role ? ' selected' : '') + '>' + esc(W['role_' + r]) + '</option>').join('') + '</select>' : '<span class="badge">' + esc(W['role_' + m.role] || W[m.role] || m.role) + '</span>') + '</li>').join('') + '</ul>' +
         '<div class="caps" style="margin-top:10px">' + esc(W.charter) + '</div>' + (charter.length ? '<ul class="list">' + charter.map((c) => '<li><a class="link" href="#/entree/' + esc(c.id) + '" data-space="' + esc(s.id) + '">' + esc(c.title) + '</a></li>').join('') + '</ul>' : '<p class="muted">' + esc(W.noCharter) + '</p>') +
         (invites ? '<div class="caps" style="margin-top:10px">' + esc(W.invitations) + '</div><ul class="list">' + invites + '</ul>' : '') +
         (mine && !s.personal ? '<form class="actions" data-invite="' + esc(s.id) + '" style="margin-top:10px"><input class="field" type="email" required placeholder="' + esc(W.inviteEmail) + '" style="flex:1;min-width:180px"><button>' + esc(W.invite) + '</button></form><div data-link="' + esc(s.id) + '"></div>' : '') +
@@ -722,7 +861,7 @@ const pages = {
   },
 };
 
-const titles = { '': 'navNow', accueil: 'navHome', fichiers: 'navFiles', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
+const titles = { '': 'navNow', accueil: 'navHome', collections: 'navCollections', fichiers: 'navFiles', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
   rappels: 'navReminders', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
 
 let drawing = 0;
@@ -731,7 +870,7 @@ async function show() {
   const [name, id] = path.split('/');
   const params = new URLSearchParams(query || '');
   const key = pages[name] ? name : '';
-  document.getElementById('title').textContent = key === 'app' && id ? decodeURIComponent(id) : W[titles[key]];
+  document.getElementById('title').textContent = key === 'app' && id ? decodeURIComponent(id) : key === 'collections' && id ? kindName(decodeURIComponent(id)) : W[titles[key]];
   document.querySelectorAll('a[data-page]').forEach((a) => a.classList.toggle('on', a.dataset.page === (titles[key] || 'navNow')));
   document.querySelectorAll('a[data-app]').forEach((a) => a.classList.toggle('on', key === 'app' && a.dataset.app === id));
   document.querySelector('.shell').classList.remove('open'); closeDrawer();
@@ -870,7 +1009,7 @@ function bind() {
     });
   }));
   const keep = async (id) => {
-    const view = Object.assign({}, ex.r.view, { kind: ex.kind, app: ex.name });
+    const view = Object.assign({}, ex.r.view, { kind: ex.kind }, ex.name ? { app: ex.name } : {});
     delete view.limit;
     if (id) { await api(inSpace('/save'), { method: 'POST', body: { entries: [{ id, data: view }] } }); toast(W.viewUpdated, null); delete explorers[ex.key]; show(); return; }
     const title = prompt(W.viewName); if (!title) return;
@@ -879,6 +1018,15 @@ function bind() {
   };
   root.querySelectorAll('[data-vsave]').forEach((b) => b.addEventListener('click', () => keep(null).catch((e) => alert(e.message))));
   root.querySelectorAll('[data-vupdate]').forEach((b) => b.addEventListener('click', () => keep(ex.st.id).catch((e) => alert(e.message))));
+  if (ex && ex.r.type === 'map') drawMap().catch(() => undefined);
+  root.querySelectorAll('[data-press]').forEach((b) => b.addEventListener('click', async (event) => {
+    event.stopPropagation();
+    b.disabled = true;
+    try {
+      await api(inSpace('/entries/' + encodeURIComponent(b.dataset.id) + '/press'), { method: 'POST', body: { field: b.dataset.press } });
+      toast(W.pressed, { id: b.dataset.id, spaceId: space }); show();
+    } catch (error) { b.disabled = false; alert(error.message); }
+  }));
   root.querySelectorAll('[data-vcard]').forEach((c) => c.addEventListener('dragstart', (event) => { event.dataTransfer.setData('text/plain', c.dataset.vcard); }));
   root.querySelectorAll('[data-vdrop]').forEach((col) => {
     col.addEventListener('dragover', (event) => { event.preventDefault(); col.classList.add('over'); });
@@ -960,6 +1108,11 @@ function bind() {
       document.getElementById('tg').innerHTML = '<p><a class="badge primary" target="_blank" rel="noopener" href="' + esc(made.link) + '">' + esc(W.telegramOpen) + '</a></p><p class="muted">' + esc(say(W.telegramThen, { minutes: made.minutes })) + '</p>';
     } catch (error) { alert(error.message); }
   });
+  root.querySelectorAll('[data-role]').forEach((sel) => sel.addEventListener('change', async () => {
+    const [spaceId, person] = sel.dataset.role.split('/');
+    try { await api('/spaces/' + encodeURIComponent(spaceId) + '/members/' + encodeURIComponent(person) + '/role', { method: 'POST', body: { role: sel.value } }); toast(W.saved, null); }
+    catch (error) { alert(error.message); show(); }
+  }));
   root.querySelectorAll('[data-install]').forEach((b) => b.addEventListener('click', async () => {
     const name = b.dataset.install;
     try {
@@ -987,24 +1140,49 @@ function bind() {
   root.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', async () => {
     const k = (await api(inSpace('/kinds'))).find((one) => one.kind === b.dataset.add);
     if (!k || !k.model) return;
-    const fields = k.model.fields.filter((c) => !['list', 'formula', 'lines'].includes(c.type));
+    const fields = k.model.fields.filter((c) => !['list', 'formula', 'lines', 'button'].includes(c.type));
     const targets = {};
     for (const c of fields) if (c.type === 'link' && c.target) targets[c.name] = await api(inSpace('/entries?limit=200&kind=' + encodeURIComponent(c.target)));
+    const files = fields.some((c) => c.type === 'file') ? await api(inSpace('/files')) : [];
     const input = (c) => {
       const id = 'f_' + c.name;
       if (c.type === 'link') return '<select id="' + id + '"' + (c.cardinality === 'many' ? ' multiple' : '') + '><option value=""></option>' + (targets[c.name] || []).map((o) => '<option value="' + esc(o.id) + '">' + esc(o.title) + '</option>').join('') + '</select>';
       if (c.type === 'choice') return '<select id="' + id + '"><option value=""></option>' + c.options.map((o) => '<option value="' + esc(o) + '">' + esc(optionLabelOf(k.model, c.name, o)) + '</option>').join('') + '</select>';
       if (c.type === 'boolean') return '<select id="' + id + '"><option value=""></option><option value="true">✓</option><option value="false">—</option></select>';
-      const type = c.type === 'date' ? 'date' : c.type === 'datetime' ? 'datetime-local' : ['number', 'amount'].includes(c.type) ? 'number' : 'text';
+      // The types of every day (spec 016).
+      if (c.type === 'multi_choice') return '<div id="' + id + '" class="checks">' + c.options.map((o) => '<label class="check"><input type="checkbox" value="' + esc(o) + '"> ' + esc(optionLabelOf(k.model, c.name, o)) + '</label>').join('') + '</div>';
+      if (c.type === 'rating') return '<select id="' + id + '"><option value=""></option>' + Array.from({ length: (typeof c.max === 'number' ? c.max : 5) + 1 }, (_, n) => '<option value="' + n + '">' + ('★'.repeat(n) || '0') + '</option>').join('') + '</select>';
+      if (c.type === 'progress') return '<input id="' + id + '" type="number" min="0" max="100" step="1" placeholder="0–100">';
+      if (c.type === 'long_text') return '<textarea id="' + id + '" rows="4"></textarea>';
+      if (c.type === 'file') return '<select id="' + id + '"><option value=""></option>' + files.map((f) => '<option value="' + esc(f.entryId) + '">' + esc(f.name) + '</option>').join('') + '</select>';
+      if (c.type === 'location') return '<div id="' + id + '" class="loc"><input data-part="address" placeholder="' + esc(W.address) + '"><input data-part="lat" type="number" step="any" placeholder="lat"><input data-part="lng" type="number" step="any" placeholder="lng"><button type="button" class="quiet mini" data-here>' + esc(W.here) + '</button></div>';
+      const type = c.type === 'date' ? 'date' : c.type === 'datetime' ? 'datetime-local' : c.type === 'time' ? 'time' : c.type === 'url' ? 'url' : c.type === 'email' ? 'email' : c.type === 'phone' ? 'tel' : ['number', 'amount'].includes(c.type) ? 'number' : 'text';
       return '<input id="' + id + '" type="' + type + '"' + (type === 'number' ? ' step="any"' : '') + '>';
     };
     openDrawer(say(W.addOne, { kind: kindLabel(k) }), '<div class="form-field"><label>' + esc(W.title) + ' *</label><input id="f__title"></div>' +
       fields.map((c) => '<div class="form-field"><label>' + esc(fieldLabelOf(k.model, c.name) + (c.required ? ' *' : '') + (c.unit ? ' · ' + c.unit : '')) + '</label>' + input(c) + '</div>').join('') + '<p class="error-text" id="f__error"></p>',
       '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button id="f__save">' + esc(W.save) + '</button>');
+    document.querySelectorAll('[data-here]').forEach((b) => b.addEventListener('click', () => {
+      const box = b.parentElement;
+      navigator.geolocation.getCurrentPosition((p) => {
+        box.querySelector('[data-part=lat]').value = p.coords.latitude.toFixed(6);
+        box.querySelector('[data-part=lng]').value = p.coords.longitude.toFixed(6);
+      }, (e) => alert(e.message));
+    }));
     document.getElementById('f__save').addEventListener('click', async () => {
       const data = {};
       for (const c of fields) {
         const el = document.getElementById('f_' + c.name);
+        if (c.type === 'multi_choice') {
+          const picked = [...el.querySelectorAll('input:checked')].map((i) => i.value);
+          if (picked.length) data[c.name] = picked;
+          continue;
+        }
+        if (c.type === 'location') {
+          const part = (n) => el.querySelector('[data-part=' + n + ']').value.trim();
+          if (part('lat') && part('lng')) data[c.name] = Object.assign({ lat: Number(part('lat')), lng: Number(part('lng')) }, part('address') ? { address: part('address') } : {});
+          continue;
+        }
         if (c.type === 'link' && c.cardinality === 'many') {
           const picked = [...el.selectedOptions].map((o) => o.value).filter(Boolean);
           if (picked.length) data[c.name] = picked;
@@ -1012,12 +1190,43 @@ function bind() {
         }
         const v = el.value;
         if (v === '') continue;
-        data[c.name] = ['number', 'amount'].includes(c.type) ? Number(v) : c.type === 'boolean' ? v === 'true' : v;
+        data[c.name] = ['number', 'amount', 'rating', 'progress'].includes(c.type) ? Number(v) : c.type === 'boolean' ? v === 'true' : v;
       }
       try {
         await api(inSpace('/save'), { method: 'POST', body: { entries: [{ kind: k.kind, title: document.getElementById('f__title').value.trim(), data }] } });
         closeDrawer(); toast(say(W.added1, { kind: k.kind }), null); show();
       } catch (error) { document.getElementById('f__error').textContent = error.message; }
+    });
+  }));
+  // Sharing a collection (spec 016): a public form, or a view to read; the link is shown once.
+  root.querySelectorAll('[data-share]').forEach((b) => b.addEventListener('click', async () => {
+    const kind = b.dataset.share;
+    const k = (await api(inSpace('/kinds'))).find((one) => one.kind === kind);
+    const shares = (await api(inSpace('/shares'))).filter((one) => one.kind === kind || (one.view && one.view.kind === kind));
+    const askable = k.model.fields.filter((c) => !['link', 'formula', 'lines', 'button', 'file', 'location', 'list'].includes(c.type));
+    openDrawer(W.share, '<p class="muted">' + esc(W.shareLead) + '</p>' +
+      '<div class="form-field"><label>' + esc(W.shareName) + '</label><input id="sh_name" value="' + esc(kindLabel(k)) + '"></div>' +
+      '<div class="form-field"><label>' + esc(W.shareMode) + '</label><select id="sh_mode"><option value="form">' + esc(W.shareForm) + '</option><option value="view">' + esc(W.shareView) + '</option></select></div>' +
+      '<div class="form-field" id="sh_fields"><label>' + esc(W.shareFields) + '</label>' + askable.map((c) => '<label class="check"><input type="checkbox" value="' + esc(c.name) + '" checked> ' + esc(fieldLabelOf(k.model, c.name)) + '</label>').join('') + '</div>' +
+      '<div id="sh_link"></div>' +
+      (shares.length ? '<h3 style="margin:14px 0 6px">' + esc(W.shareOpen) + '</h3><ul class="list">' + shares.map((one) => '<li><span>' + esc(one.title) + ' <span class="muted">· ' + esc(one.mode === 'form' ? W.shareForm : W.shareView) + '</span></span><button class="quiet mini" data-unshare="' + esc(one.id) + '">' + esc(W.shareClose) + '</button></li>').join('') + '</ul>' : '') +
+      '<p class="error-text" id="sh_error"></p>',
+      '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button id="sh_make">' + esc(W.shareMake) + '</button>');
+    const mode = document.getElementById('sh_mode');
+    mode.onchange = () => { document.getElementById('sh_fields').style.display = mode.value === 'form' ? '' : 'none'; };
+    document.querySelectorAll('[data-unshare]').forEach((x) => x.addEventListener('click', async () => {
+      await api(inSpace('/save'), { method: 'POST', body: { entries: [{ id: x.dataset.unshare, data: { active: false } }] } });
+      x.closest('li').remove();
+    }));
+    document.getElementById('sh_make').addEventListener('click', async () => {
+      const ex = explorerNow;
+      const data = mode.value === 'form'
+        ? { mode: 'form', kind, fields: [...document.querySelectorAll('#sh_fields input:checked')].map((i) => i.value) }
+        : { mode: 'view', view: Object.assign({}, ex && ex.kind === kind ? ex.r.view : { kind }, { kind }) };
+      try {
+        const made = await api(inSpace('/shares'), { method: 'POST', body: { name: document.getElementById('sh_name').value, data } });
+        document.getElementById('sh_link').innerHTML = '<p class="badge read" style="white-space:normal">' + esc(W.shareOnce) + '</p><p><code class="url">' + esc(made.link) + '</code></p>';
+      } catch (error) { document.getElementById('sh_error').textContent = error.message; }
     });
   }));
   const sub = document.getElementById('subscribe');
@@ -1086,6 +1295,7 @@ export function appPage(lang: Lang): string {
   </nav>
   <nav class="navg" id="apps"></nav>
   <nav class="navg"><div class="caps">${escape(words.navLife)}</div>
+    ${link('collections', 'navCollections', ICONS.life)}
     ${link('vie', 'navEntries', ICONS.life)}
     ${link('documents', 'navDocuments', ICONS.documents)}
     ${link('fichiers', 'navFiles', ICONS.files)}

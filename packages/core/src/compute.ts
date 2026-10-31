@@ -143,6 +143,19 @@ export class Reader {
     this.ready ??= (async () => {
       for (const model of await modelsOf(this.tx, this.spaceId))
         this.models.set(fold(model.kind), model);
+      // Her exchange rates (spec 016): entries « Rate » { currency, per_eur }, beside the fixed pegs.
+      const { rows: rates } = await this.tx.query<{ currency: string; per_eur: string }>(
+        `select upper(data->>'currency') as currency, data->>'per_eur' as per_eur from entry
+          where space_id = $1 and archived_at is null and jarvis_fold(kind) = 'rate'
+            and data ? 'currency' and data ? 'per_eur' order by created_at`,
+        [this.spaceId],
+      );
+      const given = Object.fromEntries(
+        rates
+          .map((one) => [one.currency, Number(one.per_eur)])
+          .filter(([, value]) => Number(value) > 0),
+      );
+      if (Object.keys(given).length) this.clock.rates = { ...(this.clock.rates ?? {}), ...given };
       const { rows } = await this.tx.query<{ from_id: string; to_id: string; role: string }>(
         `select l.from_id, l.to_id, l.role from link l
            join entry e on e.id = l.to_id and e.archived_at is null

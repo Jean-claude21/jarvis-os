@@ -48,6 +48,11 @@ import {
   viewsOf,
   setZone,
   zoneOf,
+  collectionsOf,
+  collectionStats,
+  createShare,
+  press,
+  setRole,
   createKey,
   fingerprintOf,
   KEY_PREFIX,
@@ -315,6 +320,61 @@ export function apiRoutes(deps: {
         return { app, area: area || null, models: models.length };
       }),
     );
+  });
+
+  // Her collections (spec 016): every kind with a model, and its statistics from its model.
+  api.get('/collections', async (c) =>
+    c.json(await act(c, (tx, _a, space) => collectionsOf(tx, space))),
+  );
+  api.get('/collections/:kind/stats', async (c) =>
+    c.json(await act(c, (tx, _a, space) => collectionStats(tx, space, c.req.param('kind')))),
+  );
+
+  // A button pressed (spec 016): its action on its entry.
+  api.post('/entries/:id/press', async (c) => {
+    const body = (await c.req.json()) as { field?: string };
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        press(tx, actor, space, { entryId: c.req.param('id'), field: String(body.field ?? '') }),
+      ),
+    );
+  });
+
+  // Public links (spec 016): a form or a view she shares; the key is in the link, shown once.
+  api.get('/shares', async (c) =>
+    c.json(
+      await act(c, async (tx, _a, space) =>
+        (await find(tx, space, { kind: 'Share', limit: 200 }))
+          .filter((one) => one.data.active !== false)
+          .map((one) => ({
+            id: one.id,
+            title: one.title,
+            mode: one.data.mode,
+            kind: one.data.kind ?? null,
+            view: one.data.view ?? null,
+          })),
+      ),
+    ),
+  );
+  api.post('/shares', async (c) => {
+    const body = (await c.req.json()) as { name?: string; data?: Record<string, unknown> };
+    const made = await act(c, (tx, actor, space) =>
+      createShare(tx, actor, space, {
+        name: String(body.name ?? ''),
+        data: (body.data ?? {}) as never,
+      }),
+    );
+    return c.json({ id: made.id, link: `${deps.publicUrl.replace(/\/$/, '')}/p/${made.key}` }, 201);
+  });
+
+  // What a member may do in a shared space (spec 016): owner, member, or viewer (reads only).
+  api.post('/spaces/:id/members/:person/role', async (c) => {
+    const body = (await c.req.json()) as { role?: string };
+    const role = z.enum(['owner', 'member', 'viewer']).parse(body.role);
+    await as(c, (tx, actor) =>
+      setRole(tx, actor, { spaceId: c.req.param('id'), person: c.req.param('person'), role }),
+    );
+    return c.json({ role });
   });
 
   // Her views (spec 015): those she kept, and one run — kept (`id`, with what she changed) or not.

@@ -180,6 +180,16 @@ stored in English and reported in `notes`; migration 0006 renamed what was store
 
 `jarvis_due_rules` (migration 0007) finds the rules that may be due, and nothing else.
 
+## Collections, shares, viewers (spec 016)
+
+| Function                                              | What it does                                               |
+| ----------------------------------------------------- | ---------------------------------------------------------- |
+| `collectionsOf`, `collectionStats`                    | her collections, and each one's statistics from its model  |
+| `press`                                               | a `button` field's action on its entry                     |
+| `createShare`, `shareOf`, `sharedPage`, `submitShare` | a public form or view: made, found by key, shown, answered |
+| `setRole`                                             | `owner`, `member` or `viewer` in a shared space            |
+| `kilometres`, `PEGGED`, `locationOf`                  | distances and fixed currency pegs used by the formulas     |
+
 ## Views, zone, keys (spec 015)
 
 | Function                                       | What it does                                                                      |

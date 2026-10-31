@@ -20,15 +20,24 @@ entrées (titres, textes) restent dans ses mots.
    `data` =
    - `label` : `{ fr, en }` ;
    - `fields` : `[{ name, type, label?, required?, options?, optionLabels?, target?, cardinality?,
-inverse?, formula?, fields?, unit?, help? }]` ; `type` parmi text, number, amount, date, datetime, duration,
-     choice, boolean, list, link, formula, lines ;
+inverse?, formula?, fields?, unit?, help?, default?, min?, max?, unique?, action? }]` ; `type`
+     parmi text, long_text, number, amount, date, datetime, time, duration, choice, multi_choice,
+     boolean, list, link, formula, lines, url, email, phone, file, location, rating, progress, button ;
+   - les options d'un field : `default` (une valeur, ou « =today() »), `min` / `max`, `unique`
+     (deux entrées ne partagent pas la valeur — pour ne pas postuler deux fois à la même offre) ;
    - `path` (facultatif) : où l'export range chaque entrée, avec `{year}`, `{month}`, `{day}`,
      `{date}`, `{title}`, `{id}` ou un champ (« finances/{year}/{month}/{title}.md ») ;
    - `columns`, `total`, `groupBy` : comment l'app montre ce type ; `app` : l'app à laquelle il
      appartient (« Finances ») ; `open` : true seulement si elle veut des champs libres ;
    - `workflow` (facultatif) : `{ field, initial?, transitions: [{ from, to, if? }] }`.
 3. Un `amount` est un nombre avec sa devise dans `unit` ; une `date` est « 2026-10-30 » ; un
-   `datetime` « 2026-10-30T14:00 » ; une `duration` des minutes. Le temps reste dans les champs de
+   `datetime` « 2026-10-30T14:00 » ; une `time` « 07:15 » ; une `duration` des minutes. Un `url`
+   commence par https:// ; un `email`, un `phone` sont cliquables ; un `multi_choice` est une liste
+   parmi ses `options` ; un `rating` va de 0 à 5 (ou `max`) ; un `progress` de 0 à 100 ; un `file`
+   est l'id d'une entrée fichier (après `upload_link`) ; une `location` est `{ address?, lat, lng }`
+   (donne les coordonnées que tu connais, origin « inferred », et dis-le). Un `button` n'est jamais
+   écrit : `action` `{ set?, rule?, script?, label? }` dit ce qu'il fait ; `press` l'appuie (sur sa
+   demande). Le temps reste dans les champs de
    l'agenda (`start`, `at`, `due`, `repeat`…) : ils sont admis par tout modèle.
 4. **Relations.** Un champ `link` (`target` : le type visé, `cardinality` : `one` par défaut ou
    `many`, `inverse` : le nom par lequel l'autre côté le lit) n'est pas une valeur : dans `save`,

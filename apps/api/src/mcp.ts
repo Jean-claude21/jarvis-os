@@ -35,6 +35,11 @@ import {
   testRule,
   OPERATORS,
   runView,
+  collectionsOf,
+  collectionStats,
+  createShare,
+  press,
+  setRole,
   type ViewData,
 } from '@jarvis-os/core';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -574,6 +579,114 @@ export async function mcpServerFor(
           }
           const result = await runView(tx, at(space), data as ViewData);
           return { ...result, fields: result.fields.map((field) => field.path) };
+        }),
+    ),
+  );
+
+  // Collections, buttons, public links, viewers (spec 016).
+  server.registerTool(
+    'collection_stats',
+    {
+      description:
+        'The statistics of one of her collections (a kind with a model), read from its model: how many, how they split on each choice, how they come week after week, the sums and averages of their numbers. Without `kind`: her collections.',
+      inputSchema: { kind: z.string().min(1).optional(), space: spaceArg },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async ({ kind, space }: { kind?: string | undefined; space?: string | undefined }) =>
+      act<unknown>((tx) =>
+        kind ? collectionStats(tx, at(space), kind) : collectionsOf(tx, at(space)),
+      ),
+    ),
+  );
+
+  server.registerTool(
+    'press',
+    {
+      description:
+        'Press a `button` field of an entry: its action (fields set, a rule or a script run on it), journaled and undoable. Press only when she asks.',
+      inputSchema: { entry: z.string().min(1), field: z.string().min(1), space: spaceArg },
+    },
+    tool(
+      async ({
+        entry,
+        field,
+        space,
+      }: {
+        entry: string;
+        field: string;
+        space?: string | undefined;
+      }) => act((tx) => press(tx, actor, at(space), { entryId: entry, field })),
+    ),
+  );
+
+  server.registerTool(
+    'share',
+    {
+      description: [
+        'Open a PUBLIC link — anyone with it can use it, so only after her explicit yes: `mode: "form"`',
+        '(`kind`, `fields`: what others may fill; what they send arrives as « proposed », origin « read »)',
+        'or `mode: "view"` (`view`: { kind, filters, columns… }, read-only). Give her the link; she',
+        'closes it by setting `active: false` on the entry « Share ».',
+      ].join(' '),
+      inputSchema: {
+        name: z.string().min(1).max(120),
+        mode: z.enum(['form', 'view']),
+        kind: z.string().min(1).optional(),
+        fields: z.array(z.string().min(1)).max(30).optional(),
+        view: z.record(z.string(), z.unknown()).optional(),
+        intro: z.string().max(2000).optional(),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async (args: {
+        name: string;
+        mode: 'form' | 'view';
+        kind?: string | undefined;
+        fields?: string[] | undefined;
+        view?: Record<string, unknown> | undefined;
+        intro?: string | undefined;
+        space?: string | undefined;
+      }) => {
+        const data = {
+          mode: args.mode,
+          ...(args.kind ? { kind: args.kind } : {}),
+          ...(args.fields ? { fields: args.fields } : {}),
+          ...(args.view ? { view: args.view } : {}),
+          ...(args.intro ? { intro: args.intro } : {}),
+        };
+        const made = await act((tx) =>
+          createShare(tx, actor, at(args.space), { name: args.name, data: data as never }),
+        );
+        return { id: made.id, link: `${deps.publicUrl.replace(/\/$/, '')}/p/${made.key}` };
+      },
+    ),
+  );
+
+  server.registerTool(
+    'set_role',
+    {
+      description:
+        'What a member may do in a shared space she owns: `owner`, `member` (reads and writes) or `viewer` (reads only). Only after she asks.',
+      inputSchema: {
+        space: z.string().min(1),
+        person: z.string().min(1),
+        role: z.enum(['owner', 'member', 'viewer']),
+      },
+    },
+    tool(
+      async ({
+        space,
+        person,
+        role,
+      }: {
+        space: string;
+        person: string;
+        role: 'owner' | 'member' | 'viewer';
+      }) =>
+        act(async (tx) => {
+          await setRole(tx, actor, { spaceId: at(space), person, role });
+          return { role };
         }),
     ),
   );

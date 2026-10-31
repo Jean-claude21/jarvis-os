@@ -84,16 +84,25 @@ export interface DayOf {
 }
 
 const DAY_FIELDS = ['date', 'at', 'start', 'due'];
+/** Fields whose day is not what the entry is about: an end, a next or last time, a bookkeeping mark. */
+const NOT_ITS_DAY =
+  /expir|deadline|until|end|fin$|echeance|échéance|next|prochain|last|dernier|updated|sent|baseline|code/i;
 const isDay = (value: unknown): value is string =>
   typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value);
 
-/** The day an entry is about: its own field, then its source path, then its title, then made. */
+/**
+ * The day an entry is about: its own field (the model's dates, `date`, `at`, `start`, `due`, then any
+ * other field holding a day but an end, a next or a last one), then its source path, then its
+ * title, then the day it was made.
+ */
 export function dayOf(
   row: { title: string; data: Record<string, unknown>; createdAt: string },
   dateFields: string[] = DAY_FIELDS,
 ): DayOf {
   for (const field of dateFields)
     if (isDay(row.data[field])) return { day: row.data[field].slice(0, 10), from: 'field' };
+  for (const [field, value] of Object.entries(row.data))
+    if (isDay(value) && !NOT_ITS_DAY.test(field)) return { day: value.slice(0, 10), from: 'field' };
   const source = typeof row.data.source === 'string' ? row.data.source : '';
   const inSource = source ? dayInText(source) : null;
   const inTitle = dayInText(row.title);
@@ -445,75 +454,92 @@ export async function listStats(
     splits,
     weeks: { field: dated?.name ?? 'day', label: dated?.label ?? null, points: weeks },
     figures,
-    habits: await habitsOf(tx, spaceId, found, today),
+    habits: await habitsOf(tx, spaceId, found, today, input.kind, (one) =>
+      dateFieldsOf(reader.model(one)),
+    ),
   };
 }
 
-/** The habits a list's entries are linked to (either way), each with how it was kept. */
+/**
+ * The habits of a list, each with how it was kept. A habit counts the entries done for it (a link
+ * `for`, either way — a mention is not a deed) and every entry of the kind it tracks: `tracks`, else the kind its title names (« Prière »
+ * tracks the kind « Prière ») — so what she does counts without being linked by hand.
+ */
 async function habitsOf(
   tx: Tx,
   spaceId: string,
-  found: { id: string; day: string; title: string; data: Record<string, unknown> }[],
+  found: Found[],
   today: string,
+  kind: string | undefined,
+  dateFields: (kind: string) => string[] | undefined,
 ): Promise<HabitRate[]> {
-  if (!found.length) return [];
-  // The list is of habits themselves: each with the entries linked to it, on their own day.
-  const planned = found.flatMap((row) => {
-    const plan = planOf(row.data);
-    return plan ? [{ row, plan }] : [];
-  });
-  if (planned.length) {
-    const { rows } = await tx.query<EntryRow & { habit: string }>(
-      `select case when l.from_id = any($2) then l.from_id else l.to_id end as habit,
-              e.id, e.kind, e.title, e.data - 'text' as data,
-              to_char(e.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
-              to_char(e.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "updatedAt"
+  type Habit = { id: string; kind: string; title: string; data: Record<string, unknown> };
+  const habits = new Map<string, Habit>();
+  // One habit per name: the same habit said twice (in « Habitude » and among what she does) once.
+  const add = (row: Habit) => {
+    const same = [...habits.values()].some((one) => fold(one.title) === fold(row.title));
+    if (!habits.has(row.id) && !same && planOf(row.data)) habits.set(row.id, row);
+  };
+  // The list is of habits themselves (most of it says its days); else the habits its entries are
+  // linked to, or that track its kind — and a habit filed among them, when there is no other.
+  const inList = found.filter((row) => planOf(row.data));
+  const ofHabits = inList.length * 2 >= found.length;
+  if (ofHabits) inList.forEach(add);
+  if (!ofHabits && found.length) {
+    const { rows } = await tx.query<Habit>(
+      `select distinct e.id, e.kind, e.title, e.data - 'text' as data
          from link l
          join entry e on e.id = case when l.from_id = any($2) then l.to_id else l.from_id end
-        where l.space_id = $1 and (l.from_id = any($2) or l.to_id = any($2)) and e.archived_at is null`,
-      [spaceId, planned.map((one) => one.row.id)],
+        where l.space_id = $1 and l.role = 'for' and (l.from_id = any($2) or l.to_id = any($2))
+          and e.archived_at is null and not (e.id = any($2))`,
+      [spaceId, found.map((row) => row.id)],
     );
-    return planned
-      .map(({ row, plan }) =>
-        rateOf(
-          { id: row.id, title: row.title, plan },
-          rows.filter((one) => one.habit === row.id).map((one) => dayOf(one).day),
-          today,
-        ),
-      )
-      .sort((a, b) => a.title.localeCompare(b.title));
+    rows.forEach(add);
   }
-  const ids = found.map((row) => row.id);
-  const { rows } = await tx.query<{
-    entry: string;
-    id: string;
-    title: string;
-    data: Record<string, unknown>;
-  }>(
-    `select case when l.from_id = any($2) then l.from_id else l.to_id end as entry,
-            e.id, e.title, e.data - 'text' as data
+  if (!ofHabits && kind) {
+    const { rows } = await tx.query<Habit>(
+      `select id, kind, title, data - 'text' as data from entry
+        where space_id = $1 and archived_at is null
+          and (jarvis_fold(coalesce(data->>'tracks', '')) = jarvis_fold($2)
+               or (data->>'tracks' is null and jarvis_fold(title) = jarvis_fold($2)))
+        order by jarvis_fold(kind) = jarvis_fold($2), created_at`,
+      [spaceId, kind],
+    );
+    rows.forEach(add);
+  }
+  if (!habits.size) inList.forEach(add);
+  if (!habits.size) return [];
+
+  const ids = [...habits.keys()];
+  const { rows: linked } = await tx.query<EntryRow & { habit: string }>(
+    `select case when l.from_id = any($2) then l.from_id else l.to_id end as habit,
+            e.id, e.kind, e.title, e.data - 'text' as data,
+            to_char(e.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
+            to_char(e.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "updatedAt"
        from link l
        join entry e on e.id = case when l.from_id = any($2) then l.to_id else l.from_id end
-      where l.space_id = $1 and (l.from_id = any($2) or l.to_id = any($2))
-        and e.archived_at is null and not (e.id = any($2))`,
+      where l.space_id = $1 and l.role = 'for' and (l.from_id = any($2) or l.to_id = any($2)) and e.archived_at is null`,
     [spaceId, ids],
   );
-  const dayOfEntry = new Map(found.map((row) => [row.id, row.day]));
-  const habits = new Map<
-    string,
-    { id: string; title: string; data: Record<string, unknown>; days: string[] }
-  >();
-  for (const row of rows) {
-    const habit = habits.get(row.id) ?? { id: row.id, title: row.title, data: row.data, days: [] };
-    habit.days.push(dayOfEntry.get(row.entry) ?? '');
-    habits.set(row.id, habit);
-  }
   const out: HabitRate[] = [];
   for (const habit of habits.values()) {
-    const plan = planOf(habit.data);
-    if (plan) out.push(rateOf({ id: habit.id, title: habit.title, plan }, habit.days, today));
+    const plan = planOf(habit.data)!;
+    const fields = (one: string) => [...(dateFields(one) ?? []), ...DAY_FIELDS];
+    const days = linked
+      .filter((row) => row.habit === habit.id)
+      .map((row) => dayOf(row, fields(row.kind)).day);
+    const tracked = typeof habit.data.tracks === 'string' ? habit.data.tracks : habit.title;
+    const ofKind = await entriesFor(
+      tx,
+      spaceId,
+      listInputSchema.parse({ kind: tracked }),
+      dateFields,
+    );
+    // What she did, not another habit said in that kind.
+    days.push(...ofKind.filter((row) => !planOf(row.data)).map((row) => row.day));
+    out.push(rateOf({ id: habit.id, title: habit.title, plan }, days, today));
   }
-  return out.sort((a, b) => a.title.localeCompare(b.title));
+  return out.sort((x, y) => x.title.localeCompare(y.title));
 }
 
 /** The journal lines this person wrote in this space after `since`: one change, grouped. */

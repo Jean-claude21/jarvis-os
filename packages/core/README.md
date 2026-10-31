@@ -180,6 +180,14 @@ stored in English and reported in `notes`; migration 0006 renamed what was store
 
 `jarvis_due_rules` (migration 0007) finds the rules that may be due, and nothing else.
 
+## The morning brief (spec 018)
+
+| Function                   | What it does                                                                   |
+| -------------------------- | ------------------------------------------------------------------------------ |
+| `morningBrief`             | her day: what to fix, what is late, today's calendar, her habits of today      |
+| `briefDue`, `localOf`      | whether the brief is due at her hour, on her clock, once, not three hours late |
+| `briefOnce`, `briefPeople` | the watcher's pass: one brief told through a teller, marked `brief_sent`       |
+
 ## Lists, groups, changes at once (spec 017)
 
 | Function                          | What it does                                                                    |

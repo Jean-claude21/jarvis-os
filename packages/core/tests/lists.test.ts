@@ -67,6 +67,17 @@ describe('the day and folder of an entry', () => {
       day: '2026-05',
       from: 'title',
     });
+    // Any field holding a day, but an end, a next or a last one.
+    expect(
+      dayOf({ title: 'Projet', data: { ouvert: '2026-03-02', stade: 'actif' }, createdAt: made }),
+    ).toEqual({ day: '2026-03-02', from: 'field' });
+    expect(
+      dayOf({
+        title: 'Passeport',
+        data: { expiration: '2031-01-01', 'derniere-interaction': '2026-01-01' },
+        createdAt: made,
+      }).from,
+    ).toBe('made');
     expect(dayOf({ title: 'Rien', data: {}, createdAt: made })).toEqual({
       day: '2026-10-29',
       from: 'made',
@@ -205,5 +216,36 @@ describe('a habit', () => {
     ]);
     const ofHabits = await ama.as((tx) => listStats(tx, ama.space, { kind: 'Habitude' }, clock));
     expect(ofHabits.habits[0]).toEqual(expect.objectContaining({ done: 5, planned: 7 }));
+  });
+
+  it('counts what she does of the kind it tracks, without a link', async () => {
+    const kofi = await person('Kofi');
+    await kofi.as((tx) =>
+      save(tx, kofi.actor, kofi.space, {
+        entries: [
+          { kind: 'Course', title: 'Course 28', data: { date: '2026-10-28' } },
+          { kind: 'Course', title: 'Course 30', data: { date: '2026-10-30' } },
+          {
+            kind: 'Habitude',
+            title: 'Courir',
+            data: { tracks: 'Course', days: '7/7', since: '2026-10-28' },
+          },
+          { kind: 'Habitude', title: 'Lire', data: { days: '7/7', since: '2026-10-28' } },
+          // A habit said among what she does is not counted as done, nor taken for the list.
+          { kind: 'Course', title: 'Course', data: { cadence: '7/7', since: '2026-10-28' } },
+        ],
+      }),
+    );
+    const stats = await kofi.as((tx) => listStats(tx, kofi.space, { kind: 'Course' }, clock));
+    expect(stats.habits).toEqual([
+      expect.objectContaining({ title: 'Courir', planned: 3, done: 2, missed: ['2026-10-29'] }),
+      expect.objectContaining({ title: 'Course', planned: 3, done: 2 }),
+    ]);
+    // A habit whose title is a kind tracks it; one with nothing to count is kept at zero.
+    const ofHabits = await kofi.as((tx) => listStats(tx, kofi.space, { kind: 'Habitude' }, clock));
+    expect(ofHabits.habits.map((one) => [one.title, one.done])).toEqual([
+      ['Courir', 2],
+      ['Lire', 0],
+    ]);
   });
 });

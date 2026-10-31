@@ -1,5 +1,7 @@
 import {
   asPerson,
+  briefOnce,
+  briefPeople,
   find,
   pool,
   save,
@@ -7,12 +9,13 @@ import {
   watchOnce,
   runDueRules,
   useScriptRunner,
+  type Brief,
   type Due,
   type PassReport,
 } from '@jarvis-os/core';
 import { parseArgs } from 'node:util';
 import type pg from 'pg';
-import { wordsOf } from './i18n';
+import { wordsOf, type Lang } from './i18n';
 import { quickjsRunner } from './scripts';
 import { readTelegramLinks } from './telegram';
 import { settingsFor, type Branch } from './settings';
@@ -53,6 +56,60 @@ export function reminderText(due: Due): string {
   );
 }
 
+/** What she reads in the morning (spec 018): what to fix, what is late, today, her habits. */
+export function briefText(brief: Brief, lang: Lang = 'fr'): string {
+  const words = wordsOf(lang);
+  const say = (text: string, values: Record<string, string>) =>
+    text.replace(/\{(\w+)\}/g, (_, key: string) => values[key] ?? '');
+  const locale = lang === 'en' ? 'en-GB' : 'fr-FR';
+  const day = new Intl.DateTimeFormat(locale, {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(new Date(`${brief.day}T12:00:00Z`));
+  const hour = (iso: string) =>
+    new Intl.DateTimeFormat(locale, {
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: brief.zone,
+    }).format(new Date(iso));
+  const blocks = [say(words.briefHello, { day })];
+  const list = (title: string, lines: string[]) => {
+    if (lines.length) blocks.push([title, ...lines.map((line) => `• ${line}`)].join('\n'));
+  };
+  list(
+    words.briefFix,
+    brief.fix.map((one) => one.title),
+  );
+  list(
+    words.briefLate,
+    brief.late.slice(0, 8).map((one) => one.title),
+  );
+  list(
+    words.briefAgenda,
+    brief.agenda
+      .slice(0, 12)
+      .map((one) => `${one.allDay ? words.briefAllDay : hour(one.start)} — ${one.title}`),
+  );
+  list(
+    words.briefHabits,
+    brief.habits
+      .slice(0, 10)
+      .map(
+        (one) =>
+          `${one.today === 'done' ? '✓' : '○'} ${one.title} (${one.today === 'done' ? words.briefHabitDone : words.briefHabitTodo}${
+            one.rate30 === null
+              ? ''
+              : ` · ${say(words.briefRate, { rate: new Intl.NumberFormat(locale).format(one.rate30) })}`
+          })`,
+      ),
+  );
+  if (blocks.length === 1) blocks.push(words.briefQuiet);
+  blocks.push(words.briefEnd);
+  return blocks.join('\n\n');
+}
+
 /** Tells a person through her channel; false when she has none. */
 export function tellerFor(db: pg.Pool, telegramToken: string | undefined) {
   return async (due: Due) => {
@@ -84,6 +141,17 @@ export function watch(
         );
       }
       onPass(await watchOnce(db, now, tell));
+      // Her morning brief (spec 018), at the hour she chose, once a day.
+      if (telegramToken) {
+        for (const person of await briefPeople(db)) {
+          await briefOnce(db, person, now, async (brief) => {
+            const channel = await channelOf(db, person);
+            return channel.telegram
+              ? sendTelegram(telegramToken, channel.telegram, briefText(brief))
+              : false;
+          }).catch((error) => console.warn('[watcher] brief', (error as Error).message));
+        }
+      }
       // Her scheduled rules and « before » rules (spec 014), on the same clock.
       const rules = await runDueRules(db, now);
       if (rules.failed) console.warn('[watcher] rules', rules);

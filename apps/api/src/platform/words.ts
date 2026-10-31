@@ -156,6 +156,18 @@ export const appWords = {
     telegramOpen: 'Ouvrir le bot de Jarvis',
     telegramThen:
       'Appuie sur « Démarrer » dans Telegram. Le lien vaut {minutes} minutes ; Jarvis te répond dans la minute.',
+    briefTitle: 'Le brief du matin',
+    briefLead:
+      'Chaque matin à cette heure, Jarvis t’envoie ta journée sur Telegram : ce qui est en retard, ton agenda, tes habitudes.',
+    briefAt: 'Heure du brief',
+    briefNone: 'Pas de brief',
+    briefSaved: 'Brief du matin à {at}.',
+    briefOff: 'Brief du matin arrêté.',
+    briefShow: 'Voir le brief d’aujourd’hui',
+    briefSend: 'Me l’envoyer maintenant',
+    briefSent: 'Brief envoyé sur Telegram.',
+    briefNotSent: 'Pas envoyé : relie d’abord ton Telegram.',
+    briefNeedsTelegram: 'Relie ton Telegram pour le recevoir.',
     unfiled: 'Non classées',
     fileIn: 'Classer',
     fileInAsk:
@@ -554,6 +566,18 @@ export const appWords = {
     telegramOpen: 'Open Jarvis’s bot',
     telegramThen:
       'Press « Start » in Telegram. The link lasts {minutes} minutes; Jarvis answers within a minute.',
+    briefTitle: 'The morning brief',
+    briefLead:
+      'Each morning at this hour, Jarvis sends you your day on Telegram: what is late, your calendar, your habits.',
+    briefAt: 'Hour of the brief',
+    briefNone: 'No brief',
+    briefSaved: 'Morning brief at {at}.',
+    briefOff: 'Morning brief stopped.',
+    briefShow: 'See today’s brief',
+    briefSend: 'Send it to me now',
+    briefSent: 'Brief sent on Telegram.',
+    briefNotSent: 'Not sent: link your Telegram first.',
+    briefNeedsTelegram: 'Link your Telegram to receive it.',
     unfiled: 'Not filed',
     fileIn: 'File',
     fileInAsk: 'Which area should « {app} » go in? (e.g. Personal, Work — empty to unfile)',

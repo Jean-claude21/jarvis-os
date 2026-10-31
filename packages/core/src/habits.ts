@@ -127,6 +127,8 @@ export interface HabitRate {
   rate: number | null;
   /** Planned days not done, the latest first (at most fourteen). */
   missed: string[];
+  /** Today: planned and done, planned and still to do, or not planned. */
+  today: 'done' | 'todo' | null;
 }
 
 const dayNumber = (day: string) =>
@@ -175,5 +177,6 @@ export function rateOf(
     done: all.kept,
     rate: rate(all.kept, all.planned),
     missed: recent.missed.reverse().slice(0, 14),
+    today: !habit.plan.days.includes(weekdayOf(todayN)) ? null : done.has(today) ? 'done' : 'todo',
   };
 }

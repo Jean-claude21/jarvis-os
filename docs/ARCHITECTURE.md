@@ -233,6 +233,30 @@ flowchart LR
   R[renameKind] --> J
 ```
 
+## Every day, without lifting a finger (spec 018)
+
+- **A habit counts by itself**: it counts the entries of the kind it tracks (`tracks`, else the
+  kind its title names: « Prière » tracks « Prière ») and the entries done `for` it. A mention is
+  not a deed; a habit said twice shows once.
+- **Her real data read right**: an entry's day is also any other field holding a day, but an end, a
+  next or a last one; a moment she noted (a prayer at 05:10) is never « late ».
+- **The morning brief** (`brief.ts`): at the hour she chose (`preferences.brief`, on her clock),
+  the watcher sends her day on Telegram once — what to fix, what is late, today, her habits of
+  today. Missed by more than three hours, it waits for the next morning. `jarvis_brief_people()`
+  gives the watcher only who to tell; it then acts as each person.
+- **Her web account, cut by what it draws**: `apps/api/src/platform/client/` holds the script in
+  parts (ground, views, Entries, pages of her day, life and settings, bindings, router), styles and
+  icons; `page.ts` joins them in the order they run. No build step.
+
+```mermaid
+flowchart LR
+  W[watcher, each minute] --> P[jarvis_brief_people] --> O[briefOnce: her hour, once a day]
+  O --> B[morningBrief: attention · today · habits] --> T[briefText] --> TG[Telegram]
+  O --> C[(Channel.brief_sent)]
+  H[Habit] -->|tracks · its title| K[entries of that kind] --> R[rateOf]
+  H -->|link for| D[deeds] --> R
+```
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |
@@ -243,11 +267,11 @@ flowchart LR
 | `/app`  | her web account (spec 009): her life, spaces, connections, data | her session                          |
 | links   | `/upload/:token`, `/document/:token`, `/invitation#…`           | a token signed by the server         |
 | feed    | `/agenda/:key.ics`, her calendar for her phone                  | a key of hers, kept as its sha-256   |
-| watcher | her reminders, on Telegram                                      | acts as each member                  |
+| watcher | her reminders and her morning brief, on Telegram                | acts as each member                  |
 
 The REST API and the MCP tools call the same core functions: what one does, the other does. Her
 web account at `/app` (specs 009, 013) opens on « Maintenant » — what needs her, from `attention` —
-lists her apps from her models and her files; it is one page that reads and acts through `/api` with her session; its
+lists her apps from her models and her files; it is one page (its script cut in `platform/client/`) that reads and acts through `/api` with her session; its
 dashboards and documents are the clients' views, framed. A client she disconnects there is refused
 by `/mcp` at once.
 

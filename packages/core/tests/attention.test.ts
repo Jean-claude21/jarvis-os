@@ -40,6 +40,13 @@ beforeAll(async () => {
         },
         { kind: 'Idée', title: 'Ajuster le coucher', data: { status: 'proposed' } },
         { kind: 'Date', title: 'Anniversaire', data: { date: '2026-11-01' } },
+        // A moment she noted is not late; one she had to do is (spec 018).
+        { kind: 'Prière', title: 'Prière du 28', data: { at: '2026-10-28T05:10' } },
+        {
+          kind: 'Tâche',
+          title: 'Appeler la banque',
+          data: { at: '2026-10-28T10:00', status: 'planned' },
+        },
       ],
     }),
   );
@@ -50,6 +57,7 @@ describe('what needs her now', () => {
     const seen = await ama.as((tx) => attention(tx, [ama.space], now));
     expect(seen.items.map((one) => `${one.group}:${one.title}`)).toEqual([
       'fix:Taxe foncière',
+      'late:Appeler la banque',
       'late:Rembourser Paul',
       'proposed:Mémoire',
       'proposed:Ajuster le coucher',

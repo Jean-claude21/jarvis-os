@@ -23,7 +23,12 @@ jobs:
 
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The suite runs against one shared Neon branch, file after file: about twenty minutes.
+    timeout-minutes: 40
+    # One run at a time on that branch: a pull request and a push to dev never write it together.
+    concurrency:
+      group: neon-test
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

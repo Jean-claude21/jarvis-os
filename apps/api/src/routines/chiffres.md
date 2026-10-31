@@ -7,7 +7,7 @@ when: elle demande un total, un reste, une moyenne, une évolution, « combien �
 
 0. Pour un nombre, une régularité ou une série sur une liste (« combien de prières cette semaine »,
    « ma série », « à quelle heure »), appelle d'abord `stats` (kind, période, dossier) : chaque
-   entrée y compte à sa propre date. Une habitude reliée y donne son taux (jours prévus contre faits)
+   entrée y compte à sa propre date. Une habitude y donne son taux (jours prévus contre faits)
    et ses jours manqués.
 1. Appelle `kinds` pour connaître les types et les champs (ex. « Dépense » : montant, date, poste).
 2. Écris un seul `select` sur `my_entries` (colonnes : id, kind, title, data, origin, created_at,

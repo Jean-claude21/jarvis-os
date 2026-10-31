@@ -51,6 +51,7 @@ import {
   collectionsOf,
   collectionStats,
   preferencesOf,
+  morningBrief,
   setPreferences,
   changeEntries,
   groupKind,
@@ -74,6 +75,7 @@ import type pg from 'pg';
 import { z } from 'zod';
 import { shippedApp, shippedApps } from './apps';
 import { telegramLink } from './telegram';
+import { briefText, channelOf, sendTelegram } from './watcher';
 import type { Auth } from './auth';
 import { codeOf, failure } from './errors';
 import { invitationLink, namesOf, spaceFor } from './spaces';
@@ -691,6 +693,21 @@ export function apiRoutes(deps: {
   api.post('/me/telegram', async (c) =>
     c.json(await telegramLink(deps.db, actorOf(c), process.env.JARVIS_TELEGRAM_BOT_TOKEN)),
   );
+
+  // Her morning brief (spec 018): read now, or sent now on her Telegram to try it.
+  api.get('/me/brief', async (c) => {
+    const brief = await as(c, (tx) => morningBrief(tx));
+    return c.json({ brief, text: briefText(brief) });
+  });
+  api.post('/me/brief', async (c) => {
+    const brief = await as(c, (tx) => morningBrief(tx));
+    const token = process.env.JARVIS_TELEGRAM_BOT_TOKEN;
+    const channel = await channelOf(deps.db, c.get('person'));
+    const sent = Boolean(
+      token && channel.telegram && (await sendTelegram(token, channel.telegram, briefText(brief))),
+    );
+    return c.json({ sent });
+  });
 
   // Her personal keys (spec 015): made, listed, revoked from her settings; a key is shown once.
   api.get('/me/keys', async (c) => c.json(await as(c, (tx) => keysOf(tx))));

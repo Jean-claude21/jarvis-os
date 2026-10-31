@@ -106,8 +106,9 @@ export async function attention(
     reason,
   });
 
-  // Late: a moment or a deadline of the last month that passed and is not done. An event that
-  // happened is not late; a repetition goes on by itself.
+  // Late: a deadline of the last month that passed and is not done, or a moment said to be done
+  // (it has a status: planned, to do). An event that happened is not late, nor a moment she noted
+  // (a prayer at 05:10); a repetition goes on by itself.
   const month = await agenda(tx, spaceIds, {
     from: new Date(start.getTime() - 30 * 86_400_000),
     to: end,
@@ -116,7 +117,7 @@ export async function attention(
   for (const one of month) {
     if (one.repeated || !open(one)) continue;
     const passed = one.allDay ? new Date(one.end ?? one.start) <= start : new Date(one.start) < now;
-    if (passed && (one.type === 'moment' || one.type === 'deadline'))
+    if (passed && ((one.type === 'moment' && one.status) || one.type === 'deadline'))
       add(item(one, 'late', 'late'));
   }
 

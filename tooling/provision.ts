@@ -121,10 +121,13 @@ async function uri(projectId: string, branchId: string, role: string, password?:
     'GET',
     `/projects/${projectId}/connection_uri?branch_id=${branchId}&database_name=neondb&role_name=neondb_owner`,
   );
-  if (role === 'neondb_owner') return uri;
   const url = new URL(uri);
-  url.username = role;
-  url.password = password!;
+  // The certificate and the host verified, as `pg` will require (« require » is ambiguous).
+  url.searchParams.set('sslmode', 'verify-full');
+  if (role !== 'neondb_owner') {
+    url.username = role;
+    url.password = password!;
+  }
   return url.toString();
 }
 

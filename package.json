@@ -14,7 +14,8 @@
     "format:check": "prettier --check .",
     "test": "pnpm -r --workspace-concurrency=1 test",
     "db:migrate": "pnpm -r --if-present db:migrate",
-    "provision": "tsx tooling/provision.ts"
+    "provision": "tsx tooling/provision.ts",
+    "serve": "tsx tooling/serve.ts"
   },
   "devDependencies": {
     "@aws-sdk/client-s3": "^3.1158.0",

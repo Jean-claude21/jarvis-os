@@ -1,24 +1,15 @@
 import { required } from '@jarvis-os/core';
+import { getSchema } from 'better-auth/db';
 import { getMigrations } from 'better-auth/db/migration';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { makeAuth } from './auth';
 
-/** The core's own tables: their grants are the core migrations' business. */
-const coreTables = new Set([
-  'space',
-  'member',
-  'entry',
-  'link',
-  'journal',
-  'file',
-  'jarvis_migration',
-]);
-
 /**
  * The accounts' tables, as Better Auth needs them, made or completed by the owner; then granted to
  * `jarvis_app`. They are global by nature (an account is not in a space) and never granted to
- * `jarvis_reader`.
+ * `jarvis_reader`. Only Better Auth's own tables: every other table's grants are the core
+ * migrations' business (spec 021 found the lease, the outbox and others granted here by mistake).
  */
 export async function migrateAccounts(ownerUrl: string): Promise<string[]> {
   const owner = new pg.Pool({ connectionString: ownerUrl, max: 2 });
@@ -31,11 +22,7 @@ export async function migrateAccounts(ownerUrl: string): Promise<string[]> {
     });
     const { toBeCreated, toBeAdded, runMigrations } = await getMigrations(auth.options);
     await runMigrations();
-    const { rows } = await owner.query<{ name: string }>(
-      `select table_name as name from information_schema.tables
-        where table_schema = 'public' and table_type = 'BASE TABLE'`,
-    );
-    for (const { name } of rows.filter((row) => !coreTables.has(row.name))) {
+    for (const name of Object.keys(getSchema(auth.options))) {
       await owner.query(`grant select, insert, update, delete on table "${name}" to jarvis_app`);
     }
     return [...toBeCreated, ...toBeAdded].map((table) => table.table);

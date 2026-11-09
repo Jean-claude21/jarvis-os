@@ -3,9 +3,11 @@ import {
   briefOnce,
   briefPeople,
   find,
+  giveLease,
   pool,
   save,
   spacesOf,
+  takeLease,
   watchOnce,
   runDueRules,
   useScriptRunner,
@@ -13,6 +15,8 @@ import {
   type Due,
   type PassReport,
 } from '@jarvis-os/core';
+import { randomBytes } from 'node:crypto';
+import { hostname } from 'node:os';
 import { parseArgs } from 'node:util';
 import type pg from 'pg';
 import {
@@ -27,6 +31,9 @@ import { wordsOf, type Lang } from './i18n';
 import { quickjsRunner } from './scripts';
 import { readTelegramLinks } from './telegram';
 import { settingsFor, type Branch } from './settings';
+
+/** Who this watcher is, for its lease (spec 021): the machine and this process. */
+export const WATCHER_HOLDER = `${process.env.NETLIFY ? 'netlify' : hostname()}:${process.pid}:${randomBytes(3).toString('hex')}`;
 
 /** How often the watcher looks: once a minute, the precision of a reminder. */
 export const WATCH_EVERY_MS = 60_000;
@@ -118,14 +125,27 @@ export function tellerFor(db: pg.Pool, delivery: Delivery) {
  * One pass of the watcher (specs 010, 020): the Telegram links, the reminders due and the morning
  * briefs entered in the outbox, the outbox delivered, the rules on a schedule. The local loop runs
  * it each minute; on Netlify, a scheduled function runs it each minute too. Its failures are
- * logged, never thrown.
+ * logged, never thrown. It runs only while it holds the database's lease (spec 021).
  */
 export async function watcherPass(
   db: pg.Pool,
   delivery: Delivery,
   now: Date = new Date(),
+  holder: string = WATCHER_HOLDER,
 ): Promise<PassReport | null> {
   useScriptRunner(quickjsRunner);
+  // One watcher at a time on a database (spec 021): another holding the lease, this pass is skipped.
+  try {
+    if (!(await takeLease(db, 'watcher', holder))) {
+      console.info('[watcher] another watcher holds the lease: pass skipped');
+      return null;
+    }
+  } catch (error) {
+    console.error('[watcher] lease', (error as Error).message);
+    return null;
+  }
+  let report: PassReport | null = null;
+  let failure: string | undefined;
   try {
     // Who pressed « Start » with her code (spec 015), before telling anyone.
     if (delivery.telegramToken) {
@@ -133,7 +153,7 @@ export async function watcherPass(
         (error) => console.warn('[watcher] telegram', (error as Error).message),
       );
     }
-    const report = await watchOnce(db, now, tellerFor(db, delivery));
+    report = await watchOnce(db, now, tellerFor(db, delivery));
     // Her morning brief (spec 018), at the hour she chose, once a day.
     for (const person of await briefPeople(db)) {
       await briefOnce(db, person, now, async (brief) => {
@@ -158,8 +178,13 @@ export async function watcherPass(
     if (rules.failed) console.warn('[watcher] rules', rules);
     return report;
   } catch (error) {
-    console.error('[watcher]', (error as Error).message);
+    failure = (error as Error).message;
+    console.error('[watcher]', failure);
     return null;
+  } finally {
+    await giveLease(db, 'watcher', holder, failure ? { error: failure } : { report }).catch(
+      (error) => console.warn('[watcher] lease', (error as Error).message),
+    );
   }
 }
 

@@ -27,8 +27,11 @@ const envOf = (path: string): Record<string, string> =>
       )
     : {};
 
-const secrets = envOf(process.argv[2] ?? '../.secrets/atelier-admin.env');
-const apiKey = secrets.NEON_API_KEY ?? process.env.NEON_API_KEY;
+const secrets = {
+  ...envOf('../.secrets/.admin.env'),
+  ...envOf(process.argv[2] ?? '../.secrets/atelier-admin.env'),
+};
+const apiKey = secrets.NEON_API_KEY ?? secrets.NEON_API_TOKEN ?? process.env.NEON_API_KEY;
 if (!apiKey) throw new Error('NEON_API_KEY is missing (secrets file or environment).');
 const current = envOf('.env');
 
@@ -131,11 +134,13 @@ async function uri(projectId: string, branchId: string, role: string, password?:
   return url.toString();
 }
 
-const appPassword = current.JARVIS_APP_PASSWORD || randomBytes(24).toString('base64url');
+let appPassword = current.JARVIS_APP_PASSWORD ?? '';
 
 /**
  * The role the application connects with: it logs in, never bypasses RLS, owns nothing. Made on
- * `main` before the branches, so they inherit it with the same password.
+ * `main` before the branches, so they inherit it with the same password. When it exists already,
+ * its password is never invented nor changed (spec 010: a new one written to `.env` once took
+ * production down): it must come from `.env`, or the run stops and says so.
  */
 async function appRole(projectId: string, mainId: string) {
   const client = new pg.Client({ connectionString: await uri(projectId, mainId, 'neondb_owner') });
@@ -143,8 +148,13 @@ async function appRole(projectId: string, mainId: string) {
   try {
     const { rowCount } = await client.query("select 1 from pg_roles where rolname = 'jarvis_app'");
     if (!rowCount) {
+      appPassword ||= randomBytes(24).toString('base64url');
       await client.query(`create role jarvis_app login nobypassrls password '${appPassword}'`);
       console.info('role jarvis_app created');
+    } else if (!appPassword) {
+      throw new Error(
+        'The role jarvis_app exists: set JARVIS_APP_PASSWORD in .env (it is not invented, never changed).',
+      );
     }
   } finally {
     await client.end();
@@ -199,7 +209,13 @@ const lines = [
   `JARVIS_NEON_PROJECT_ID=${projectId}`,
   `JARVIS_APP_PASSWORD=${appPassword}`,
 ];
-for (const name of BRANCHES) {
+// Production (`main`) is reached by Netlify only (spec 010): no credential of it lands on a laptop.
+lines.push(
+  '',
+  '# Branch main (production): credentials in Netlify only',
+  `JARVIS_MAIN_BRANCH_ID=${all.main.id}`,
+);
+for (const name of BRANCHES.filter((one) => one !== 'main')) {
   const branch = all[name];
   const prefix = `JARVIS_${name.toUpperCase()}`;
   const files = await storage(projectId, branch, prefix);
@@ -221,9 +237,13 @@ lines.push(
   '# Accounts: one secret per environment, at least 32 characters.',
   `JARVIS_DEV_AUTH_SECRET=${current.JARVIS_DEV_AUTH_SECRET || randomBytes(32).toString('base64url')}`,
   `JARVIS_TEST_AUTH_SECRET=${current.JARVIS_TEST_AUTH_SECRET || randomBytes(32).toString('base64url')}`,
-  '',
 );
-writeFileSync('.env', lines.join('\n'));
+// What provisioning does not manage (the tunnel, the Netlify site, Telegram…) is kept as it was.
+const managed = /^JARVIS_(NEON_PROJECT_ID|APP_PASSWORD|(MAIN|DEV|TEST)_.+)$/;
+const kept = Object.entries(current).filter(([key]) => !managed.test(key));
+if (kept.length)
+  lines.push('', '# Kept as it was', ...kept.map(([key, value]) => `${key}=${value}`));
+writeFileSync('.env', [...lines, ''].join('\n'));
 console.info(
   `.env written: project ${projectId}, branches ${BRANCHES.join(', ')}, storage on each.`,
 );

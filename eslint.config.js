@@ -2,7 +2,15 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/node_modules/**', '**/dist/**', '.specify/**', '.claude/**'] },
+  {
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '.specify/**',
+      '.claude/**',
+      'apps/api/netlify/.build/**',
+    ],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
 );

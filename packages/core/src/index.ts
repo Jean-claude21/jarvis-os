@@ -250,3 +250,4 @@ export {
   RETRY_MINUTES,
   type Message,
 } from './outbox';
+export { LEASE_SECONDS, giveLease, lastPass, takeLease, type LastPass } from './lease';

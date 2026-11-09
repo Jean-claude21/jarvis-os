@@ -279,6 +279,22 @@ flowchart LR
   D -->|email| S[SMTP] --> M[her mailbox] -->|link| A[GET /act: a page] -->|POST| R[the reminder changed, journaled]
 ```
 
+## One watcher at a time (spec 021)
+
+Any number of watchers may run on a database (Netlify each minute, a laptop through `pnpm serve`):
+before a pass, `watcherPass` takes the lease `watcher` (`lease.ts`, migration `0015`), and skips the
+pass while another holder has it. A pass gives the lease back when it ends, with its report or its
+error; a holder that stops in the middle loses it after five minutes. The lease row is the trace of
+the last pass: who, when, how it ended. The application reaches it through its functions only.
+
+```mermaid
+flowchart LR
+  N[watcher on Netlify] -->|jarvis_lease_take| L[(watcher_lease)]
+  P[watcher on a laptop] -->|jarvis_lease_take| L
+  L -->|free or expired: taken| R[the pass] -->|jarvis_lease_give: report or error| L
+  L -->|held by another| S[pass skipped]
+```
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |

@@ -257,6 +257,28 @@ flowchart LR
   H -->|link for| D[deeds] --> R
 ```
 
+## Every message, on her channel, and its trace (spec 020)
+
+- **The outbox** (`outbox.ts`, migration `0013`): the watcher no longer writes to Telegram. A
+  reminder due or a morning brief enters the table `outbox` once per channel (a dedupe key per
+  occurrence), then is delivered: sent, or tried again after 1, 5 and 30 minutes, then failed with
+  its reason. Each row is hers (`person_id`, its policy); `GET /api/outbox` shows her last days.
+- **Her channels** (`channels.ts`): Telegram by the bot, e-mail by any SMTP server
+  (`JARVIS_SMTP_URL`, `JARVIS_EMAIL_FROM`). She chooses per kind in her « Channel »
+  (`preferences.channels`); without a choice, Telegram when linked, else e-mail.
+- **Acting from an e-mail** (`act.ts`): a reminder's e-mail carries four links — done, in one hour,
+  tomorrow, not for me — signed with the branch's secret, valid seven days, used once. Opening one
+  shows a page; only its button (a POST) acts, as her, journaled through the door « email ».
+
+```mermaid
+flowchart LR
+  W[watcher, each minute] -->|reminders, briefs| E[enterMessage: once per channel]
+  E --> O[(outbox)]
+  W --> D[deliverOutbox] --> O
+  D -->|telegram| T[Telegram bot]
+  D -->|email| S[SMTP] --> M[her mailbox] -->|link| A[GET /act: a page] -->|POST| R[the reminder changed, journaled]
+```
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |
@@ -300,11 +322,13 @@ writes `.env` with the credentials of `dev` and `test` only: those of `main` liv
 Production runs on Netlify, built from this repository: `pnpm deploy:draft` bundles the two
 functions (esbuild, every dependency inside, QuickJS's WebAssembly file, the shipped apps and the
 routines beside them) and deploys them to a private address; `pnpm deploy:prod` does the same to
-the production site, from a clean `main` only.
+the production site, from a clean `main` only, after applying to Neon `main` the migrations not
+applied yet (its owner's address asked of Neon, kept in memory).
 
 ```mermaid
 flowchart LR
   R[main, this repository] -->|pnpm deploy:prod| N[Netlify]
+  R -->|its migrations first| M
   N --> A[function api · every request · Hono app]
   N --> W[function watcher · each minute · watcherPass]
   A --> M[(Neon main · her life)]

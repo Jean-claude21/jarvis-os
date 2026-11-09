@@ -37,6 +37,7 @@ import type { Settings } from './settings';
 import { objectStorage } from './storage';
 import { appPage } from './platform/page';
 import { spaceFor } from './spaces';
+import { actRoutes } from './act';
 import { computeDashboard, dashboardView, widgetsOf } from './views/dashboard';
 import { pageView } from './views/page';
 import { sharedView } from './views/shared';
@@ -64,6 +65,8 @@ export function makeApp(settings: Settings) {
 
   app.get('/health', (c) => c.json({ status: 'healthy' }));
   app.on(['GET', 'POST'], '/auth/*', (c) => auth.handler(c.req.raw));
+  // Actions from an e-mail (spec 020): a signed link, a page that asks, a button that acts.
+  app.route('/act', actRoutes({ db, secret: settings.authSecret }));
   // Discovery at the root, where MCP clients look first. The protected resource's metadata
   // (RFC 9728) is matched by the MCP plugin on the path as it is; the authorization server's
   // (RFC 8414, path-inserted) is answered by the same handler as under /auth.

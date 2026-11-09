@@ -80,6 +80,7 @@ import { telegramLink } from './telegram';
 import { briefText, channelOf, sendTelegram } from './watcher';
 import type { Auth } from './auth';
 import { codeOf, failure } from './errors';
+import { connectorChange, connectorInput, type ConnectorService } from './connector-service';
 import { invitationLink, namesOf, spaceFor } from './spaces';
 import { computeDashboard, widgetSchema, widgetsOf, type Widget } from './views/dashboard';
 import { DOCUMENT_HOURS, documentShown, documentToken } from './views/document';
@@ -139,6 +140,7 @@ export function apiRoutes(deps: {
   auth: Auth;
   db: pg.Pool;
   blobs: Blobs;
+  connectors: ConnectorService;
   publicUrl: string;
   secret: string;
 }) {
@@ -611,6 +613,33 @@ export function apiRoutes(deps: {
       'content-type': 'application/zip',
       'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(`${space.name} ${day}.zip`)}`,
     });
+  });
+
+  // Her connectors (spec 025): the tools of other servers, reached through Jarvis. Never a secret
+  // in an answer.
+  api.get('/connectors', async (c) =>
+    c.json(
+      await deps.connectors.list(
+        c.get('person'),
+        c.get('spaces').map((one) => one.id),
+      ),
+    ),
+  );
+  api.post('/connectors', async (c) => {
+    const input = connectorInput.parse(await c.req.json());
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    return c.json(await deps.connectors.add(actorOf(c), space.id, input), 201);
+  });
+  api.post('/connectors/:id/check', async (c) =>
+    c.json(await deps.connectors.check(c.get('person'), c.req.param('id'))),
+  );
+  api.patch('/connectors/:id', async (c) => {
+    const input = connectorChange.parse(await c.req.json());
+    return c.json(await deps.connectors.change(actorOf(c), c.req.param('id'), input));
+  });
+  api.delete('/connectors/:id', async (c) => {
+    await deps.connectors.cut(actorOf(c), c.req.param('id'));
+    return c.json({ cut: c.req.param('id') });
   });
 
   // Her space's nightly backups (spec 022): the list, and a link that opens one for ten minutes.

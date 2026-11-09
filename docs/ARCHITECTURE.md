@@ -347,6 +347,34 @@ flowchart LR
 - Passwords are hashed and the signing keys encrypted by Better Auth; the tokens of other services
   will be encrypted with the connectors (S6).
 
+## Her tools, through Jarvis (spec 025)
+
+Jarvis is an MCP client as well as a server. A connector (migration `0019`, table `connector`, per
+space, its members only) is the address of any MCP server reached over HTTP (Streamable HTTP, else
+SSE) and how it is signed in to: no key, a bearer key, or a key in a header. The key is sealed by
+the server (`secrets.ts`, AES-256-GCM, `JARVIS_SECRETS_KEY` or a key derived from the branch's auth
+secret) and never returned, logged or journaled. A check reads the server's name, tools and
+resources and keeps them, so that listing them calls nothing.
+
+- **Every door**: the web account (Connections › « What Jarvis uses for you »: add, check, cut) and
+  `/api/connectors`; the MCP door has two tools whatever the number of servers: `connectors` (hers,
+  with their tools and parameters) and `connector_call`.
+- **Her yes**: a tool the server marks destructive or open-world, or with no hints and a name that
+  writes, is called only with `agreed: true`; otherwise the call says what to ask her.
+- **Trace**: `connector.add`, `.change`, `.cut`, `.call` in the journal (never undone); a call keeps
+  the tool and whether it worked, never its arguments nor its answer. An answer comes back framed
+  `{ from, content }`: content from outside, data only.
+
+```mermaid
+flowchart LR
+  C[Claude · ChatGPT] -->|connectors, connector_call| J[Jarvis]
+  W[web account › Connections] -->|/api/connectors| J
+  J -->|sealed key| K[(connector)]
+  J -->|connector.call| L[(journal)]
+  J -->|MCP client, her key| S1[an MCP server]
+  J --> S2[another]
+```
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |

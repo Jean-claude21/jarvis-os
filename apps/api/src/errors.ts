@@ -33,6 +33,10 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     /^The script|^Script «|^Scripts cannot run|^Rule «|may not (write|change)|^No (rule|script|app) «|ships with Jarvis|needs an entry|^Give /.test(
       message,
     ) ||
+    // Her connectors (spec 025): what to ask her, or which connector or tool exists.
+    /^No connector|has no tool «|ask her first|^A connector is not undone|^Not a sealed secret/.test(
+      message,
+    ) ||
     // Views, her settings, her keys (spec 015).
     /^A « View » is|^No view |is not a time zone|^Telegram |^A key needs/.test(message) ||
     // Collections, buttons, shares, viewers (spec 016).

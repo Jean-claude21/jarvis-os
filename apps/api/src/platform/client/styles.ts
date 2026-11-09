@@ -241,9 +241,39 @@ label.check { display: flex; gap: 8px; align-items: center; padding: 5px 0; }
 @media (max-width: 640px) { .cday { min-height: 54px; } .cev { font-size: 10.5px; } }
 details.area summary { cursor: pointer; list-style: none; margin: 8px 0 2px; }
 details.area summary::-webkit-details-marker { display: none; }
-.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--rule); overflow-x: auto; margin-bottom: 14px; }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--rule); overflow-x: auto; overflow-y: hidden; margin-bottom: 14px; }
 .tabs a { padding: 8px 12px; text-decoration: none; color: var(--bark); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; font-size: 13.5px; }
 .tabs a.on { color: var(--ink); border-color: var(--primary); font-weight: 600; }
+.tabs a .n { font: 500 11px/1 "JetBrains Mono", monospace; color: var(--bark); margin-left: 4px; }
+/* Connections (spec 025): assistants come to Jarvis, Jarvis goes to her tools. */
+.flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 6px; }
+.flow-node { padding: 5px 10px; border: 1px solid var(--rule-strong); border-radius: 2px; background: var(--paper); font-size: 13px; }
+.flow-node.main { border-color: var(--primary); color: var(--primary); font-weight: 600; }
+.flow-arrow { color: var(--bark); }
+.flow-lead { margin: 0 0 14px; max-width: 70ch; }
+.tools-group { margin: 22px 0 10px; }
+.tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.tool { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 16px; border: 1px solid var(--rule); border-radius: 2px; background: var(--paper); }
+.tool-head { display: flex; gap: 12px; align-items: center; min-width: 0; }
+.tool-title { display: grid; gap: 3px; min-width: 0; }
+.tool-title h3 { margin: 0; font-size: 15px; line-height: 1.25; overflow-wrap: anywhere; }
+.logo { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 8px; font: 700 17px "Instrument Sans", sans-serif; box-shadow: inset 0 0 0 1px rgba(127, 127, 127, .18); }
+.logo svg { width: 22px; height: 22px; fill: currentColor; }
+.way { font: 500 10.5px/1.3 "JetBrains Mono", monospace; letter-spacing: .04em; text-transform: uppercase; color: var(--bark); }
+.tool-text, .tool-meta, .tool-reason, .tool-wait { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--bark); overflow-wrap: anywhere; }
+.tool-reason { color: var(--error); }
+.tool-wait { padding: 8px 10px; background: var(--sand); border: 1px dashed var(--rule-strong); border-radius: 2px; }
+.tool-form { display: grid; gap: 8px; margin-top: auto; }
+.tool-form.wide { gap: 14px; }
+.tool-form .field, .tool-form select { width: 100%; box-sizing: border-box; }
+.tool-go { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: auto; }
+.tool-help { font-size: 12.5px; color: var(--bark); }
+.tool-list summary { cursor: pointer; font: 500 11px "JetBrains Mono", monospace; text-transform: uppercase; color: var(--bark); }
+.tool-list ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--bark); display: grid; gap: 4px; }
+.state { justify-self: start; padding: 2px 7px; border-radius: 999px; font: 500 11px "JetBrains Mono", monospace; background: var(--sand); color: var(--bark); }
+.state.connected { background: var(--success-surface, #e6f2ea); color: var(--success); }
+.state.needs_sign_in { background: var(--info-surface); color: var(--info); }
+.state.refused, .state.unreachable { background: var(--error-surface, #f8e4e1); color: var(--error); }
 tr.group td { background: var(--sand); font: 500 11px "JetBrains Mono", monospace; text-transform: uppercase; color: var(--bark); }
 tr.total td { border-top: 1px solid var(--rule-strong); font-weight: 600; background: var(--sand); }
 .neg { color: var(--error); } .pos { color: var(--success); }

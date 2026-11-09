@@ -80,7 +80,7 @@ import { telegramLink } from './telegram';
 import { briefText, channelOf, sendTelegram } from './watcher';
 import type { Auth } from './auth';
 import { codeOf, failure } from './errors';
-import { CATALOG } from './catalog';
+import { catalogFor } from './catalog';
 import { connectorChange, connectorInput, type ConnectorService } from './connector-service';
 import { invitationLink, namesOf, spaceFor } from './spaces';
 import { computeDashboard, widgetSchema, widgetsOf, type Widget } from './views/dashboard';
@@ -632,7 +632,7 @@ export function apiRoutes(deps: {
     return c.json(await deps.connectors.add(actorOf(c), space.id, input), 201);
   });
   // « Discover »: the servers their makers host, ready to connect.
-  api.get('/connectors/catalog', (c) => c.json(CATALOG));
+  api.get('/connectors/catalog', (c) => c.json(catalogFor()));
   // Her sign-in to a server that asks for it (spec 025, US4): its page, then back here.
   api.post('/connectors/:id/sign-in', async (c) =>
     c.json({ url: await deps.connectors.signIn(c.get('person'), c.req.param('id')) }),

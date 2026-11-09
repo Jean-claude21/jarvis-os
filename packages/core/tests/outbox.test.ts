@@ -42,6 +42,12 @@ describe('the outbox', () => {
     expect(second).toBeNull();
   });
 
+  it('is due in the pass that entered it, even on a server clock behind the database', async () => {
+    const id = (await enter(ama, `clock:${ama.actor.person}:${Date.now()}`))!;
+    const behind = new Date(Date.now() - 30_000);
+    expect((await pendingMessages(db, behind)).some((one) => one.id === id)).toBe(true);
+  });
+
   it('tries again after a failure, then fails for good after the last try, with the reason', async () => {
     const id = (await enter(ama, `retry:${ama.actor.person}:${Date.now()}`))!;
     const due = async (at: Date) => (await pendingMessages(db, at)).some((one) => one.id === id);

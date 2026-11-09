@@ -392,6 +392,14 @@ tesseract.js for photos (French and English). The words go to `file.text` (up to
 characters), where `find` already looks. A file that cannot be read is `failed` with its reason,
 once; a photo without writing is `none`.
 
+## Search that finds (spec 027)
+
+One rule for every search by words (`search.ts`): every word present in the title, the fields or a
+file's words, accents and case aside; the best first (a word in the title counts 3, in a field 2,
+in a file 1). When no entry holds every word, words close to hers count, by trigrams (`pg_trgm`,
+migration `0022`, word similarity at least 0.6): a typing slip, a plural. Search by meaning waits
+for the author's choice of model.
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |

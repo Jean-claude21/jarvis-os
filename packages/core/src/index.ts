@@ -266,6 +266,7 @@ export {
   connectorWithSecret,
   cutConnector,
   recordCall,
+  setOAuth,
   setProbe,
   type Connector,
   type ConnectorAuth,

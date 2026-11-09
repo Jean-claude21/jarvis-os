@@ -21,6 +21,7 @@
 
 ## Later in this feature (P2)
 
-- [ ] T009 Resources: list and read a connector's resources (US3)
-- [ ] T010 OAuth sign-in to servers that ask for it (US4)
+- [x] T009 Resources: listed at each check, read through the API (US3)
+- [x] T010 OAuth sign-in to servers that ask for it (US4); proof in `apps/api/tests/connectors-oauth.test.ts`; tried against Notion up to its sign-in page
+- [x] T012 « Discover »: the catalog of hosted servers, one click; « Add my own connector »; every address checked live
 - [ ] T011 The watcher's use of connectors (background syncs)

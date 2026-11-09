@@ -63,7 +63,11 @@ export function makeApp(settings: Settings) {
   useScriptRunner(quickjsRunner);
   const blobs = objectStorage(settings.storage);
   // Her connectors (spec 025): their secrets sealed with the branch's key.
-  const connectors = connectorService({ db, key: secretsKey(settings.authSecret) });
+  const connectors = connectorService({
+    db,
+    key: secretsKey(settings.authSecret),
+    publicUrl: settings.publicUrl,
+  });
   const auth = makeAuth({ db, secret: settings.authSecret, publicUrl: settings.publicUrl });
   const resource = mcpResource(settings.publicUrl);
   const app = new Hono();

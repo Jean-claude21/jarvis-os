@@ -302,7 +302,8 @@ flowchart LR
   storage) into `backups/<space>/<day>.zip`, a few spaces each pass, acting as a member. Thirty
   days are kept. She lists them (`GET /api/backups`) and opens one by a ten-minute link; `import`
   reads one back.
-- **The database, each night** (`pnpm backup`, the workflow « Backup »): `main` kept as a Neon
+- **The database, each night** (`pnpm backup` by hand; on Cloudflare, the Worker
+  `jarvis-os-backup` at 01:30 UTC, deployed by `pnpm cron:deploy`): `main` kept as a Neon
   branch `backup-main-<day>`, the last three kept (Neon itself goes back six hours on its free
   plan). `pnpm backup restore --from <backup> --into <branch>` shows what each holds; `--apply`
   restores, keeping the state before as `<branch>_before_restore_<stamp>`. Neon then makes the
@@ -313,7 +314,7 @@ flowchart LR
   W[watcher, each pass] -->|jarvis_backup_due| S[spaces without the day's backup]
   S -->|as a member: exportMarkdown, zip| B[(storage: backups/space/day.zip)]
   S --> R[(space_backup: 30 days)]
-  G[GitHub, each night] -->|pnpm backup| N[Neon: backup-main-day, 3 kept]
+  G[Cloudflare Worker, each night] -->|Neon API| N[Neon: backup-main-day, 3 kept]
   N -->|pnpm backup restore --apply| M[(main)]
 ```
 
@@ -356,6 +357,14 @@ the server (`secrets.ts`, AES-256-GCM, `JARVIS_SECRETS_KEY` or a key derived fro
 secret) and never returned, logged or journaled. A check reads the server's name, tools and
 resources and keeps them, so that listing them calls nothing.
 
+- **Signed in to (OAuth)**: a server that asks her to sign in gets Jarvis registered with it, her
+  passage through its sign-in page (PKCE, a state naming the connector) and back to
+  `/api/connectors/callback`; the tokens are sealed like a key (`oauth_sealed`, migration `0020`)
+  and renewed by the MCP client. Until then the connector is `needs_sign_in`.
+- **Discover** (`catalog.ts`): the servers their makers host (Notion, Asana, Linear, Atlassian,
+  Canva, PayPal, Stripe, GitHub, Hugging Face, Microsoft Learn, DeepWiki; Zapier for Gmail, Google
+  Calendar, Drive, Outlook…), added in one click; « Add my own connector » for any other.
+- **Resources**: `GET /api/connectors/:id/resources/read?uri=` reads one, framed as outside content.
 - **Every door**: the web account (Connections › « What Jarvis uses for you »: add, check, cut) and
   `/api/connectors`; the MCP door has two tools whatever the number of servers: `connectors` (hers,
   with their tools and parameters) and `connector_call`.

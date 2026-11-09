@@ -20,6 +20,7 @@ import { hostname } from 'node:os';
 import { parseArgs } from 'node:util';
 import type pg from 'pg';
 import { backupOnce } from './backups';
+import { readOnce } from './reading';
 import {
   channelOf,
   deliverOutbox,
@@ -183,6 +184,12 @@ export async function watcherPass(
       const backups = await backupOnce(db, delivery.blobs, now);
       done.backups = backups;
       if (backups.failed) console.warn('[watcher] backups', backups);
+    }
+    // Her files read (spec 026): PDF, Word, photos, a few each pass.
+    if (delivery.blobs) {
+      const reading = await readOnce(db, delivery.blobs);
+      done.reading = reading;
+      if (reading.failed) console.warn('[watcher] reading', reading);
     }
     // Her scheduled rules and « before » rules (spec 014), on the same clock.
     const rules = await runDueRules(db, now);

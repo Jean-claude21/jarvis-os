@@ -1,3 +1,4 @@
+import type pg from 'pg';
 import type { Actor, Tx } from './db';
 import { save } from './entries';
 import type { LinkInput, Origin } from './schemas';
@@ -16,7 +17,65 @@ export interface Blobs {
 }
 
 export const FILE_MAX_BYTES = 20 * 1024 * 1024;
+
+/** Files whose words are read after the upload, by the watcher (spec 026): PDF, Word, photos. */
+export const READ_LATER = new Set([
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+]);
+
+/** A file waiting to be read, with a member of its space to read it as. */
+export interface FileToRead {
+  entryId: string;
+  spaceId: string;
+  person: string;
+  storageKey: string;
+  mediaType: string;
+}
+
+/** The files waiting to be read, the oldest first. */
+export async function filesToRead(db: pg.Pool, max: number): Promise<FileToRead[]> {
+  const { rows } = await db.query<{
+    entry_id: string;
+    space_id: string;
+    person: string;
+    storage_key: string;
+    media_type: string;
+  }>('select * from jarvis_files_to_read($1)', [max]);
+  return rows.map((row) => ({
+    entryId: row.entry_id,
+    spaceId: row.space_id,
+    person: row.person,
+    storageKey: row.storage_key,
+    mediaType: row.media_type,
+  }));
+}
+
+/** What a file says, once read: its words kept for `find`, or why it could not be read. */
+export async function setFileWords(
+  tx: Tx,
+  entryId: string,
+  outcome: { text: string | null } | { error: string },
+): Promise<void> {
+  if ('error' in outcome) {
+    await tx.query(
+      `update file set read_state = 'failed', read_error = $2, read_at = now() where entry_id = $1`,
+      [entryId, outcome.error.slice(0, 500)],
+    );
+    return;
+  }
+  const text = outcome.text?.replace(/\s+\n/g, '\n').trim().slice(0, READ_MAX_CHARS) || null;
+  await tx.query(
+    `update file set text = $2, read_state = $3, read_error = null, read_at = now() where entry_id = $1`,
+    [entryId, text, text ? 'read' : 'none'],
+  );
+}
 const TEXT_MAX_CHARS = 20_000;
+/** A read document keeps more: a contract, a statement of several pages. */
+const READ_MAX_CHARS = 200_000;
 
 export interface StoredFile {
   entryId: string;
@@ -74,10 +133,11 @@ export async function addFile(
   });
   const entryId = saved.entries[0]!.id;
   const storageKey = `${input.spaceId}/${entryId}`;
+  const words = wordsOf(input.bytes, input.mediaType);
   await blobs.put(storageKey, input.bytes, input.mediaType);
   await tx.query(
-    `insert into file (entry_id, space_id, storage_key, name, media_type, size, text)
-     values ($1, $2, $3, $4, $5, $6, $7)`,
+    `insert into file (entry_id, space_id, storage_key, name, media_type, size, text, read_state, read_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, case when $8 = 'read' then now() end)`,
     [
       entryId,
       input.spaceId,
@@ -85,7 +145,8 @@ export async function addFile(
       name,
       input.mediaType,
       input.bytes.byteLength,
-      wordsOf(input.bytes, input.mediaType),
+      words,
+      words !== null ? 'read' : READ_LATER.has(input.mediaType) ? 'pending' : 'none',
     ],
   );
   return { entryId, name, mediaType: input.mediaType, size: input.bytes.byteLength, storageKey };

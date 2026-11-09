@@ -384,6 +384,14 @@ flowchart LR
   J --> S2[another]
 ```
 
+## Her files, read (spec 026)
+
+A PDF, a Word document or a photo she gives is kept at once (`read_state: pending`, migration
+`0021`); the watcher reads a few each pass (`reading.ts`): unpdf for PDFs, mammoth for Word,
+tesseract.js for photos (French and English). The words go to `file.text` (up to 200 000
+characters), where `find` already looks. A file that cannot be read is `failed` with its reason,
+once; a photo without writing is `none`.
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |

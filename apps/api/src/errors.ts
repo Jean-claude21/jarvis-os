@@ -34,7 +34,7 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
       message,
     ) ||
     // Her connectors (spec 025): what to ask her, or which connector or tool exists.
-    /^No connector|has no tool «|ask her first|^A connector is not undone|^Not a sealed secret/.test(
+    /^No connector|has no tool «|ask her first|needs Jarvis's Google client|is reached with a key|gave no sign-in page|^A connector is not undone|^Not a sealed secret/.test(
       message,
     ) ||
     // Views, her settings, her keys (spec 015).

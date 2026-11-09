@@ -17,6 +17,7 @@ import { randomBytes } from 'node:crypto';
 import type pg from 'pg';
 import { z } from 'zod';
 import { callTool, headersOf, needsAgreement, probe, readResource, type Reach } from './connectors';
+import { presetClientFor } from './catalog';
 import { signInProvider, type SignIn } from './oauth-client';
 import { open, seal } from './secrets';
 
@@ -58,10 +59,17 @@ export function connectorService(deps: { db: pg.Pool; key: Buffer; publicUrl: st
       headers: headersOf(found.connector, found.sealed ? open(deps.key, found.sealed) : null),
     };
     if (found.connector.auth === 'oauth') {
+      let preset: ReturnType<typeof presetClientFor> = null;
+      try {
+        preset = presetClientFor(found.connector.url);
+      } catch {
+        preset = null;
+      }
       way.authProvider = signInProvider({
         redirectUrl,
         signIn: signInOf(found.oauth),
         save: keepSignIn(person, id),
+        ...(preset ? { preset: preset.client } : {}),
         ...(onRedirect ? { onRedirect } : {}),
       });
     }
@@ -69,8 +77,12 @@ export function connectorService(deps: { db: pg.Pool; key: Buffer; publicUrl: st
   };
 
   const check = async (person: string, id: string): Promise<Connector> => {
-    const { connector, headers } = await reach(person, id);
+    const { connector, headers, oauth } = await reach(person, id);
     const read = await probe(connector.url, headers);
+    // A server may show its tools to anyone (Google's do): without her sign-in, it still waits.
+    if (connector.auth === 'oauth' && read.state === 'connected' && !signInOf(oauth).tokens) {
+      read.state = 'needs_sign_in';
+    }
     return as(person, async (tx) => {
       await setProbe(tx, id, read);
       return (await connectorsOf(tx, [connector.spaceId])).find((one) => one.id === id)!;
@@ -125,12 +137,22 @@ export function connectorService(deps: { db: pg.Pool; key: Buffer; publicUrl: st
       if (connector.auth !== 'oauth' || !headers.authProvider) {
         throw new Error(`« ${connector.name} » is reached with a key, not a sign-in.`);
       }
+      // A server that does not register clients itself (Google) uses the one registered once.
+      const preset = presetClientFor(connector.url);
       const state = `${id}.${randomBytes(16).toString('base64url')}`;
       await keepSignIn(person, id)({ ...signInOf((await reach(person, id)).oauth), state });
       const { headers: fresh } = await reach(person, id, (url) => {
+        // Google gives a renewable sign-in only when asked for it.
+        if (preset?.google) {
+          url.searchParams.set('access_type', 'offline');
+          url.searchParams.set('prompt', 'consent');
+        }
         page = url;
       });
-      const result = await auth(fresh.authProvider!, { serverUrl: connector.url });
+      const result = await auth(fresh.authProvider!, {
+        serverUrl: connector.url,
+        ...(preset?.scope ? { scope: preset.scope } : {}),
+      });
       if (result === 'AUTHORIZED') {
         await check(person, id);
         return null;

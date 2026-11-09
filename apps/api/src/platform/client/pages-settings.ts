@@ -35,44 +35,68 @@ const settingsPages = {
     return '<section class="grid">' + blocks.join('') + card(W.newSpace, '<form class="actions" id="new-space"><input class="field" required style="flex:1;min-width:160px" placeholder="Nous"><button>' + esc(W.create) + '</button></form>') + '</section>';
   },
 
-  async connexions () {
+  async connexions (params) {
+    // Two directions (spec 025): assistants come to Jarvis; Jarvis goes to her tools for them.
     const list = await api('/connections');
     const tools = await api('/connectors');
     const catalog = await api('/connectors/catalog');
     const spaces = me.spaces;
-    return card('', '<p class="muted" style="margin:0 0 8px">' + esc(W.connectLead) + '</p><div class="actions"><code class="url">' + esc(location.origin + '/mcp') + '</code><button class="quiet" data-copy="' + esc(location.origin + '/mcp') + '">' + esc(W.copy) + '</button></div>', true) +
-      '<h2 style="margin:20px 0 10px">' + esc(W.connections) + '</h2>' +
-      (list.length ? '<section class="grid">' + list.map((c) => card(c.name || c.clientId,
-        '<p class="muted" style="margin:0 0 8px">' + esc(say(W.since, { date: day(c.since) })) + (c.used ? ' · ' + esc(say(W.lastUsed, { date: time(c.used) })) : '') + '</p>' +
-        '<form data-reach="' + esc(c.clientId) + '"><div class="caps">' + esc(W.reach) + '</div>' + spaces.map((s) => '<label style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" value="' + esc(s.id) + '"' + (c.spaces.includes(s.id) ? ' checked' : '') + '> ' + esc(s.name) + '</label>').join('') +
-        '<div class="actions" style="margin-top:8px"><button>' + esc(W.save) + '</button><button type="button" class="quiet" data-revoke="' + esc(c.clientId) + '" data-name="' + esc(c.name || c.clientId) + '">' + esc(W.revoke) + '</button></div></form>')).join('') + '</section>' : card('', empty(W.noConnections))) +
-      // What Jarvis reaches for her (spec 025): any MCP server, its key or sign-in kept sealed.
-      '<h2 style="margin:20px 0 10px">' + esc(W.conTitle) + '</h2>' +
-      (tools.length ? '<section class="grid">' + tools.map((t) => card(t.name,
-        '<p class="badge ' + (t.state === 'connected' ? 'said' : 'error') + '" style="white-space:normal">' + esc(W['con_' + t.state] || t.state) + (t.reason && t.state !== 'needs_sign_in' ? ' · ' + esc(t.reason) : '') + '</p>' +
-        '<p class="muted" style="margin:6px 0">' + esc(t.url) + (t.serverName ? ' · ' + esc(t.serverName) : '') + (t.checkedAt ? ' · ' + esc(say(W.conChecked, { date: time(t.checkedAt) })) : '') + '</p>' +
-        (t.tools.length ? '<div class="caps">' + esc(say(W.conTools, { n: t.tools.length })) + '</div><ul class="list">' + t.tools.map((o) => '<li><span>' + esc(o.name) + (o.description ? ' <span class="muted">· ' + esc(o.description) + '</span>' : '') + '</span></li>').join('') + '</ul>' : '') +
-        '<div class="actions" style="margin-top:8px">' + (t.state === 'needs_sign_in' ? '<button data-con-signin="' + esc(t.id) + '">' + esc(W.conSignIn) + '</button>' : '') + '<button class="quiet" data-con-check="' + esc(t.id) + '">' + esc(W.conCheck) + '</button><button type="button" class="quiet" data-con-cut="' + esc(t.id) + '" data-name="' + esc(t.name) + '">' + esc(W.conCut) + '</button></div>')).join('') + '</section>' : card('', empty(W.conNone))) +
-      // « Discover »: the servers their makers host, one click away; her own below.
-      '<h2 style="margin:20px 0 6px">' + esc(W.conDiscover) + '</h2><p class="muted" style="margin:0 0 10px">' + esc(W.conDiscoverLead) + '</p>' +
-      '<section class="grid">' + catalog.filter((e) => !tools.some((t) => e.url && t.url === e.url)).map((e) => card(e.name,
-        '<p class="muted" style="margin:0 0 8px">' + esc(LANG === 'en' ? e.en : e.fr) + '</p>' +
-        '<p class="caps" style="margin:0 0 8px">' + esc(W['conCat_' + e.category] || e.category) + ' · ' + esc(e.url ? W['conWay_' + e.auth] : W.conWay_url) + '</p>' +
-        '<form class="stack" data-con-pick="' + esc(e.id) + '" data-name="' + esc(e.name) + '" data-url="' + esc(e.url) + '" data-auth="' + esc(e.auth) + '">' +
-        (e.url ? '' : '<input class="field" name="url" type="url" required placeholder="https://…">') +
-        (e.auth === 'bearer' ? '<input class="field" name="secret" type="password" required autocomplete="off" placeholder="' + esc(W.conKey) + '">' : '') +
-        (e.help ? '<a class="muted" href="' + esc(e.help) + '" target="_blank" rel="noopener">' + esc(e.url ? W.conWhereKey : W.conWhereUrl) + '</a>' : '') +
-        '<div class="actions"><button>' + esc(W.conPick) + '</button></div></form>')).join('') + '</section>' +
-      '<div class="actions" style="margin:16px 0"><button class="quiet" id="con-custom">' + esc(W.conCustom) + '</button></div>' +
-      '<section class="grid" id="con-custom-box" hidden>' +
-      card(W.conAdd, '<p class="muted">' + esc(W.conLead) + '</p><form id="con-add" class="stack">' +
+    const tab = params.get('tab') || (tools.length ? 'outils' : 'decouvrir');
+    const logo = (l) => '<span class="logo" style="background:#' + esc(l.hex) + ';color:' + esc(l.fg) + '">' +
+      (l.path ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + esc(l.path) + '"/></svg>' : esc(l.initial)) + '</span>';
+    const known = (t) => catalog.find((e) => e.url && e.url === t.url);
+    const logoOfTool = (t) => { const e = known(t); return logo(e ? e.logo : { hex: '6B4E43', fg: '#ffffff', path: null, initial: (t.name || '?').slice(0, 1) }); };
+    const tabs = '<nav class="tabs" role="tablist">' + [['assistants', W.conTabAssistants, list.length], ['outils', W.conTabTools, tools.length], ['decouvrir', W.conTabDiscover, null]]
+      .map(([id, label, n]) => '<a href="#/connexions?tab=' + id + '" class="' + (tab === id ? 'on' : '') + '" role="tab">' + esc(label) + (n === null ? '' : ' <span class="n">' + n + '</span>') + '</a>').join('') + '</nav>';
+    const flow = '<div class="flow" aria-label="' + esc(W.conFlowLabel) + '"><span class="flow-node">' + esc(W.conFlowAssistants) + '</span><span class="flow-arrow" aria-hidden="true">→</span><span class="flow-node main">Jarvis</span><span class="flow-arrow" aria-hidden="true">→</span><span class="flow-node">' + esc(W.conFlowTools) + '</span></div>' +
+      '<p class="muted flow-lead">' + esc(W.conFlowLead) + '</p>';
+
+    let body = '';
+    if (tab === 'assistants') {
+      body = card('', '<p class="muted" style="margin:0 0 8px">' + esc(W.connectLead) + '</p><div class="actions"><code class="url">' + esc(location.origin + '/mcp') + '</code><button class="quiet" data-copy="' + esc(location.origin + '/mcp') + '">' + esc(W.copy) + '</button></div>', true) +
+        (list.length ? '<section class="grid">' + list.map((c) => card(c.name || c.clientId,
+          '<p class="muted" style="margin:0 0 8px">' + esc(say(W.since, { date: day(c.since) })) + (c.used ? ' · ' + esc(say(W.lastUsed, { date: time(c.used) })) : '') + '</p>' +
+          '<form data-reach="' + esc(c.clientId) + '"><div class="caps">' + esc(W.reach) + '</div>' + spaces.map((s) => '<label style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" value="' + esc(s.id) + '"' + (c.spaces.includes(s.id) ? ' checked' : '') + '> ' + esc(s.name) + '</label>').join('') +
+          '<div class="actions" style="margin-top:8px"><button>' + esc(W.save) + '</button><button type="button" class="quiet" data-revoke="' + esc(c.clientId) + '" data-name="' + esc(c.name || c.clientId) + '">' + esc(W.revoke) + '</button></div></form>')).join('') + '</section>' : card('', empty(W.noConnections)));
+    } else if (tab === 'outils') {
+      body = tools.length ? '<section class="tools">' + tools.map((t) => '<article class="tool">' +
+        '<div class="tool-head">' + logoOfTool(t) + '<div class="tool-title"><h3>' + esc(t.name) + '</h3><span class="state ' + esc(t.state) + '">' + esc(W['con_' + t.state] || t.state) + '</span></div></div>' +
+        (t.reason && t.state !== 'needs_sign_in' && t.state !== 'connected' ? '<p class="tool-reason">' + esc(t.reason) + '</p>' : '') +
+        '<p class="tool-meta">' + esc(t.serverName || t.url) + (t.checkedAt ? ' · ' + esc(say(W.conChecked, { date: time(t.checkedAt) })) : '') + '</p>' +
+        (t.tools.length ? '<details class="tool-list"><summary>' + esc(say(W.conTools, { n: t.tools.length })) + '</summary><ul>' + t.tools.map((o) => '<li><b>' + esc(o.name) + '</b>' + (o.description ? ' — ' + esc(String(o.description).split('\\n')[0]) : '') + '</li>').join('') + '</ul></details>' : '') +
+        '<div class="tool-go">' + (t.state === 'needs_sign_in' ? '<button data-con-signin="' + esc(t.id) + '">' + esc(W.conSignIn) + '</button>' : '') +
+        '<button class="quiet" data-con-check="' + esc(t.id) + '">' + esc(W.conCheck) + '</button><button type="button" class="quiet" data-con-cut="' + esc(t.id) + '" data-name="' + esc(t.name) + '">' + esc(W.conCut) + '</button></div></article>').join('') + '</section>'
+        : card('', empty(W.conNone) + '<div class="actions"><a href="#/connexions?tab=decouvrir"><button type="button">' + esc(W.conTabDiscover) + '</button></a></div>');
+    } else {
+      const groups = ['everyday', 'files', 'money', 'work', 'design'];
+      const shown = catalog.filter((e) => !tools.some((t) => e.url && t.url === e.url));
+      body = groups.map((g) => {
+        const here = shown.filter((e) => e.group === g);
+        if (!here.length) return '';
+        return '<h2 class="caps tools-group">' + esc(W['conGroup_' + g] || g) + '</h2><section class="tools">' + here.map((e) => '<article class="tool">' +
+          '<div class="tool-head">' + logo(e.logo) + '<div class="tool-title"><h3>' + esc(e.name) + '</h3><span class="way">' + esc(e.url ? W['conWay_' + e.auth] : W.conWay_url) + '</span></div></div>' +
+          '<p class="tool-text">' + esc(LANG === 'en' ? e.en : e.fr) + '</p>' +
+          (e.ready
+            ? '<form class="tool-form" data-con-pick="' + esc(e.id) + '" data-name="' + esc(e.name) + '" data-url="' + esc(e.url) + '" data-auth="' + esc(e.auth) + '">' +
+              (e.url ? '' : '<input class="field" name="url" type="url" required placeholder="https://…" aria-label="' + esc(W.conUrl) + '">') +
+              (e.auth === 'bearer' ? '<input class="field" name="secret" type="password" required autocomplete="off" placeholder="' + esc(W.conKey) + '" aria-label="' + esc(W.conKey) + '">' : '') +
+              '<div class="tool-go"><button>' + esc(e.auth === 'oauth' ? W.conPickSignIn : W.conPick) + '</button>' +
+              (e.help ? '<a class="tool-help" href="' + esc(e.help) + '" target="_blank" rel="noopener">' + esc(e.url ? W.conWhereKey : W.conWhereUrl) + '</a>' : '') + '</div></form>'
+            : '<p class="tool-wait">' + esc(W.conNeedsGoogle) + '</p>') +
+          '</article>').join('') + '</section>';
+      }).join('') +
+      '<div class="actions" style="margin:20px 0 8px"><button class="quiet" id="con-custom">' + esc(W.conCustom) + '</button></div>' +
+      '<div id="con-custom-box" hidden>' +
+      card(W.conAdd, '<p class="muted">' + esc(W.conLead) + '</p><form id="con-add" class="tool-form wide">' +
         '<label class="caps">' + esc(W.conName) + '<input class="field" name="name" required maxlength="80"></label>' +
         '<label class="caps">' + esc(W.conUrl) + '<input class="field" name="url" type="url" required placeholder="https://…/mcp"></label>' +
         '<label class="caps">' + esc(W.conAuth) + '<select class="field" name="auth"><option value="none">' + esc(W.conAuthNone) + '</option><option value="oauth">' + esc(W.conAuthOauth) + '</option><option value="bearer">' + esc(W.conAuthBearer) + '</option><option value="header">' + esc(W.conAuthHeader) + '</option></select></label>' +
         '<label class="caps">' + esc(W.conHeader) + '<input class="field" name="headerName" placeholder="x-api-key"></label>' +
         '<label class="caps">' + esc(W.conKey) + '<input class="field" name="secret" type="password" autocomplete="off"></label>' +
-        '<div class="actions"><button>' + esc(W.conConnect) + '</button></div></form>') +
-      '</section>';
+        '<div class="tool-go"><button>' + esc(W.conConnect) + '</button></div></form>', true) +
+      '</div>';
+    }
+    return flow + tabs + body;
   },
 
   async donnees () {

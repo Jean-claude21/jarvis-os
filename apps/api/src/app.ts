@@ -38,6 +38,8 @@ import { objectStorage } from './storage';
 import { appPage } from './platform/page';
 import { spaceFor } from './spaces';
 import { actRoutes } from './act';
+import { connectorService } from './connector-service';
+import { secretsKey } from './secrets';
 import { healthOf } from './health';
 import { computeDashboard, dashboardView, widgetsOf } from './views/dashboard';
 import { pageView } from './views/page';
@@ -60,6 +62,8 @@ export function makeApp(settings: Settings) {
   // Her scripts (spec 014) run in QuickJS, whichever door starts them.
   useScriptRunner(quickjsRunner);
   const blobs = objectStorage(settings.storage);
+  // Her connectors (spec 025): their secrets sealed with the branch's key.
+  const connectors = connectorService({ db, key: secretsKey(settings.authSecret) });
   const auth = makeAuth({ db, secret: settings.authSecret, publicUrl: settings.publicUrl });
   const resource = mcpResource(settings.publicUrl);
   const app = new Hono();
@@ -87,7 +91,14 @@ export function makeApp(settings: Settings) {
 
   app.route(
     '/api',
-    apiRoutes({ auth, db, blobs, publicUrl: settings.publicUrl, secret: settings.authSecret }),
+    apiRoutes({
+      auth,
+      db,
+      blobs,
+      connectors,
+      publicUrl: settings.publicUrl,
+      secret: settings.authSecret,
+    }),
   );
 
   /** The name the client gave itself when it registered, for the pages. */
@@ -421,7 +432,7 @@ export function makeApp(settings: Settings) {
         return Response.json({ error: 'No such account.' }, { status: 401 });
       }
       const server = await mcpServerFor(
-        { db, blobs, publicUrl: settings.publicUrl, secret: settings.authSecret },
+        { db, blobs, connectors, publicUrl: settings.publicUrl, secret: settings.authSecret },
         {
           person,
           name: rows[0].name,
@@ -439,5 +450,5 @@ export function makeApp(settings: Settings) {
   );
   app.all('/mcp', (c) => mcp(c.req.raw));
 
-  return { app, auth, db, blobs, resource, close: () => db.end() };
+  return { app, auth, db, blobs, connectors, resource, close: () => db.end() };
 }

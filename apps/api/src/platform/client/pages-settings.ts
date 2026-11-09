@@ -37,13 +37,29 @@ const settingsPages = {
 
   async connexions () {
     const list = await api('/connections');
+    const tools = await api('/connectors');
     const spaces = me.spaces;
     return card('', '<p class="muted" style="margin:0 0 8px">' + esc(W.connectLead) + '</p><div class="actions"><code class="url">' + esc(location.origin + '/mcp') + '</code><button class="quiet" data-copy="' + esc(location.origin + '/mcp') + '">' + esc(W.copy) + '</button></div>', true) +
       '<h2 style="margin:20px 0 10px">' + esc(W.connections) + '</h2>' +
       (list.length ? '<section class="grid">' + list.map((c) => card(c.name || c.clientId,
         '<p class="muted" style="margin:0 0 8px">' + esc(say(W.since, { date: day(c.since) })) + (c.used ? ' · ' + esc(say(W.lastUsed, { date: time(c.used) })) : '') + '</p>' +
         '<form data-reach="' + esc(c.clientId) + '"><div class="caps">' + esc(W.reach) + '</div>' + spaces.map((s) => '<label style="display:flex;gap:8px;align-items:center;padding:4px 0"><input type="checkbox" value="' + esc(s.id) + '"' + (c.spaces.includes(s.id) ? ' checked' : '') + '> ' + esc(s.name) + '</label>').join('') +
-        '<div class="actions" style="margin-top:8px"><button>' + esc(W.save) + '</button><button type="button" class="quiet" data-revoke="' + esc(c.clientId) + '" data-name="' + esc(c.name || c.clientId) + '">' + esc(W.revoke) + '</button></div></form>')).join('') + '</section>' : card('', empty(W.noConnections)));
+        '<div class="actions" style="margin-top:8px"><button>' + esc(W.save) + '</button><button type="button" class="quiet" data-revoke="' + esc(c.clientId) + '" data-name="' + esc(c.name || c.clientId) + '">' + esc(W.revoke) + '</button></div></form>')).join('') + '</section>' : card('', empty(W.noConnections))) +
+      // What Jarvis reaches for her (spec 025): any MCP server, its key kept sealed.
+      '<h2 style="margin:20px 0 10px">' + esc(W.conTitle) + '</h2>' +
+      '<section class="grid">' + tools.map((t) => card(t.name,
+        '<p class="badge ' + (t.state === 'connected' ? 'said' : 'error') + '" style="white-space:normal">' + esc(W['con_' + t.state] || t.state) + (t.reason ? ' · ' + esc(t.reason) : '') + '</p>' +
+        '<p class="muted" style="margin:6px 0">' + esc(t.url) + (t.serverName ? ' · ' + esc(t.serverName) : '') + (t.checkedAt ? ' · ' + esc(say(W.conChecked, { date: time(t.checkedAt) })) : '') + '</p>' +
+        (t.tools.length ? '<div class="caps">' + esc(say(W.conTools, { n: t.tools.length })) + '</div><ul class="list">' + t.tools.map((o) => '<li><span>' + esc(o.name) + (o.description ? ' <span class="muted">· ' + esc(o.description) + '</span>' : '') + '</span></li>').join('') + '</ul>' : '') +
+        '<div class="actions" style="margin-top:8px"><button class="quiet" data-con-check="' + esc(t.id) + '">' + esc(W.conCheck) + '</button><button type="button" class="quiet" data-con-cut="' + esc(t.id) + '" data-name="' + esc(t.name) + '">' + esc(W.conCut) + '</button></div>')).join('') +
+      card(W.conAdd, '<p class="muted">' + esc(W.conLead) + '</p><form id="con-add" class="stack">' +
+        '<label class="caps">' + esc(W.conName) + '<input class="field" name="name" required maxlength="80"></label>' +
+        '<label class="caps">' + esc(W.conUrl) + '<input class="field" name="url" type="url" required placeholder="https://…/mcp"></label>' +
+        '<label class="caps">' + esc(W.conAuth) + '<select class="field" name="auth"><option value="none">' + esc(W.conAuthNone) + '</option><option value="bearer">' + esc(W.conAuthBearer) + '</option><option value="header">' + esc(W.conAuthHeader) + '</option></select></label>' +
+        '<label class="caps">' + esc(W.conHeader) + '<input class="field" name="headerName" placeholder="x-api-key"></label>' +
+        '<label class="caps">' + esc(W.conKey) + '<input class="field" name="secret" type="password" autocomplete="off"></label>' +
+        '<div class="actions"><button>' + esc(W.conConnect) + '</button></div></form>') +
+      '</section>';
   },
 
   async donnees () {

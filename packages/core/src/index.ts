@@ -259,3 +259,17 @@ export {
   recordBackup,
   type SpaceBackup,
 } from './backups';
+export {
+  addConnector,
+  changeConnector,
+  connectorsOf,
+  connectorWithSecret,
+  cutConnector,
+  recordCall,
+  setProbe,
+  type Connector,
+  type ConnectorAuth,
+  type ConnectorState,
+  type ConnectorTool,
+  type Probe,
+} from './connectors';

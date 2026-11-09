@@ -24,6 +24,7 @@ export async function connect(account: Account, clientId = 'test'): Promise<Conn
     {
       db: server.db,
       blobs: server.blobs,
+      connectors: server.connectors,
       publicUrl: PUBLIC_URL,
       secret: settingsFor('test').authSecret,
       today: () => '2026-10-29',

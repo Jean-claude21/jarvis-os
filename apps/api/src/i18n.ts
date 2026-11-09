@@ -14,6 +14,9 @@ const words = {
     haveAccount: 'Déjà un compte ?',
     wrong: 'E-mail ou mot de passe incorrect.',
     failed: 'Ça n’a pas marché : {reason}',
+    tooMany: 'Trop d’essais : attends une minute avant de réessayer.',
+    byInvitation:
+      'Jarvis s’ouvre sur invitation : demande à une personne déjà inscrite de t’inviter.',
     consentTitle: 'Autoriser {client} ?',
     consentLead:
       '{client} demande l’accès à ta vie Jarvis : lire, ranger, calculer et annuler pour toi.',
@@ -82,6 +85,8 @@ const words = {
     haveAccount: 'Already have an account?',
     wrong: 'Wrong e-mail or password.',
     failed: 'That did not work: {reason}',
+    tooMany: 'Too many tries: wait a minute before trying again.',
+    byInvitation: 'Jarvis opens on invitation: ask a person already here to invite you.',
     consentTitle: 'Allow {client}?',
     consentLead: '{client} asks to reach your Jarvis life: read, file, compute and undo for you.',
     consentScopes: 'What is asked: {scopes}',

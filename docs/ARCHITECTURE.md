@@ -335,6 +335,18 @@ flowchart LR
   L[(watcher_lease: last pass, its report)] --> H[/health: 200 or 503/] --> U[a monitor outside]
 ```
 
+## Who may come in, and how many tries (spec 024)
+
+- **Sign-up**: open by default; `JARVIS_SIGNUP=invite` lets in only an address invited to a space
+  (`jarvis_invited`, a boolean, before any account exists) or one `JARVIS_SIGNUP_ALLOW` names
+  (addresses, « @domain »). Refused, the sign-in page says why in her language.
+- **Attempts**: Better Auth's limiter, kept in the database (table `rateLimit`) so that every
+  server instance counts the same: five sign-ins a minute, five sign-ups an hour, a hundred other
+  `/auth` calls a minute, per client address (Netlify's `x-nf-client-connection-ip`, else
+  `x-forwarded-for`). The test suite turns it off (`JARVIS_RATE_LIMIT=off`) and proves it apart.
+- Passwords are hashed and the signing keys encrypted by Better Auth; the tokens of other services
+  will be encrypted with the connectors (S6).
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |

@@ -64,7 +64,10 @@ describe('the outbox', () => {
     expect(await ama.as((tx) => messageOf(tx, id))).toMatchObject({ state: 'sent', attempts: 2 });
     expect(await ama.as((tx) => markActed(tx, id, 'done', now))).toBe(true);
     expect(await ama.as((tx) => markActed(tx, id, 'tomorrow', now))).toBe(false);
-    expect(await ama.as((tx) => messageOf(tx, id))).toMatchObject({ state: 'acted', action: 'done' });
+    expect(await ama.as((tx) => messageOf(tx, id))).toMatchObject({
+      state: 'acted',
+      action: 'done',
+    });
   });
 
   it('shows a person her own messages, never another’s', async () => {

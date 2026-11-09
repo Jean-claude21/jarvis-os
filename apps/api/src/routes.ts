@@ -67,6 +67,7 @@ import {
   keyOwner,
   keysOf,
   revokeKey,
+  recentMessages,
   type ViewData,
 } from '@jarvis-os/core';
 import { Hono, type Context } from 'hono';
@@ -518,6 +519,12 @@ export function apiRoutes(deps: {
       ? [spaceFor(c.get('spaces'), named).id]
       : c.get('spaces').map((one) => one.id);
     return c.json(await as(c, (tx) => query(tx, { spaceIds, sql })));
+  });
+
+  // What Jarvis sent her (spec 020): the last days, on which channel, delivered or not.
+  api.get('/outbox', async (c) => {
+    const days = Math.min(30, Math.max(1, Number(c.req.query('days') ?? 7)));
+    return c.json(await as(c, (tx) => recentMessages(tx, days)));
   });
 
   api.get('/history', async (c) => {

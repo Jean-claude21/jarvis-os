@@ -26,9 +26,9 @@ const sign = (secret: string, payload: string) =>
 
 /** A link's token: the message, the action, the end of its validity, signed. */
 export function actionToken(secret: string, message: number, action: Action, now = Date.now()) {
-  const payload = Buffer.from(JSON.stringify({ o: message, a: action, x: now + VALID_MS })).toString(
-    'base64url',
-  );
+  const payload = Buffer.from(
+    JSON.stringify({ o: message, a: action, x: now + VALID_MS }),
+  ).toString('base64url');
   return `${payload}.${sign(secret, payload)}`;
 }
 

@@ -15,6 +15,14 @@ import {
 } from '@jarvis-os/core';
 import { parseArgs } from 'node:util';
 import type pg from 'pg';
+import {
+  channelOf,
+  deliverOutbox,
+  deliveryFor,
+  sendTelegram,
+  tellThrough,
+  type Delivery,
+} from './channels';
 import { wordsOf, type Lang } from './i18n';
 import { quickjsRunner } from './scripts';
 import { readTelegramLinks } from './telegram';
@@ -23,29 +31,8 @@ import { settingsFor, type Branch } from './settings';
 /** How often the watcher looks: once a minute, the precision of a reminder. */
 export const WATCH_EVERY_MS = 60_000;
 
-/** Where she is told: an entry « Channel » of her own space, `telegram` the chat of her bot. */
-export async function channelOf(db: pg.Pool, person: string): Promise<{ telegram?: string }> {
-  return asPerson(db, person, async (tx) => {
-    const own = (await spacesOf(tx)).find((one) => one.personal);
-    if (!own) return {};
-    const [canal] = await find(tx, own.id, { kind: 'Channel', limit: 1 });
-    const telegram = canal?.data.telegram;
-    return typeof telegram === 'string' || typeof telegram === 'number'
-      ? { telegram: String(telegram) }
-      : {};
-  });
-}
-
-/** A message through the Telegram bot; true when Telegram took it. */
-export async function sendTelegram(token: string, chat: string, text: string): Promise<boolean> {
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: chat, text, disable_web_page_preview: true }),
-  });
-  if (!response.ok) console.warn(`[watcher] Telegram answered ${response.status}`);
-  return response.ok;
-}
+// Her channels moved to `channels.ts` (spec 020); kept here for the doors that import them.
+export { channelOf, sendTelegram } from './channels';
 
 /** What she reads when a reminder is due. */
 export function reminderText(due: Due): string {
@@ -110,45 +97,62 @@ export function briefText(brief: Brief, lang: Lang = 'fr'): string {
   return blocks.join('\n\n');
 }
 
-/** Tells a person through her channel; false when she has none. */
-export function tellerFor(db: pg.Pool, telegramToken: string | undefined) {
-  return async (due: Due) => {
-    const channel = await channelOf(db, due.person);
-    if (!channel.telegram || !telegramToken) return false;
-    return sendTelegram(telegramToken, channel.telegram, reminderText(due));
-  };
+/**
+ * Tells a person a reminder (spec 020): it enters the outbox on each of her channels, once per
+ * occurrence; false when she has no channel.
+ */
+export function tellerFor(db: pg.Pool, delivery: Delivery) {
+  return (due: Due) =>
+    tellThrough(db, delivery, {
+      person: due.person,
+      spaceId: due.spaceId,
+      kind: 'reminder',
+      subject: due.title,
+      body: due.message ?? (due.repeated ? '' : wordsOf('fr').reminderDone),
+      entryId: due.entryId,
+      key: `reminder:${due.entryId}:${due.at.toISOString()}`,
+    });
 }
 
 /**
- * One pass of the watcher (spec 010): the Telegram links, the reminders due, the morning briefs,
- * the rules on a schedule. The local loop runs it each minute; on Netlify, a scheduled function
- * runs it each minute too. Its failures are logged, never thrown.
+ * One pass of the watcher (specs 010, 020): the Telegram links, the reminders due and the morning
+ * briefs entered in the outbox, the outbox delivered, the rules on a schedule. The local loop runs
+ * it each minute; on Netlify, a scheduled function runs it each minute too. Its failures are
+ * logged, never thrown.
  */
 export async function watcherPass(
   db: pg.Pool,
-  telegramToken: string | undefined,
+  delivery: Delivery,
   now: Date = new Date(),
 ): Promise<PassReport | null> {
   useScriptRunner(quickjsRunner);
   try {
     // Who pressed « Start » with her code (spec 015), before telling anyone.
-    if (telegramToken) {
-      await readTelegramLinks(db, telegramToken, wordsOf('fr').channelLinked).catch((error) =>
-        console.warn('[watcher] telegram', (error as Error).message),
+    if (delivery.telegramToken) {
+      await readTelegramLinks(db, delivery.telegramToken, wordsOf('fr').channelLinked).catch(
+        (error) => console.warn('[watcher] telegram', (error as Error).message),
       );
     }
-    const report = await watchOnce(db, now, tellerFor(db, telegramToken));
+    const report = await watchOnce(db, now, tellerFor(db, delivery));
     // Her morning brief (spec 018), at the hour she chose, once a day.
-    if (telegramToken) {
-      for (const person of await briefPeople(db)) {
-        await briefOnce(db, person, now, async (brief) => {
-          const channel = await channelOf(db, person);
-          return channel.telegram
-            ? sendTelegram(telegramToken, channel.telegram, briefText(brief))
-            : false;
-        }).catch((error) => console.warn('[watcher] brief', (error as Error).message));
-      }
+    for (const person of await briefPeople(db)) {
+      await briefOnce(db, person, now, async (brief) => {
+        const own = (await channelOf(db, person)).spaceId;
+        if (!own) return false;
+        const [subject, ...rest] = briefText(brief).split('\n\n');
+        return tellThrough(db, delivery, {
+          person,
+          spaceId: own,
+          kind: 'brief',
+          subject: subject ?? '',
+          body: rest.join('\n\n'),
+          key: `brief:${brief.day}`,
+        });
+      }).catch((error) => console.warn('[watcher] brief', (error as Error).message));
     }
+    // What entered the outbox (now or before, waiting for another try), delivered (spec 020).
+    const delivered = await deliverOutbox(db, now, delivery);
+    if (delivered.failed) console.warn('[watcher] outbox', delivered);
     // Her scheduled rules and « before » rules (spec 014), on the same clock.
     const rules = await runDueRules(db, now);
     if (rules.failed) console.warn('[watcher] rules', rules);
@@ -162,7 +166,7 @@ export async function watcherPass(
 /** The watcher's loop: a pass each minute, never two at once; it stops when `signal` aborts. */
 export function watch(
   db: pg.Pool,
-  telegramToken: string | undefined,
+  delivery: Delivery,
   onPass: (report: PassReport) => void = () => undefined,
   signal?: AbortSignal,
 ) {
@@ -171,7 +175,7 @@ export function watch(
     if (running || signal?.aborted) return;
     running = true;
     try {
-      const report = await watcherPass(db, telegramToken);
+      const report = await watcherPass(db, delivery);
       if (report) onPass(report);
     } finally {
       running = false;
@@ -218,7 +222,7 @@ if (process.argv[1]?.endsWith('watcher.ts')) {
     await db.end();
   } else {
     console.info(`[watcher] ${branch}: a pass every ${WATCH_EVERY_MS / 1000} s`);
-    watch(db, token, (report) => {
+    watch(db, deliveryFor(settingsFor(branch, process.env.JARVIS_PUBLIC_URL)), (report) => {
       if (report.sent || report.scheduled || report.skipped || report.failed) {
         console.info('[watcher]', report);
       }

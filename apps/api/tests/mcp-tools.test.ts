@@ -48,6 +48,7 @@ describe('Jarvis’s method on connection (story 3)', () => {
         'collection_stats',
         'connector_call',
         'connectors',
+        'context',
         'group_kind',
         'rename_kind',
         'stats',

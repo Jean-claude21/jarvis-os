@@ -23,6 +23,7 @@ import {
   renewCalendarKey,
   upcoming,
   backupsOf,
+  contextReadings,
   exportMarkdown,
   importMarkdown,
   invitationsOf,
@@ -920,7 +921,15 @@ export function apiRoutes(deps: {
         all[row.clientId] = (await clientSpaces(tx, row.clientId)).map((one) => one.id);
       return all;
     });
-    return c.json(rows.map((row) => ({ ...row, spaces: reach[row.clientId] ?? [] })));
+    // When each assistant last read her context (spec 029).
+    const readings = await as(c, (tx) => contextReadings(tx));
+    return c.json(
+      rows.map((row) => ({
+        ...row,
+        spaces: reach[row.clientId] ?? [],
+        contextReadAt: readings[row.clientId] ?? null,
+      })),
+    );
   });
 
   api.delete('/connections/:client', async (c) => {

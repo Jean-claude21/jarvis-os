@@ -1,4 +1,4 @@
-import type { Embedder } from '@jarvis-os/core';
+import { entriesToEmbed, type Embedder } from '@jarvis-os/core';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { embedOnce, searchByMeaning } from '../src/embeddings';
 import { server, signUp, type Account } from './client';
@@ -48,19 +48,19 @@ beforeAll(async () => {
 
 describe('search by meaning', () => {
   it('turns her entries into vectors once, and again when their words change', async () => {
-    let turned = 0;
-    for (let pass = 0; pass < 20; pass += 1) {
-      const report = await embedOnce(server.db, themed);
-      turned += report.embedded;
-      if (report.embedded === 0) break;
-    }
-    expect(turned).toBeGreaterThanOrEqual(3);
-    const again = await embedOnce(server.db, themed);
-    expect(again.embedded).toBe(0);
+    // The base holds other runs' entries too: hers are the latest, turned first.
+    const waiting = async () =>
+      (await entriesToEmbed(server.db, themed.model, 1000)).map((one) => one.entryId);
+    const hers = Object.values(ids);
+    expect(await waiting()).toEqual(expect.arrayContaining(hers));
+    expect((await embedOnce(server.db, themed)).embedded).toBeGreaterThanOrEqual(3);
+    expect((await waiting()).filter((id) => hers.includes(id))).toEqual([]);
     await ama.json('/api/save', {
       entries: [{ id: ids.Garage, data: { text: 'vidange, pneus et voiture lavée' } }],
     });
-    expect((await embedOnce(server.db, themed)).embedded).toBe(1);
+    expect((await waiting()).filter((id) => hers.includes(id))).toEqual([ids.Garage]);
+    await embedOnce(server.db, themed);
+    expect((await waiting()).filter((id) => hers.includes(id))).toEqual([]);
   });
 
   it('finds what the words miss: « papiers pour le visa » reaches the passport scan', async () => {

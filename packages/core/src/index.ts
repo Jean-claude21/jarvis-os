@@ -283,3 +283,12 @@ export {
   VECTOR_DIMENSIONS,
   type Embedder,
 } from './meaning';
+export {
+  changesSince,
+  clientKey,
+  CONTEXT_FRESH_HOURS,
+  contextReadings,
+  lastContextRead,
+  markContextRead,
+  type Change,
+} from './assistants';

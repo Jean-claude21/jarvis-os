@@ -15,6 +15,9 @@
     "test": "pnpm -r --workspace-concurrency=1 test",
     "db:migrate": "pnpm -r --if-present db:migrate",
     "provision": "tsx tooling/provision.ts",
+    "deploy:draft": "tsx tooling/deploy.ts",
+    "deploy:prod": "tsx tooling/deploy.ts --prod",
+    "production": "tsx tooling/production.ts",
     "serve": "tsx tooling/serve.ts"
   },
   "devDependencies": {
@@ -22,6 +25,7 @@
     "@eslint/js": "^9.39.5",
     "@types/node": "^22.20.4",
     "@types/pg": "^8.23.1",
+    "esbuild": "0.25.12",
     "eslint": "^9.39.5",
     "pg": "^8.23.1",
     "prettier": "^3.9.9",

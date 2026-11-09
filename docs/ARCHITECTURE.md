@@ -322,11 +322,13 @@ writes `.env` with the credentials of `dev` and `test` only: those of `main` liv
 Production runs on Netlify, built from this repository: `pnpm deploy:draft` bundles the two
 functions (esbuild, every dependency inside, QuickJS's WebAssembly file, the shipped apps and the
 routines beside them) and deploys them to a private address; `pnpm deploy:prod` does the same to
-the production site, from a clean `main` only.
+the production site, from a clean `main` only, after applying to Neon `main` the migrations not
+applied yet (its owner's address asked of Neon, kept in memory).
 
 ```mermaid
 flowchart LR
   R[main, this repository] -->|pnpm deploy:prod| N[Netlify]
+  R -->|its migrations first| M
   N --> A[function api · every request · Hono app]
   N --> W[function watcher · each minute · watcherPass]
   A --> M[(Neon main · her life)]

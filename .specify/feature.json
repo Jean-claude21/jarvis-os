@@ -1,1 +1,3 @@
-{"feature_directory":"specs\\003-mcp"}
+{
+  "feature_directory": "specs/020-outbox"
+}

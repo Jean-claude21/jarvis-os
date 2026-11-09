@@ -237,3 +237,16 @@ export {
 } from './habits';
 export { preferencesOf, preferencesSchema, setPreferences, type Preferences } from './prefs';
 export { briefDue, briefOnce, briefPeople, localOf, morningBrief, type Brief } from './brief';
+export {
+  enterMessage,
+  markActed,
+  markFailed,
+  markSent,
+  messageOf,
+  messagePerson,
+  pendingMessages,
+  personEmail,
+  recentMessages,
+  RETRY_MINUTES,
+  type Message,
+} from './outbox';

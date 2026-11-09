@@ -55,7 +55,18 @@ function bindCommon(root) {
     if (!confirm(say(W.revokeAsk, { client: b.dataset.name }))) return;
     try { await api('/connections/' + encodeURIComponent(b.dataset.revoke), { method: 'DELETE' }); show(); } catch (error) { alert(error.message); }
   }));
-  // Her connectors (spec 025): add, check again, cut.
+  // Her connectors (spec 025): add (from « Discover » or her own), sign in, check again, cut.
+  const signInTo = async (id) => {
+    const { url } = await api('/connectors/' + encodeURIComponent(id) + '/sign-in', { method: 'POST', body: {} });
+    if (url) location.href = url; else show();
+  };
+  const addConnector = async (body, button) => {
+    button.disabled = true;
+    try {
+      const made = await api('/connectors', { method: 'POST', body });
+      if (made.state === 'needs_sign_in') await signInTo(made.id); else show();
+    } catch (error) { button.disabled = false; alert(error.message); }
+  };
   const conAdd = document.getElementById('con-add');
   if (conAdd) conAdd.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -63,9 +74,25 @@ function bindCommon(root) {
     const body = { name: f.get('name'), url: f.get('url'), auth: f.get('auth') };
     if (f.get('headerName')) body.headerName = f.get('headerName');
     if (f.get('secret')) body.secret = f.get('secret');
-    conAdd.querySelector('button').disabled = true;
-    try { await api('/connectors', { method: 'POST', body }); show(); } catch (error) { conAdd.querySelector('button').disabled = false; alert(error.message); }
+    await addConnector(body, conAdd.querySelector('button'));
   });
+  root.querySelectorAll('form[data-con-pick]').forEach((form) => form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const f = new FormData(form);
+    const body = { name: form.dataset.name, url: form.dataset.url || f.get('url'), auth: form.dataset.auth };
+    if (f.get('secret')) body.secret = f.get('secret');
+    await addConnector(body, form.querySelector('button'));
+  }));
+  const custom = document.getElementById('con-custom');
+  if (custom) custom.addEventListener('click', () => {
+    const box = document.getElementById('con-custom-box');
+    box.hidden = !box.hidden;
+    if (!box.hidden) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  root.querySelectorAll('[data-con-signin]').forEach((b) => b.addEventListener('click', async () => {
+    b.disabled = true;
+    try { await signInTo(b.dataset.conSignin); } catch (error) { b.disabled = false; alert(error.message); }
+  }));
   root.querySelectorAll('[data-con-check]').forEach((b) => b.addEventListener('click', async () => {
     b.disabled = true;
     try { await api('/connectors/' + encodeURIComponent(b.dataset.conCheck) + '/check', { method: 'POST', body: {} }); show(); } catch (error) { b.disabled = false; alert(error.message); }

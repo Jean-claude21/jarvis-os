@@ -6,8 +6,9 @@ import { record } from './journal';
 // them and journals what changes; it never sees a secret in clear (the server seals it) and names
 // no protocol: reaching the tool is the doors' work.
 
-export type ConnectorAuth = 'none' | 'bearer' | 'header';
-export type ConnectorState = 'unchecked' | 'connected' | 'refused' | 'unreachable';
+export type ConnectorAuth = 'none' | 'bearer' | 'header' | 'oauth';
+export type ConnectorState =
+  'unchecked' | 'connected' | 'refused' | 'unreachable' | 'needs_sign_in';
 
 export interface ConnectorTool {
   name: string;
@@ -123,14 +124,24 @@ export async function connectorsOf(tx: Tx, spaceIds: string[]): Promise<Connecto
 export async function connectorWithSecret(
   tx: Tx,
   id: string,
-): Promise<{ connector: Connector; sealed: string | null } | null> {
-  const { rows } = await tx.query(`select ${columns}, secret_sealed from connector where id = $1`, [
-    id,
-  ]);
+): Promise<{ connector: Connector; sealed: string | null; oauth: string | null } | null> {
+  const { rows } = await tx.query(
+    `select ${columns}, secret_sealed, oauth_sealed from connector where id = $1`,
+    [id],
+  );
   const row = rows[0];
   return row
-    ? { connector: connectorOf(row), sealed: (row.secret_sealed as string | null) ?? null }
+    ? {
+        connector: connectorOf(row),
+        sealed: (row.secret_sealed as string | null) ?? null,
+        oauth: (row.oauth_sealed as string | null) ?? null,
+      }
     : null;
+}
+
+/** What Jarvis keeps of her sign-in to the server (spec 025, US4), sealed by the server. */
+export async function setOAuth(tx: Tx, id: string, sealed: string | null): Promise<void> {
+  await tx.query('update connector set oauth_sealed = $2 where id = $1', [id, sealed]);
 }
 
 /** What a check read, kept so that listing her tools needs no call. */

@@ -251,3 +251,11 @@ export {
   type Message,
 } from './outbox';
 export { LEASE_SECONDS, giveLease, lastPass, takeLease, type LastPass } from './lease';
+export {
+  BACKUP_KEEP_DAYS,
+  backupsDue,
+  backupsOf,
+  forgetOldBackups,
+  recordBackup,
+  type SpaceBackup,
+} from './backups';

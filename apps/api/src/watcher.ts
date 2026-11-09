@@ -19,6 +19,7 @@ import { randomBytes } from 'node:crypto';
 import { hostname } from 'node:os';
 import { parseArgs } from 'node:util';
 import type pg from 'pg';
+import { backupOnce } from './backups';
 import {
   channelOf,
   deliverOutbox,
@@ -173,6 +174,11 @@ export async function watcherPass(
     // What entered the outbox (now or before, waiting for another try), delivered (spec 020).
     const delivered = await deliverOutbox(db, now, delivery);
     if (delivered.failed) console.warn('[watcher] outbox', delivered);
+    // Each space's backup of the day (spec 022), a few each pass.
+    if (delivery.blobs) {
+      const backups = await backupOnce(db, delivery.blobs, now);
+      if (backups.failed) console.warn('[watcher] backups', backups);
+    }
     // Her scheduled rules and « before » rules (spec 014), on the same clock.
     const rules = await runDueRules(db, now);
     if (rules.failed) console.warn('[watcher] rules', rules);

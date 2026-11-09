@@ -1,3 +1,5 @@
+import type { Embedder } from '@jarvis-os/core';
+import { searchByMeaning } from './embeddings';
 import type { ConnectorService } from './connector-service';
 import { needsAgreement } from './connectors';
 import {
@@ -164,6 +166,8 @@ export async function mcpServerFor(
     today?: () => string;
     /** Her connectors (spec 025): the tools of other servers, through Jarvis. */
     connectors?: ConnectorService;
+    /** Search by meaning (spec 028), when this server has a model. */
+    embedder?: Embedder | null;
   },
   who: McpPerson,
 ): Promise<McpServer> {
@@ -356,7 +360,7 @@ export async function mcpServerFor(
     'find',
     {
       description:
-        'Her entries in a space by words (in titles, fields and text files, accents and case aside), by kind, by creation day (YYYY-MM-DD); latest first.',
+        'Her entries in a space by words (in titles, fields and files, accents and case aside, a slip forgiven), by kind, by creation day (YYYY-MM-DD); the best first. With words, the entries near in meaning follow, marked `byMeaning` (« papiers pour le visa » finds the passport scan).',
       inputSchema: { ...findInputSchema.shape, space: spaceArg },
       annotations: { readOnlyHint: true },
     },
@@ -364,8 +368,29 @@ export async function mcpServerFor(
       async ({
         space,
         ...args
-      }: z.input<typeof findInputSchema> & { space?: string | undefined }) =>
-        act(async (tx) => withComputed(tx, at(space), await find(tx, at(space), args))),
+      }: z.input<typeof findInputSchema> & { space?: string | undefined }) => {
+        const found = await act(async (tx) =>
+          withComputed(tx, at(space), await find(tx, at(space), args)),
+        );
+        if (!args.text || !deps.embedder) return found;
+        // Search by meaning (spec 028): what the words missed, the nearest first.
+        const near = await searchByMeaning(
+          deps.db,
+          deps.embedder,
+          who.person,
+          at(space),
+          args.text,
+          {
+            limit: 10,
+            ...(args.kind ? { kind: args.kind } : {}),
+          },
+        );
+        const seen = new Set(found.map((one) => one.id));
+        return [
+          ...found,
+          ...near.filter((one) => !seen.has(one.id)).map((one) => ({ ...one, byMeaning: true })),
+        ];
+      },
     ),
   );
 

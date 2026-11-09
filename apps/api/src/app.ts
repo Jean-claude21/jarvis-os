@@ -39,6 +39,7 @@ import { appPage } from './platform/page';
 import { spaceFor } from './spaces';
 import { actRoutes } from './act';
 import { connectorService } from './connector-service';
+import { embedderFor } from './embeddings';
 import { secretsKey } from './secrets';
 import { healthOf } from './health';
 import { computeDashboard, dashboardView, widgetsOf } from './views/dashboard';
@@ -62,6 +63,8 @@ export function makeApp(settings: Settings) {
   // Her scripts (spec 014) run in QuickJS, whichever door starts them.
   useScriptRunner(quickjsRunner);
   const blobs = objectStorage(settings.storage);
+  // Search by meaning (spec 028), when a model key is set.
+  const embedder = embedderFor();
   // Her connectors (spec 025): their secrets sealed with the branch's key.
   const connectors = connectorService({
     db,
@@ -100,6 +103,7 @@ export function makeApp(settings: Settings) {
       db,
       blobs,
       connectors,
+      embedder,
       publicUrl: settings.publicUrl,
       secret: settings.authSecret,
     }),
@@ -436,7 +440,14 @@ export function makeApp(settings: Settings) {
         return Response.json({ error: 'No such account.' }, { status: 401 });
       }
       const server = await mcpServerFor(
-        { db, blobs, connectors, publicUrl: settings.publicUrl, secret: settings.authSecret },
+        {
+          db,
+          blobs,
+          connectors,
+          embedder,
+          publicUrl: settings.publicUrl,
+          secret: settings.authSecret,
+        },
         {
           person,
           name: rows[0].name,

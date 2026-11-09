@@ -39,6 +39,7 @@ import {
   withdrawInvitation,
   type Actor,
   type Blobs,
+  type Embedder,
   type Space,
   type Tx,
   withComputed,
@@ -81,6 +82,7 @@ import { briefText, channelOf, sendTelegram } from './watcher';
 import type { Auth } from './auth';
 import { codeOf, failure } from './errors';
 import { catalogFor } from './catalog';
+import { searchByMeaning } from './embeddings';
 import { connectorChange, connectorInput, type ConnectorService } from './connector-service';
 import { invitationLink, namesOf, spaceFor } from './spaces';
 import { computeDashboard, widgetSchema, widgetsOf, type Widget } from './views/dashboard';
@@ -142,6 +144,7 @@ export function apiRoutes(deps: {
   db: pg.Pool;
   blobs: Blobs;
   connectors: ConnectorService;
+  embedder?: Embedder | null;
   publicUrl: string;
   secret: string;
 }) {
@@ -659,6 +662,19 @@ export function apiRoutes(deps: {
   api.delete('/connectors/:id', async (c) => {
     await deps.connectors.cut(actorOf(c), c.req.param('id'));
     return c.json({ cut: c.req.param('id') });
+  });
+
+  // Search by meaning (spec 028): her space's entries nearest to a question; none without a model.
+  api.get('/search/meaning', async (c) => {
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    const text = c.req.query('text') ?? '';
+    const kind = c.req.query('kind');
+    return c.json(
+      await searchByMeaning(deps.db, deps.embedder ?? null, c.get('person'), space.id, text, {
+        limit: Math.min(Math.max(Number(c.req.query('limit') ?? 10), 1), 50),
+        ...(kind ? { kind } : {}),
+      }),
+    );
   });
 
   // Her space's nightly backups (spec 022): the list, and a link that opens one for ten minutes.

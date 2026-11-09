@@ -400,6 +400,16 @@ in a file 1). When no entry holds every word, words close to hers count, by trig
 migration `0022`, word similarity at least 0.6): a typing slip, a plural. Search by meaning waits
 for the author's choice of model.
 
+## Search by meaning (spec 028)
+
+Each entry's words (title, fields, a file's words; `jarvis_said`) are turned into a vector of 1024
+numbers by an outside model — Voyage AI (`VOYAGE_API_KEY`, voyage-3.5-lite) or OpenAI
+(`OPENAI_API_KEY`) — kept in `entry_vector` (pgvector, migration `0023`, members only). The watcher
+turns 64 entries a pass: those without a vector, or whose words or model changed (a hash). A
+question is turned the same way; `find` gives the entries found by words, then those near in
+meaning (`byMeaning`), and the Entries page shows them under « Near in meaning ». Without a key,
+search stays by words. Only the entries' words leave, to the model chosen.
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |

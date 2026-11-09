@@ -245,6 +245,10 @@ details.area summary::-webkit-details-marker { display: none; }
 .tabs a { padding: 8px 12px; text-decoration: none; color: var(--bark); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; font-size: 13.5px; }
 .tabs a.on { color: var(--ink); border-color: var(--primary); font-weight: 600; }
 .tabs a .n { font: 500 11px/1 "JetBrains Mono", monospace; color: var(--bark); margin-left: 4px; }
+/* Near in meaning (spec 028), under the entries found by words. */
+.ent-near { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--rule-strong); }
+.ent-near h3 { margin: 0 0 6px; }
+.ent-near li { display: flex; gap: 10px; justify-content: space-between; align-items: baseline; }
 /* Connections (spec 025): assistants come to Jarvis, Jarvis goes to her tools. */
 .flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 0 0 6px; }
 .flow-node { padding: 5px 10px; border: 1px solid var(--rule-strong); border-radius: 2px; background: var(--paper); font-size: 13px; }

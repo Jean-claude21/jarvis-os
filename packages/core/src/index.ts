@@ -275,3 +275,11 @@ export {
   type Probe,
 } from './connectors';
 export { filesToRead, READ_LATER, setFileWords, type FileToRead } from './files';
+export {
+  entriesToEmbed,
+  keepVector,
+  nearEntries,
+  saidOf,
+  VECTOR_DIMENSIONS,
+  type Embedder,
+} from './meaning';

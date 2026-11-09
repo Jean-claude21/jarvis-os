@@ -8,6 +8,7 @@ import {
   pendingMessages,
   personEmail,
   spacesOf,
+  type Blobs,
   type Message,
 } from '@jarvis-os/core';
 import nodemailer from 'nodemailer';
@@ -15,6 +16,7 @@ import type pg from 'pg';
 import { ACTIONS, actionToken, actionWord } from './act';
 import { wordsOf, type Lang } from './i18n';
 import type { Settings } from './settings';
+import { objectStorage } from './storage';
 
 // Her channels (spec 020): every message enters the outbox, then is delivered here — Telegram by its
 // bot, e-mail by any SMTP server — and its delivery written back (sent, or tried again later).
@@ -34,6 +36,8 @@ export interface Delivery {
   publicUrl: string;
   secret: string;
   lang?: Lang;
+  /** Where the nightly backups go (spec 022); none, no backup. */
+  blobs?: Blobs;
 }
 
 /** E-mail through SMTP (`JARVIS_SMTP_URL`, `JARVIS_EMAIL_FROM`); null when it is not configured. */
@@ -58,6 +62,7 @@ export function deliveryFor(settings: Settings, mailer?: Mailer | null): Deliver
         : mailer,
     publicUrl: settings.publicUrl,
     secret: settings.authSecret,
+    blobs: objectStorage(settings.storage),
   };
 }
 

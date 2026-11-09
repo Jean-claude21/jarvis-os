@@ -295,6 +295,28 @@ flowchart LR
   L -->|held by another| S[pass skipped]
 ```
 
+## Backups (spec 022)
+
+- **Each space, each night** (`backups.ts`, migration `0017`): the watcher exports each space as a
+  Markdown folder (what `/api/export` gives, without the files' bytes, which stay once in the
+  storage) into `backups/<space>/<day>.zip`, a few spaces each pass, acting as a member. Thirty
+  days are kept. She lists them (`GET /api/backups`) and opens one by a ten-minute link; `import`
+  reads one back.
+- **The database, each night** (`pnpm backup`, the workflow « Backup »): `main` kept as a Neon
+  branch `backup-main-<day>`, the last three kept (Neon itself goes back six hours on its free
+  plan). `pnpm backup restore --from <backup> --into <branch>` shows what each holds; `--apply`
+  restores, keeping the state before as `<branch>_before_restore_<stamp>`. Neon then makes the
+  backup the restored branch's parent: it stays.
+
+```mermaid
+flowchart LR
+  W[watcher, each pass] -->|jarvis_backup_due| S[spaces without the day's backup]
+  S -->|as a member: exportMarkdown, zip| B[(storage: backups/space/day.zip)]
+  S --> R[(space_backup: 30 days)]
+  G[GitHub, each night] -->|pnpm backup| N[Neon: backup-main-day, 3 kept]
+  N -->|pnpm backup restore --apply| M[(main)]
+```
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |

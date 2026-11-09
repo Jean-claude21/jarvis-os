@@ -11,6 +11,8 @@ export interface Blobs {
   get(key: string): Promise<Uint8Array>;
   /** A link that opens the file without a token, for `seconds`. */
   link(key: string, seconds: number): Promise<string>;
+  /** The bytes removed, when the storage allows it (spec 022: old backups). */
+  remove?(key: string): Promise<void>;
 }
 
 export const FILE_MAX_BYTES = 20 * 1024 * 1024;

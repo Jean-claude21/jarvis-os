@@ -1,4 +1,9 @@
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  DeleteObjectCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Blobs } from '@jarvis-os/core';
 import type { Settings } from './settings';
@@ -34,6 +39,9 @@ export function objectStorage(settings: Settings['storage']): Blobs {
       return getSignedUrl(s3, new GetObjectCommand({ Bucket: bucket, Key: key }), {
         expiresIn: seconds,
       });
+    },
+    async remove(key) {
+      await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
     },
   };
 }

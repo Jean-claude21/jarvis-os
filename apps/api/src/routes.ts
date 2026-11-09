@@ -22,6 +22,7 @@ import {
   readDocument,
   renewCalendarKey,
   upcoming,
+  backupsOf,
   exportMarkdown,
   importMarkdown,
   invitationsOf,
@@ -610,6 +611,17 @@ export function apiRoutes(deps: {
       'content-type': 'application/zip',
       'content-disposition': `attachment; filename*=UTF-8''${encodeURIComponent(`${space.name} ${day}.zip`)}`,
     });
+  });
+
+  // Her space's nightly backups (spec 022): the list, and a link that opens one for ten minutes.
+  api.get('/backups', async (c) => c.json(await act(c, (tx, _a, space) => backupsOf(tx, space))));
+  api.get('/backups/:day/link', async (c) => {
+    const day = c.req.param('day');
+    const backup = (await act(c, (tx, _a, space) => backupsOf(tx, space))).find(
+      (one) => one.day === day,
+    );
+    if (!backup) return c.json({ error: `No backup of ${day}.` }, 404);
+    return c.json({ url: await deps.blobs.link(backup.storageKey, 600), seconds: 600 });
   });
 
   api.post(

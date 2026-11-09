@@ -58,6 +58,8 @@ const follow = (words: Words, done = "location.href = '/';") => `
     if (data && data.url) { location.href = data.url; return; }
     if (!response.ok) {
       error.textContent = response.status === 401 ? ${JSON.stringify(words.wrong)}
+        : response.status === 429 ? ${JSON.stringify(words.tooMany)}
+        : data && data.code === 'SIGN_UP_BY_INVITATION' ? ${JSON.stringify(words.byInvitation)}
         : ${JSON.stringify(words.failed)}.replace('{reason}', (data && data.message) || response.status);
       return;
     }

@@ -274,3 +274,4 @@ export {
   type ConnectorTool,
   type Probe,
 } from './connectors';
+export { filesToRead, READ_LATER, setFileWords, type FileToRead } from './files';

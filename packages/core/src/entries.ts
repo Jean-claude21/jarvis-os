@@ -1,4 +1,5 @@
 import type { Actor, Tx } from './db';
+import { NEAR, SAID, wordsMatch, wordsOf } from './search';
 import { prefixedId } from './ids';
 import { record } from './journal';
 import { readerOf } from './compute';
@@ -537,40 +538,56 @@ export async function get(
   return { ...entry, links: { out: await ends('out'), in: await ends('in') } };
 }
 
-const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-
 /**
- * Entries by words (in the title, the fields and a text file's words, accents and case aside,
- * every word present), by
- * kind, by the day they were created; the latest first. Archived ones only when asked.
+ * Entries by words (in the title, the fields and a file's words, accents and case aside, every word
+ * present), by kind, by the day they were created. With words, the best first: a word in the title
+ * counts more than in a field, more than in a file (spec 027); without, the latest first. When no
+ * entry holds every word, words close to hers count (a typing slip, a plural). Archived ones only
+ * when asked.
  */
 export async function find(tx: Tx, spaceId: string, raw: FindInput = {}): Promise<Entry[]> {
   const input = findInputSchema.parse(raw);
-  const words = fold(input.text ?? '')
-    .split(/\s+/)
-    .filter((word) => word.length > 0);
-  const { rows } = await tx.query<Entry>(
-    `select ${columns} from entry
-      where space_id = $1
+  const words = wordsOf(input.text);
+  const params = [
+    spaceId,
+    input.archived,
+    input.kind ? (KIND_RENAMES[foldKind(input.kind)] ?? input.kind) : null,
+    input.from ?? null,
+    input.to ?? null,
+    words,
+    input.limit,
+  ];
+  const scope = `space_id = $1
         and ($2::boolean or archived_at is null)
         and ($3::text is null or jarvis_fold(kind) = jarvis_fold($3))
         and ($4::date is null or created_at >= $4::date)
-        and ($5::date is null or created_at < $5::date + 1)
-        and (select bool_and(jarvis_fold(title || ' ' || data::text || ' ' || jarvis_file_words(id))
-                             like '%' || word || '%')
-               from unnest($6::text[]) as word) is not false
-      order by updated_at desc limit $7`,
-    [
-      spaceId,
-      input.archived,
-      input.kind ? (KIND_RENAMES[foldKind(input.kind)] ?? input.kind) : null,
-      input.from ?? null,
-      input.to ?? null,
-      words,
-      input.limit,
-    ],
+        and ($5::date is null or created_at < $5::date + 1)`;
+  const { rows } = await tx.query<Entry>(
+    `select ${columns} from entry
+      where ${scope}
+        and ${wordsMatch(6)}
+      order by (select coalesce(sum(case
+                  when jarvis_fold(title) like '%' || word || '%' then 3
+                  when jarvis_fold(data::text) like '%' || word || '%' then 2
+                  else 1 end), 0)
+                  from unnest($6::text[]) as word) desc,
+               updated_at desc
+      limit $7`,
+    params,
   );
-  return rows;
+  if (rows.length > 0 || words.length === 0) return rows;
+  // Nothing holds every word: the words close to hers (spec 027).
+  const { rows: near } = await tx.query<Entry>(
+    `select ${columns} from (
+       select e.*, (select min(word_similarity(word, ${SAID}))
+                      from unnest($6::text[]) as word) as close
+         from entry e where ${scope}) e
+      where close >= ${NEAR}
+      order by close desc, updated_at desc
+      limit $7`,
+    params,
+  );
+  return near;
 }
 
 export interface Kind {

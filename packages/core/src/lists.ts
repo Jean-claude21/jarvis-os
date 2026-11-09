@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { readerOf, type EntryRow } from './compute';
 import type { Actor, Tx } from './db';
+import { wordsMatch, wordsOf } from './search';
 import { archive, save, snapshotOf } from './entries';
 import { isScope, todayOf, type Clock } from './formula';
 import { record, recordMany } from './journal';
@@ -168,22 +169,22 @@ async function entriesFor(
   input: z.infer<typeof listInputSchema>,
   dateFields: (kind: string) => string[] | undefined,
 ): Promise<Found[]> {
-  const words = fold(input.text ?? '')
-    .split(/\s+/)
-    .filter((word) => word.length > 0);
-  const { rows } = await tx.query<EntryRow>(
-    `select id, kind, title, data - 'text' as data,
-            to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
-            to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "updatedAt"
-       from entry
-      where space_id = $1 and archived_at is null
-        and ($2::text is null or jarvis_fold(kind) = jarvis_fold($2))
-        and (select bool_and(jarvis_fold(title || ' ' || data::text || ' ' || jarvis_file_words(id))
-                             like '%' || word || '%')
-               from unnest($3::text[]) as word) is not false
-      order by updated_at desc limit 5000`,
-    [spaceId, input.kind ?? null, words],
-  );
+  const words = wordsOf(input.text);
+  const select = (near: boolean) =>
+    tx.query<EntryRow>(
+      `select id, kind, title, data - 'text' as data,
+              to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
+              to_char(updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "updatedAt"
+         from entry
+        where space_id = $1 and archived_at is null
+          and ($2::text is null or jarvis_fold(kind) = jarvis_fold($2))
+          and ${wordsMatch(3, near)}
+        order by updated_at desc limit 5000`,
+      [spaceId, input.kind ?? null, words],
+    );
+  // Nothing holds every word: the words close to hers (spec 027).
+  let { rows } = await select(false);
+  if (rows.length === 0 && words.length > 0) rows = (await select(true)).rows;
   const asDay = (day: string, end: boolean) =>
     day.length === 7 ? `${day}-${end ? '31' : '01'}` : day;
   const folder = input.folder

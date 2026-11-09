@@ -63,6 +63,20 @@ describe('the outbox', () => {
     expect(await due(new Date(now.getTime() + 86_400_000))).toBe(false);
   });
 
+  it('tries a message again when it is entered after it failed for good', async () => {
+    const key = `again:${ama.actor.person}:${Date.now()}`;
+    const id = (await enter(ama, key))!;
+    for (let n = 0; n < 4; n += 1) await ama.as((tx) => markFailed(tx, id, 'refused', now));
+    expect(await ama.as((tx) => messageOf(tx, id))).toMatchObject({ state: 'failed' });
+    expect(await enter(ama, key)).toBe(id);
+    expect(await ama.as((tx) => messageOf(tx, id))).toMatchObject({
+      state: 'queued',
+      attempts: 0,
+      lastError: null,
+    });
+    expect(await enter(ama, key)).toBeNull();
+  });
+
   it('delivers on a later try, and takes an action from it once only', async () => {
     const id = (await enter(ama, `later:${ama.actor.person}:${Date.now()}`))!;
     await ama.as((tx) => markFailed(tx, id, 'timeout', now));

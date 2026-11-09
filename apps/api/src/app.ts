@@ -38,6 +38,7 @@ import { objectStorage } from './storage';
 import { appPage } from './platform/page';
 import { spaceFor } from './spaces';
 import { actRoutes } from './act';
+import { healthOf } from './health';
 import { computeDashboard, dashboardView, widgetsOf } from './views/dashboard';
 import { pageView } from './views/page';
 import { sharedView } from './views/shared';
@@ -63,7 +64,12 @@ export function makeApp(settings: Settings) {
   const resource = mcpResource(settings.publicUrl);
   const app = new Hono();
 
-  app.get('/health', (c) => c.json({ status: 'healthy' }));
+  // For a monitor outside (spec 023): the database answers, the watcher passed lately and without
+  // failure. Nothing personal, nor who runs the watcher. 503 when something is wrong.
+  app.get('/health', async (c) => {
+    const health = await healthOf(db);
+    return c.json(health, health.status === 'healthy' ? 200 : 503);
+  });
   app.on(['GET', 'POST'], '/auth/*', (c) => auth.handler(c.req.raw));
   // Actions from an e-mail (spec 020): a signed link, a page that asks, a button that acts.
   app.route('/act', actRoutes({ db, secret: settings.authSecret }));

@@ -27,7 +27,7 @@ jobs:
     timeout-minutes: 40
     # One run at a time on that branch: a pull request and a push to dev never write it together.
     concurrency:
-      group: neon-test
+      group: neon-test-branch
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4

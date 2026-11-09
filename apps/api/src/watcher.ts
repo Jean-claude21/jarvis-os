@@ -119,6 +119,46 @@ export function tellerFor(db: pg.Pool, telegramToken: string | undefined) {
   };
 }
 
+/**
+ * One pass of the watcher (spec 010): the Telegram links, the reminders due, the morning briefs,
+ * the rules on a schedule. The local loop runs it each minute; on Netlify, a scheduled function
+ * runs it each minute too. Its failures are logged, never thrown.
+ */
+export async function watcherPass(
+  db: pg.Pool,
+  telegramToken: string | undefined,
+  now: Date = new Date(),
+): Promise<PassReport | null> {
+  useScriptRunner(quickjsRunner);
+  try {
+    // Who pressed « Start » with her code (spec 015), before telling anyone.
+    if (telegramToken) {
+      await readTelegramLinks(db, telegramToken, wordsOf('fr').channelLinked).catch((error) =>
+        console.warn('[watcher] telegram', (error as Error).message),
+      );
+    }
+    const report = await watchOnce(db, now, tellerFor(db, telegramToken));
+    // Her morning brief (spec 018), at the hour she chose, once a day.
+    if (telegramToken) {
+      for (const person of await briefPeople(db)) {
+        await briefOnce(db, person, now, async (brief) => {
+          const channel = await channelOf(db, person);
+          return channel.telegram
+            ? sendTelegram(telegramToken, channel.telegram, briefText(brief))
+            : false;
+        }).catch((error) => console.warn('[watcher] brief', (error as Error).message));
+      }
+    }
+    // Her scheduled rules and « before » rules (spec 014), on the same clock.
+    const rules = await runDueRules(db, now);
+    if (rules.failed) console.warn('[watcher] rules', rules);
+    return report;
+  } catch (error) {
+    console.error('[watcher]', (error as Error).message);
+    return null;
+  }
+}
+
 /** The watcher's loop: a pass each minute, never two at once; it stops when `signal` aborts. */
 export function watch(
   db: pg.Pool,
@@ -126,37 +166,13 @@ export function watch(
   onPass: (report: PassReport) => void = () => undefined,
   signal?: AbortSignal,
 ) {
-  const tell = tellerFor(db, telegramToken);
-  useScriptRunner(quickjsRunner);
   let running = false;
   const pass = async () => {
     if (running || signal?.aborted) return;
     running = true;
     try {
-      const now = new Date();
-      // Who pressed « Start » with her code (spec 015), before telling anyone.
-      if (telegramToken) {
-        await readTelegramLinks(db, telegramToken, wordsOf('fr').channelLinked).catch((error) =>
-          console.warn('[watcher] telegram', (error as Error).message),
-        );
-      }
-      onPass(await watchOnce(db, now, tell));
-      // Her morning brief (spec 018), at the hour she chose, once a day.
-      if (telegramToken) {
-        for (const person of await briefPeople(db)) {
-          await briefOnce(db, person, now, async (brief) => {
-            const channel = await channelOf(db, person);
-            return channel.telegram
-              ? sendTelegram(telegramToken, channel.telegram, briefText(brief))
-              : false;
-          }).catch((error) => console.warn('[watcher] brief', (error as Error).message));
-        }
-      }
-      // Her scheduled rules and « before » rules (spec 014), on the same clock.
-      const rules = await runDueRules(db, now);
-      if (rules.failed) console.warn('[watcher] rules', rules);
-    } catch (error) {
-      console.error('[watcher]', (error as Error).message);
+      const report = await watcherPass(db, telegramToken);
+      if (report) onPass(report);
     } finally {
       running = false;
     }

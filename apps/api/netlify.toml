@@ -1,0 +1,21 @@
+# Jarvis OS on Netlify (spec 010). Built and deployed from this repository by `pnpm deploy:draft`
+# (a private address, to check) and `pnpm deploy:prod` (the production site, from `main` only).
+# The variables (JARVIS_BRANCH, JARVIS_PUBLIC_URL, JARVIS_<BRANCH>_*, JARVIS_TELEGRAM_BOT_TOKEN)
+# live in Netlify, never here. Paths are relative to the repository's root.
+#
+# `tooling/deploy.ts` bundles `netlify/functions/*.mts` into `netlify/.build/functions/`, each
+# function one file with its dependencies inside; beside them, what the code reads next to itself
+# (QuickJS's WebAssembly file, the shipped apps, Jarvis's routines). Netlify ships them as they are
+# (no build step, no second bundling).
+
+[build]
+  publish = "apps/api/netlify/public"
+
+[functions]
+  directory = "apps/api/netlify/.build/functions"
+  node_bundler = "none"
+  included_files = [
+    "apps/api/netlify/.build/functions/emscripten-module.wasm",
+    "apps/api/netlify/.build/functions/apps/**",
+    "apps/api/netlify/.build/functions/routines/**",
+  ]

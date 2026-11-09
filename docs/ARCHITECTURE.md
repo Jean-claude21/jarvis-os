@@ -293,4 +293,26 @@ through it; files go straight to `/upload/:token`, never through the model.
 | `test`      | local tests and CI |
 
 Each branch has its own database and its own `files` bucket; `pnpm provision` makes them and
-writes `.env`.
+writes `.env` with the credentials of `dev` and `test` only: those of `main` live in Netlify.
+
+## Production (spec 010)
+
+Production runs on Netlify, built from this repository: `pnpm deploy:draft` bundles the two
+functions (esbuild, every dependency inside, QuickJS's WebAssembly file, the shipped apps and the
+routines beside them) and deploys them to a private address; `pnpm deploy:prod` does the same to
+the production site, from a clean `main` only.
+
+```mermaid
+flowchart LR
+  R[main, this repository] -->|pnpm deploy:prod| N[Netlify]
+  N --> A[function api · every request · Hono app]
+  N --> W[function watcher · each minute · watcherPass]
+  A --> M[(Neon main · her life)]
+  W --> M
+  L[a laptop · provision, migrate, tests] --> D[(Neon dev · a copy)]
+  L --> T[(Neon test)]
+```
+
+The move of her life from `dev` (where it lived until spec 010) to `main` is `pnpm production`:
+a dry run by default, `--apply` to restore `main` from `dev` (its previous state kept as a backup
+branch), copy her files and compare the counts, `--switch` to set Netlify's variables for `main`.

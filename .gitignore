@@ -7,3 +7,6 @@ coverage/
 !.env.example
 .DS_Store
 .local/
+# The Netlify functions bundled by `pnpm deploy:*` (spec 010), rebuilt at each deploy; the CLI's state.
+apps/api/netlify/.build/
+.netlify/

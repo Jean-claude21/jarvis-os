@@ -32,7 +32,8 @@ const COLUMNS = `id::int, person_id as "personId", space_id as "spaceId", channe
 
 /**
  * Enters a message, once: a second message with the same `dedupe` key is ignored (no message is
- * ever sent twice). Its id, or null when it was there already. Runs as the person it is for.
+ * ever sent twice), unless the first failed for good: then it is tried again (spec 023, « Retry »).
+ * Its id, or null when it was there already. Runs as the person it is for.
  */
 export async function enterMessage(
   tx: Tx,
@@ -50,7 +51,9 @@ export async function enterMessage(
   const { rows } = await tx.query<{ id: number }>(
     `insert into outbox (person_id, space_id, channel, kind, subject, body, entry_id, dedupe)
      values ($1, $2, $3, $4, $5, $6, $7, $8)
-     on conflict (dedupe) do nothing
+     on conflict (dedupe) do update
+       set state = 'queued', attempts = 0, next_try_at = now(), last_error = null
+     where outbox.state = 'failed'
      returning id::int`,
     [
       message.person,
@@ -110,7 +113,7 @@ export async function markSent(tx: Tx, id: number, now: Date): Promise<void> {
 }
 
 /** A failed delivery: tried again later, or failed for good after the last try. */
-export async function markFailed(tx: Tx, id: number, error: string, now: Date): Promise<void> {
+export async function markFailed(tx: Tx, id: number, error: string, now: Date): Promise<boolean> {
   const { rows } = await tx.query<{ attempts: number }>(
     'select attempts from outbox where id = $1',
     [id],
@@ -129,6 +132,7 @@ export async function markFailed(tx: Tx, id: number, error: string, now: Date): 
       wait === undefined ? null : new Date(now.getTime() + wait * 60_000).toISOString(),
     ],
   );
+  return wait === undefined;
 }
 
 /** An action taken from the message (a link in an e-mail): once only. True when it was the first. */

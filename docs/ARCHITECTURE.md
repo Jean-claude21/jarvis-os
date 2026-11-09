@@ -317,6 +317,24 @@ flowchart LR
   N -->|pnpm backup restore --apply| M[(main)]
 ```
 
+## Knowing when something went wrong (spec 023)
+
+- **For her**: a reminder whose message failed for good (three tries after the first) is saved
+  `failed`, its `error` saying the channel and the reason, as her through the door « watcher »:
+  « Maintenant » shows it to fix. « Retry » plans it again; the watcher enters the same message,
+  which, having failed, is queued again from its first try.
+- **For whoever runs it**: `/health` answers 200 or 503 with three parts: the database answers;
+  the watcher's last pass (from its lease, spec 021): when, late after five minutes, failed or not,
+  and how many failures it counted (reminders, outbox, backups, rules). Counts only. A monitor
+  outside (any uptime service) reads it and alerts.
+
+```mermaid
+flowchart LR
+  D[deliverOutbox] -->|failed for good| R[the reminder: failed, its reason]
+  R --> M[Maintenant: to fix] -->|Retry| P[planned] --> W[watcher] -->|same message, queued again| D
+  L[(watcher_lease: last pass, its report)] --> H[/health: 200 or 503/] --> U[a monitor outside]
+```
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |

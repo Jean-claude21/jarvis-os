@@ -103,7 +103,7 @@ describe('one watcher at a time', () => {
     expect(await watcherPass(server.db, delivery, new Date(), 'netlify:2')).not.toBeNull();
     const last = await lastPass(server.db, 'watcher');
     expect(last).toMatchObject({ holder: 'netlify:2', error: null });
-    expect(last?.report).toEqual(expect.objectContaining({ failed: 0 }));
+    expect(last?.report).toMatchObject({ reminders: { failed: 0 }, rules: expect.any(Object) });
     expect(last?.endedAt).toBeInstanceOf(Date);
   });
 });

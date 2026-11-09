@@ -2,10 +2,12 @@ import {
   asPerson,
   enterMessage,
   find,
+  get,
   markFailed,
   markSent,
   messageOf,
   pendingMessages,
+  save,
   personEmail,
   spacesOf,
   type Blobs,
@@ -219,9 +221,28 @@ export async function deliverOutbox(
     } catch (failure) {
       error = (failure as Error).message;
     }
-    await asPerson(db, message.personId, (tx) =>
-      error ? markFailed(tx, message.id, error, now) : markSent(tx, message.id, now),
-    );
+    const reason = error;
+    await asPerson(db, message.personId, async (tx) => {
+      if (!reason) return markSent(tx, message.id, now);
+      // A reminder that failed for good is « to fix » with its reason (spec 023): she sees it in
+      // « Maintenant », and « Retry » asks for it again.
+      if (!(await markFailed(tx, message.id, reason, now))) return;
+      if (message.kind !== 'reminder' || !message.entryId) return;
+      if (!(await get(tx, message.spaceId, message.entryId))) return;
+      await save(tx, { person: message.personId, door: 'watcher' }, message.spaceId, {
+        entries: [
+          {
+            id: message.entryId,
+            data: {
+              status: 'failed',
+              error: wordsOf(delivery.lang ?? 'fr')
+                .notSent.replace('{channel}', message.channel)
+                .replace('{reason}', reason),
+            },
+          },
+        ],
+      });
+    });
     if (error) report.failed += 1;
     else report.sent += 1;
   }

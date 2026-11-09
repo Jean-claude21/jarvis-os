@@ -147,6 +147,8 @@ export async function watcherPass(
   }
   let report: PassReport | null = null;
   let failure: string | undefined;
+  // What the pass did, kept with the lease (spec 023): `/health` reads its failures.
+  const done: Record<string, unknown> = {};
   try {
     // Who pressed « Start » with her code (spec 015), before telling anyone.
     if (delivery.telegramToken) {
@@ -155,6 +157,7 @@ export async function watcherPass(
       );
     }
     report = await watchOnce(db, now, tellerFor(db, delivery));
+    done.reminders = report;
     // Her morning brief (spec 018), at the hour she chose, once a day.
     for (const person of await briefPeople(db)) {
       await briefOnce(db, person, now, async (brief) => {
@@ -173,14 +176,17 @@ export async function watcherPass(
     }
     // What entered the outbox (now or before, waiting for another try), delivered (spec 020).
     const delivered = await deliverOutbox(db, now, delivery);
+    done.outbox = delivered;
     if (delivered.failed) console.warn('[watcher] outbox', delivered);
     // Each space's backup of the day (spec 022), a few each pass.
     if (delivery.blobs) {
       const backups = await backupOnce(db, delivery.blobs, now);
+      done.backups = backups;
       if (backups.failed) console.warn('[watcher] backups', backups);
     }
     // Her scheduled rules and « before » rules (spec 014), on the same clock.
     const rules = await runDueRules(db, now);
+    done.rules = rules;
     if (rules.failed) console.warn('[watcher] rules', rules);
     return report;
   } catch (error) {
@@ -188,9 +194,12 @@ export async function watcherPass(
     console.error('[watcher]', failure);
     return null;
   } finally {
-    await giveLease(db, 'watcher', holder, failure ? { error: failure } : { report }).catch(
-      (error) => console.warn('[watcher] lease', (error as Error).message),
-    );
+    await giveLease(
+      db,
+      'watcher',
+      holder,
+      failure ? { error: failure, report: done } : { report: done },
+    ).catch((error) => console.warn('[watcher] lease', (error as Error).message));
   }
 }
 

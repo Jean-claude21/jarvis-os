@@ -69,7 +69,11 @@ export async function readTelegramLinks(
   db: pg.Pool,
   token: string,
   linked: string,
-  replies: { kept: string; filed: string } = { kept: 'OK', filed: 'OK' },
+  replies: { kept: string; filed: string; unheard?: string } = { kept: 'OK', filed: 'OK' },
+  /** Her voice notes are written down with this key (OpenAI); without it, she is told. */
+  transcribe: ((audio: Blob, name: string) => Promise<string>) | null = openaiTranscriber(
+    process.env.OPENAI_API_KEY,
+  ),
 ): Promise<number> {
   const response = await fetch(
     `${API}/bot${token}/getUpdates?timeout=0&offset=${offset}&allowed_updates=%5B%22message%22%5D`,
@@ -79,7 +83,13 @@ export async function readTelegramLinks(
     ok: boolean;
     result?: {
       update_id: number;
-      message?: { text?: string; date?: number; chat?: { id: number } };
+      message?: {
+        text?: string;
+        date?: number;
+        chat?: { id: number };
+        voice?: { file_id: string; duration?: number };
+        audio?: { file_id: string; file_name?: string };
+      };
     }[];
   };
   let count = 0;
@@ -90,9 +100,20 @@ export async function readTelegramLinks(
     if (chat === undefined) continue;
     // Anything else from a linked chat is kept in her inbox (spec 035), without any AI.
     if (!match) {
-      const text = update.message?.text?.trim();
-      const owner = text && !text.startsWith('/') ? await personByChat(db, String(chat)) : null;
-      if (!owner || !text) continue;
+      const sound = update.message?.voice ?? update.message?.audio;
+      let text = update.message?.text?.trim();
+      const owner =
+        (text && !text.startsWith('/')) || sound ? await personByChat(db, String(chat)) : null;
+      if (!owner) continue;
+      // A voice note: written down, then kept like a written message (her words, said).
+      if (!text && sound) {
+        text = transcribe ? await heard(token, sound.file_id, transcribe).catch(() => '') : '';
+        if (!text) {
+          await reply(token, chat, replies.unheard ?? replies.kept);
+          continue;
+        }
+      }
+      if (!text) continue;
       const done = await asPerson(db, owner.person, (tx) =>
         captureAs(tx, { person: owner.person, door: 'telegram' }, owner.spaceId, {
           text,
@@ -100,11 +121,7 @@ export async function readTelegramLinks(
           at: new Date((update.message?.date ?? Date.now() / 1000) * 1000).toISOString(),
         }),
       );
-      await fetch(`${API}/bot${token}/sendMessage`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ chat_id: chat, text: done.filed ? replies.filed : replies.kept }),
-      });
+      await reply(token, chat, done.filed ? replies.filed : replies.kept);
       count += 1;
       continue;
     }
@@ -133,4 +150,46 @@ export async function readTelegramLinks(
     count += 1;
   }
   return count;
+}
+
+async function reply(token: string, chat: number, text: string): Promise<void> {
+  await fetch(`${API}/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chat_id: chat, text }),
+  });
+}
+
+/** A voice note's words: the file fetched from Telegram, written down by the transcriber. */
+async function heard(
+  token: string,
+  fileId: string,
+  transcribe: (audio: Blob, name: string) => Promise<string>,
+): Promise<string> {
+  const info = await fetch(`${API}/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`);
+  if (!info.ok) return '';
+  const path = ((await info.json()) as { result?: { file_path?: string } }).result?.file_path;
+  if (!path) return '';
+  const file = await fetch(`${API}/file/bot${token}/${path}`);
+  if (!file.ok) return '';
+  return (await transcribe(await file.blob(), path.split('/').pop() ?? 'voice.ogg')).trim();
+}
+
+/** OpenAI's transcription, when its key is set; null otherwise (nothing is sent anywhere). */
+export function openaiTranscriber(
+  key: string | undefined,
+): ((audio: Blob, name: string) => Promise<string>) | null {
+  if (!key) return null;
+  return async (audio, name) => {
+    const form = new FormData();
+    form.append('file', audio, name);
+    form.append('model', 'gpt-4o-mini-transcribe');
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}` },
+      body: form,
+    });
+    if (!response.ok) throw new Error(`Transcription failed (${response.status}).`);
+    return ((await response.json()) as { text?: string }).text ?? '';
+  };
 }

@@ -10,7 +10,8 @@ export const appWords = {
     keySpace: 'Espace',
     keyKinds: 'Types qu’elle peut écrire',
     keyKindsHint: 'aucun coché : tous',
-    keyLimitsHow: 'Pour un programme (un agent sur ton serveur), donne-lui un seul espace et les types qu’il peut écrire : il ne verra rien d’autre, et chaque ligne qu’il écrit porte son nom dans ton journal.',
+    keyLimitsHow:
+      'Pour un programme (un agent sur ton serveur), donne-lui un seul espace et les types qu’il peut écrire : il ne verra rien d’autre, et chaque ligne qu’il écrit porte son nom dans ton journal.',
     keyMake: 'Créer la clé',
     conProtocol: 'Type',
     conProtocolMcp: 'Serveur MCP',
@@ -1265,7 +1266,8 @@ export const appWords = {
     keySpace: 'Space',
     keyKinds: 'Kinds it may write',
     keyKindsHint: 'none ticked: all',
-    keyLimitsHow: 'For a program (an agent on your server), give it one space and the kinds it may write: it sees nothing else, and each line it writes carries its name in your journal.',
+    keyLimitsHow:
+      'For a program (an agent on your server), give it one space and the kinds it may write: it sees nothing else, and each line it writes carries its name in your journal.',
     keyMake: 'Make the key',
     conProtocol: 'Kind',
     conProtocolMcp: 'MCP server',

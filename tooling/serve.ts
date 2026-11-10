@@ -102,7 +102,9 @@ function keep(name: string, command: string, args: string[], env: NodeJS.Process
   run();
 }
 
-keep('api', 'pnpm', ['--filter', '@jarvis-os/api', 'start'], {
+// `pnpm serve --watch`: the API starts again by itself when its code changes (working on screens).
+const watch = process.argv.includes('--watch');
+keep('api', 'pnpm', ['--filter', '@jarvis-os/api', watch ? 'dev' : 'start'], {
   JARVIS_PUBLIC_URL: publicUrl,
   PORT: port,
 });

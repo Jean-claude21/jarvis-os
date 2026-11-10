@@ -138,9 +138,11 @@ export async function patternsOf(tx: Tx, spaceIds: string[], now = new Date()): 
                    and jarvis_fold(e.kind) not in ('person', 'comment', 'intention', 'reminder')
                    and (exists (select 1 from link l where (l.from_id = e.id and l.to_id = p.id)
                                                        or (l.from_id = p.id and l.to_id = e.id))
-                        or jarvis_fold(e.title || ' ' || e.data::text) like '%' || jarvis_fold(p.title) || '%')
+                        or jarvis_fold(e.title || ' ' || e.data::text) ~ ('\\m' || regexp_replace(jarvis_fold(p.title), '[^[:alnum:] ]', '', 'g') || '\\M'))
       where p.space_id = any($1) and p.archived_at is null and jarvis_fold(p.kind) = 'person'
         and length(p.title) >= 3
+        -- Not herself: the person named as her space.
+        and not exists (select 1 from space s where s.id = p.space_id and jarvis_fold(s.name) = jarvis_fold(p.title))
       group by p.id, p.title having count(distinct e.id) >= 4
       order by 4 desc limit 5`,
     [spaceIds, since30],

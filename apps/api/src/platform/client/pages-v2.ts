@@ -652,14 +652,21 @@ v2Pages.app = async function (params, name) {
   const kinds = knownKinds.length ? knownKinds : await api(inSpace('/kinds'));
   const models = kinds.filter((k) => k.model && k.model.app === name);
   const [appPages, views] = await Promise.all([api(inSpace('/pages?app=' + encodeURIComponent(name))), api(inSpace('/views?app=' + encodeURIComponent(name))).catch(() => [])]);
-  const pageId = params.get('page') || (!params.get('kind') && !params.get('view') && appPages[0] ? appPages[0].id : null);
+  const habitTab = isHabitApp(models, name) ? params.get('t') || (!params.get('page') && !params.get('kind') && !params.get('view') ? 'aujourdhui' : null) : null;
+  const pageId = habitTab ? null : params.get('page') || (!params.get('kind') && !params.get('view') && appPages[0] ? appPages[0].id : null);
+  const appHref = '#/app/' + esc(encodeURIComponent(name));
   const tabs = '<nav class="tabs">' +
+    (isHabitApp(models, name) ? [['aujourdhui', W.rt_today], ['habitudes', W.rt_habits], ['regularite', W.rt_regularity]].map((t) => '<a href="' + appHref + '?t=' + t[0] + '"' + (habitTab === t[0] ? ' aria-current="page"' : '') + '>' + esc(t[1]) + '</a>').join('') : '') +
     appPages.map((p) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?page=' + esc(encodeURIComponent(p.id)) + '"' + (p.id === pageId ? ' aria-current="page"' : '') + '>' + esc(tr(p.label) || p.title) + '</a>').join('') +
     models.map((k) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '"' + (params.get('kind') === k.kind ? ' aria-current="page"' : '') + '>' + esc(kindLabel(k)) + '<span class="n">' + num(k.count || 0) + '</span></a>').join('') +
     views.map((v) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?view=' + esc(encodeURIComponent(v.id)) + '"' + (params.get('view') === v.id ? ' aria-current="page"' : '') + '>' + esc(tr(v.label) || v.title) + '</a>').join('') +
     '<a href="#/role/' + esc(encodeURIComponent(name)) + '">' + esc(W.v2appRoleTab) + '</a></nav>';
   const head = v2head(esc(name) + ' <span class="built">' + esc(say(W.v2nKinds, { n: models.length })) + '</span>', esc(W.v2appSub), '', v2app(name));
   crumbs([W.navApps, name]);
+  if (habitTab) {
+    crumbs([W.navApps, name, { aujourdhui: W.rt_today, habitudes: W.rt_habits, regularite: W.rt_regularity }[habitTab] || '']);
+    return head + tabs + await habitsView(name, habitTab);
+  }
   if (pageId) {
     const drawn = await drawPageInto(pageId, pageParams(params));
     return head + tabs + blocksHtml(drawn);

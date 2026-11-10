@@ -2,7 +2,8 @@ import type { Actor, Tx } from './db';
 import { find, save } from './entries';
 import { agenda } from './agenda';
 import { goalsOf, type GoalProgress } from './goals';
-import { planOf, WEEKDAYS } from './habits';
+import { habitsWithDays } from './habit-board';
+import { WEEKDAYS } from './habits';
 import { lingering, openIntentions } from './intentions';
 import { CLOSED } from './keywords';
 import { patternsOf, type Pattern } from './patterns';
@@ -118,38 +119,13 @@ export async function mirrorOf(
     days.push(dayOf(new Date(at)));
   }
 
-  // Her habits day by day: an entry that says its days; the days she did it are linked to it.
-  const { rows: habitRows } = await tx.query<{
-    id: string;
-    title: string;
-    data: Record<string, unknown>;
-    done: string[] | null;
-  }>(
-    `select h.id, h.title, h.data,
-            array(
-              select left(coalesce(d.data->>'date', d.data->>'day', d.data->>'start', to_char(d.created_at, 'YYYY-MM-DD')), 10)
-                from entry d
-               where d.archived_at is null and d.id <> h.id
-                 and not (d.data ? 'days' or d.data ? 'jours' or d.data ? 'cadence')
-                 and (exists (select 1 from link l
-                               where l.role = 'for' and ((l.from_id = d.id and l.to_id = h.id) or (l.from_id = h.id and l.to_id = d.id)))
-                      or (d.space_id = h.space_id
-                          and jarvis_fold(d.kind) = jarvis_fold(coalesce(h.data->>'tracks', h.title))))) as done
-       from entry h
-      where h.space_id = any($1) and h.archived_at is null
-        and (h.data ? 'days' or h.data ? 'jours' or h.data ? 'cadence')
-      order by h.title limit 20`,
-    [spaceIds],
-  );
+  // Her habits day by day: an entry that says its days; the days she did it.
+  const habitRows = await habitsWithDays(tx, spaceIds, 10);
   const weekdayOf = (day: string) => WEEKDAYS[(new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7]!;
   const habits: Mirror['habits'] = [];
-  const seen = new Set<string>();
   for (const h of habitRows) {
-    const plan = planOf(h.data);
-    const name = h.title.trim().toLowerCase();
-    if (!plan || seen.has(name) || habits.length >= 10) continue;
-    seen.add(name);
-    const did = new Set(h.done ?? []);
+    const plan = h.plan;
+    const did = h.done;
     const line = days.map((day) => ({
       day,
       state: (did.has(day)

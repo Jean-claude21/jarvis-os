@@ -78,6 +78,7 @@ import {
   viewsOf,
   setZone,
   zoneOf,
+  habitBoard,
   collectionsOf,
   collectionStats,
   preferencesOf,
@@ -1008,6 +1009,27 @@ export function apiRoutes(deps: {
           end,
         ),
       ),
+    );
+  });
+  // The Routines page: her habits today, their streaks, the last days (her own day, in her zone).
+  api.get('/habits/board', async (c) => {
+    const span = Math.min(60, Math.max(7, Number(c.req.query('days') ?? 28) || 28));
+    return c.json(
+      await as(c, async (tx) => {
+        const zone = await zoneOf(tx);
+        const today = new Intl.DateTimeFormat('en-CA', {
+          timeZone: zone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(new Date());
+        return habitBoard(
+          tx,
+          c.get('spaces').map((one) => one.id),
+          today,
+          span,
+        );
+      }),
     );
   });
   api.post('/review', async (c) => {

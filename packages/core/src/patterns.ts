@@ -53,22 +53,23 @@ export async function patternsOf(tx: Tx, spaceIds: string[], now = new Date()): 
   // A habit that slips: its last thirty days twenty points under the thirty before.
   const { rows: habits } = await tx.query<{
     id: string;
+    kind: string;
     title: string;
     data: Record<string, unknown>;
     done: string[] | null;
   }>(
-    `select h.id, h.title, h.data,
+    `select h.id, h.kind, h.title, h.data,
             array(select left(coalesce(d.data->>'date', to_char(d.created_at, 'YYYY-MM-DD')), 10)
                     from link l join entry d on d.id = l.from_id
                    where l.to_id = h.id and d.archived_at is null) as done
        from entry h
       where h.space_id = any($1) and h.archived_at is null
-        and (h.data ? 'days' or h.data ? 'jours' or h.data ? 'cadence')
+        and (h.data ? 'days' or h.data ? 'jours' or h.data ? 'cadence' or (h.data ? 'repeat' and jarvis_fold(h.kind) in ('habit', 'habitude')))
       limit 100`,
     [spaceIds],
   );
   for (const habit of habits) {
-    const plan = planOf(habit.data);
+    const plan = planOf(habit.data, habit.kind);
     if (!plan) continue;
     const done = habit.done ?? [];
     const recent = rateOf({ id: habit.id, title: habit.title, plan }, done, dayOf(now)).rate30;

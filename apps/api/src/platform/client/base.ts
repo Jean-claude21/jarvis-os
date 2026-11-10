@@ -118,6 +118,8 @@ async function drawApps() {
   const [kinds, appPages] = await Promise.all([api(inSpace('/kinds')), api(inSpace('/pages'))]);
   knownKinds = kinds;
   const all = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app).concat(appPages.filter((p) => p.app).map((p) => p.app)))];
+  // Her habits held by no app still open as « Routines » (the mockup's app), with its three tabs.
+  if (!all.includes('Routines') && kinds.some((k) => ['habit', 'habitude'].includes(String(k.kind).toLowerCase()) && k.count && !(k.model && k.model.app))) all.unshift('Routines');
   // Her pinned apps, in her order (I13), when she pinned some; else all of them.
   await prefsNow();
   const pins = (prefs && Array.isArray(prefs.pinned) ? prefs.pinned : []).filter((a) => all.includes(a));

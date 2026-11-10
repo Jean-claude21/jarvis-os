@@ -201,7 +201,10 @@ describe('connecting a client to her life (story 1)', () => {
       arguments: { entries: [{ kind: 'Dépense', title: 'Taxi', data: { montant: 2000 } }] },
     })) as { content: { text: string }[]; isError?: boolean };
     expect(saved.isError).toBeFalsy();
-    const lines = (await client.callTool({ name: 'history', arguments: { limit: 1 } })) as {
+    const lines = (await client.callTool({
+      name: 'history',
+      arguments: { action: 'history', args: { limit: 1 } },
+    })) as {
       content: { text: string }[];
     };
     expect(JSON.parse(lines.content[0]!.text)[0]).toMatchObject({

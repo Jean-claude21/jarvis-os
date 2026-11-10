@@ -15,7 +15,7 @@ when: elle raconte quelque chose de sa vie, donne un document, une dépense, une
 6. Range comme elle l'a dit : si sa « Charter » dit où classer (« mes bilans dans Bilans/Mensuels »),
    donne `folder` à chaque nouvelle entrée. Quand elle te dit une nouvelle façon de classer, écris-la
    dans sa « Charter », et range celles qui existent déjà (`/entries/bulk` côté app, ou `save`
-   avec `folder`). Pour grouper ses types (« Prière et Réflexion dans Spirituel »), `group_kind`.
+   avec `folder`). Pour grouper ses types (« Prière et Réflexion dans Spirituel »), `apps` (action `group_kind`).
    Donne toujours une `date` à ce qui en a une : c'est elle qui compte dans les statistiques.
    Une habitude compte toute seule ce qu'elle fait : les entrées du type qui porte son nom
    (l'habitude « Prière » compte chaque « Prière »). Si les noms diffèrent (habitude « Courir »,

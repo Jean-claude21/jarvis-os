@@ -176,3 +176,35 @@ describe('a proposal across her apps, through Claude (spec 046)', () => {
     expect(yes.isError).toBe(false);
   });
 });
+
+describe('a structured routine through Claude (spec 047)', () => {
+  it('proposes the five parts of a routine kept as text, then prepares it by its phrase', async () => {
+    const ama = await signUp('Ama');
+    const claude = await connect(ama);
+    const saved = await claude.call<{ entries: { id: string }[] }>('save', {
+      entries: [
+        {
+          kind: 'Routine',
+          title: 'Bilan',
+          data: { instruction: 'Chaque soir à 21h, fais mon bilan. Regarde mon agenda. /bilan' },
+        },
+      ],
+    });
+    const asText = await claude.call<{ structured: boolean; structure: { prepare: string[] } }>(
+      'routine',
+      { name: 'Bilan' },
+    );
+    expect(asText.value.structured).toBe(false);
+    expect(asText.value.structure.prepare).toEqual(['agenda_today', 'mirror_day']);
+    const proposal = await claude.call<{ entries: { id: string }[] }>('structure_routine', {
+      id: saved.value.entries[0]!.id,
+    });
+    await claude.call('decide', { id: proposal.value.entries[0]!.id, yes: true });
+    const follow = await claude.call<{ structured: boolean; prepared: Record<string, unknown> }>(
+      'routine',
+      { name: '/bilan' },
+    );
+    expect(follow.value.structured).toBe(true);
+    expect(Object.keys(follow.value.prepared)).toEqual(['agenda_today', 'mirror_day']);
+  });
+});

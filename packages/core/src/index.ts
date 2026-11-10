@@ -94,6 +94,15 @@ export {
   type ToSort,
 } from './proposals';
 export {
+  prepare,
+  proposeStructure,
+  routineToFollow,
+  structureFromText,
+  structureOf,
+  structureSchema,
+  type Structure,
+} from './routines';
+export {
   DEFAULT_QUESTIONS,
   keepReview,
   mirrorOf,

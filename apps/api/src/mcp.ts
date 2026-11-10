@@ -5,6 +5,9 @@ import {
   mirrorOf,
   patternsOf,
   personCard,
+  proposeStructure,
+  routineToFollow,
+  structureFromText,
   decide,
   propose,
   toSortOf,
@@ -932,7 +935,7 @@ export async function mcpServerFor(
     'routine',
     {
       description:
-        'The full text of a routine named in the instructions (Jarvis’s or one of her spaces’), to follow it.',
+        'A routine named in the instructions (Jarvis’s or one of her spaces’), or by a phrase that starts it (« /bilan »), to follow it. Hers in five parts (spec 047) come with what Jarvis prepared (`prepared`: her day, a mirror, her goals…), the instructions, the references (style, criteria) and the result to make (e.g. a « Bilan »); one kept as text comes with `structure`, a proposal of its five parts to offer her (apps family, action `structure_routine`).',
       inputSchema: { name: z.string().min(1) },
       annotations: { readOnlyHint: true },
     },
@@ -940,6 +943,35 @@ export async function mcpServerFor(
       const wanted = name.trim().toLowerCase();
       // « matin », « Matin » or « /matin »: the name she uses.
       const bare = wanted.replace(/^\//, '');
+      // Hers, as entries: by name, or by a phrase that starts it.
+      const mine = await act(async (tx) => {
+        for (const space of reach) {
+          for (const entry of await find(tx, space.id, { kind: 'Routine', limit: 100 })) {
+            const phrases = ((entry.data.trigger as { phrases?: unknown } | undefined)?.phrases ??
+              []) as unknown[];
+            const named =
+              [wanted, bare].includes(entry.title.toLowerCase()) ||
+              phrases.some((one) => typeof one === 'string' && one.toLowerCase() === wanted);
+            if (!named) continue;
+            const follow = await routineToFollow(
+              tx,
+              reach.map((one) => one.id),
+              space.id,
+              entry.id,
+            );
+            return follow.structured
+              ? { id: entry.id, space: space.name, ...follow }
+              : {
+                  id: entry.id,
+                  space: space.name,
+                  ...follow,
+                  structure: structureFromText(entry.title, follow.text),
+                };
+          }
+        }
+        return null;
+      });
+      if (mine) return mine;
       const all = [...method.routines, ...baseRoutines];
       const found = all.find((one) => [wanted, bare].includes(one.name.toLowerCase()));
       if (!found) {
@@ -1564,6 +1596,19 @@ export async function mcpServerFor(
     },
     tool(async (args: { id: string; yes: boolean; space?: string | undefined }) =>
       act((tx) => decide(tx, actor, at(args.space), args.id, args.yes)),
+    ),
+  );
+
+  // A routine kept as text, proposed in its five parts (spec 047), in the family « apps ».
+  server.registerTool(
+    'structure_routine',
+    {
+      description:
+        'Propose, for her yes, her routine kept as text in its five parts — trigger, what Jarvis prepares, instructions, references, result — read by rules; she accepts it in « À ranger » (`decide`).',
+      inputSchema: { id: z.string().min(1), space: spaceArg },
+    },
+    tool(async ({ id, space }: { id: string; space?: string | undefined }) =>
+      act((tx) => proposeStructure(tx, actor, at(space), id)),
     ),
   );
 

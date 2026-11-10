@@ -12,7 +12,7 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
   }
   const message = error instanceof Error ? error.message : String(error);
   if (
-    /^No (entry|change|stored file|routine|open invitation|member|key|person|proposal)/.test(
+    /^No (entry|change|stored file|routine|open invitation|member|key|person|proposal|routine)/.test(
       message,
     )
   ) {
@@ -42,7 +42,7 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
       message,
     ) ||
     // Repetitions, for whom, captures (specs 035–038).
-    /is no member of this space|names several members|does not repeat|has no occurrence on|is not a day \(|is not a time \(|^A capture needs|^A comment (needs|is larger)|^Give her answers|^Give what the proposal/.test(
+    /is no member of this space|names several members|does not repeat|has no occurrence on|is not a day \(|is not a time \(|^A capture needs|^A comment (needs|is larger)|^Give her answers|^Give what the proposal|is already structured|has no text to read/.test(
       message,
     ) ||
     // Views, her settings, her keys (spec 015).

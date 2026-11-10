@@ -1,3 +1,4 @@
+import { momentsOf, whenOf } from './when';
 import {
   attention as dayAttention,
   changesSince,
@@ -491,7 +492,9 @@ export async function mcpServerFor(
         'fields, their `origin`) and changes to existing ones (`id`; a field set to null is removed),',
         'the links among them (`from`/`to` an id or a ref, a `role` in her words) and links to take',
         'away (`unlink`). One call for everything she said about that space. Every change is',
-        'journaled and can be undone.',
+        'journaled and can be undone. A moment (`at`, `due`, `start`, `end`, `date`, `next`) may be',
+        'written in her words (« demain 9h », « vendredi prochain à 14h30 »): Jarvis reads it on her',
+        'clock and says how it understood it (`understood`); tell her.',
       ].join(' '),
       inputSchema: { ...saveInputSchema.shape, space: spaceArg },
     },
@@ -500,7 +503,12 @@ export async function mcpServerFor(
         space,
         ...args
       }: z.input<typeof saveInputSchema> & { space?: string | undefined }) =>
-        act((tx) => save(tx, actor, at(space), args)),
+        act(async (tx) => {
+          // Dates in her words (spec 030), read on her clock before anything is written.
+          const moments = momentsOf(args.entries ?? [], await zoneOf(tx));
+          const saved = await save(tx, actor, at(space), { ...args, entries: moments.entries });
+          return moments.understood.length ? { ...saved, understood: moments.understood } : saved;
+        }),
     ),
   );
 
@@ -671,25 +679,39 @@ export async function mcpServerFor(
         'Her calendar for a window: every entry of any kind that has a time — `start`/`end`/`duration`',
         '(a span), `at` (a moment), `due` (a deadline), `date` (a day, from today on),',
         '`repeat` (again and again, minus the days in `except`) — at its place, sorted. Answer « what do',
-        'I have Thursday? » from this, never from memory. `from`/`to`: ISO times or days',
+        'I have Thursday? » from this, never from memory. `from`/`to`: ISO times or days, or her words (« demain », « lundi prochain »)',
         '(« 2026-10-29 »); at most 366 days. Every space this client reaches unless `space` is given.',
       ].join(' '),
       inputSchema: {
-        from: z.string().min(10),
-        to: z.string().min(10),
+        from: z.string().min(2),
+        to: z.string().min(2),
         space: spaceArg,
       },
       annotations: { readOnlyHint: true },
     },
-    tool(async ({ from, to, space }: { from: string; to: string; space?: string | undefined }) => {
-      const start = timeOf(from.length === 10 ? `${from}T00:00` : from);
-      const end = timeOf(to.length === 10 ? `${to}T00:00` : to);
-      if (!start || !end) throw new Error('from and to are ISO days or times (« 2026-10-29 »).');
-      // A day given as the end is included: « to 2026-10-29 » means through that day.
-      const until = to.length === 10 ? new Date(end.getTime() + 86_400_000) : end;
-      const ids = space ? [at(space)] : reach.map((one) => one.id);
-      return act((tx) => agenda(tx, ids, { from: start, to: until }));
-    }),
+    tool(
+      async ({
+        from: fromSaid,
+        to: toSaid,
+        space,
+      }: {
+        from: string;
+        to: string;
+        space?: string | undefined;
+      }) => {
+        // « demain », « la semaine prochaine »: read on her clock (spec 030).
+        const zone = await act((tx) => zoneOf(tx));
+        const from = whenOf(fromSaid, zone)?.value ?? fromSaid;
+        const to = whenOf(toSaid, zone)?.value ?? toSaid;
+        const start = timeOf(from.length === 10 ? `${from}T00:00` : from);
+        const end = timeOf(to.length === 10 ? `${to}T00:00` : to);
+        if (!start || !end) throw new Error('from and to are ISO days or times (« 2026-10-29 »).');
+        // A day given as the end is included: « to 2026-10-29 » means through that day.
+        const until = to.length === 10 ? new Date(end.getTime() + 86_400_000) : end;
+        const ids = space ? [at(space)] : reach.map((one) => one.id);
+        return act((tx) => agenda(tx, ids, { from: start, to: until }));
+      },
+    ),
   );
 
   server.registerTool(

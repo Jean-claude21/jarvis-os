@@ -72,6 +72,11 @@ describe('reading her files', () => {
     );
   });
 
+  it('fails a broken photo alone, without stopping the process', async () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4, 5, 6]);
+    await expect(readWords(png, 'image/png')).rejects.toThrow(/cannot be read/);
+  });
+
   it('reads them after the upload, so that find reaches their words', async () => {
     const invoice = await upload(pdfSaying('Facture eau ZX-40917'), 'facture.pdf', PDF);
     const lease = await upload(docxSaying('Bail appartement QW-88120'), 'bail.docx', DOCX);

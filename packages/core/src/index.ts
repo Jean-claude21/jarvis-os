@@ -303,3 +303,16 @@ export {
   type MergeProposal,
   type MergeStep,
 } from './common';
+export {
+  APP_KIND,
+  appLines,
+  appsOf,
+  appsTouched,
+  bridgeSchema,
+  bridgesOf,
+  createBridge,
+  roleSchema,
+  type AppInSpace,
+  type Bridge,
+  type Role,
+} from './roles';

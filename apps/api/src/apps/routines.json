@@ -9,49 +9,92 @@
     {
       "title": "Habit",
       "data": {
-        "label": { "fr": "Habitude", "en": "Habit" },
+        "label": {
+          "fr": "Habitude",
+          "en": "Habit"
+        },
         "fields": [
           {
             "name": "repeat",
             "type": "text",
-            "label": { "fr": "Cadence", "en": "Cadence" },
+            "label": {
+              "fr": "Cadence",
+              "en": "Cadence"
+            },
             "help": "Five fields (« 30 18 * * 2,3 »): it puts the habit in the calendar."
           },
-          { "name": "duration", "type": "duration", "label": { "fr": "Durée", "en": "Duration" } },
+          {
+            "name": "duration",
+            "type": "duration",
+            "label": {
+              "fr": "Durée",
+              "en": "Duration"
+            }
+          },
           {
             "name": "facet",
             "type": "choice",
             "options": ["mind", "soul", "body", "relationships", "work"],
-            "label": { "fr": "Aspect", "en": "Facet" },
+            "label": {
+              "fr": "Aspect",
+              "en": "Facet"
+            },
             "optionLabels": {
-              "mind": { "fr": "esprit", "en": "mind" },
-              "soul": { "fr": "âme", "en": "soul" },
-              "body": { "fr": "corps", "en": "body" },
-              "relationships": { "fr": "relations", "en": "relationships" },
-              "work": { "fr": "travail", "en": "work" }
+              "mind": {
+                "fr": "esprit",
+                "en": "mind"
+              },
+              "soul": {
+                "fr": "âme",
+                "en": "soul"
+              },
+              "body": {
+                "fr": "corps",
+                "en": "body"
+              },
+              "relationships": {
+                "fr": "relations",
+                "en": "relationships"
+              },
+              "work": {
+                "fr": "travail",
+                "en": "work"
+              }
             }
           },
           {
             "name": "non_negotiable",
             "type": "boolean",
-            "label": { "fr": "Non négociable", "en": "Non-negotiable" }
+            "label": {
+              "fr": "Non négociable",
+              "en": "Non-negotiable"
+            }
           },
           {
             "name": "streak",
             "type": "formula",
-            "label": { "fr": "Série", "en": "Streak" },
+            "label": {
+              "fr": "Série",
+              "en": "Streak"
+            },
             "formula": "streak(check_ins.date)"
           },
           {
             "name": "rate_30d",
             "type": "formula",
-            "label": { "fr": "Régularité 30 j (%)", "en": "30-day rate (%)" },
+            "label": {
+              "fr": "Régularité 30 j (%)",
+              "en": "30-day rate (%)"
+            },
             "formula": "round(count(check_ins where last_days(date, 30)) / 30 * 100)"
           },
           {
             "name": "last",
             "type": "formula",
-            "label": { "fr": "Dernier pointage", "en": "Last check-in" },
+            "label": {
+              "fr": "Dernier pointage",
+              "en": "Last check-in"
+            },
             "formula": "max(check_ins.date)"
           }
         ],
@@ -62,13 +105,19 @@
     {
       "title": "CheckIn",
       "data": {
-        "label": { "fr": "Pointage", "en": "Check-in" },
+        "label": {
+          "fr": "Pointage",
+          "en": "Check-in"
+        },
         "fields": [
           {
             "name": "date",
             "type": "date",
             "required": true,
-            "label": { "fr": "Date", "en": "Date" }
+            "label": {
+              "fr": "Date",
+              "en": "Date"
+            }
           },
           {
             "name": "habit",
@@ -76,9 +125,19 @@
             "target": "Habit",
             "inverse": "check_ins",
             "required": true,
-            "label": { "fr": "Habitude", "en": "Habit" }
+            "label": {
+              "fr": "Habitude",
+              "en": "Habit"
+            }
           },
-          { "name": "note", "type": "text", "label": { "fr": "Note", "en": "Note" } }
+          {
+            "name": "note",
+            "type": "text",
+            "label": {
+              "fr": "Note",
+              "en": "Note"
+            }
+          }
         ],
         "columns": ["date"],
         "path": "routines/{year}/{month}/{date}-{title}.md"
@@ -89,33 +148,59 @@
     {
       "title": "Consistency",
       "data": {
-        "label": { "fr": "Ma régularité", "en": "My consistency" },
+        "label": {
+          "fr": "Ma régularité",
+          "en": "My consistency"
+        },
         "order": 1,
         "blocks": [
-          { "block": "calendar", "title": { "fr": "Cette semaine", "en": "This week" }, "days": 7 },
+          {
+            "block": "calendar",
+            "title": {
+              "fr": "Cette semaine",
+              "en": "This week"
+            },
+            "days": 7
+          },
           {
             "block": "gauge",
-            "title": { "fr": "Régularité sur 30 jours (%)", "en": "30-day consistency (%)" },
+            "title": {
+              "fr": "Régularité sur 30 jours (%)",
+              "en": "30-day consistency (%)"
+            },
             "kind": "Habit",
             "value": "rate_30d",
             "max": "100"
           },
           {
             "block": "heatmap",
-            "title": { "fr": "Jours pointés", "en": "Days checked in" },
+            "title": {
+              "fr": "Jours pointés",
+              "en": "Days checked in"
+            },
             "kind": "CheckIn",
             "days": 35
           },
           {
             "block": "table",
-            "title": { "fr": "Habitudes", "en": "Habits" },
+            "title": {
+              "fr": "Habitudes",
+              "en": "Habits"
+            },
             "query": {
               "kind": "Habit",
               "fields": ["facet", "streak", "rate_30d", "last"],
               "sort": "-streak"
             }
           },
-          { "block": "form", "title": { "fr": "Pointer", "en": "Check in" }, "kind": "CheckIn" }
+          {
+            "block": "form",
+            "title": {
+              "fr": "Pointer",
+              "en": "Check in"
+            },
+            "kind": "CheckIn"
+          }
         ]
       }
     }
@@ -124,8 +209,16 @@
     {
       "title": "Non-negotiable missed",
       "data": {
-        "when": { "schedule": "0 21 * * *" },
-        "then": [{ "run_script": { "script": "Habits of the day" } }]
+        "when": {
+          "schedule": "0 21 * * *"
+        },
+        "then": [
+          {
+            "run_script": {
+              "script": "Habits of the day"
+            }
+          }
+        ]
       }
     }
   ],
@@ -139,5 +232,41 @@
         "code": "function run(input) {\n  return input.entries.Habit\n    .filter((h) => h.data.non_negotiable && h.computed.last !== input.today)\n    .map((h) => ({ remind: { text: h.title } }));\n}"
       }
     }
-  ]
+  ],
+  "role": {
+    "covers": {
+      "fr": "Tes habitudes : leur cadence, les pointages, les séries et la régularité.",
+      "en": "Your habits: their cadence, check-ins, streaks and consistency."
+    },
+    "intents": [
+      "habitude",
+      "routine",
+      "séance",
+      "seance",
+      "sport",
+      "course",
+      "lecture",
+      "prière",
+      "priere",
+      "méditation",
+      "meditation",
+      "chaque jour",
+      "tous les jours",
+      "pointé"
+    ],
+    "watches": ["Habit", "CheckIn"],
+    "reads": ["Habit"],
+    "writes": ["CheckIn"],
+    "ask": [
+      {
+        "fr": "Pour quelle habitude ?",
+        "en": "For which habit?"
+      }
+    ],
+    "instructions": {
+      "fr": "Une habitude faite est un « CheckIn » du jour relié à son « Habit » ; la série et le taux se calculent.",
+      "en": "A habit done is a « CheckIn » of the day linked to its « Habit »; streak and rate are computed."
+    },
+    "bridges": []
+  }
 }

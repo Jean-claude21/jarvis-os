@@ -14,7 +14,7 @@ export const TOOL_GROUPS: Record<string, { about: string; actions: string[] }> =
   },
   apps: {
     about:
-      'Her apps and kinds: install or export an app, migrate or rename a kind, file a kind in a group, test a rule, run a script, press a button, merge two kinds that are one thing.',
+      'Her apps and kinds: install or export an app, migrate or rename a kind, file a kind in a group, test a rule, run a script, press a button, merge two kinds that are one thing, make or list the bridges between apps.',
     actions: [
       'app_install',
       'app_export',
@@ -25,6 +25,7 @@ export const TOOL_GROUPS: Record<string, { about: string; actions: string[] }> =
       'run_script',
       'press',
       'merge_kinds',
+      'bridge',
     ],
   },
   history: {

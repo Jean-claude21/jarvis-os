@@ -1,3 +1,12 @@
+import {
+  appLines,
+  appsOf,
+  appsTouched,
+  bridgeSchema,
+  bridgesOf,
+  createBridge,
+} from '@jarvis-os/core';
+import { shippedRoles } from './apps';
 import { mergeKind, mergeProposals, preferencesOf } from '@jarvis-os/core';
 import { gather } from './tool-groups';
 import { momentsOf, whenOf } from './when';
@@ -192,6 +201,19 @@ export async function mcpServerFor(
   const reach = [...who.spaces];
   const at = (space?: string) => spaceFor(reach, space ?? null).id;
   const method = await act((tx) => methodOf(tx, reach));
+  // Her apps, one line each, for every assistant (spec 033); read again by `context`, so an app
+  // installed during the conversation shows at once.
+  const appsNow = () =>
+    act(async (tx) => {
+      const lines: string[] = [];
+      for (const space of reach) {
+        for (const line of appLines(await appsOf(tx, space.id, shippedRoles))) {
+          lines.push(reach.length > 1 ? `${line} (in « ${space.name} »)` : line);
+        }
+      }
+      return lines;
+    });
+  const apps = await appsNow();
   const server = new McpServer(
     { name: 'jarvis-os', version: '0.5.0' },
     {
@@ -201,6 +223,7 @@ export async function mcpServerFor(
         spaces: reach.map((one) => ({ name: one.name, personal: one.personal })),
         charters: method.charters,
         upcoming: method.upcoming,
+        apps,
         routines: [
           ...baseRoutines.map((one) => ({ name: one.name, when: one.when })),
           ...method.routines.map((one) => ({
@@ -279,6 +302,7 @@ export async function mcpServerFor(
         comingSoon: method.upcoming,
         changedSinceYouLastRead: read.changes,
         spaces: reach.map((one) => ({ name: one.name, personal: one.personal })),
+        apps: await appsNow(),
         charters: method.charters,
         routines: [...baseRoutines, ...method.routines].map((one) => ({
           name: one.name,
@@ -419,6 +443,54 @@ export async function mcpServerFor(
         email: email.trim().toLowerCase(),
       };
     }),
+  );
+
+  // The apps a sentence touches (spec 033, A3): found by her words and kinds, without any AI.
+  server.registerTool(
+    'which_apps',
+    {
+      description:
+        'What she said (« j’ai acheté du riz 3500 F au marché ») → the apps it touches, why, their own instructions, what to ask her if missing, and the fields of the kinds to write. One thing may touch several apps: file it in each, in one `save`.',
+      inputSchema: { text: z.string().min(1).max(2000), space: spaceArg },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async ({ text, space }: { text: string; space?: string | undefined }) =>
+      act((tx) => appsTouched(tx, at(space), text, shippedRoles)),
+    ),
+  );
+
+  // A bridge made on demand (spec 033, A4), in the family « apps ».
+  server.registerTool(
+    'bridge',
+    {
+      description:
+        'Make a bridge between two apps after her yes: when an entry of `from` is saved, an entry of `create` is made with `title` and `data` (« =amount », « =paid_on » read the saved entry), linked by `link`. It is a rule of `app`: visible among her rules, journaled, undoable. Without `from`, lists the bridges of the space.',
+      inputSchema: {
+        app: z.string().min(1).max(60).optional(),
+        from: z.string().min(1).max(80).optional(),
+        create: z.string().min(1).max(80).optional(),
+        title: z.string().min(1).max(300).optional(),
+        data: z
+          .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
+          .optional(),
+        link: z.string().min(1).max(80).optional(),
+        if: z.string().min(1).max(1000).optional(),
+        space: spaceArg,
+      },
+    },
+    tool(async (args: Record<string, unknown> & { space?: string | undefined }) =>
+      act(async (tx) => {
+        if (!args.from) return bridgesOf(tx, at(args.space));
+        const bridge = Object.fromEntries(
+          Object.entries(args).filter(([key]) => key !== 'space' && key !== 'app'),
+        );
+        const app = args.app;
+        return createBridge(tx, actor, at(args.space), {
+          app: String(app ?? 'Jarvis'),
+          bridge: bridgeSchema.parse(bridge),
+        });
+      }),
+    ),
   );
 
   // The common types and the duplicates of her life (spec 032), in the family « apps ».

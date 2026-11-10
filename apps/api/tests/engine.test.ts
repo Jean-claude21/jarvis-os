@@ -26,7 +26,9 @@ describe('the Finances app', () => {
       name: 'Finances',
       dryRun: false,
     });
-    expect(done.value.result.created).toHaveLength(9);
+    // Its 9 pieces, and its role kept as an entry « App » (spec 033).
+    expect(done.value.result.created).toHaveLength(10);
+    expect(done.value.result.created).toContain('App « Finances »');
     const unknown = await claude.call<{ error: string }>('app_install', { name: 'Garden' });
     expect(unknown.value.error).toMatch(/No app « Garden » ships with Jarvis: Finances, Routines/);
   });

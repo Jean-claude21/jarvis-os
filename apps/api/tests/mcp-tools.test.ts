@@ -61,6 +61,7 @@ describe('Jarvis’s method on connection (story 3)', () => {
         'show_entry',
         'spaces',
         'upload_link',
+        'which_apps',
         'write_document',
       ].sort(),
     );

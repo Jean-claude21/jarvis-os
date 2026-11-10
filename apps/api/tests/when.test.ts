@@ -82,4 +82,129 @@ describe('through Claude', () => {
     });
     expect(agenda.isError).toBe(false);
   });
+
+  it('saves a repetition said in her words, and marks one occurrence done (spec 036)', async () => {
+    const saved = await claude.call<{
+      entries: { id: string }[];
+      understood: { field: string; date: string }[];
+    }>('save', {
+      entries: [{ kind: 'Event', title: 'Sport', data: { repeat: 'tous les jours à 7h' } }],
+    });
+    expect(saved.value.understood).toContainEqual(
+      expect.objectContaining({ field: 'repeat', date: '0 7 * * *' }),
+    );
+    const id = saved.value.entries[0]!.id;
+    const done = await claude.call('occurrence', { id, day: 'demain', status: 'done' });
+    expect(done.isError).toBe(false);
+    const agenda = await claude.call<{ id: string; status: string | null; day: string }[]>(
+      'agenda',
+      { from: 'demain', to: 'demain' },
+    );
+    expect(agenda.value.find((one) => one.id === id)?.status).toBe('done');
+  });
+});
+
+describe('her review through Claude (spec 043)', () => {
+  it('prepares the mirror, then keeps her decisions as tasks', async () => {
+    const ama = await signUp('Ama');
+    const claude = await connect(ama);
+    const mirror = await claude.call<{ questions: string[] }>('review', {});
+    expect(mirror.isError).toBe(false);
+    expect(mirror.value.questions.length).toBeGreaterThan(0);
+    const kept = await claude.call<{ entries: { id: string }[] }>('review', {
+      action: 'keep',
+      answers: [{ question: 'Qu’est-ce qui a coincé ?', answer: 'Le sommeil.' }],
+      decisions: [{ text: 'Me coucher à 23h', due: 'demain' }],
+    });
+    expect(kept.isError).toBe(false);
+    expect(kept.value.entries).toHaveLength(2);
+  });
+});
+
+describe('what it changes, through Claude (spec 044)', () => {
+  it('says what a new time collides with, and proposes to replan an absence', async () => {
+    const ama = await signUp('Ama');
+    const claude = await connect(ama);
+    await claude.call('save', {
+      entries: [
+        { kind: 'Event', title: 'Dentiste', data: { start: '2027-03-10T10:00', duration: 60 } },
+      ],
+    });
+    const saved = await claude.call<{ changes: { conflicts: { title: string }[] }[] }>('save', {
+      entries: [
+        { kind: 'Event', title: 'Coiffeur', data: { start: '2027-03-10T10:30', duration: 60 } },
+      ],
+    });
+    expect(saved.value.changes[0]!.conflicts.map((one) => one.title)).toEqual(['Dentiste']);
+    const proposed = await claude.call<{
+      applied: boolean;
+      steps: { title: string; does: string }[];
+    }>('replan', { from: '2027-03-09', to: '2027-03-12' });
+    expect(proposed.value.applied).toBe(false);
+    expect(proposed.value.steps.map((one) => one.does)).toEqual(['to_reschedule', 'to_reschedule']);
+  });
+});
+
+describe('a person’s card through Claude (spec 045)', () => {
+  it('finds them by name', async () => {
+    const ama = await signUp('Ama');
+    const claude = await connect(ama);
+    await claude.call('save', { entries: [{ kind: 'Person', title: 'Paul Agbo' }] });
+    const card = await claude.call<{ title: string; promises: unknown[] }>('person', {
+      person: 'Paul',
+    });
+    expect(card.isError).toBe(false);
+    expect(card.value.title).toBe('Paul Agbo');
+    const none = await claude.call<{ error: string }>('person', { person: 'Zoé' });
+    expect(none.value.error).toContain('No person');
+  });
+});
+
+describe('a proposal across her apps, through Claude (spec 046)', () => {
+  it('proposes, lists what waits, and makes it on her yes', async () => {
+    const ama = await signUp('Ama');
+    const claude = await connect(ama);
+    const made = await claude.call<{ entries: { id: string }[] }>('propose', {
+      title: 'Frigo acheté',
+      apps: ['Finances'],
+      entries: [{ kind: 'Transaction', title: 'Frigo', data: { amount: 250000 } }],
+    });
+    expect(made.isError).toBe(false);
+    const waits = await claude.call<{ type: string }[]>('to_sort', {});
+    expect(waits.value.map((one) => one.type)).toContain('proposal');
+    const yes = await claude.call('decide', { id: made.value.entries[0]!.id, yes: true });
+    expect(yes.isError).toBe(false);
+  });
+});
+
+describe('a structured routine through Claude (spec 047)', () => {
+  it('proposes the five parts of a routine kept as text, then prepares it by its phrase', async () => {
+    const ama = await signUp('Ama');
+    const claude = await connect(ama);
+    const saved = await claude.call<{ entries: { id: string }[] }>('save', {
+      entries: [
+        {
+          kind: 'Routine',
+          title: 'Bilan',
+          data: { instruction: 'Chaque soir à 21h, fais mon bilan. Regarde mon agenda. /bilan' },
+        },
+      ],
+    });
+    const asText = await claude.call<{ structured: boolean; structure: { prepare: string[] } }>(
+      'routine',
+      { name: 'Bilan' },
+    );
+    expect(asText.value.structured).toBe(false);
+    expect(asText.value.structure.prepare).toEqual(['agenda_today', 'mirror_day']);
+    const proposal = await claude.call<{ entries: { id: string }[] }>('structure_routine', {
+      id: saved.value.entries[0]!.id,
+    });
+    await claude.call('decide', { id: proposal.value.entries[0]!.id, yes: true });
+    const follow = await claude.call<{ structured: boolean; prepared: Record<string, unknown> }>(
+      'routine',
+      { name: '/bilan' },
+    );
+    expect(follow.value.structured).toBe(true);
+    expect(Object.keys(follow.value.prepared)).toEqual(['agenda_today', 'mirror_day']);
+  });
 });

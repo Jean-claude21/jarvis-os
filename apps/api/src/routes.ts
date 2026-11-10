@@ -1,3 +1,18 @@
+import { withWho } from './who';
+import {
+  comment,
+  commentsOf,
+  goalsOf,
+  impactOf,
+  keepReview,
+  replan,
+  mirrorOf,
+  patternsOf,
+  personCard,
+  decide,
+  toSortOf,
+  timeOf,
+} from '@jarvis-os/core';
 import {
   addFile,
   agenda,
@@ -603,7 +618,27 @@ export function apiRoutes(deps: {
 
   api.post('/save', async (c) => {
     const body = await c.req.json();
-    return c.json(await act(c, (tx, actor, space) => save(tx, actor, space, body)));
+    return c.json(
+      await act(c, async (tx, actor, space) =>
+        save(tx, actor, space, {
+          ...body,
+          ...(Array.isArray(body?.entries)
+            ? { entries: await withWho(deps.db, tx, space, actor.person, body.entries) }
+            : {}),
+        }),
+      ),
+    );
+  });
+
+  // Notes on an entry (spec 039): hers, as she wrote them, the oldest first.
+  api.get('/entries/:id/comments', async (c) =>
+    c.json(await act(c, (tx, _a, space) => commentsOf(tx, space, c.req.param('id')))),
+  );
+  api.post('/entries/:id/comments', async (c) => {
+    const body = z.object({ text: z.string().min(1).max(4000) }).parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) => comment(tx, actor, space, c.req.param('id'), body.text)),
+    );
   });
 
   api.post('/entries/:id/archive', async (c) => {
@@ -853,6 +888,129 @@ export function apiRoutes(deps: {
       }),
     );
   });
+
+  // Her goals (spec 041), across her spaces, with their progress.
+  api.get('/goals', async (c) =>
+    c.json(
+      await as(c, async (tx) =>
+        (await Promise.all(c.get('spaces').map((one) => goalsOf(tx, one.id)))).flat(),
+      ),
+    ),
+  );
+
+  // What waits for her yes, in one place (spec 046).
+  api.get('/to-sort', async (c) =>
+    c.json(
+      await as(c, (tx) =>
+        toSortOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+        ),
+      ),
+    ),
+  );
+  api.post('/to-sort/:id', async (c) => {
+    const body = z.object({ yes: z.boolean() }).parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) => decide(tx, actor, space, c.req.param('id'), body.yes)),
+    );
+  });
+
+  // A person's card across her apps (spec 045).
+  api.get('/people/:id', async (c) =>
+    c.json(await act(c, (tx, _a, space) => personCard(tx, space, c.req.param('id')))),
+  );
+
+  // What a period changes, and an absence replanned (spec 044).
+  api.get('/impact', async (c) => {
+    const from = timeOf(c.req.query('from') ?? '');
+    const to = timeOf(c.req.query('to') ?? '');
+    if (!from || !to || to <= from)
+      return c.json({ error: 'from and to are ISO times, to after from.' }, 400);
+    return c.json(
+      await as(c, (tx) =>
+        impactOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+          { from, to },
+        ),
+      ),
+    );
+  });
+  api.post('/replan', async (c) => {
+    const body = z
+      .object({
+        from: z.string().min(10),
+        to: z.string().min(10),
+        dryRun: z.boolean().default(true),
+      })
+      .parse(await c.req.json());
+    const from = timeOf(body.from.length === 10 ? `${body.from}T00:00` : body.from);
+    const to = timeOf(body.to.length === 10 ? `${body.to}T00:00` : body.to);
+    if (!from || !to || to <= from)
+      return c.json({ error: 'from and to are ISO days, to after from.' }, 400);
+    return c.json(
+      await act(c, (tx, actor, space) => replan(tx, actor, space, { from, to }, body.dryRun)),
+    );
+  });
+
+  // Her review (spec 043): the mirror of a period (the last seven days by default), and keeping it.
+  api.get('/review', async (c) => {
+    const to = c.req.query('to') ?? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    const from =
+      c.req.query('from') ?? new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10);
+    const start = timeOf(`${from.slice(0, 10)}T00:00`);
+    const end = timeOf(`${to.slice(0, 10)}T00:00`);
+    if (!start || !end) return c.json({ error: 'from and to are ISO days (« 2026-11-03 »).' }, 400);
+    return c.json(
+      await as(c, (tx) =>
+        mirrorOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+          start,
+          end,
+        ),
+      ),
+    );
+  });
+  api.post('/review', async (c) => {
+    const body = z
+      .object({
+        title: z.string().min(1).max(200),
+        from: z.string().min(10).max(10),
+        to: z.string().min(10).max(10),
+        answers: z
+          .array(z.object({ question: z.string().min(1), answer: z.string().min(1) }))
+          .max(20),
+        decisions: z
+          .array(z.object({ text: z.string().min(1).max(300), due: z.string().max(30).optional() }))
+          .max(20),
+      })
+      .parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        keepReview(tx, actor, space, {
+          ...body,
+          decisions: body.decisions.map((one) => ({
+            text: one.text,
+            ...(one.due ? { due: one.due } : {}),
+          })),
+        }),
+      ),
+    );
+  });
+
+  // What comes back (spec 042), across her spaces.
+  api.get('/patterns', async (c) =>
+    c.json(
+      await as(c, (tx) =>
+        patternsOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+        ),
+      ),
+    ),
+  );
 
   // What needs her now (spec 013), across her spaces: to fix, late, proposed, today, this week.
   api.get('/now', async (c) =>

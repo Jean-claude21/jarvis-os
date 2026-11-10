@@ -37,14 +37,27 @@ jobs:
         run: pnpm lint && pnpm typecheck && pnpm format:check
 
   check:
+    # Each package's tests on a database of their own, on the runner itself: Postgres beside the
+    # tests, no network between them — and core and api side by side.
     runs-on: ubuntu-latest
-    # The suite runs file after file against a database of its own: a Neon branch copied from
-    # « test » for this run, removed after — so pull requests are checked side by side.
-    timeout-minutes: 40
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ['@jarvis-os/core', '@jarvis-os/api']
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          # Reached only from the runner itself, for one run: no password to keep.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s
+          --health-retries 30
     env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      JARVIS_NEON_PROJECT_ID: ${{ vars.JARVIS_NEON_PROJECT_ID }}
-      RUN_BRANCH: ci-${{ github.run_id }}-${{ github.run_attempt }}
+      JARVIS_TEST_OWNER_URL: postgres://jarvis_owner@localhost:5432/jarvis
+      JARVIS_TEST_APP_URL: postgres://jarvis_app@localhost:5432/jarvis
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -53,15 +66,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: A database of its own (a branch of « test »)
-        run: pnpm exec tsx tooling/ci-branch.ts create "$RUN_BRANCH"
-        env:
-          JARVIS_TEST_OWNER_URL: ${{ secrets.JARVIS_TEST_OWNER_URL }}
-          JARVIS_TEST_APP_URL: ${{ secrets.JARVIS_TEST_APP_URL }}
-      - name: Migrate it
-        run: pnpm db:migrate
-      - name: Tests (on its own branch)
-        run: pnpm test
+      - name: Its database (roles as on Neon)
+        run: psql postgres://postgres@localhost:5432/postgres -v ON_ERROR_STOP=1 -q -f tooling/ci/postgres.sql
+      - name: Tests
+        run: pnpm --filter "${{ matrix.package }}" test
         env:
           JARVIS_TEST_STORAGE_ENDPOINT: ${{ secrets.JARVIS_TEST_STORAGE_ENDPOINT }}
           JARVIS_TEST_STORAGE_REGION: ${{ secrets.JARVIS_TEST_STORAGE_REGION }}
@@ -69,6 +77,3 @@ jobs:
           JARVIS_TEST_STORAGE_ACCESS_KEY_ID: ${{ secrets.JARVIS_TEST_STORAGE_ACCESS_KEY_ID }}
           JARVIS_TEST_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.JARVIS_TEST_STORAGE_SECRET_ACCESS_KEY }}
           JARVIS_TEST_AUTH_SECRET: ${{ secrets.JARVIS_TEST_AUTH_SECRET }}
-      - name: Remove its database
-        if: always()
-        run: pnpm exec tsx tooling/ci-branch.ts delete "$RUN_BRANCH"

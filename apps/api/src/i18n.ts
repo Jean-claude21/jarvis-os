@@ -71,6 +71,8 @@ const words = {
     briefRate: '{rate} % sur 30 j',
     briefQuiet: 'Rien de prévu ni en retard : une journée libre.',
     briefInbox: '📥 {n} chose(s) à ranger dans ton inbox.',
+    briefIntent:
+      '💭 « {title} » — dit {n} fois depuis le {since}, rien n’a suivi : planifier, déléguer ou abandonner ?',
     captureKept: 'Gardé ✓ — à ranger.',
     captureFiled: 'Gardé et rangé ✓',
     briefEnd: 'Dis à Claude ce que tu veux en faire.',
@@ -142,6 +144,8 @@ const words = {
     briefRate: '{rate} % over 30 d',
     briefQuiet: 'Nothing planned, nothing late: a free day.',
     briefInbox: '📥 {n} thing(s) to file in your inbox.',
+    briefIntent:
+      '💭 « {title} » — said {n} time(s) since {since}, nothing followed: plan it, hand it over, or drop it?',
     captureKept: 'Kept ✓ — to file.',
     captureFiled: 'Kept and filed ✓',
     briefEnd: 'Tell Claude what you want to do with it.',

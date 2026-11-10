@@ -1,3 +1,4 @@
+import { repetitionFromWords } from '@jarvis-os/core';
 import * as chrono from 'chrono-node';
 
 // Dates in her words (spec 030): « demain 9h », « vendredi prochain à 14h30 », « dans 2 semaines »
@@ -72,6 +73,19 @@ export function momentsOf<
       if (!when) continue;
       data[field] = when.value;
       understood.push({ entry: entry.title ?? '', field, said: value, date: when.value });
+    }
+    // A repetition in her words (spec 036): « tous les lundis à 7h » → « 0 7 * * 1 ».
+    if (typeof data.repeat === 'string') {
+      const fields = repetitionFromWords(data.repeat);
+      if (fields) {
+        understood.push({
+          entry: entry.title ?? '',
+          field: 'repeat',
+          said: data.repeat,
+          date: fields,
+        });
+        data.repeat = fields;
+      }
     }
     return { ...entry, data };
   });

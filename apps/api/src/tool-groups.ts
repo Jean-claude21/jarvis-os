@@ -14,7 +14,7 @@ export const TOOL_GROUPS: Record<string, { about: string; actions: string[] }> =
   },
   apps: {
     about:
-      'Her apps and kinds: install, remove or export an app, migrate or rename a kind, file a kind in a group, test a rule, run a script, press a button, merge two kinds that are one thing, make or list the bridges between apps.',
+      'Her apps and kinds: install, remove or export an app, migrate or rename a kind, file a kind in a group, test a rule, run a script, press a button, merge two kinds that are one thing, make or list the bridges between apps, propose a routine in its five parts.',
     actions: [
       'app_install',
       'app_remove',
@@ -27,12 +27,13 @@ export const TOOL_GROUPS: Record<string, { about: string; actions: string[] }> =
       'press',
       'merge_kinds',
       'bridge',
+      'structure_routine',
     ],
   },
   inbox: {
     about:
-      'Raw capture and filing later: keep something at once as she said it, list what is to file, file one, or file everything sure.',
-    actions: ['capture', 'inbox', 'file_capture', 'file_sure'],
+      'Raw capture and filing later, and everything that waits for her yes: keep something at once as she said it, list what is to file, file one, or file everything sure; list all that waits (to_sort), propose several entries across her apps at once, give her answer (decide).',
+    actions: ['capture', 'inbox', 'file_capture', 'file_sure', 'to_sort', 'propose', 'decide'],
   },
   history: {
     about:
@@ -40,8 +41,9 @@ export const TOOL_GROUPS: Record<string, { about: string; actions: string[] }> =
     actions: ['history', 'undo', 'archive'],
   },
   figures: {
-    about: 'Figures already shaped: a kind’s statistics, a collection’s, a saved view run.',
-    actions: ['stats', 'collection_stats', 'view'],
+    about:
+      'Figures already shaped: a kind’s statistics, a collection’s, a saved view run, her goals and how far they went, what comes back (patterns).',
+    actions: ['stats', 'collection_stats', 'view', 'goals', 'patterns'],
   },
   files: {
     about: 'Small files through the conversation, and links to open a stored one.',

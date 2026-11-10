@@ -69,6 +69,12 @@ export const COMMON_KINDS: CommonKind[] = [
     fields: ['type', 'website', 'phone'],
   },
   {
+    kind: 'Goal',
+    label: { fr: 'Objectif', en: 'Goal' },
+    aliases: ['objectif', 'objectifs', 'but', 'buts', 'goals'],
+    fields: ['target', 'unit', 'deadline', 'measure', 'status'],
+  },
+  {
     kind: 'Fichier',
     label: { fr: 'Fichier', en: 'File' },
     aliases: ['file', 'files', 'fichiers'],
@@ -93,6 +99,8 @@ export const FIELD_SYNONYMS: Readonly<Record<string, string>> = {
   cercle: 'circle',
   'derniere-interaction': 'last_contact',
   derniere_interaction: 'last_contact',
+  cible: 'target',
+  unite: 'unit',
   echeance: 'due',
   adresse: 'address',
   ville: 'city',

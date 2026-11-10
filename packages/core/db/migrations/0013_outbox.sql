@@ -51,8 +51,11 @@ $$;
 -- Where to send her e-mail: her account's address, and nothing else.
 create function jarvis_person_email(person text)
 returns text
-language sql stable security definer set search_path = public as $$
-  select email from "user" where id = person
+-- plpgsql: read when called, so a new database migrates before its accounts exist.
+language plpgsql stable security definer set search_path = public as $$
+begin
+  return (select email from "user" where id = person);
+end
 $$;
 
 revoke all on function jarvis_outbox_pending(timestamptz) from public;

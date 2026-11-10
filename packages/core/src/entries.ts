@@ -7,6 +7,9 @@ import { formulaValue } from './formula';
 import { checkPage } from './pages';
 import { zoneOf } from './zone';
 import { checkRule, runRulesAfterSave, type Changed } from './rules';
+import { syncReminders } from './reminders';
+import { closeIntentions } from './intentions';
+import { TIME_FIELDS } from './time';
 import { checkScript } from './scripts';
 import { checkView } from './views';
 import { checkShare } from './shares';
@@ -529,6 +532,66 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
   }
   // Her rules (spec 014) run on what this save made or changed, in the same transaction.
   await runRulesAfterSave(tx, actor, spaceId, changed);
+  // What follows a save (specs 037, 040), read in one query: whether an intention is open, which
+  // of these entries have reminders attached, and her default reminders.
+  const own = actor.client === 'intentions' || actor.client === 'reminders';
+  const made = changed.filter((one) => one.created);
+  const timed = changed.filter(
+    (one) =>
+      !/^reminder$/i.test(one.kind) &&
+      one.fields.some(
+        (field) =>
+          field === 'remind' ||
+          (TIME_FIELDS as readonly string[]).includes(field) ||
+          ['occurrences', 'until', 'count', 'except', 'status'].includes(field),
+      ),
+  );
+  if (!own && (made.length || timed.length)) {
+    const { rows: after } = await tx.query<{
+      intents: boolean;
+      attached: string[] | null;
+      defaults: Record<string, string[]> | null;
+    }>(
+      `select exists(select 1 from entry where space_id = $1 and archived_at is null
+                       and jarvis_fold(kind) = 'intention' and coalesce(data->>'status', 'open') = 'open') as intents,
+              (select array_agg(distinct l.to_id) from link l join entry r on r.id = l.from_id
+                where l.space_id = $1 and l.to_id = any($2) and l.role = 'for'
+                  and jarvis_fold(r.kind) = 'reminder' and r.archived_at is null) as attached,
+              (select e.data->'preferences'->'reminders' from entry e join space s on s.id = e.space_id
+                where s.personal and s.created_by = current_setting('jarvis.person', true)
+                  and e.archived_at is null and jarvis_fold(e.kind) = 'channel'
+                order by e.created_at limit 1) as defaults`,
+      [spaceId, timed.map((one) => one.id)],
+    );
+    const { intents, attached, defaults } = after[0]!;
+    // An entry that does what she meant to do closes her intention (spec 040).
+    if (intents && made.length) {
+      const { rows } = await tx.query<{ id: string; kind: string; title: string }>(
+        'select id, kind, title from entry where id = any($1)',
+        [made.map((one) => one.id)],
+      );
+      await closeIntentions(tx, actor, spaceId, rows);
+    }
+    // The reminders attached to what moved, or to what says them (spec 037), kept in step.
+    const hasDefaults =
+      defaults !== null && typeof defaults === 'object' && Object.keys(defaults).length > 0;
+    const created = new Set(timed.filter((one) => one.created).map((one) => one.id));
+    const keep = timed.filter(
+      (one) =>
+        one.fields.includes('remind') ||
+        (attached ?? []).includes(one.id) ||
+        (hasDefaults && created.has(one.id)),
+    );
+    if (keep.length) {
+      await syncReminders(
+        tx,
+        actor,
+        spaceId,
+        keep.map((one) => one.id),
+        { created, ...(hasDefaults ? { defaults: defaults! } : {}) },
+      );
+    }
+  }
   return saved;
 }
 

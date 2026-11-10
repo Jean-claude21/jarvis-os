@@ -11,7 +11,11 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     };
   }
   const message = error instanceof Error ? error.message : String(error);
-  if (/^No (entry|change|stored file|routine|open invitation|member|key)/.test(message)) {
+  if (
+    /^No (entry|change|stored file|routine|open invitation|member|key|person|proposal|routine)/.test(
+      message,
+    )
+  ) {
     return { status: 404, message };
   }
   if (
@@ -35,6 +39,10 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     ) ||
     // Her connectors (spec 025): what to ask her, or which connector or tool exists.
     /^No connector|has no tool «|ask her first|needs Jarvis's Google client|is reached with a key|gave no sign-in page|^A connector is not undone|^Not a sealed secret/.test(
+      message,
+    ) ||
+    // Repetitions, for whom, captures (specs 035–038).
+    /is no member of this space|names several members|does not repeat|has no occurrence on|is not a day \(|is not a time \(|^A capture needs|^A comment (needs|is larger)|^Give her answers|^Give what the proposal|is already structured|has no text to read/.test(
       message,
     ) ||
     // Views, her settings, her keys (spec 015).

@@ -77,8 +77,49 @@ export {
   type Member,
   type Space,
 } from './spaces';
-export { DEFAULT_ZONE, inZone, nextTime, repetitionOf, timeOf } from './time';
+export { DEFAULT_ZONE, inZone, nextTime, repetitionFromWords, repetitionOf, timeOf } from './time';
 export { watchOnce, type Due, type PassReport } from './watcher';
+export { defaultsFor, offsetOf, syncReminders } from './reminders';
+export { comment, COMMENT_KIND, commentsOf } from './comments';
+export { GOAL_KIND, goalProgress, goalsOf, type GoalProgress } from './goals';
+export { patternsOf, type Pattern, type PatternKind } from './patterns';
+export { impactOf, replan, windowOf, type Impact, type Replan } from './impact';
+export { personCard, type PersonCard } from './people';
+export {
+  decide,
+  propose,
+  PROPOSAL_KIND,
+  toSortOf,
+  type ProposalInput,
+  type ToSort,
+} from './proposals';
+export {
+  prepare,
+  proposeStructure,
+  routineToFollow,
+  structureFromText,
+  structureOf,
+  structureSchema,
+  type Structure,
+} from './routines';
+export {
+  DEFAULT_QUESTIONS,
+  keepReview,
+  mirrorOf,
+  REVIEW_KIND,
+  reviewsOf,
+  type Mirror,
+} from './review';
+export {
+  closeIntentions,
+  INTENTION_KIND,
+  intentionIn,
+  lingering,
+  noteIntention,
+  openIntentions,
+  stemsOf,
+  type IntentionStatus,
+} from './intentions';
 export { upcoming, type Upcoming } from './upcoming';
 export {
   agenda,
@@ -87,10 +128,13 @@ export {
   calendarOwner,
   fingerprintOf,
   minutesOf,
+  OCCURRENCE_STATES,
   occurrencesOf,
   renewCalendarKey,
+  setOccurrence,
   TIME_FIELDS,
   type Occurrence,
+  type OccurrenceState,
 } from './agenda';
 export {
   checkAgainst,

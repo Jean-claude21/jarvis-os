@@ -104,6 +104,20 @@ export function briefText(brief: Brief, lang: Lang = 'fr'): string {
   );
   // Her inbox (spec 035): what she captured and has not filed yet.
   if (brief.inbox) blocks.push(say(words.briefInbox, { n: String(brief.inbox) }));
+  // What she said she would do, and nothing followed (spec 040).
+  for (const one of brief.intentions ?? []) {
+    blocks.push(
+      say(words.briefIntent, {
+        title: one.title,
+        n: String(one.times),
+        since: new Intl.DateTimeFormat(locale, {
+          day: 'numeric',
+          month: 'short',
+          timeZone: brief.zone,
+        }).format(new Date(one.since)),
+      }),
+    );
+  }
   if (blocks.length === 1) blocks.push(words.briefQuiet);
   blocks.push(words.briefEnd);
   return blocks.join('\n\n');

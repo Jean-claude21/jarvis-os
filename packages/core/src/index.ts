@@ -324,3 +324,14 @@ export {
   type Bridge,
   type Role,
 } from './roles';
+export {
+  capture,
+  CAPTURE_KIND,
+  fileCapture,
+  fileSure,
+  inboxOf,
+  personByChat,
+  presort,
+  type CaptureSource,
+  type Guess,
+} from './inbox';

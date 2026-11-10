@@ -52,6 +52,7 @@ describe('Jarvis’s method on connection (story 3)', () => {
         'find',
         'get',
         'history',
+        'inbox',
         'kinds',
         'page',
         'query',

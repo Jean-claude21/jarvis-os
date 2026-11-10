@@ -1,3 +1,5 @@
+import { fileCapture, fileSure, inboxOf, type EntryInput } from '@jarvis-os/core';
+import { captureAs } from './capture';
 import { COMMON_KINDS, removeApp } from '@jarvis-os/core';
 import {
   appLines,
@@ -1217,6 +1219,60 @@ export async function mcpServerFor(
         if (!bundle) throw new Error('Give `name` (an app Jarvis ships) or `bundle`.');
         return act((tx) => installApp(tx, actor, at(args.space), bundle, args.dryRun));
       },
+    ),
+  );
+
+  // Raw capture and filing later (spec 035), in the family « inbox ».
+  server.registerTool(
+    'capture',
+    {
+      description:
+        'Keep something at once, as she said it, to file later (« mets ça dans l’inbox »): her words, the exact time, « said ». Jarvis pre-sorts it by rules (her apps’ words, an amount, an account).',
+      inputSchema: { text: z.string().min(1).max(4000), space: spaceArg },
+    },
+    tool(async ({ text, space }: { text: string; space?: string | undefined }) =>
+      act((tx) => captureAs(tx, actor, at(space), { text, source: 'claude' })),
+    ),
+  );
+  server.registerTool(
+    'inbox',
+    {
+      description:
+        'Her captures still to file, the oldest first, each with what the rules guessed (`guess`: apps, amount, account, `sure`).',
+      inputSchema: { space: spaceArg },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async ({ space }: { space?: string | undefined }) => act((tx) => inboxOf(tx, at(space)))),
+  );
+  server.registerTool(
+    'file_capture',
+    {
+      description:
+        '« Range l’inbox », one by one: what a capture becomes (`entries`, as in `save`: kinds she has, links), linked to it, the capture marked filed — one step, undoable. Call `which_apps` with its text first.',
+      inputSchema: {
+        id: z.string().min(1),
+        entries: z.array(z.record(z.string(), z.unknown())).min(1).max(20),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async (args: {
+        id: string;
+        entries: Record<string, unknown>[];
+        space?: string | undefined;
+      }) =>
+        act((tx) => fileCapture(tx, actor, at(args.space), args.id, args.entries as EntryInput[])),
+    ),
+  );
+  server.registerTool(
+    'file_sure',
+    {
+      description:
+        '« Range tout ce qui est sûr »: every capture one app claims with an amount becomes its movement of money, linked to it; the rest stays to file. After her yes.',
+      inputSchema: { space: spaceArg },
+    },
+    tool(async ({ space }: { space?: string | undefined }) =>
+      act((tx) => fileSure(tx, actor, at(space))),
     ),
   );
 

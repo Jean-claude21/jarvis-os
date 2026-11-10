@@ -1,4 +1,13 @@
-import { asPerson, fingerprintOf, find, save, spacesOf, type Actor } from '@jarvis-os/core';
+import {
+  asPerson,
+  fingerprintOf,
+  find,
+  personByChat,
+  save,
+  spacesOf,
+  type Actor,
+} from '@jarvis-os/core';
+import { captureAs } from './capture';
 import { randomBytes } from 'node:crypto';
 import type pg from 'pg';
 
@@ -52,11 +61,15 @@ export async function telegramLink(
 
 let offset = 0;
 
-/** What the bot received: each « /start <code> » links that chat to whoever the code was made for. */
+/**
+ * What the bot received: each « /start <code> » links that chat to whoever the code was made for;
+ * any other message from a linked chat is kept in her inbox (spec 035).
+ */
 export async function readTelegramLinks(
   db: pg.Pool,
   token: string,
   linked: string,
+  replies: { kept: string; filed: string } = { kept: 'OK', filed: 'OK' },
 ): Promise<number> {
   const response = await fetch(
     `${API}/bot${token}/getUpdates?timeout=0&offset=${offset}&allowed_updates=%5B%22message%22%5D`,
@@ -64,14 +77,37 @@ export async function readTelegramLinks(
   if (!response.ok) return 0;
   const body = (await response.json()) as {
     ok: boolean;
-    result?: { update_id: number; message?: { text?: string; chat?: { id: number } } }[];
+    result?: {
+      update_id: number;
+      message?: { text?: string; date?: number; chat?: { id: number } };
+    }[];
   };
   let count = 0;
   for (const update of body.result ?? []) {
     offset = Math.max(offset, update.update_id + 1);
     const match = /^\/start\s+([A-Za-z0-9_-]{8,64})$/.exec(update.message?.text?.trim() ?? '');
     const chat = update.message?.chat?.id;
-    if (!match || chat === undefined) continue;
+    if (chat === undefined) continue;
+    // Anything else from a linked chat is kept in her inbox (spec 035), without any AI.
+    if (!match) {
+      const text = update.message?.text?.trim();
+      const owner = text && !text.startsWith('/') ? await personByChat(db, String(chat)) : null;
+      if (!owner || !text) continue;
+      const done = await asPerson(db, owner.person, (tx) =>
+        captureAs(tx, { person: owner.person, door: 'telegram' }, owner.spaceId, {
+          text,
+          source: 'telegram',
+          at: new Date((update.message?.date ?? Date.now() / 1000) * 1000).toISOString(),
+        }),
+      );
+      await fetch(`${API}/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ chat_id: chat, text: done.filed ? replies.filed : replies.kept }),
+      });
+      count += 1;
+      continue;
+    }
     const { rows } = await db.query<{ person: string; space_id: string; entry_id: string }>(
       'select person, space_id, entry_id from jarvis_channel_by_code($1)',
       [fingerprintOf(match[1]!)],

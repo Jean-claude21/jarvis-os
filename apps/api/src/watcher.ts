@@ -102,6 +102,8 @@ export function briefText(brief: Brief, lang: Lang = 'fr'): string {
           })`,
       ),
   );
+  // Her inbox (spec 035): what she captured and has not filed yet.
+  if (brief.inbox) blocks.push(say(words.briefInbox, { n: String(brief.inbox) }));
   if (blocks.length === 1) blocks.push(words.briefQuiet);
   blocks.push(words.briefEnd);
   return blocks.join('\n\n');
@@ -154,9 +156,10 @@ export async function watcherPass(
   try {
     // Who pressed « Start » with her code (spec 015), before telling anyone.
     if (delivery.telegramToken) {
-      await readTelegramLinks(db, delivery.telegramToken, wordsOf('fr').channelLinked).catch(
-        (error) => console.warn('[watcher] telegram', (error as Error).message),
-      );
+      await readTelegramLinks(db, delivery.telegramToken, wordsOf('fr').channelLinked, {
+        kept: wordsOf('fr').captureKept,
+        filed: wordsOf('fr').captureFiled,
+      }).catch((error) => console.warn('[watcher] telegram', (error as Error).message));
     }
     report = await watchOnce(db, now, tellerFor(db, delivery));
     done.reminders = report;

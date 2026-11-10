@@ -34,6 +34,26 @@ Day (each occurrence of what repeats: done, missed, postponed — that day only,
 
 « Toutes les apps »: installed (pinned to her sidebar, in her order, every device alike), the catalog (each previewed before it is installed: what will be made, what of hers is reused, one journal line), how they talk (who reads and writes which common type, the active bridges). An app's role (I6): what it covers, when it is concerned, what it reads and writes, what it asks, what her assistants know of it; removed from there (her entries stay).
 
+## I9 — A space and the life in common (P1)
+
+A space's page: its charter (kept as it is), its routines in five parts (each one kept as text offered for structuring, in « À ranger »), and in a shared space: who does what (to her, to others, to nobody, « Je prends »), what happened, the money in common this month against equal shares.
+
+## I5 — Her documents in one place (P1)
+
+Written (long texts), kept by Jarvis (her files, linked or to link), Google Drive and OneDrive (shown, never copied — to connect), received by messages.
+
+## I8 — A search that answers (P1, spec 049)
+
+A question in the search box (« combien en transport en octobre ? », « combien de prières cette semaine ? ») gets a figure computed from her entries, never from memory: a sum of money or a count of what she kept (a word naming one of her kinds counts that kind), against the period before, week by week, with the entries that justify it.
+
+## « Mes données » (P1)
+
+Her entries, files, kinds (common, hers, possible duplicates), last backup, what Jarvis sent her these seven days, what to watch; her import and export, as before.
+
+## I10 — The first launch (P1)
+
+When nothing is kept yet: her spaces, what she already has, her connections, her rhythm (morning brief, time zone).
+
 ## I11 — The phone (P1, first part)
 
 A tab bar under the thumb: Maintenant · Agenda · Noter (a few words kept at once) · À ranger · Menu.

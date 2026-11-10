@@ -85,6 +85,7 @@ export { GOAL_KIND, goalProgress, goalsOf, type GoalProgress } from './goals';
 export { patternsOf, type Pattern, type PatternKind } from './patterns';
 export { impactOf, replan, windowOf, type Impact, type Replan } from './impact';
 export { personCard, type PersonCard } from './people';
+export { answerOf, asksAFigure, periodOf, type Answer } from './answer';
 export {
   decide,
   propose,

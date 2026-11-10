@@ -9,7 +9,7 @@ const pages = Object.assign({}, dayPages, lifePages, settingsPages, v2Pages);
 const V2 = new Set(Object.keys(v2Pages));
 
 const titles = { '': 'navNow', accueil: 'navHome', collections: 'navCollections', fichiers: 'navFiles', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
-  rappels: 'navReminders', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
+  rappels: 'navReminders', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', espace: 'navSpaces', bienvenue: 'v2welcome', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
 
 let drawing = 0;
 async function show() {
@@ -28,7 +28,7 @@ async function show() {
     const html = await pages[key](params, id ? decodeURIComponent(id) : undefined);
     if (ticket !== drawing) return;
     page().classList.toggle('v2', V2.has(key));
-    page().innerHTML = html; bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); window.scrollTo(0, 0);
+    page().innerHTML = html; bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); window.scrollTo(0, 0);
     document.querySelectorAll('.x-tabbar a[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === key));
     if (key === 'ranger') counts();
   } catch (error) { if (ticket === drawing) fail(error); }
@@ -52,7 +52,11 @@ async function load() {
 
 document.getElementById('space').addEventListener('change', (event) => choose(event.target.value));
 document.getElementById('search').addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') location.hash = '#/vie?q=' + encodeURIComponent(event.target.value.trim());
+  if (event.key !== 'Enter') return;
+  const q = event.target.value.trim();
+  // A question (« combien… », « how much… ») is answered with a figure (I8); words find entries.
+  if (/^(combien|how much|how many|total|quel total)/i.test(q)) answer(q);
+  else location.hash = '#/vie?q=' + encodeURIComponent(q);
 });
 document.getElementById('menu').addEventListener('click', () => document.querySelector('.shell').classList.toggle('open'));
 document.getElementById('tab-menu').addEventListener('click', () => document.querySelector('.shell').classList.toggle('open'));
@@ -67,8 +71,9 @@ async function counts() {
 function drawSpaces() {
   const colors = ['var(--primary)', 'var(--ochre)', 'var(--info)', 'var(--success)', 'var(--verify)'];
   document.getElementById('spaces-nav').innerHTML = '<div class="caps">' + esc(W.navSpacesTitle) + '</div>' + me.spaces.map((s, i) =>
-    '<a class="navi" href="#/espaces" data-space-link="' + esc(s.id) + '"><span class="space-dot" style="width:9px;height:9px;border-radius:50%;flex:none;background:' + colors[i % colors.length] + '"></span><span>' + esc(s.name) + '</span></a>').join('');
+    '<a class="navi" href="#/espace/' + esc(s.id) + '" data-space-link="' + esc(s.id) + '"><span class="space-dot" style="width:9px;height:9px;border-radius:50%;flex:none;background:' + colors[i % colors.length] + '"></span><span>' + esc(s.name) + '</span></a>').join('');
   document.querySelectorAll('[data-space-link]').forEach((a) => a.addEventListener('click', () => choose(a.dataset.spaceLink, false)));
+  document.querySelectorAll('[data-space-link]').forEach((a) => a.classList.toggle('on', location.hash === '#/espace/' + a.dataset.spaceLink));
 }
 // Her theme: light, dark, or as her device says; kept on this device.
 function applyTheme(t) { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
@@ -88,5 +93,9 @@ document.getElementById('note').addEventListener('click', () => {
   });
 });
 window.addEventListener('hashchange', show);
-load().then(() => { clock(); drawSpaces(); return drawApps(); }).then(show).then(() => counts()).catch(fail);
+load().then(() => { clock(); drawSpaces(); return drawApps(); }).then(() => {
+  // Her first time (I10): nothing kept yet, and no page asked: the welcome.
+  if (!location.hash.replace(/^#[/]?/, '') && !knownKinds.some((k) => (k.count || 0) > 0)) location.hash = '#/bienvenue';
+  return show();
+}).then(() => counts()).catch(fail);
 `;

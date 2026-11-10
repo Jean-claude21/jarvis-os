@@ -75,20 +75,25 @@ export async function toSortOf(tx: Tx, spaceIds: string[]): Promise<ToSort[]> {
     );
     for (const one of proposed) {
       const isProposal = one.kind === PROPOSAL_KIND;
+      // What it makes, or which entry it changes and the fields it would write there.
+      const makes = [];
+      for (const entry of isProposal ? (one.data.entries as EntryInput[]) : []) {
+        if (entry.id) {
+          const target = await get(tx, spaceId, entry.id);
+          makes.push({
+            kind: target?.kind ?? '',
+            title: target?.title ?? entry.id,
+            changes: Object.keys(entry.data ?? {}),
+          });
+        } else makes.push({ kind: entry.kind, title: entry.title });
+      }
       out.push({
         type: isProposal ? 'proposal' : 'proposed',
         id: one.id,
         title: one.title,
         spaceId,
         detail: isProposal
-          ? {
-              why: one.data.why,
-              apps: one.data.apps,
-              makes: (one.data.entries as EntryInput[]).map((entry) => ({
-                kind: entry.kind,
-                title: entry.title,
-              })),
-            }
+          ? { why: one.data.why, apps: one.data.apps, makes }
           : { kind: one.kind, data: one.data, origin: one.origin },
       });
     }

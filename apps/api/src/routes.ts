@@ -1,5 +1,5 @@
 import { withWho } from './who';
-import { appLines, appsOf, bridgesOf } from '@jarvis-os/core';
+import { answerOf, appLines, appsOf, bridgesOf, proposeStructure } from '@jarvis-os/core';
 import {
   comment,
   commentsOf,
@@ -1033,6 +1033,29 @@ export function apiRoutes(deps: {
             ...(one.due ? { due: one.due } : {}),
           })),
         }),
+      ),
+    );
+  });
+
+  // A routine kept as text, proposed in its five parts (spec 047): for her yes, in « À ranger ».
+  api.post('/routines/:id/structure', async (c) =>
+    c.json(
+      await act(c, (tx, actor, space) => proposeStructure(tx, actor, space, c.req.param('id'))),
+    ),
+  );
+
+  // A search that answers (spec 049): a figure computed from her entries, with what justifies it.
+  api.get('/answer', async (c) => {
+    const q = (c.req.query('q') ?? '').slice(0, 300);
+    if (!q.trim())
+      return c.json({ error: 'Ask a question (« combien en transport en octobre ? »).' }, 400);
+    return c.json(
+      await as(c, (tx) =>
+        answerOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+          q,
+        ),
       ),
     );
   });

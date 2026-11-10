@@ -1,4 +1,5 @@
 import { withWho } from './who';
+import { comment, commentsOf } from '@jarvis-os/core';
 import {
   addFile,
   agenda,
@@ -613,6 +614,17 @@ export function apiRoutes(deps: {
             : {}),
         }),
       ),
+    );
+  });
+
+  // Notes on an entry (spec 039): hers, as she wrote them, the oldest first.
+  api.get('/entries/:id/comments', async (c) =>
+    c.json(await act(c, (tx, _a, space) => commentsOf(tx, space, c.req.param('id')))),
+  );
+  api.post('/entries/:id/comments', async (c) => {
+    const body = z.object({ text: z.string().min(1).max(4000) }).parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) => comment(tx, actor, space, c.req.param('id'), body.text)),
     );
   });
 

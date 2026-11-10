@@ -5,6 +5,7 @@ import {
   find,
   giveLease,
   pool,
+  setCallOut,
   save,
   spacesOf,
   takeLease,
@@ -33,6 +34,8 @@ import {
 import { wordsOf, type Lang } from './i18n';
 import { quickjsRunner } from './scripts';
 import { readTelegramLinks } from './telegram';
+import { connectorService } from './connector-service';
+import { secretsKey } from './secrets';
 import { settingsFor, type Branch } from './settings';
 
 /** Who this watcher is, for its lease (spec 021): the machine and this process. */
@@ -292,6 +295,11 @@ if (process.argv[1]?.endsWith('watcher.ts')) {
     console.info(sent ? 'linked, and a message sent' : 'linked; no message sent');
     await db.end();
   } else {
+    const settings = settingsFor(branch, process.env.JARVIS_PUBLIC_URL);
+    setCallOut(
+      connectorService({ db, key: secretsKey(settings.authSecret), publicUrl: settings.publicUrl })
+        .callOut,
+    );
     console.info(`[watcher] ${branch}: a pass every ${WATCH_EVERY_MS / 1000} s`);
     watch(db, deliveryFor(settingsFor(branch, process.env.JARVIS_PUBLIC_URL)), (report) => {
       if (report.sent || report.scheduled || report.skipped || report.failed) {

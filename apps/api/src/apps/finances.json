@@ -602,6 +602,17 @@
       "fr": "Un montant dépensé est un « Mouvement » (Transaction) direction « out », un montant reçu direction « in » ; relie-le à son compte (account) et à son fonds (fund) ; une facture à payer est un « Bill ». Les soldes et restes se calculent, ne les écris jamais.",
       "en": "Money spent is a Transaction with direction « out », money received « in »; link it to its account and its fund; a bill to pay is a « Bill ». Balances and remainders are computed, never written."
     },
-    "bridges": []
+    "bridges": [],
+    "patterns": [
+      {
+        "about": {
+          "fr": "Tes sorties d'argent",
+          "en": "Your money going out"
+        },
+        "kind": "Transaction",
+        "where": "direction = 'out'",
+        "sum": "amount"
+      }
+    ]
   }
 }

@@ -10,6 +10,7 @@ import {
   setProbe,
   type Actor,
   type Connector,
+  type CallRequest,
   type ConnectorAuth,
 } from '@jarvis-os/core';
 import { auth } from '@modelcontextprotocol/sdk/client/auth.js';
@@ -35,10 +36,47 @@ export const connectorInput = z.object({
   auth: z.enum(['none', 'bearer', 'header', 'oauth']).default('none'),
   headerName: z.string().trim().min(1).max(80).nullish(),
   secret: z.string().min(1).max(4000).nullish(),
+  /** MCP (default), or plain HTTP: an agent's own address, reached by a rule's `call` (spec 050). */
+  protocol: z.enum(['mcp', 'http']).default('mcp'),
 });
 export type ConnectorInput = z.infer<typeof connectorInput>;
 
 export const connectorChange = connectorInput.partial();
+
+const CALL_TIMEOUT_MS = 20_000;
+const CALL_MAX_BYTES = 2 * 1024 * 1024;
+
+/**
+ * An address a call may reach (spec 050): https outside private networks; on a developer's own
+ * machine (a local Jarvis), http://localhost too. Hostnames are read as written: no request is
+ * sent before this says yes.
+ */
+export function reachable(url: URL, local: boolean): boolean {
+  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  const loopback = host === 'localhost' || host === '127.0.0.1' || host === '::1';
+  if (loopback) return local && (url.protocol === 'http:' || url.protocol === 'https:');
+  if (url.protocol !== 'https:') return false;
+  if (/^(10\.|192\.168\.|169\.254\.|127\.|0\.)/.test(host)) return false;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
+  if (/^(fc|fd|fe80)/.test(host) && host.includes(':')) return false;
+  if (host.endsWith('.internal') || host.endsWith('.local')) return false;
+  return true;
+}
+
+/** An HTTP connection checked: it answers (and does not refuse its key). */
+async function knock(url: string, headers: Record<string, string>) {
+  const base = { reason: null, serverName: null, tools: [], resources: [] };
+  try {
+    const answer = await fetch(url, { headers, signal: AbortSignal.timeout(10_000) });
+    if (answer.status === 401 || answer.status === 403)
+      return { ...base, state: 'refused' as const, reason: `It answered ${answer.status}.` };
+    if (answer.status >= 500)
+      return { ...base, state: 'unreachable' as const, reason: `It answered ${answer.status}.` };
+    return { ...base, state: 'connected' as const };
+  } catch (error) {
+    return { ...base, state: 'unreachable' as const, reason: (error as Error).message };
+  }
+}
 
 export function connectorService(deps: { db: pg.Pool; key: Buffer; publicUrl: string }) {
   /** Where a server sends her back after she signed in (spec 025, US4). */
@@ -78,7 +116,10 @@ export function connectorService(deps: { db: pg.Pool; key: Buffer; publicUrl: st
 
   const check = async (person: string, id: string): Promise<Connector> => {
     const { connector, headers, oauth } = await reach(person, id);
-    const read = await probe(connector.url, headers);
+    const read =
+      connector.protocol === 'http'
+        ? await knock(connector.url, headers.headers)
+        : await probe(connector.url, headers);
     // A server may show its tools to anyone (Google's do): without her sign-in, it still waits.
     if (connector.auth === 'oauth' && read.state === 'connected' && !signInOf(oauth).tokens) {
       read.state = 'needs_sign_in';
@@ -89,7 +130,78 @@ export function connectorService(deps: { db: pg.Pool; key: Buffer; publicUrl: st
     });
   };
 
+  // An agent on her own machine (http://localhost) is reached from a developer's Jarvis, never
+  // from production.
+  const local = (process.env.JARVIS_BRANCH ?? 'dev') !== 'main';
+
+  /** A rule's `call` (spec 050): her connection by name, its secret opened here only. */
+  const callOut = async (request: CallRequest): Promise<unknown> => {
+    const { rows } = await as(request.person, (tx) =>
+      tx.query<{ id: string }>(
+        'select id from connector where space_id = $1 and lower(name) = lower($2) limit 1',
+        [request.spaceId, request.connection],
+      ),
+    );
+    if (!rows[0]) throw new Error(`Call «${request.connection}»: no connection of that name here.`);
+    const { connector, headers } = await reach(request.person, rows[0].id);
+    const actor: Actor = { person: request.person, door: 'rule' };
+    let ok = false;
+    try {
+      if (request.tool) {
+        if (connector.protocol === 'http')
+          throw new Error(
+            `Call «${connector.name}»: an HTTP connection has no tools; give a path.`,
+          );
+        const answer = await callTool(connector, headers, request.tool, request.body);
+        if (answer.isError)
+          throw new Error(`Call «${connector.name}»: its tool answered an error.`);
+        ok = true;
+        return answer.content;
+      }
+      if (connector.protocol !== 'http')
+        throw new Error(`Call «${connector.name}»: an MCP connection is called by a tool.`);
+      const url = new URL(
+        (request.path ?? '').replace(/^\//, ''),
+        connector.url.replace(/\/?$/, '/'),
+      );
+      if (!reachable(url, local))
+        throw new Error(
+          `Call «${connector.name}»: ${url.origin} is not an address Jarvis calls (https, outside private networks).`,
+        );
+      const answer = await fetch(url, {
+        method: 'POST',
+        headers: {
+          ...headers.headers,
+          'content-type': 'application/json',
+          accept: 'application/json',
+        },
+        body: JSON.stringify(request.body),
+        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+        redirect: 'error',
+      });
+      const text = await answer.text();
+      if (text.length > CALL_MAX_BYTES)
+        throw new Error(`Call «${connector.name}»: its answer is larger than 2 MB.`);
+      if (!answer.ok) throw new Error(`Call «${connector.name}»: it answered ${answer.status}.`);
+      ok = true;
+      try {
+        return text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(`Call «${connector.name}»: its answer is not JSON.`);
+      }
+    } finally {
+      await as(request.person, (tx) =>
+        recordCall(tx, actor, connector, {
+          tool: request.tool ?? request.path ?? '/',
+          ok,
+          agreed: true,
+        }),
+      ).catch(() => undefined);
+    }
+  };
+
   return {
+    callOut,
     list: (person: string, spaceIds: string[]) => as(person, (tx) => connectorsOf(tx, spaceIds)),
 
     async add(actor: Actor, spaceId: string, input: ConnectorInput): Promise<Connector> {
@@ -101,6 +213,7 @@ export function connectorService(deps: { db: pg.Pool; key: Buffer; publicUrl: st
           auth: input.auth as ConnectorAuth,
           headerName: input.headerName ?? null,
           sealed: input.secret ? seal(deps.key, input.secret) : null,
+          protocol: input.protocol,
         }),
       );
       return check(actor.person, made.id);

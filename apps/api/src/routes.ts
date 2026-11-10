@@ -95,7 +95,9 @@ import {
   createKey,
   fingerprintOf,
   KEY_PREFIX,
-  keyOwner,
+  keyScope,
+  receive,
+  receiveSchema,
   keysOf,
   revokeKey,
   recentMessages,
@@ -126,6 +128,8 @@ type Env = {
     name: string;
     spaces: Space[];
     client: string | undefined;
+    /** A program's key (spec 050): the kinds it may write. */
+    keyKinds: string[] | undefined;
   };
 };
 
@@ -183,9 +187,17 @@ export function apiRoutes(deps: {
   api.use('*', async (c, next) => {
     // A personal key (spec 015) acts as her, like her session.
     const bearer = /^Bearer\s+(\S+)$/i.exec(c.req.header('authorization') ?? '')?.[1] ?? '';
-    const byKey = bearer.startsWith(KEY_PREFIX) ? await keyOwner(deps.db, bearer) : null;
+    const scope = bearer.startsWith(KEY_PREFIX) ? await keyScope(deps.db, bearer) : null;
+    const byKey = scope?.person ?? null;
     if (bearer.startsWith(KEY_PREFIX) && !byKey)
       return c.json({ error: 'This key answers nothing.' }, 401);
+    // A program's key (spec 050) stays within its space, and never makes keys or connections.
+    const limited = Boolean(scope && (scope.spaceId || scope.kinds));
+    const asked = c.req.query('space') ?? c.req.header('x-jarvis-space');
+    if (scope?.spaceId && asked && asked !== scope.spaceId)
+      return c.json({ error: 'This key reaches one space only.' }, 403);
+    if (limited && /^\/api\/(me\/keys|connectors|spaces\/)/.test(c.req.path))
+      return c.json({ error: 'This key may not manage keys, connections or spaces.' }, 403);
     const session = byKey
       ? await deps.db
           .query<{ id: string; email: string; name: string }>(
@@ -203,13 +215,16 @@ export function apiRoutes(deps: {
         ]),
       );
     }
-    const spaces = await asPerson(deps.db, person, (tx) => spacesOf(tx));
+    const all = await asPerson(deps.db, person, (tx) => spacesOf(tx));
+    const spaces = scope?.spaceId ? all.filter((one) => one.id === scope.spaceId) : all;
     if (spaces.length === 0) return c.json({ error: 'This account has no space.' }, 500);
     c.set('person', person);
     c.set('email', session.user.email);
     c.set('name', session.user.name);
     c.set('spaces', spaces);
-    c.set('client', c.req.header('x-jarvis-client') ?? undefined);
+    // What a key writes is named after it in her journal.
+    c.set('client', scope ? `key:${scope.name}` : (c.req.header('x-jarvis-client') ?? undefined));
+    c.set('keyKinds', scope?.kinds ?? undefined);
     await next();
   });
 
@@ -222,7 +237,13 @@ export function apiRoutes(deps: {
 
   const actorOf = (c: Context<Env>): Actor => {
     const client = c.get('client');
-    return { person: c.get('person'), door: 'api', ...(client ? { client } : {}) };
+    const kinds = c.get('keyKinds');
+    return {
+      person: c.get('person'),
+      door: 'api',
+      ...(client ? { client } : {}),
+      ...(kinds ? { kinds } : {}),
+    };
   };
   /** The work of a route, in the space it names (else her own). */
   const act = <T>(c: Context<Env>, work: (tx: Tx, actor: Actor, spaceId: string) => Promise<T>) => {
@@ -633,6 +654,13 @@ export function apiRoutes(deps: {
       return one ? (await withComputed(tx, space, [one]))[0] : null;
     });
     return entry ? c.json(entry) : c.json({ error: `No entry ${c.req.param('id')}.` }, 404);
+  });
+
+  // What an agent sends (spec 050): a list written as her entries of one kind — her model's other
+  // names for its fields understood, the entry already there (same `match`) updated, not doubled.
+  api.post('/receive', async (c) => {
+    const body = receiveSchema.parse(await c.req.json());
+    return c.json(await act(c, (tx, actor, space) => receive(tx, actor, space, body)));
   });
 
   api.post('/save', async (c) => {
@@ -1130,9 +1158,20 @@ export function apiRoutes(deps: {
   // Her personal keys (spec 015): made, listed, revoked from her settings; a key is shown once.
   api.get('/me/keys', async (c) => c.json(await as(c, (tx) => keysOf(tx))));
   api.post('/me/keys', async (c) => {
-    const body = (await c.req.json()) as { name?: string };
+    const body = z
+      .object({
+        name: z.string().max(80).default(''),
+        space: z.string().max(64).nullish(),
+        kinds: z.array(z.string().max(80)).max(30).nullish(),
+      })
+      .parse(await c.req.json());
     return c.json(
-      await as(c, (tx) => createKey(tx, c.get('person'), String(body.name ?? ''))),
+      await as(c, (tx) =>
+        createKey(tx, c.get('person'), body.name, {
+          spaceId: body.space ?? null,
+          kinds: body.kinds ?? null,
+        }),
+      ),
       201,
     );
   });

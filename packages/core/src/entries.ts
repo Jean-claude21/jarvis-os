@@ -11,6 +11,7 @@ import { checkScript } from './scripts';
 import { checkView } from './views';
 import { checkShare } from './shares';
 import { checkArea } from './areas';
+import { asCommon, COMMON_KINDS } from './common';
 import { dataInNewWords, KIND_RENAMES, modelInNewWords, ROLE_RENAMES } from './keywords';
 import {
   checkAgainst,
@@ -289,6 +290,29 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
       notes.push(`kind « ${wanted} » → « ${KIND_RENAMES[foldKind(wanted)]} »`);
       wanted = KIND_RENAMES[foldKind(wanted)];
     }
+    // The common types (spec 032): another name of one her space already uses becomes it, its
+    // fields in the engine's words — unless she keeps entries or a model under her own name: then
+    // her word stays, until she merges them.
+    let commonData: Record<string, unknown> | null = null;
+    const common = !one.id && wanted ? asCommon(wanted, one.data) : null;
+    if (wanted && common) {
+      const { rows: uses } = await tx.query<{ hers: boolean; common: boolean }>(
+        `select bool_or(jarvis_fold(kind) = jarvis_fold($2)
+                        or (kind = 'Model' and jarvis_fold(title) = jarvis_fold($2))) as hers,
+                bool_or(kind = $3 or (kind = 'Model' and title = $3)) as common
+           from entry where space_id = $1 and archived_at is null
+            and (jarvis_fold(kind) in (jarvis_fold($2), jarvis_fold($3)) or kind = 'Model')`,
+        [spaceId, wanted, common.kind],
+      );
+      if (uses[0]?.common && !uses[0]?.hers) {
+        notes.push(
+          `kind « ${wanted} » → « ${common.kind} » (a common type, its fields in its words)`,
+        );
+        wanted = common.kind;
+        commonData = common.data;
+      }
+    }
+    if (commonData) one.data = commonData;
     const current = one.id
       ? (
           await tx.query<{
@@ -602,6 +626,8 @@ export interface Kind {
    */
   group: string | null;
   system: boolean;
+  /** A common type's name in her languages (spec 032). */
+  common?: { fr: string; en: string };
 }
 
 /** Jarvis's own kinds: the engine and her method, grouped apart from her life. */
@@ -644,10 +670,17 @@ export async function kinds(tx: Tx, spaceId: string): Promise<Kind[]> {
       system,
     };
   };
+  // A common type (spec 032) shows by its name in her language, even without a model.
+  const commonOf = (kind: string) => {
+    const one = COMMON_KINDS.find((common) => common.kind === kind);
+    return one ? { common: one.label } : {};
+  };
   const out: Kind[] = rows.map((row) => {
     const model = models.get(fold(row.kind));
     models.delete(fold(row.kind));
-    return model ? { ...row, model, ...placed(row.kind, model) } : { ...row, ...placed(row.kind) };
+    return model
+      ? { ...row, model, ...placed(row.kind, model), ...commonOf(row.kind) }
+      : { ...row, ...placed(row.kind), ...commonOf(row.kind) };
   });
   for (const model of models.values())
     out.push({ kind: model.kind, count: 0, fields: [], model, ...placed(model.kind, model) });

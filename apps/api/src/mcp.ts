@@ -1,3 +1,4 @@
+import { mergeKind, mergeProposals, preferencesOf } from '@jarvis-os/core';
 import { gather } from './tool-groups';
 import { momentsOf, whenOf } from './when';
 import {
@@ -418,6 +419,49 @@ export async function mcpServerFor(
         email: email.trim().toLowerCase(),
       };
     }),
+  );
+
+  // The common types and the duplicates of her life (spec 032), in the family « apps ».
+  server.registerTool(
+    'merge_kinds',
+    {
+      description:
+        'Kinds that are one thing under two names (« dépense » and « Transaction », « Doc » and « document »): without `from`, the merges Jarvis proposes, with the fields renamed on the way; with `from` and `to`, a merge tried (`dryRun`, the default) or, after her yes, applied — each step journaled and undoable. Never merge without her yes.',
+      inputSchema: {
+        from: z.string().min(1).max(80).optional(),
+        to: z.string().min(1).max(80).optional(),
+        dryRun: z.boolean().default(true),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async ({
+        from,
+        to,
+        dryRun,
+        space,
+      }: {
+        from?: string | undefined;
+        to?: string | undefined;
+        dryRun: boolean;
+        space?: string | undefined;
+      }) =>
+        act(async (tx) => {
+          const proposals = await mergeProposals(
+            tx,
+            at(space),
+            (await preferencesOf(tx)).mergesDismissed ?? [],
+          );
+          if (!from || !to) return proposals;
+          const proposal = proposals.find((one) => one.from === from && one.to === to);
+          return mergeKind(tx, actor, at(space), {
+            from,
+            to,
+            steps: proposal?.steps ?? [],
+            dryRun,
+          });
+        }),
+    ),
   );
 
   server.registerTool(

@@ -245,6 +245,13 @@ details.area summary::-webkit-details-marker { display: none; }
 .tabs a { padding: 8px 12px; text-decoration: none; color: var(--bark); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; font-size: 13.5px; }
 .tabs a.on { color: var(--ink); border-color: var(--primary); font-weight: 600; }
 .tabs a .n { font: 500 11px/1 "JetBrains Mono", monospace; color: var(--bark); margin-left: 4px; }
+/* Her duplicates, proposed to merge (spec 032). */
+.ent-col { display: grid; gap: 12px; min-width: 0; align-content: start; }
+.merges .merge { display: flex; gap: 12px; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; padding: 10px 0; border-top: 1px dotted var(--rule); }
+.merges .merge-what { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
+.merges .merge-steps { font: 500 11.5px "JetBrains Mono", monospace; margin-top: 4px; }
+.merge-sample { display: grid; gap: 4px; margin-top: 6px; font-size: 12.5px; }
+.merge-sample code { display: block; padding: 4px 6px; background: var(--sand); border: 1px solid var(--rule); border-radius: 2px; overflow-wrap: anywhere; white-space: pre-wrap; }
 /* Near in meaning (spec 028), under the entries found by words. */
 .ent-near { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--rule-strong); }
 .ent-near h3 { margin: 0 0 6px; }

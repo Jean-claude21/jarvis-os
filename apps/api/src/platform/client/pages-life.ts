@@ -135,7 +135,15 @@ const lifePages = {
     const shownIds = new Set(list.rows.map((e) => e.id));
     const near = q ? (await api(inSpace('/search/meaning?limit=8&text=' + encodeURIComponent(q) + (kind ? '&kind=' + encodeURIComponent(kind) : '')))).filter((e) => !shownIds.has(e.id)) : [];
     const nearHtml = near.length ? '<div class="ent-near"><h3 class="caps">' + esc(W.byMeaning) + '</h3><ul class="list">' + near.map((e) => '<li><a class="link" href="#/entree/' + esc(e.id) + '">' + esc(e.title) + '</a><span class="muted">' + esc(kindName(e.kind)) + '</span></li>').join('') + '</ul></div>' : '';
-    return '<div class="ent">' + nav + '<section class="card ent-main">' + head + (stats ? statsHtml(stats) : '') + tools + sel + body + nearHtml + '</section></div>';
+    // Her duplicates (spec 032): kinds that are one thing under two names, proposed to merge.
+    const merges = !kind && !q ? await api(inSpace('/kinds/merges')) : [];
+    window.__merges = merges;
+    const stepWords = (m) => m.steps.map((st) => st.rename ? st.rename.from + ' → ' + st.rename.to : st.set ? say(W.mergeSet, { field: st.set.field }) : say(W.mergeRemove, { field: st.remove })).join(' · ');
+    const mergesHtml = merges.length ? '<section class="card merges"><div class="caps">' + esc(say(merges.length > 1 ? W.mergesTitleN : W.mergesTitle1, { n: merges.length })) + '</div><p class="muted" style="margin:4px 0 10px">' + esc(W.mergesLead) + '</p>' +
+      merges.map((m, i) => '<div class="merge" data-merge-row="' + i + '"><div class="merge-what"><b>« ' + esc(kindName(m.from)) + ' »</b> <span class="muted">(' + m.count + ')</span> → <b>« ' + esc(m.toLabel ? tr(m.toLabel) : kindName(m.to)) + ' »</b> <span class="muted">(' + m.toCount + ')</span>' + (m.toLabel ? ' <span class="badge">' + esc(W.commonType) + '</span>' : '') + '' +
+        (m.steps.length ? '<div class="muted merge-steps">' + esc(stepWords(m)) + '</div>' : '') + '<div class="merge-preview" id="merge-preview-' + i + '"></div></div>' +
+        '<div class="actions"><button class="quiet" data-merge-try="' + i + '">' + esc(W.mergeTry) + '</button><button data-merge-do="' + i + '">' + esc(W.mergeDo) + '</button><button class="quiet" data-merge-no="' + i + '">' + esc(W.mergeNo) + '</button></div></div>').join('') + '</section>' : '';
+    return '<div class="ent">' + nav + '<div class="ent-col">' + mergesHtml + '<section class="card ent-main">' + head + (stats ? statsHtml(stats) : '') + tools + sel + body + nearHtml + '</section></div></div>';
   },
 
   async entree (params, id) {

@@ -23,6 +23,9 @@ import {
   renewCalendarKey,
   upcoming,
   backupsOf,
+  mergeKind,
+  mergeProposals,
+  type MergeStep,
   contextReadings,
   exportMarkdown,
   importMarkdown,
@@ -372,6 +375,44 @@ export function apiRoutes(deps: {
   api.post('/entries/bulk', async (c) => {
     const body = await c.req.json();
     return c.json(await act(c, (tx, actor, space) => changeEntries(tx, actor, space, body)));
+  });
+  // The common types and the duplicates of her life (spec 032): proposed, tried, merged on her yes.
+  const mergeInput = z.object({
+    from: z.string().min(1).max(80),
+    to: z.string().min(1).max(80),
+    steps: z.array(z.record(z.string(), z.unknown())).max(20).optional(),
+    dryRun: z.boolean().default(true),
+  });
+  api.get('/kinds/merges', async (c) =>
+    c.json(
+      await act(c, async (tx, _a, space) =>
+        mergeProposals(tx, space, (await preferencesOf(tx)).mergesDismissed ?? []),
+      ),
+    ),
+  );
+  api.post('/kinds/merge', async (c) => {
+    const input = mergeInput.parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        mergeKind(tx, actor, space, {
+          from: input.from,
+          to: input.to,
+          steps: (input.steps ?? []) as MergeStep[],
+          dryRun: input.dryRun,
+        }),
+      ),
+    );
+  });
+  api.post('/kinds/merges/dismiss', async (c) => {
+    const { from, to } = mergeInput.pick({ from: true, to: true }).parse(await c.req.json());
+    return c.json(
+      await as(c, async (tx, actor) => {
+        const now = (await preferencesOf(tx)).mergesDismissed ?? [];
+        return setPreferences(tx, actor, {
+          mergesDismissed: [...new Set([...now, `${from}→${to}`])],
+        });
+      }),
+    );
   });
   api.post('/kinds/rename', async (c) => {
     const body = (await c.req.json()) as { from?: string; to?: string };

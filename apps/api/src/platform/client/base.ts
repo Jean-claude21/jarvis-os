@@ -7,7 +7,7 @@ const W = WORDS;
 const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => '&#' + c.charCodeAt(0) + ';');
 // Technical names stay English; what she reads comes from the models' labels, in her language.
 const tr = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v[LANG] || v.en || v.fr || '' : v);
-const kindLabel = (k) => (k && k.model && k.model.label ? tr(k.model.label) : k.kind);
+const kindLabel = (k) => (k && k.model && k.model.label ? tr(k.model.label) : k && k.common ? tr(k.common) : k.kind);
 const fieldLabelOf = (model, name) => { const f = model && model.fields.find((c) => c.name === name); return f && f.label ? tr(f.label) : name; };
 const optionLabelOf = (model, name, v) => { const f = model && model.fields.find((c) => c.name === name); return f && f.optionLabels && typeof v === 'string' && f.optionLabels[v] ? tr(f.optionLabels[v]) : v; };
 const say = (t, v) => String(t).replace(/\\{(\\w+)\\}/g, (_, k) => (v && v[k] != null ? v[k] : ''));

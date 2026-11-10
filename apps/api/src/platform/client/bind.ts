@@ -55,6 +55,33 @@ function bindCommon(root) {
     if (!confirm(say(W.revokeAsk, { client: b.dataset.name }))) return;
     try { await api('/connections/' + encodeURIComponent(b.dataset.revoke), { method: 'DELETE' }); show(); } catch (error) { alert(error.message); }
   }));
+  // Her duplicates (spec 032): tried, merged on her yes, or set aside for good.
+  const mergeOf = (b) => (window.__merges || [])[Number(b.dataset.mergeTry ?? b.dataset.mergeDo ?? b.dataset.mergeNo)];
+  const mergeTo = (m) => (m.toLabel ? tr(m.toLabel) : kindName(m.to));
+  root.querySelectorAll('[data-merge-try]').forEach((b) => b.addEventListener('click', async () => {
+    const m = mergeOf(b); const box = document.getElementById('merge-preview-' + b.dataset.mergeTry);
+    b.disabled = true;
+    try {
+      const r = await api(inSpace('/kinds/merge'), { method: 'POST', body: { from: m.from, to: m.to, steps: m.steps, dryRun: true } });
+      const sample = r.fields && r.fields.sample && r.fields.sample[0];
+      box.innerHTML = '<p class="muted">' + esc(say(W.mergeTried, { n: r.entries, to: mergeTo(m) })) + '</p>' +
+        (sample ? '<div class="merge-sample"><b>' + esc(sample.title) + '</b><code>' + esc(JSON.stringify(sample.before)) + '</code><span>→</span><code>' + esc(JSON.stringify(sample.after)) + '</code></div>' : '');
+    } catch (error) { alert(error.message); } finally { b.disabled = false; }
+  }));
+  root.querySelectorAll('[data-merge-do]').forEach((b) => b.addEventListener('click', async () => {
+    const m = mergeOf(b);
+    if (!confirm(say(W.mergeAsk, { from: kindName(m.from), to: mergeTo(m), n: m.count }))) return;
+    b.disabled = true;
+    try {
+      await api(inSpace('/kinds/merge'), { method: 'POST', body: { from: m.from, to: m.to, steps: m.steps, dryRun: false } });
+      toast(say(W.mergeDone, { n: m.count, to: mergeTo(m) }));
+      await load(); show();
+    } catch (error) { b.disabled = false; alert(error.message); }
+  }));
+  root.querySelectorAll('[data-merge-no]').forEach((b) => b.addEventListener('click', async () => {
+    const m = mergeOf(b);
+    try { await api('/kinds/merges/dismiss?space=' + encodeURIComponent(space), { method: 'POST', body: { from: m.from, to: m.to } }); show(); } catch (error) { alert(error.message); }
+  }));
   // Her connectors (spec 025): add (from « Discover » or her own), sign in, check again, cut.
   const signInTo = async (id) => {
     const { url } = await api('/connectors/' + encodeURIComponent(id) + '/sign-in', { method: 'POST', body: {} });

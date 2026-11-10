@@ -37,7 +37,18 @@ async function api(path, options) {
 const inSpace = (path) => path + (path.includes('?') ? '&' : '?') + 'space=' + encodeURIComponent(space);
 const page = () => document.getElementById('page');
 const fail = (error) => { page().innerHTML = '<p class="error-text">' + esc(say(W.failed, { reason: error.message })) + '</p>'; };
-const card = (title, body, wide) => '<article class="card' + (wide ? ' wide' : '') + '">' + (title ? '<h2>' + esc(title) + '</h2>' : '') + body + '</article>';
+// A card is the mockup's panel: its title in capitals at its head, what it holds below.
+const card = (title, body, wide) => '<section class="panel' + (wide ? ' wide' : '') + '">' + (title ? '<div class="panel-head"><span class="left caps">' + esc(title) + '</span></div>' : '') + '<div class="panel-body pad">' + body + '</div></section>';
+// What a page drawn before the mockup still holds, dressed as the mockup: its buttons, its badges.
+function dress(root) {
+  root.querySelectorAll('button:not(.btn):not(.row):not(.chip):not(.icon-btn):not(.back):not(.undo):not([role="tab"]):not(.x-occ button)').forEach((b) => {
+    if (b.closest('.segmented, .x-occ, .x-src, .menu, .x-tabbar, .tabs')) return;
+    b.classList.add('btn');
+    if (b.classList.contains('primary')) b.classList.add('solid');
+  });
+  root.querySelectorAll('.badge').forEach((b) => { b.classList.add('tag'); if (b.classList.contains('said')) b.classList.add('ok'); else if (b.classList.contains('error')) b.classList.add('error'); else if (b.classList.contains('primary')) b.classList.add('info'); else b.classList.add('neutral'); });
+  root.querySelectorAll('nav.tabs a.on').forEach((a) => a.setAttribute('aria-current', 'page'));
+}
 const empty = (text) => '<p class="empty">' + esc(text || W.empty) + '</p>';
 const originBadge = (o) => '<span class="badge ' + esc(o) + '">' + esc(W[o] || o) + '</span>';
 const said = (command) => W['c.' + command] || command;
@@ -63,6 +74,7 @@ function openDrawer(title, body, foot, sub) {
   drawer().classList.add('open');
   document.getElementById('scrim').classList.add('open');
   drawer().querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', closeDrawer));
+  dress(drawer());
 }
 function closeDrawer() {
   drawer().classList.remove('open');

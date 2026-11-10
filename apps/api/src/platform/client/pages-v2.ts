@@ -641,4 +641,23 @@ function bindBoards(root) {
   const ask = root.querySelector('[data-ask-board]');
   if (ask) ask.addEventListener('click', () => openDrawer(W.v2askBoard, '<p>' + esc(W.v2askBoardHow) + '</p>'));
 }
+
+// The settings pages, in the mockup's frame: her account, her spaces; the journal, her reminders
+// and her files where the mockup puts them (the journal's drawer, the agenda, her documents).
+v2Pages.compte = async function () {
+  return v2head(esc(W.navAccount), esc(W.v2accountSub), '', '<span class="avatar" style="width:28px;height:28px">' + esc(String(me.person.name || '?').split(/ +/).map((w) => w.slice(0, 1)).join('').slice(0, 2).toUpperCase()) + '</span>') +
+    (await settingsPages.compte()).replace('<section class="grid">', '<div class="x-grid">').replace(/<[/]section>$/, '</div>');
+};
+v2Pages.espaces = async function () {
+  return v2head(esc(W.navSpaces), esc(W.v2spacesSub), '') + (await settingsPages.espaces()).replace('<section class="grid">', '<div class="x-grid">').replace(/<[/]section>$/, '</div>');
+};
+v2Pages.journal = async function () { setTimeout(journalDrawer, 0); return v2Pages[''](); };
+v2Pages.rappels = async function () { setTimeout(() => { location.replace('#/agenda?v=rappels'); }, 0); return '<div class="empty">' + esc(W.loading) + '</div>'; };
+v2Pages.fichiers = async function () { setTimeout(() => { location.replace('#/documents?s=deposes'); }, 0); return '<div class="empty">' + esc(W.loading) + '</div>'; };
+v2Pages.document = async function (params, id) {
+  const e = await api(inSpace('/entries/' + encodeURIComponent(id)));
+  crumbs([W.navDocuments, e.title]);
+  return v2head(esc(e.title), esc(kindName(e.kind) + ' · ' + say(W.chars, { n: num(String(e.data.text || '').length) })), '<a class="btn" href="#/documents">' + ic('i-left') + esc(W.navDocuments) + '</a><a class="btn" href="#/entree/' + esc(id) + '">' + ic('i-life') + esc(W.fullEntry) + '</a>') +
+    '<section class="panel"><div class="panel-body">' + frame('/app/frame/document/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(space)) + '</div></section>';
+};
 `;

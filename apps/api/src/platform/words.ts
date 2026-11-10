@@ -3,6 +3,8 @@
 export const appWords = {
   fr: {
     brand: 'Jarvis OS',
+    v2accountSub: 'Qui tu es, ton fuseau, ton Telegram, ton brief du matin, tes clés',
+    v2spacesSub: 'Tes espaces, leurs membres et leurs chartes ; inviter, renommer, quitter',
     allDone: 'Tout est fait.',
     v2appRoleTab: 'Rôle de l’app',
     v2appSub: 'Ses pages, ses types et son rôle, calculés à l’ouverture',
@@ -1123,6 +1125,8 @@ export const appWords = {
   },
   en: {
     brand: 'Jarvis OS',
+    v2accountSub: 'Who you are, your time zone, your Telegram, your morning brief, your keys',
+    v2spacesSub: 'Your spaces, their members and their charters; invite, rename, leave',
     allDone: 'All done.',
     v2appRoleTab: 'The app’s role',
     v2appSub: 'Its pages, its kinds and its role, computed when opened',

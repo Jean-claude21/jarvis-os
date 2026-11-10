@@ -1,3 +1,14 @@
+import {
+  attention as dayAttention,
+  changesSince,
+  clientKey,
+  CONTEXT_FRESH_HOURS,
+  lastContextRead,
+  markContextRead,
+  zoneOf,
+} from '@jarvis-os/core';
+import type { Embedder } from '@jarvis-os/core';
+import { searchByMeaning } from './embeddings';
 import type { ConnectorService } from './connector-service';
 import { needsAgreement } from './connectors';
 import {
@@ -164,6 +175,8 @@ export async function mcpServerFor(
     today?: () => string;
     /** Her connectors (spec 025): the tools of other servers, through Jarvis. */
     connectors?: ConnectorService;
+    /** Search by meaning (spec 028), when this server has a model. */
+    embedder?: Embedder | null;
   },
   who: McpPerson,
 ): Promise<McpServer> {
@@ -197,16 +210,78 @@ export async function mcpServerFor(
     },
   );
 
+  // The charter received whole (spec 029): has this assistant read her context lately?
+  const assistant = clientKey(who.clientId);
+  let readLately = await act(async (tx) => {
+    const at = await lastContextRead(tx, assistant);
+    return Boolean(at && Date.now() - at.getTime() < CONTEXT_FRESH_HOURS * 3_600_000);
+  });
+  const REMIND = {
+    type: 'text' as const,
+    text: 'Jarvis: you have not read her context in this conversation. Call `context` now: her day, what changed, and her charters in full — they apply to everything you do here.',
+  };
+
   /** A tool's work, its failures said in words the model can act on. */
   const tool =
     <A>(work: (args: A) => Promise<unknown>) =>
     async (args: A) => {
       try {
-        return json(await work(args));
+        const answer = json(await work(args));
+        return readLately ? answer : { content: [...answer.content, REMIND] };
       } catch (error) {
         return { ...json({ error: failure(error).message }), isError: true };
       }
     };
+
+  server.registerTool(
+    'context',
+    {
+      description:
+        'Call first, at the start of every conversation: the date and time where she lives, her day (what to fix, what is late, today), what changed in her spaces since you last read it, her charters in full and her routines. Her charters apply to everything you do.',
+      annotations: { readOnlyHint: true },
+    },
+    tool(async () => {
+      const ids = reach.map((one) => one.id);
+      const read = await act(async (tx) => {
+        const zone = await zoneOf(tx);
+        const now = new Date();
+        const day = await dayAttention(tx, ids, now, zone);
+        const since = await lastContextRead(tx, assistant);
+        const changes = await changesSince(tx, ids, since, who.client ?? null);
+        await markContextRead(tx, who.person, assistant);
+        return { zone, now, day, changes };
+      });
+      readLately = true;
+      const say = (options: Intl.DateTimeFormatOptions) =>
+        new Intl.DateTimeFormat('fr-FR', { timeZone: read.zone, ...options }).format(read.now);
+      const group = (name: string) =>
+        read.day.items
+          .filter((one) => one.group === name)
+          .map((one) => ({ title: one.title, kind: one.kind, space: one.space, when: one.when }));
+      return {
+        now: {
+          date: say({ year: 'numeric', month: '2-digit', day: '2-digit' }),
+          weekday: say({ weekday: 'long' }),
+          time: say({ hour: '2-digit', minute: '2-digit' }),
+          zone: read.zone,
+        },
+        day: {
+          toFix: group('fix'),
+          late: group('late'),
+          proposed: group('proposed'),
+          today: group('today'),
+        },
+        comingSoon: method.upcoming,
+        changedSinceYouLastRead: read.changes,
+        spaces: reach.map((one) => ({ name: one.name, personal: one.personal })),
+        charters: method.charters,
+        routines: [...baseRoutines, ...method.routines].map((one) => ({
+          name: one.name,
+          when: one.when,
+        })),
+      };
+    }),
+  );
 
   server.registerTool(
     'spaces',
@@ -356,7 +431,7 @@ export async function mcpServerFor(
     'find',
     {
       description:
-        'Her entries in a space by words (in titles, fields and text files, accents and case aside), by kind, by creation day (YYYY-MM-DD); latest first.',
+        'Her entries in a space by words (in titles, fields and files, accents and case aside, a slip forgiven), by kind, by creation day (YYYY-MM-DD); the best first. With words, the entries near in meaning follow, marked `byMeaning` (« papiers pour le visa » finds the passport scan).',
       inputSchema: { ...findInputSchema.shape, space: spaceArg },
       annotations: { readOnlyHint: true },
     },
@@ -364,8 +439,29 @@ export async function mcpServerFor(
       async ({
         space,
         ...args
-      }: z.input<typeof findInputSchema> & { space?: string | undefined }) =>
-        act(async (tx) => withComputed(tx, at(space), await find(tx, at(space), args))),
+      }: z.input<typeof findInputSchema> & { space?: string | undefined }) => {
+        const found = await act(async (tx) =>
+          withComputed(tx, at(space), await find(tx, at(space), args)),
+        );
+        if (!args.text || !deps.embedder) return found;
+        // Search by meaning (spec 028): what the words missed, the nearest first.
+        const near = await searchByMeaning(
+          deps.db,
+          deps.embedder,
+          who.person,
+          at(space),
+          args.text,
+          {
+            limit: 10,
+            ...(args.kind ? { kind: args.kind } : {}),
+          },
+        );
+        const seen = new Set(found.map((one) => one.id));
+        return [
+          ...found,
+          ...near.filter((one) => !seen.has(one.id)).map((one) => ({ ...one, byMeaning: true })),
+        ];
+      },
     ),
   );
 

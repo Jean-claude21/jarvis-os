@@ -11,6 +11,7 @@ import {
   personEmail,
   spacesOf,
   type Blobs,
+  type Embedder,
   type Message,
 } from '@jarvis-os/core';
 import nodemailer from 'nodemailer';
@@ -19,6 +20,7 @@ import { ACTIONS, actionToken, actionWord } from './act';
 import { wordsOf, type Lang } from './i18n';
 import type { Settings } from './settings';
 import { objectStorage } from './storage';
+import { embedderFor } from './embeddings';
 
 // Her channels (spec 020): every message enters the outbox, then is delivered here — Telegram by its
 // bot, e-mail by any SMTP server — and its delivery written back (sent, or tried again later).
@@ -40,6 +42,8 @@ export interface Delivery {
   lang?: Lang;
   /** Where the nightly backups go (spec 022); none, no backup. */
   blobs?: Blobs;
+  /** The model that turns entries into vectors (spec 028); none, search stays by words. */
+  embedder?: Embedder | null;
 }
 
 /** E-mail through SMTP (`JARVIS_SMTP_URL`, `JARVIS_EMAIL_FROM`); null when it is not configured. */
@@ -65,6 +69,7 @@ export function deliveryFor(settings: Settings, mailer?: Mailer | null): Deliver
     publicUrl: settings.publicUrl,
     secret: settings.authSecret,
     blobs: objectStorage(settings.storage),
+    embedder: embedderFor(),
   };
 }
 

@@ -131,7 +131,11 @@ const lifePages = {
     const sel = '<div class="ent-sel" id="entsel"><b id="entsel-n"></b><span class="grow"></span><button class="quiet" data-bulk="folder">' + esc(W.fileInFolder) + '</button><button class="quiet" data-bulk="kind">' + esc(W.retype) + '</button><button class="quiet" data-bulk="link">' + esc(W.linkTo) + '</button><button class="quiet" data-bulk="archive">' + esc(W.setAside) + '</button><button class="quiet" data-bulk="none">' + esc(W.unselect) + '</button></div>';
     const head = '<div class="head" style="margin:0"><div>' + (k && k.group ? '<div class="caps">' + esc(k.group) + '</div>' : '') + '<h2 style="margin:0">' + esc(kind ? kindName(kind) : q ? '« ' + q + ' »' : W.all) + '</h2></div>' +
       (kind ? '<div class="actions"><button class="quiet" data-kgroup="' + esc(kind) + '" data-current="' + esc((k && k.group) || '') + '">' + esc(W.groupKind) + '</button><button class="quiet" data-krename="' + esc(kind) + '">' + esc(W.renameKind) + '</button></div>' : '') + '</div>';
-    return '<div class="ent">' + nav + '<section class="card ent-main">' + head + (stats ? statsHtml(stats) : '') + tools + sel + body + '</section></div>';
+    // Near in meaning (spec 028): what the words missed, under them; nothing without a model.
+    const shownIds = new Set(list.rows.map((e) => e.id));
+    const near = q ? (await api(inSpace('/search/meaning?limit=8&text=' + encodeURIComponent(q) + (kind ? '&kind=' + encodeURIComponent(kind) : '')))).filter((e) => !shownIds.has(e.id)) : [];
+    const nearHtml = near.length ? '<div class="ent-near"><h3 class="caps">' + esc(W.byMeaning) + '</h3><ul class="list">' + near.map((e) => '<li><a class="link" href="#/entree/' + esc(e.id) + '">' + esc(e.title) + '</a><span class="muted">' + esc(kindName(e.kind)) + '</span></li>').join('') + '</ul></div>' : '';
+    return '<div class="ent">' + nav + '<section class="card ent-main">' + head + (stats ? statsHtml(stats) : '') + tools + sel + body + nearHtml + '</section></div>';
   },
 
   async entree (params, id) {

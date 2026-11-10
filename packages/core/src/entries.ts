@@ -632,9 +632,19 @@ export interface Kind {
 
 /** Jarvis's own kinds: the engine and her method, grouped apart from her life. */
 export const SYSTEM_KINDS = new Set(
-  ['Model', 'Page', 'Rule', 'Script', 'View', 'Share', 'Area', 'Charter', 'Routine', 'Channel'].map(
-    (kind) => kind.toLowerCase(),
-  ),
+  [
+    'Model',
+    'Page',
+    'Rule',
+    'Script',
+    'View',
+    'Share',
+    'Area',
+    'Charter',
+    'Routine',
+    'Channel',
+    'App',
+  ].map((kind) => kind.toLowerCase()),
 );
 
 /** The kinds of things in a space, the most used first, with the fields each uses. */

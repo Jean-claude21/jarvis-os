@@ -4,6 +4,7 @@ import { save } from './entries';
 import { record } from './journal';
 import { MODEL_KIND, modelsOf } from './models';
 import { PAGE_KIND } from './pages';
+import { APP_KIND, roleSchema } from './roles';
 import { RULE_KIND } from './rules';
 import { SCRIPT_KIND } from './scripts';
 import { trial, type Trial } from './trial';
@@ -29,6 +30,8 @@ export const bundleSchema = z.object({
   pages: z.array(piece).max(40).default([]),
   rules: z.array(piece).max(40).default([]),
   scripts: z.array(piece).max(20).default([]),
+  /** Its role among her apps (spec 033): what it covers, when it is concerned, its bridges. */
+  role: roleSchema.optional(),
 });
 export type Bundle = z.input<typeof bundleSchema>;
 
@@ -92,14 +95,52 @@ export async function installApp(
 ): Promise<Trial<InstallReport>> {
   const bundle = bundleSchema.parse(raw);
   const report: InstallReport = { app: bundle.app, created: [], kept: [] };
+  // Its role is kept as an entry « App »; its bridges become rules (spec 033), named so she sees
+  // them among her rules, each undone with the install.
+  const bridges = (bundle.role?.bridges ?? []).map((bridge) => ({
+    title: `${bridge.from} → ${bridge.create}`,
+    data: {
+      app: bundle.app,
+      bridge: true,
+      when: { saved: bridge.from },
+      ...(bridge.if ? { if: bridge.if } : {}),
+      then: [
+        {
+          create: {
+            kind: bridge.create,
+            title: bridge.title,
+            data: bridge.data,
+            ...(bridge.link ? { link: bridge.link } : {}),
+          },
+        },
+      ],
+    },
+  }));
   const groups: [string, { title: string; data: Record<string, unknown> }[]][] = [
+    [
+      APP_KIND,
+      bundle.role
+        ? [
+            {
+              title: bundle.app,
+              data: { role: bundle.role, description: bundle.description ?? null },
+            },
+          ]
+        : [],
+    ],
     [MODEL_KIND, bundle.models.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } }))],
     [PAGE_KIND, bundle.pages.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } }))],
     [
       SCRIPT_KIND,
       bundle.scripts.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } })),
     ],
-    [RULE_KIND, bundle.rules.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } }))],
+    [
+      RULE_KIND,
+      [
+        ...bundle.rules.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } })),
+        ...bridges,
+      ],
+    ],
   ];
   return trial(tx, dryRun, async () => {
     const { rows: before } = await tx.query<{ id: string | null }>(

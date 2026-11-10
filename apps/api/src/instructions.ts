@@ -9,6 +9,8 @@ export function instructionsFor(input: {
   spaces: { name: string; personal: boolean }[];
   charters: { space: string; title: string; text: string }[];
   routines: { name: string; when: string; space?: string }[];
+  /** One line per app of her spaces (spec 033): what it covers, when it is concerned. */
+  apps?: string[];
   /** Reminders and dated things of the next days (the anticipation). */
   upcoming?: { when: string; kind: string; title: string; space: string }[];
 }): string {
@@ -54,6 +56,9 @@ ${spaces}
 11. A space's charter is its rules, always active there: follow them without being asked. It is an entry of kind « Charter » with \`data.text\`; change a shared one only when she asks, and tell her the others will see it.
 12. Some entries come from her Markdown files (\`data.source\` is the path): their text is \`data.text\`, their links \`mentions\` and \`part_of\` follow her folders. Read the text before answering about them; Jarvis is where her life is written now: when she changes one, change the entry.
 13. A routine or charter read from her files may name files (« vie/2026/…/journal/2026-09-01.md ») and scripts (« python scripts/… », « rebuild the index »): follow its intent with your tools — a file is the entry whose \`source\` is that path (\`query\`: data->>'source'), a script's figures come from \`query\`, a file to write is an entry to \`save\`. Never tell her to run a script.
+
+Her apps (call \`which_apps\` with what she said to know which are concerned, their instructions and what to ask; one thing she says may touch several):
+${input.apps?.length ? input.apps.map((one) => `- ${one}`).join('\n') : '- (none yet)'}
 
 Coming soon (the next three days; say it when it matters to what she asks, and in the morning):
 ${upcoming}

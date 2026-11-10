@@ -1,4 +1,4 @@
-import { bundleSchema, type Bundle } from '@jarvis-os/core';
+import { bundleSchema, type Bundle, type Role } from '@jarvis-os/core';
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 
@@ -25,3 +25,8 @@ export function shippedApp(name: string): Bundle {
   }
   return found;
 }
+
+/** The roles of the shipped apps (spec 033): an app installed before roles reads its role here. */
+export const shippedRoles: Record<string, Role> = Object.fromEntries(
+  shippedApps.filter((one) => one.role).map((one) => [one.app, bundleSchema.parse(one).role!]),
+);

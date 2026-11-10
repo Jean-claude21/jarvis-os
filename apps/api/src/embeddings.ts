@@ -3,7 +3,7 @@ import {
   entriesToEmbed,
   keepVector,
   nearEntries,
-  saidOf,
+  saidOfMany,
   VECTOR_DIMENSIONS,
   type Embedder,
 } from '@jarvis-os/core';
@@ -76,11 +76,18 @@ export async function embedOnce(
   embedder: Embedder,
 ): Promise<{ embedded: number; failed: number }> {
   const targets = await entriesToEmbed(db, embedder.model, EMBEDS_PER_PASS);
+  // One reading and one writing per person, whatever the number of her entries.
+  const byPerson = new Map<string, Map<string, string>>();
+  for (const one of targets) {
+    if (!byPerson.has(one.person)) byPerson.set(one.person, new Map());
+    byPerson.get(one.person)!.set(one.entryId, one.spaceId);
+  }
   const said: { entryId: string; spaceId: string; person: string; text: string; hash: string }[] =
     [];
-  for (const target of targets) {
-    const one = await asPerson(db, target.person, (tx) => saidOf(tx, target.entryId));
-    if (one) said.push({ ...target, ...one });
+  for (const [person, entries] of byPerson) {
+    for (const one of await asPerson(db, person, (tx) => saidOfMany(tx, [...entries.keys()]))) {
+      said.push({ ...one, person, spaceId: entries.get(one.entryId)! });
+    }
   }
   if (said.length === 0) return { embedded: 0, failed: 0 };
   try {
@@ -88,16 +95,19 @@ export async function embedOnce(
       said.map((one) => one.text),
       'document',
     );
-    for (const [at, one] of said.entries()) {
-      await asPerson(db, one.person, (tx) =>
-        keepVector(tx, {
-          entryId: one.entryId,
-          spaceId: one.spaceId,
-          model: embedder.model,
-          hash: one.hash,
-          vector: vectors[at]!,
-        }),
-      );
+    for (const person of byPerson.keys()) {
+      await asPerson(db, person, async (tx) => {
+        for (const [at, one] of said.entries()) {
+          if (one.person !== person) continue;
+          await keepVector(tx, {
+            entryId: one.entryId,
+            spaceId: one.spaceId,
+            model: embedder.model,
+            hash: one.hash,
+            vector: vectors[at]!,
+          });
+        }
+      });
     }
     return { embedded: said.length, failed: 0 };
   } catch (error) {

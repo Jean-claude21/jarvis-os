@@ -40,6 +40,21 @@ export async function saidOf(
   return row?.text && row.hash ? { text: row.text, hash: row.hash } : null;
 }
 
+/** What several entries say, as one person reads them (those she cannot read stay out). */
+export async function saidOfMany(
+  tx: Tx,
+  entryIds: string[],
+): Promise<{ entryId: string; text: string; hash: string }[]> {
+  const { rows } = await tx.query<{ id: string; text: string | null; hash: string | null }>(
+    `select id, jarvis_said(id) as text, md5(jarvis_said(id)) as hash
+       from unnest($1::text[]) as id`,
+    [entryIds],
+  );
+  return rows
+    .filter((row) => row.text && row.hash)
+    .map((row) => ({ entryId: row.id, text: row.text!, hash: row.hash! }));
+}
+
 const literal = (vector: number[]) => `[${vector.join(',')}]`;
 
 /** An entry's vector, kept or replaced. */

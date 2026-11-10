@@ -280,6 +280,7 @@ export {
   keepVector,
   nearEntries,
   saidOf,
+  saidOfMany,
   VECTOR_DIMENSIONS,
   type Embedder,
 } from './meaning';

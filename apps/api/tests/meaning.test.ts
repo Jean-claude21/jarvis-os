@@ -50,7 +50,7 @@ describe('search by meaning', () => {
   it('turns her entries into vectors once, and again when their words change', async () => {
     // The base holds other runs' entries too: hers are the latest, turned first.
     const waiting = async () =>
-      (await entriesToEmbed(server.db, themed.model, 1000)).map((one) => one.entryId);
+      (await entriesToEmbed(server.db, themed.model, 50)).map((one) => one.entryId);
     const hers = Object.values(ids);
     expect(await waiting()).toEqual(expect.arrayContaining(hers));
     expect((await embedOnce(server.db, themed)).embedded).toBeGreaterThanOrEqual(3);

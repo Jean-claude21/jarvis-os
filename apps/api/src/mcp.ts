@@ -1003,6 +1003,28 @@ export async function mcpServerFor(
     }),
   );
 
+  // A person's card across her apps (spec 045).
+  server.registerTool(
+    'person',
+    {
+      description:
+        'A person of hers (an entry « Person », by id or name): the last time they met or spoke, what she promised them (open tasks and intentions), the next thing with them, and what touches them in every app, by kind. Use it before she calls or meets someone.',
+      inputSchema: { person: z.string().min(1).max(200), space: spaceArg },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async (args: { person: string; space?: string | undefined }) =>
+      act(async (tx) => {
+        const space = at(args.space);
+        const byId = await get(tx, space, args.person);
+        const id =
+          byId?.id ??
+          (await find(tx, space, { kind: 'Person', text: args.person, limit: 1 }))[0]?.id;
+        if (!id) throw new Error(`No person « ${args.person} » in this space.`);
+        return personCard(tx, space, id);
+      }),
+    ),
+  );
+
   // An absence replanned at once (spec 044).
   server.registerTool(
     'replan',

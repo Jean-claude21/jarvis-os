@@ -11,7 +11,7 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     };
   }
   const message = error instanceof Error ? error.message : String(error);
-  if (/^No (entry|change|stored file|routine|open invitation|member|key)/.test(message)) {
+  if (/^No (entry|change|stored file|routine|open invitation|member|key|person)/.test(message)) {
     return { status: 404, message };
   }
   if (

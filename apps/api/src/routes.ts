@@ -895,6 +895,11 @@ export function apiRoutes(deps: {
     ),
   );
 
+  // A person's card across her apps (spec 045).
+  api.get('/people/:id', async (c) =>
+    c.json(await act(c, (tx, _a, space) => personCard(tx, space, c.req.param('id')))),
+  );
+
   // What a period changes, and an absence replanned (spec 044).
   api.get('/impact', async (c) => {
     const from = timeOf(c.req.query('from') ?? '');

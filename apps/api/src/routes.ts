@@ -10,6 +10,8 @@ import {
   patternsOf,
   personCard,
   decide,
+  OCCURRENCE_STATES,
+  setOccurrence,
   toSortOf,
   timeOf,
 } from '@jarvis-os/core';
@@ -626,6 +628,25 @@ export function apiRoutes(deps: {
             ? { entries: await withWho(deps.db, tx, space, actor.person, body.entries) }
             : {}),
         }),
+      ),
+    );
+  });
+
+  // One occurrence of a repetition (spec 036): done, missed, postponed to a time, cancelled, or back.
+  api.post('/entries/:id/occurrences/:day', async (c) => {
+    const body = z
+      .object({
+        status: z.enum(OCCURRENCE_STATES).nullable().optional(),
+        at: z.string().min(10).max(40).nullable().optional(),
+      })
+      .parse(await c.req.json());
+    const change =
+      body.status === null && !body.at
+        ? null
+        : { ...(body.status ? { status: body.status } : {}), ...(body.at ? { at: body.at } : {}) };
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        setOccurrence(tx, actor, space, c.req.param('id'), c.req.param('day'), change),
       ),
     );
   });

@@ -22,6 +22,10 @@ The last seven days or this month: the mirror in one sentence (computed), what s
 
 The list, then a person's card: last time, promises, next time, what she promised, across her apps.
 
+## I2 — Her full agenda (P1)
+
+Day (each occurrence of what repeats: done, missed, postponed — that day only, undone with a second tap), Week (events, blocks that come back, deadlines, proposals, by space, a click on a free hour adds something), Month (deadlines and events; green dots: what repeats, kept that day), Reminders (what will ring, where it comes from, where it stands). Spaces shown or hidden. Her iCal address. Google and Outlook stay a connector (later).
+
 ## I11 — The phone (P1, first part)
 
 A tab bar under the thumb: Maintenant · Agenda · Noter (a few words kept at once) · À ranger · Menu.

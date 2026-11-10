@@ -12,6 +12,7 @@ import { settingsPages } from './client/pages-settings';
 import { bind } from './client/bind';
 import { router } from './client/router';
 import { v2Pages } from './client/pages-v2';
+import { v2Agenda } from './client/pages-v2-agenda';
 import { v2Css } from './client/styles-v2';
 import { SPRITE } from './client/sprite';
 
@@ -30,6 +31,7 @@ const script = [
   lifePages,
   settingsPages,
   v2Pages,
+  v2Agenda,
   bind,
   router,
 ].join('\n\n');

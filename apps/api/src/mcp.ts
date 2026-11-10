@@ -1,4 +1,12 @@
-import { goalsOf, keepReview, mirrorOf, patternsOf } from '@jarvis-os/core';
+import {
+  goalsOf,
+  impactOf,
+  keepReview,
+  mirrorOf,
+  patternsOf,
+  replan,
+  windowOf,
+} from '@jarvis-os/core';
 import { withWho } from './who';
 import { OCCURRENCE_STATES, setOccurrence, type OccurrenceState } from '@jarvis-os/core';
 import { fileCapture, fileSure, inboxOf, type EntryInput } from '@jarvis-os/core';
@@ -619,7 +627,9 @@ export async function mcpServerFor(
         'away (`unlink`). One call for everything she said about that space. Every change is',
         'journaled and can be undone. A moment (`at`, `due`, `start`, `end`, `date`, `next`) may be',
         'written in her words (« demain 9h », « vendredi prochain à 14h30 »): Jarvis reads it on her',
-        'clock and says how it understood it (`understood`); tell her. So may a repetition (`repeat`:',
+        'clock and says how it understood it (`understood`); tell her. A new time that collides with',
+        'something, threatens a deadline or concerns someone comes back in `changes`, with free slots:',
+        'tell her before anything else. So may a repetition (`repeat`:',
         '« tous les lundis à 7h », « le 2e lundi du mois à 18h », « le dernier vendredi »), with',
         '`until` (a day) or `count` (so many times) to end it and `except` (days skipped). A dated',
         'thing may say its reminders (`remind`: « 1 jour avant », « 15 min »): Jarvis keeps them,',
@@ -642,7 +652,28 @@ export async function mcpServerFor(
           // For whom (spec 038): a member by her name, « moi », or nobody in particular.
           const entries = await withWho(deps.db, tx, at(space), who.person, moments.entries);
           const saved = await save(tx, actor, at(space), { ...args, entries });
-          return moments.understood.length ? { ...saved, understood: moments.understood } : saved;
+          // What it changes (spec 044): a new time that collides, threatens or concerns someone.
+          const zone = await zoneOf(tx);
+          const changes = [];
+          for (const [index, entry] of entries.entries()) {
+            const window = entry.data ? windowOf(entry.data, zone) : null;
+            if (!window) continue;
+            const impact = await impactOf(
+              tx,
+              reach.map((one) => one.id),
+              {
+                ...window,
+                except: saved.entries[index]?.id ?? entry.id ?? '',
+              },
+            );
+            if (impact.conflicts.length || impact.deadlines.length || impact.reminders.length)
+              changes.push({ entry: entry.title ?? entry.id, ...impact });
+          }
+          return {
+            ...saved,
+            ...(moments.understood.length ? { understood: moments.understood } : {}),
+            ...(changes.length ? { changes } : {}),
+          };
         }),
     ),
   );
@@ -970,6 +1001,32 @@ export async function mcpServerFor(
       const ids = space ? [at(space)] : reach.map((one) => one.id);
       return act(async (tx) => (await Promise.all(ids.map((id) => goalsOf(tx, id)))).flat());
     }),
+  );
+
+  // An absence replanned at once (spec 044).
+  server.registerTool(
+    'replan',
+    {
+      description:
+        '« Je pars du 12 au 20 »: what that period collides with and how Jarvis would replan it — a repetition’s occurrences skipped, an appointment to reschedule, a deadline the day before she leaves, a reminder the morning she is back — with the people concerned. `dryRun` (default true) proposes only; tell her, then apply after her yes (one step, undone at once). `from`/`to`: days or her words; `to` is the day she is back.',
+      inputSchema: {
+        from: z.string().min(2),
+        to: z.string().min(2),
+        dryRun: z.boolean().default(true),
+        space: spaceArg,
+      },
+    },
+    tool(async (args: { from: string; to: string; dryRun: boolean; space?: string | undefined }) =>
+      act(async (tx) => {
+        const zone = await zoneOf(tx);
+        const day = (said: string) => (whenOf(said, zone)?.value ?? said).slice(0, 10);
+        const from = timeOf(`${day(args.from)}T00:00`, zone);
+        const to = timeOf(`${day(args.to)}T00:00`, zone);
+        if (!from || !to || to <= from)
+          throw new Error('from and to are ISO days (« 2026-11-12 »), to after from.');
+        return replan(tx, actor, at(args.space), { from, to }, args.dryRun);
+      }),
+    ),
   );
 
   // Her review (spec 043): her questions, the mirror Jarvis prepares, her decisions as tasks.

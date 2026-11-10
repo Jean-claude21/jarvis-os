@@ -83,6 +83,7 @@ export { defaultsFor, offsetOf, syncReminders } from './reminders';
 export { comment, COMMENT_KIND, commentsOf } from './comments';
 export { GOAL_KIND, goalProgress, goalsOf, type GoalProgress } from './goals';
 export { patternsOf, type Pattern, type PatternKind } from './patterns';
+export { impactOf, replan, windowOf, type Impact, type Replan } from './impact';
 export {
   DEFAULT_QUESTIONS,
   keepReview,

@@ -3,7 +3,9 @@ import {
   comment,
   commentsOf,
   goalsOf,
+  impactOf,
   keepReview,
+  replan,
   mirrorOf,
   patternsOf,
   timeOf,
@@ -892,6 +894,39 @@ export function apiRoutes(deps: {
       ),
     ),
   );
+
+  // What a period changes, and an absence replanned (spec 044).
+  api.get('/impact', async (c) => {
+    const from = timeOf(c.req.query('from') ?? '');
+    const to = timeOf(c.req.query('to') ?? '');
+    if (!from || !to || to <= from)
+      return c.json({ error: 'from and to are ISO times, to after from.' }, 400);
+    return c.json(
+      await as(c, (tx) =>
+        impactOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+          { from, to },
+        ),
+      ),
+    );
+  });
+  api.post('/replan', async (c) => {
+    const body = z
+      .object({
+        from: z.string().min(10),
+        to: z.string().min(10),
+        dryRun: z.boolean().default(true),
+      })
+      .parse(await c.req.json());
+    const from = timeOf(body.from.length === 10 ? `${body.from}T00:00` : body.from);
+    const to = timeOf(body.to.length === 10 ? `${body.to}T00:00` : body.to);
+    if (!from || !to || to <= from)
+      return c.json({ error: 'from and to are ISO days, to after from.' }, 400);
+    return c.json(
+      await act(c, (tx, actor, space) => replan(tx, actor, space, { from, to }, body.dryRun)),
+    );
+  });
 
   // Her review (spec 043): the mirror of a period (the last seven days by default), and keeping it.
   api.get('/review', async (c) => {

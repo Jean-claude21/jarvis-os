@@ -59,6 +59,7 @@ describe('Jarvis’s method on connection (story 3)', () => {
         'page',
         'query',
         'read_document',
+        'replan',
         'routine',
         'save',
         'show_entry',

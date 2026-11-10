@@ -120,3 +120,27 @@ describe('her review through Claude (spec 043)', () => {
     expect(kept.value.entries).toHaveLength(2);
   });
 });
+
+describe('what it changes, through Claude (spec 044)', () => {
+  it('says what a new time collides with, and proposes to replan an absence', async () => {
+    const ama = await signUp('Ama');
+    const claude = await connect(ama);
+    await claude.call('save', {
+      entries: [
+        { kind: 'Event', title: 'Dentiste', data: { start: '2027-03-10T10:00', duration: 60 } },
+      ],
+    });
+    const saved = await claude.call<{ changes: { conflicts: { title: string }[] }[] }>('save', {
+      entries: [
+        { kind: 'Event', title: 'Coiffeur', data: { start: '2027-03-10T10:30', duration: 60 } },
+      ],
+    });
+    expect(saved.value.changes[0]!.conflicts.map((one) => one.title)).toEqual(['Dentiste']);
+    const proposed = await claude.call<{
+      applied: boolean;
+      steps: { title: string; does: string }[];
+    }>('replan', { from: '2027-03-09', to: '2027-03-12' });
+    expect(proposed.value.applied).toBe(false);
+    expect(proposed.value.steps.map((one) => one.does)).toEqual(['to_reschedule', 'to_reschedule']);
+  });
+});

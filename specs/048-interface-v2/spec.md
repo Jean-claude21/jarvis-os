@@ -59,3 +59,25 @@ When nothing is kept yet: her spaces, what she already has, her connections, her
 A tab bar under the thumb: Maintenant · Agenda · Noter (a few words kept at once) · À ranger · Menu.
 
 **Proof**: each screen seen on dev through ngrok at the three widths; `apps/api/tests/platform.test.ts`; `packages/core/tests/inbox.test.ts` (the account linked or waited for).
+
+## I1 — The review, complete (P1)
+
+Beyond the mirror, her goals, what comes back, her questions and her decisions: her habits day by day (done, missed, not planned, the streak), her time planned and actual (what repeats with a duration, its occurrences marked done), her money out by fund or category against the three periods before, her commitments of the period (done, late, ahead), her people (what was linked to them), what she said (her captures, journal, notes) — each computed from her entries.
+
+## I6 — Routines (P1)
+
+An app that holds habits (the Routines app, or her habits held by no app, shown as « Routines ») opens on « Aujourd’hui » (the non-negotiables to check — a check-in linked to the habit —, the day from her agenda, the 7-day consistency, the longest streak), « Habitudes » (cadence, time, non-negotiable, streak, 30 days) and « Régularité » (the last 28 days, the daily rate, what slips and on which weekday). A Habit's five-field cadence (`repeat`) says its days.
+
+## I13 — The catalog of the mockup (P1)
+
+Shipped next to Finances and Routines: Santé, Projets, Relations, Lecture, Maison, Garanties, Journal — each with its models, its page, its role; each installs next to the others and every block of its pages computes. New common types: Note, Project, Habit, Treatment.
+
+## Drawers (P1)
+
+« Ajouter un mouvement »: drawn from her model of « Transaction » (a field it lacks is not asked; a required account has no empty choice, and when she has none she is told), with a warning when the fund goes over, and the receipt kept with it. A routine opens in five parts: trigger, preparation (no AI), instructions, references, result.
+
+## Telegram voice notes (P2)
+
+A voice note sent to the bot is written down (OpenAI, when its key is set) and kept in her inbox as her words; without the key, or when it fails, she is asked to type it.
+
+**Proof (this batch)**: `packages/core/tests/review.test.ts`, `packages/core/tests/habit-board.test.ts`, `apps/api/tests/shipped-apps.test.ts`, `apps/api/tests/voice.test.ts`; every screen on dev through ngrok at 1366, 768 and 390 (no horizontal scroll).

@@ -47,60 +47,48 @@ const escape = (text: string) => text.replace(/[&<>"']/g, (char) => `&#${char.ch
 /** Her web account: the shell; every page is drawn by the script from `/api`. */
 export function appPage(lang: Lang): string {
   const words = appWords[lang];
-  const link = (hash: string, key: keyof typeof words, icon: string, count = '') =>
-    `<a class="navi" href="#/${hash}" data-page="${key}">${icon}<span>${escape(words[key])}</span>${count}</a>`;
-  // The mockup's icons (its sprite), for the screens of plan v2.
+  // The mockup's icons (its sprite).
   const use = (id: string) => `<svg class="i"><use href="#${id}"/></svg>`;
   return `<!doctype html>
 <html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escape(words.brand)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Instrument+Sans:wght@400;600&family=JetBrains+Mono:wght@600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
 <style>${brandCss}${appCss}${v2Css}
 svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-button.navi { width: 100%; background: none; font: inherit; cursor: pointer; text-align: left; }</style></head>
-<body><div class="shell">
-<aside class="sidebar">
-  <div class="brand"><i>J</i><select id="space" aria-label="${escape(words.space)}"></select></div>
-  <input class="search-box" id="search" type="search" placeholder="${escape(words.search)}">
-  <nav class="navg"><div class="caps">${escape(words.navDaily)}</div>
-    ${link('', 'navNow', ICONS.now)}
-    ${link('agenda', 'navAgenda', ICONS.agenda)}
-    ${link('ranger', 'navToSort', use('i-box'), '<span class="n hot" id="n-ranger" hidden></span>')}
-    ${link('revue', 'navReview', use('i-eye'))}
-  </nav>
-  <nav class="navg"><div class="caps">${escape(words.navLife)}</div>
-    ${link('personnes', 'navPeople', use('i-person'))}
-    ${link('vie', 'navEntries', ICONS.life)}
-    ${link('documents', 'navDocuments', ICONS.documents)}
-    ${link('tableaux', 'navDashboards', ICONS.dashboards)}
-  </nav>
-  <nav class="navg" id="apps"></nav>
-  <nav class="navg" id="spaces-nav"></nav>
-  <div class="profile">
-    <details><summary class="navi">${ICONS.more}<span>${escape(words.navSettings)}</span></summary>
-      <div class="more">
-        ${link('journal', 'navJournal', ICONS.journal)}
-        ${link('rappels', 'navReminders', ICONS.reminders)}
-        ${link('collections', 'navModels', use('i-shape'))}
-        ${link('espaces', 'navSpaces', ICONS.spaces)}
-        ${link('connexions', 'navConnections', ICONS.connections)}
-        ${link('donnees', 'navData', ICONS.data)}
-        ${link('compte', 'navAccount', ICONS.account)}
-        <button class="navi" id="theme" type="button">${use('i-moon')}<span>${escape(words.navTheme)}</span></button>
-      </div>
-    </details>
-    <div class="who" id="who"></div>
-  </div>
-</aside>
-<div class="frame">
-  <header class="topbar">
-    <button class="quiet" id="menu" aria-label="${escape(words.menu)}">☰</button>
-    <h1 id="title"></h1>
-    <span class="chip-now" id="clock"></span>
-  </header>
-  <main class="page" id="page"><p class="empty">${escape(words.loading)}</p></main>
-</div>
+.v2 #space-menu { position: absolute; top: 58px; left: 12px; right: 12px; z-index: 30; }
+.v2 .side { position: relative; }
+.v2 .chip-now::before { content: none; display: none; }</style></head>
+<body class="v2">
+<div class="app">
+  <aside class="side" id="side">
+    <button class="switcher" id="switcher" type="button" aria-haspopup="menu" title="${escape(words.space)}">
+      <span class="logo">J</span><span><b>${escape(words.brand)}</b><small id="space-name"></small></span>${use('i-updown')}
+    </button>
+    <div class="menu" id="space-menu" role="menu"></div>
+    <label class="search">${use('i-search')}<input id="search" placeholder="${escape(words.v2searchOrNote)}" aria-label="${escape(words.v2searchOrNote)}" autocomplete="off"><span class="kbd">Ctrl K</span></label>
+    <nav id="nav"></nav>
+    <div class="grow"></div>
+    <div class="menu" id="me-menu" role="menu">
+      <button data-go="#/collections">${use('i-shape')}${escape(words.navModels)}</button>
+      <button data-go="#/connexions">${use('i-plug')}${escape(words.navConnections)}</button>
+      <button data-go="#/donnees">${use('i-box')}${escape(words.navData)}</button>
+      <button data-go="#/espaces">${use('i-person')}${escape(words.navSpaces)}</button>
+      <button data-go="#/compte">${use('i-gear')}${escape(words.navAccount)}</button>
+      <button id="theme" type="button">${use('i-moon')}${escape(words.v2themeToggle)}</button>
+    </div>
+    <button class="me" id="me" type="button" aria-haspopup="menu"><span class="avatar" id="me-initials"></span><span><b id="me-name"></b><small id="me-sub"></small></span>${use('i-updown')}</button>
+  </aside>
+  <main>
+    <header class="topbar">
+      <button class="icon-btn only-mobile" id="open-side" type="button" aria-label="${escape(words.menu)}">${use('i-menu')}</button>
+      <div class="crumbs" id="crumbs"></div>
+      <span class="chip-now mono"><span class="live"></span><span id="clock"></span></span>
+      <button class="icon-btn" id="open-journal" type="button" aria-label="${escape(words.navJournal)}">${use('i-history')}</button>
+      <button class="icon-btn" id="open-bell" type="button" aria-label="${escape(words.v2notifications)}">${use('i-bell')}<span class="pip" id="pip" style="display:none"></span></button>
+    </header>
+    <div class="page v2" id="page"><div class="empty">${escape(words.loading)}</div></div>
+  </main>
 </div>
 <nav class="x-tabbar" aria-label="${escape(words.navDaily)}">
   <a href="#/" data-tab="">${use('i-now')}${escape(words.navNow)}</a>
@@ -110,6 +98,7 @@ button.navi { width: 100%; background: none; font: inherit; cursor: pointer; tex
   <button type="button" id="tab-menu">${use('i-menu')}${escape(words.navMenu)}</button>
 </nav>
 ${SPRITE}
+<div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" role="dialog" aria-modal="true"></aside>
 <div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo">${escape(words.undo)}</button></div>
 <script>

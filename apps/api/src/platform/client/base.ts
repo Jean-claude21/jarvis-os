@@ -56,12 +56,19 @@ function frame(src) {
 
 // The drawer, the toast and an undo for what was just done (spec 013).
 const drawer = () => document.getElementById('drawer');
-function openDrawer(title, body, foot) {
-  drawer().innerHTML = '<div class="dh"><h2>' + esc(title) + '</h2><button class="quiet" data-close>✕</button></div><div class="db">' + body + '</div>' + (foot ? '<div class="df">' + foot + '</div>' : '');
+// The drawer of the mockup: its title and a line under it, what it holds, its gestures at the foot.
+function openDrawer(title, body, foot, sub) {
+  drawer().innerHTML = '<div class="drawer-head"><div><h2>' + esc(title) + '</h2>' + (sub ? '<span class="muted" style="font-size:12px">' + esc(sub) + '</span>' : '') + '</div><button class="icon-btn" data-close aria-label="' + esc(W.close || '×') + '"><svg class="i"><use href="#i-x"/></svg></button></div>' +
+    '<div class="pad" style="display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex:1;min-height:0">' + body + '</div>' + (foot ? '<div class="drawer-foot">' + foot + '</div>' : '');
   drawer().classList.add('open');
+  document.getElementById('scrim').classList.add('open');
   drawer().querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', closeDrawer));
 }
-function closeDrawer() { drawer().classList.remove('open'); }
+function closeDrawer() {
+  drawer().classList.remove('open');
+  const side = document.getElementById('side');
+  if (!side || !side.classList.contains('open')) { const scrim = document.getElementById('scrim'); if (scrim) scrim.classList.remove('open'); }
+}
 let toastTimer; let lastDone = null;
 function toast(text, undoable) {
   document.getElementById('toast-text').textContent = text;
@@ -83,7 +90,8 @@ function dayLater(text) {
   const next = new Date(Date.UTC(d[0], d[1] - 1, d[2] + 1)).toISOString().slice(0, 10);
   return next + String(text).slice(10);
 }
-const clock = () => { const el = document.getElementById('clock'); if (el) el.textContent = new Date().toLocaleString(locale, { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).toUpperCase(); };
+// « MAR. 10 NOV · 15:52 », as the mockup's top bar says it.
+const clock = () => { const el = document.getElementById('clock'); if (!el) return; const d = new Date(); el.innerHTML = '<span class="hide-s">' + esc(d.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' }).toUpperCase().replace(/[.,]/g, '') + ' · ') + '</span>' + esc(d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })); };
 setInterval(clock, 30000);
 let pick = null;
 // The views she is exploring, by kind or kept view; the one on screen.
@@ -102,14 +110,15 @@ async function drawApps() {
   await prefsNow();
   const pins = (prefs && Array.isArray(prefs.pinned) ? prefs.pinned : []).filter((a) => all.includes(a));
   const apps = pins.length ? pins : all;
-  // Apps grouped by the area she files them in (spec 015); those not filed last.
-  const groups = {};
-  for (const a of apps) (groups[areaOfApp(kinds, a) || ''] = groups[areaOfApp(kinds, a) || ''] || []).push(a);
-  const names = Object.keys(groups).sort((x, y) => (x === '') - (y === '') || x.localeCompare(y));
-  const link = (a) => '<a class="navi" data-app="' + esc(encodeURIComponent(a)) + '" href="#/app/' + esc(encodeURIComponent(a)) + '"><span class="app-dot">' + esc(a.slice(0, 1).toUpperCase()) + '</span><span>' + esc(a) + '</span></a>';
-  document.getElementById('apps').innerHTML = '<div class="caps">' + esc(W.navApps) + '</div>' +
-    (pins.length ? pins.map(link).join('') : names.length === 1 && names[0] === '' ? groups[''].map(link).join('') : names.map((n) => '<details class="area" open><summary class="caps">' + esc(n || W.unfiled) + '</summary>' + groups[n].map(link).join('') + '</details>').join('')) +
-    '<a class="navi ghost" href="#/apps">' + ICON_PLUS + '<span>' + esc(W.navAllApps) + '</span></a>';
+  navApps = apps;
+  // Her counts beside « Personnes », « Entrées », « Tableaux de bord ».
+  const person = kinds.find((k) => k.kind === 'Person');
+  navCounts.people = person && person.count ? num(person.count) : '';
+  navCounts.entries = num(kinds.reduce((a, k) => a + (['Model', 'Rule', 'Script', 'Page', 'View', 'App', 'Channel'].includes(k.kind) ? 0 : k.count || 0), 0));
+  navCounts.boards = appPages.filter((p) => !p.app).length || '';
+  const [path] = location.hash.replace(/^#[/]?/, '').split('?');
+  const [name, id] = path.split('/');
+  if (typeof drawNav === 'function') drawNav(pages[name] ? name : '', id ? decodeURIComponent(id) : undefined);
 }
 
 // A kind whose model links it, or that other models link to (spec 014): its record page shows them.

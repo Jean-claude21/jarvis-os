@@ -173,7 +173,7 @@ async function answer(q) {
       '<p class="context" style="margin:0">' + esc(say(a.currency ? W.v2answerSum : W.v2answerCount, { n: a.count })) + (diff !== null ? ' <b>' + esc(say(diff >= 0 ? W.v2moreThan : W.v2lessThan, { n: Math.abs(diff), before: value(a.previous) })) + '</b>' : '') + '</p>' +
       (a.weeks.length ? '<div class="x-cmp">' + a.weeks.map((w) => '<span>' + esc(day(w.from)) + '</span><div class="bars"><i class="real" style="width:' + (w.value / max) * 100 + '%"></i></div><span class="v">' + esc(value(w.value)) + '</span>').join('') + '</div>' : '') +
       (a.top.length ? '<div class="scroll"><table><thead><tr><th>' + esc(a.currency ? W.v2largest : W.v2latest) + '</th><th class="n">' + esc(a.currency ? W.v2amount : W.v2day) + '</th></tr></thead><tbody>' + a.top.map((t) => '<tr><td><a href="#/entree/' + esc(t.id) + '">' + esc(t.title) + '</a> <span class="cell-sub">· ' + esc(day(t.day)) + '</span></td><td class="n">' + esc(a.currency ? value(t.value) : day(t.day)) + '</td></tr>').join('') + '</tbody></table></div>' : '') + '</div>',
-      '<a class="btn" href="#/vie?q=' + encodeURIComponent(a.question.words.join(' ')) + '">' + esc(W.v2seeEntries) + '</a><button class="primary" data-close>' + esc(W.v2understood2) + '</button>');
+      '<a class="btn" href="#/vie?q=' + encodeURIComponent(a.question.words.join(' ')) + '">' + esc(W.v2seeEntries) + '</a><button class="btn solid" data-close>' + esc(W.v2understood2) + '</button>');
   } catch (error) { alert(error.message); }
 }
 `;

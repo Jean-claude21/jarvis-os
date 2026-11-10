@@ -166,4 +166,63 @@ function bindV2(root) {
     run(keep, () => api(inSpace('/review'), { method: 'POST', body: { title: say(W.v2reviewTitle, { from: day(from), to: day(to) }), from, to, answers, decisions } }), W.v2reviewKept);
   });
 }
+
+// The journal (the mockup's top bar): each change of her space, who made it, and its undoing.
+async function journalDrawer() {
+  try {
+    const hist = await api(inSpace('/history?limit=40'));
+    const who = (h) => h.client || (h.actor === me.person.id ? W.v2you : h.actor);
+    openDrawer(W.navJournal, '<ul class="journal">' + hist.map((h) => '<li class="' + (h.undoneBy ? 'undone' : '') + '"><time>' + esc(new Date(h.at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })) + '</time><span>' + esc(said(h.command)) + (h.after && h.after.title ? ' · ' + esc(h.after.title) : h.before && h.before.title ? ' · ' + esc(h.before.title) : '') + '<small>' + esc(say(W.by, { who: who(h), door: h.door })) + ' · ' + esc(day(h.at)) + '</small></span>' + (h.undoneBy || h.command === 'journal.undo' ? '' : '<button class="undo" data-undo="' + h.id + '">' + esc(W.undo) + '</button>') + '</li>').join('') + '</ul>', '', W.v2journalSub);
+    drawer().querySelectorAll('[data-undo]').forEach((b) => b.addEventListener('click', async () => {
+      b.disabled = true;
+      try { await api(inSpace('/undo'), { method: 'POST', body: { journalId: Number(b.dataset.undo) } }); toast(W.undoneToast, null); journalDrawer(); show(); } catch (error) { b.disabled = false; alert(error.message); }
+    }));
+  } catch (error) { alert(error.message); }
+}
+
+// The bell: what went wrong or is late, and what Jarvis sent her these days.
+async function bellDrawer() {
+  try {
+    const [now, out] = await Promise.all([api('/now'), api('/outbox?days=7').catch(() => [])]);
+    const urgent = now.items.filter((i) => i.group === 'fix' || i.group === 'late');
+    openDrawer(W.v2notifications, (urgent.length ? '<div class="x-rel">' + urgent.map((i) => '<a href="#/entree/' + esc(i.id) + '">' + ic(i.group === 'fix' ? 'i-alert' : 'i-bell', 'color:' + (i.group === 'fix' ? 'var(--error)' : 'var(--verify)')) + '<span><b>' + esc(i.title) + '</b> <em>· ' + esc(W['g_' + i.group]) + (i.when ? ' · ' + esc(time(i.when)) : '') + '</em></span></a>').join('') + '</div>' : '<div class="muted">' + esc(W.allClear) + '</div>') +
+      '<div class="caps">' + esc(W.v2sentByJarvis) + '</div>' + (out.length ? '<ul class="journal">' + out.slice(0, 20).map((m) => '<li><time>' + esc(new Date(m.createdAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })) + '</time><span>' + esc(m.subject || m.kind) + '<small>' + esc(m.channel) + ' · ' + esc(W['st_' + m.state] || m.state) + ' · ' + esc(day(m.createdAt)) + '</small></span></li>').join('') + '</ul>' : '<div class="muted">' + esc(W.v2nothingSent) + '</div>'), '', W.v2bellSub);
+    drawer().querySelectorAll('a[href^="#/"]').forEach((a) => a.addEventListener('click', closeDrawer));
+  } catch (error) { alert(error.message); }
+}
+
+// « Chercher ou noter »: what Jarvis understood of her words — its kind, its title, an amount, a
+// day; kept as it is to file later, or saved now.
+function captureDrawer(text) {
+  const amount = (text.match(/[0-9][0-9 .]{2,}/) || [''])[0].replace(/[ .]/g, '');
+  const kinds = knownKinds.filter((k) => k.model && !['Model', 'Rule', 'Script', 'Page', 'View', 'App', 'Channel', 'Capture', 'Reminder', 'Comment', 'Proposal'].includes(k.kind));
+  const guess = amount ? 'Transaction' : /(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|demain|aujourd|ce soir|[0-9]h)/i.test(text) ? 'Event' : 'Note';
+  const options = [...new Set([guess, 'Transaction', 'Event', 'Task', 'Note', 'Person'].concat(kinds.map((k) => k.kind)))];
+  const field = (label, html) => '<label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + label + html + '</label>';
+  openDrawer(W.v2understoodTitle,
+    field(esc(W.v2kind) + ' <small class="muted">' + esc(W.v2fromModels) + '</small>', '<select class="field" id="cap-kind">' + options.map((k) => '<option value="' + esc(k) + '"' + (k === guess ? ' selected' : '') + '>' + esc(kindName(k)) + '</option>').join('') + '</select>') +
+    field(esc(W.title), '<input class="field" id="cap-title" value="' + esc(text.replace(/[0-9][0-9 .]{2,}/, '').replace(/ +/g, ' ').trim() || text) + '">') +
+    (amount ? field(esc(W.v2amount), '<input class="field mono" id="cap-amount" inputmode="numeric" value="' + esc(amount) + '">') : '') +
+    field(esc(W.space), '<select class="field" id="cap-space">' + me.spaces.map((x) => '<option value="' + esc(x.id) + '"' + (x.id === space ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select>') +
+    '<a class="muted" href="#/vie?q=' + encodeURIComponent(text) + '" data-close style="font-size:13px">' + ic('i-search') + ' ' + esc(say(W.v2searchFor, { q: text })) + '</a>',
+    '<button class="btn" id="cap-box">' + ic('i-box') + esc(W.v2putToSort) + '</button><button class="btn solid" id="cap-save">' + ic('i-check') + esc(W.v2save) + '</button>', '« ' + text + ' »');
+  const where = () => document.getElementById('cap-space').value;
+  document.getElementById('cap-box').addEventListener('click', async () => {
+    try { await api('/inbox?space=' + encodeURIComponent(where()), { method: 'POST', body: { text } }); closeDrawer(); document.getElementById('search').value = ''; toast(W.v2kept, null); counts(); } catch (error) { alert(error.message); }
+  });
+  document.getElementById('cap-save').addEventListener('click', async () => {
+    const kind = document.getElementById('cap-kind').value;
+    const amountEl = document.getElementById('cap-amount');
+    const data = {};
+    if (amountEl && amountEl.value) { data.amount = Number(amountEl.value.replace(/[^0-9.]/g, '')); if (kind === 'Transaction') { data.direction = 'out'; data.date = new Date().toISOString().slice(0, 10); } }
+    if (kind === 'Event') data.start = text;
+    if (kind === 'Task') data.due = text;
+    try {
+      const saved = await api('/save?space=' + encodeURIComponent(where()), { method: 'POST', body: { entries: [{ kind, title: document.getElementById('cap-title').value.trim() || text, data, origin: 'said' }] } });
+      closeDrawer(); document.getElementById('search').value = '';
+      toast(W.v2savedToast, { id: saved.entries[0].id, spaceId: where() });
+      location.hash = '#/entree/' + saved.entries[0].id;
+    } catch (error) { alert(error.message); }
+  });
+}
 `;

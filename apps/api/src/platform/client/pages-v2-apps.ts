@@ -90,7 +90,7 @@ function bindApps(root) {
       if (r.reuse && r.reuse.length) rows.push([W.v2reused, r.reuse.map((x) => '<span class="tag info">' + esc(W.v2yours) + '</span> ' + esc(say(W.v2reuseLine, { from: x.from, to: kindName(x.to), n: x.count }))).join(' · ')]);
       if (r.kept && r.kept.length) rows.push([W.v2alreadyThere, esc(say(W.installKept, { n: r.kept.length }))]);
       openDrawer(say(W.installWhat, { app: name }), '<div class="v2"><div class="scroll"><table><tbody>' + rows.map((x) => '<tr><td><b>' + esc(x[0]) + '</b></td><td>' + x[1] + '</td></tr>').join('') + '</tbody></table></div><div class="hint" style="margin-top:12px">' + ic('i-plug') + '<span>' + W.v2installHint + '</span></div><p class="error-text" id="i__error"></p></div>',
-        '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button class="primary" id="i__go">' + esc(W.install) + '</button>');
+        '<button class="btn" data-close>' + esc(W.cancel) + '</button><button class="btn solid" id="i__go">' + esc(W.install) + '</button>');
       document.getElementById('i__go').addEventListener('click', async () => {
         try {
           await api(inSpace('/apps/install'), { method: 'POST', body: { name, dryRun: false } });
@@ -105,7 +105,7 @@ function bindApps(root) {
     try {
       const tried = await api(inSpace('/apps/remove'), { method: 'POST', body: { name, dryRun: true } });
       openDrawer(say(W.v2removeWhat, { app: name }), '<p>' + esc(W.v2removeKeeps) + '</p><ul class="list">' + tried.result.removed.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' + (tried.result.kept.length ? '<p class="muted">' + esc(say(W.v2removeKept, { list: tried.result.kept.join(', ') })) + '</p>' : ''),
-        '<button class="quiet" data-close>' + esc(W.cancel) + '</button><button class="primary" id="r__go">' + esc(W.v2remove) + '</button>');
+        '<button class="btn" data-close>' + esc(W.cancel) + '</button><button class="btn solid" id="r__go">' + esc(W.v2remove) + '</button>');
       document.getElementById('r__go').addEventListener('click', async () => {
         try { await api(inSpace('/apps/remove'), { method: 'POST', body: { name, dryRun: false } }); closeDrawer(); toast(say(W.v2removed, { app: name }), null); await drawApps(); location.hash = '#/apps'; } catch (error) { alert(error.message); }
       });

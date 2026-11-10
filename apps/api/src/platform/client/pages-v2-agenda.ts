@@ -153,7 +153,7 @@ function bindAgenda(root) {
 
 // Something new in her agenda, from a time: its title, its hour, how long; saved as an event.
 function newEvent(start) {
-  openDrawer(W.v2newEvent, '<div style="display:grid;gap:14px">' + [[W.title, '<input class="field" id="ne-title" autocomplete="off">'], [W.when, '<input class="field" id="ne-start" type="datetime-local" value="' + esc(start) + '">'], [W.v2duration, '<input class="field" id="ne-dur" type="number" min="5" step="5" value="60">']].map((f) => '<label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(f[0]) + f[1] + '</label>').join('') + '</div>', '<button class="primary" id="ne-save">' + esc(W.v2keep) + '</button>');
+  openDrawer(W.v2newEvent, '<div style="display:grid;gap:14px">' + [[W.title, '<input class="field" id="ne-title" autocomplete="off">'], [W.when, '<input class="field" id="ne-start" type="datetime-local" value="' + esc(start) + '">'], [W.v2duration, '<input class="field" id="ne-dur" type="number" min="5" step="5" value="60">']].map((f) => '<label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(f[0]) + f[1] + '</label>').join('') + '</div>', '<button class="btn solid" id="ne-save">' + esc(W.v2keep) + '</button>');
   document.getElementById('ne-title').focus();
   document.getElementById('ne-save').addEventListener('click', async () => {
     const title = document.getElementById('ne-title').value.trim();

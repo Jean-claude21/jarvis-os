@@ -3,3 +3,5 @@ pnpm-lock.yaml
 .specify/
 .claude/
 apps/api/netlify/.build/
+# J-C's mockup, kept exactly as he made it (the design).
+docs/design/jarvis-v2.html

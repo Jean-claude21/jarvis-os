@@ -1,4 +1,5 @@
 import { withWho } from './who';
+import { appLines, appsOf, bridgesOf } from '@jarvis-os/core';
 import {
   comment,
   commentsOf,
@@ -10,6 +11,8 @@ import {
   patternsOf,
   personCard,
   decide,
+  OCCURRENCE_STATES,
+  setOccurrence,
   toSortOf,
   timeOf,
 } from '@jarvis-os/core';
@@ -101,7 +104,7 @@ import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type pg from 'pg';
 import { z } from 'zod';
-import { shippedApp, shippedApps } from './apps';
+import { shippedApp, shippedApps, shippedRoles } from './apps';
 import { telegramLink } from './telegram';
 import { briefText, channelOf, sendTelegram } from './watcher';
 import type { Auth } from './auth';
@@ -536,6 +539,21 @@ export function apiRoutes(deps: {
     c.json(shippedApps.map((one) => ({ app: one.app, description: one.description ?? '' }))),
   );
 
+  // Her apps in this space (I6, I7): each with its role, the line her assistants read, and the
+  // bridges among them.
+  api.get('/apps/mine', async (c) =>
+    c.json(
+      await act(c, async (tx, _a, space) => {
+        const apps = await appsOf(tx, space, shippedRoles);
+        const lines = appLines(apps, 'fr');
+        return {
+          apps: apps.map((one, at) => ({ ...one, line: lines[at] })),
+          bridges: await bridgesOf(tx, space),
+        };
+      }),
+    ),
+  );
+
   api.post('/apps/install', async (c) => {
     const body = (await c.req.json()) as { name?: string; dryRun?: boolean };
     const bundle = shippedApp(String(body.name ?? ''));
@@ -626,6 +644,25 @@ export function apiRoutes(deps: {
             ? { entries: await withWho(deps.db, tx, space, actor.person, body.entries) }
             : {}),
         }),
+      ),
+    );
+  });
+
+  // One occurrence of a repetition (spec 036): done, missed, postponed to a time, cancelled, or back.
+  api.post('/entries/:id/occurrences/:day', async (c) => {
+    const body = z
+      .object({
+        status: z.enum(OCCURRENCE_STATES).nullable().optional(),
+        at: z.string().min(10).max(40).nullable().optional(),
+      })
+      .parse(await c.req.json());
+    const change =
+      body.status === null && !body.at
+        ? null
+        : { ...(body.status ? { status: body.status } : {}), ...(body.at ? { at: body.at } : {}) };
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        setOccurrence(tx, actor, space, c.req.param('id'), c.req.param('day'), change),
       ),
     );
   });

@@ -46,21 +46,24 @@ export async function personCard(
         and jarvis_fold(e.kind) not in ('model', 'rule', 'reminder', 'comment')
         and (exists (select 1 from link l where (l.from_id = e.id and l.to_id = $2)
                                             or (l.from_id = $2 and l.to_id = e.id))
-             or (length($3) >= 3 and jarvis_fold(e.title || ' ' || e.data::text) like '%' || jarvis_fold($3) || '%'))
+             or (length($3) >= 3 and jarvis_fold(e.title || ' ' || e.data::text) ~ ('\\m' || regexp_replace(jarvis_fold($3), '[^[:alnum:] ]', '', 'g') || '\\M')))
       order by 6 desc limit 300`,
     [spaceId, id, person.title],
   );
   const today = now.toISOString().slice(0, 16);
   const open = (status: string | null) => !status || !CLOSED.has(status.toLowerCase());
   const doing = (kind: string) => /^(task|intention)$/i.test(kind);
+  // Another person linked to them is not a time they met.
+  const event = (kind: string) => !/^(person|capture)$/i.test(kind);
   // What happened with them: a dated thing (a capture is what she said, not a meeting).
-  const past = rows.filter(
-    (one) => one.on <= today && !doing(one.kind) && !/^capture$/i.test(one.kind),
-  );
+  const past = rows.filter((one) => one.on <= today && !doing(one.kind) && event(one.kind));
   const ahead = rows
     .filter(
       (one) =>
-        one.timed && one.on > today && open(one.status) && !/^(intention|capture)$/i.test(one.kind),
+        one.timed &&
+        one.on > today &&
+        open(one.status) &&
+        !/^(intention|capture|person)$/i.test(one.kind),
     )
     .sort((a, b) => a.on.localeCompare(b.on));
   const kinds = new Map<string, { id: string; title: string }[]>();

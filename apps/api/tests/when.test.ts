@@ -208,3 +208,24 @@ describe('a structured routine through Claude (spec 047)', () => {
     expect(Object.keys(follow.value.prepared)).toEqual(['agenda_today', 'mirror_day']);
   });
 });
+
+describe('one occurrence from her agenda (spec 036, I2)', () => {
+  it('marks a day done, then puts it back', async () => {
+    const ama = await signUp('Ama');
+    const saved = await ama.json<{ entries: { id: string }[] }>('/api/save', {
+      entries: [{ kind: 'Event', title: 'Sport', data: { repeat: '0 7 * * *' } }],
+    });
+    const id = saved.body.entries[0]!.id;
+    const done = await ama.json(`/api/entries/${id}/occurrences/2027-01-04`, { status: 'done' });
+    expect(done.status).toBe(200);
+    const entry = await ama.json<{ data: { occurrences: unknown } }>(`/api/entries/${id}`);
+    expect(entry.body.data.occurrences).toEqual({ '2027-01-04': { status: 'done' } });
+    await ama.json(`/api/entries/${id}/occurrences/2027-01-04`, { status: null });
+    const back = await ama.json<{ data: { occurrences: unknown } }>(`/api/entries/${id}`);
+    expect(back.body.data.occurrences).toEqual({});
+    const wrong = await ama.json<{ error: string }>(`/api/entries/${id}/occurrences/demain`, {
+      status: 'done',
+    });
+    expect(wrong.status).toBe(400);
+  });
+});

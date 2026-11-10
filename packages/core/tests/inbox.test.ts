@@ -67,7 +67,7 @@ describe('her inbox', () => {
     ]);
 
     const sure = await ama.as((tx) => fileSure(tx, ama.actor, ama.space));
-    expect(sure).toEqual({ filed: ["J'ai payé le taxi 2 000 F en cash"], left: 1 });
+    expect(sure).toEqual({ filed: ["J'ai payé le taxi 2 000 F en cash"], left: 1, waiting: [] });
     const [movement] = await ama.as((tx) => find(tx, ama.space, { kind: 'Transaction' }));
     expect(movement!.data).toMatchObject({
       amount: 2000,
@@ -90,6 +90,46 @@ describe('her inbox', () => {
       ]),
     );
     expect(rows.map((one) => one.role)).toEqual(['from_capture']);
+  });
+
+  it('links the account her model asks for, or leaves it to file and says why', async () => {
+    const kofi = await person('Kofi');
+    await kofi.as((tx) =>
+      save(tx, kofi.actor, kofi.space, {
+        entries: [
+          { kind: 'Model', title: 'Account', data: { fields: [{ name: 'type', type: 'text' }] } },
+          {
+            kind: 'Model',
+            title: 'Transaction',
+            data: {
+              fields: [
+                { name: 'amount', type: 'amount', required: true },
+                { name: 'date', type: 'date' },
+                { name: 'direction', type: 'choice', options: ['in', 'out'] },
+                { name: 'account', type: 'link', target: 'Account', required: true },
+                { name: 'note', type: 'text' },
+              ],
+            },
+          },
+          { kind: 'Account', title: 'Espèces', data: { type: 'cash' } },
+          { kind: 'Account', title: 'Ecobank', data: { type: 'bank' } },
+        ],
+      }),
+    );
+    for (const text of ["J'ai payé le taxi 2 000 F en cash", 'Payé le pain 500 F']) {
+      await kofi.as((tx) => capture(tx, kofi.actor, kofi.space, { text, source: 'app', words }));
+    }
+    const sure = await kofi.as((tx) => fileSure(tx, kofi.actor, kofi.space));
+    expect(sure.filed).toEqual(["J'ai payé le taxi 2 000 F en cash"]);
+    expect(sure.waiting).toEqual([{ title: 'Payé le pain 500 F', needs: 'account' }]);
+    const [move] = await kofi.as((tx) => find(tx, kofi.space, { kind: 'Transaction' }));
+    const { rows } = await kofi.as((tx) =>
+      tx.query<{ title: string }>(
+        `select e.title from link l join entry e on e.id = l.to_id where l.from_id = $1 and l.role = 'account'`,
+        [move!.id],
+      ),
+    );
+    expect(rows.map((one) => one.title)).toEqual(['Espèces']);
   });
 
   it('finds whose a Telegram chat is: her own space', async () => {

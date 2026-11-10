@@ -148,14 +148,42 @@ export async function fileCapture(
 
 /**
  * Everything sure filed at once: a capture that one app claims, with an amount, becomes a movement
- * of money of that app (`Transaction`, out unless it says « reçu »), linked to its capture. The
- * rest stays to file.
+ * of money of that app (`Transaction`, out unless it says « reçu »), linked to its capture. When her
+ * model asks for a link (its account), Jarvis links the one she named (by its type or its name), or
+ * her only one; when it cannot tell, the capture stays to file, and says what it waits for.
  */
 export async function fileSure(tx: Tx, actor: Actor, spaceId: string) {
   const filed: string[] = [];
+  const waiting: { title: string; needs: string }[] = [];
   // Its model, when her space has one: what it does not know goes into the note.
   const model = await modelOf(tx, spaceId, 'Transaction');
   const known = model ? new Set(model.fields.map((field) => field.name)) : null;
+  const required = (model?.fields ?? []).filter(
+    (field) => field.type === 'link' && field.required && 'target' in field && field.target,
+  ) as { name: string; target: string }[];
+  const targets = new Map<string, Entry[]>();
+  for (const field of required)
+    targets.set(field.name, await find(tx, spaceId, { kind: field.target, limit: 100 }));
+  const fold2 = (text: unknown) => fold(String(text ?? ''));
+  const pickOne = (field: string, hint: string | undefined): Entry | null => {
+    const all = targets.get(field) ?? [];
+    if (all.length === 1) return all[0]!;
+    if (!hint) return null;
+    const words =
+      hint === 'mobile_money'
+        ? ['mobile', 'money', 'flooz', 'tmoney', 'wave', 'momo']
+        : hint === 'cash'
+          ? ['cash', 'especes', 'liquide', 'caisse']
+          : ['banque', 'bank', 'carte', 'compte'];
+    const found = all.filter(
+      (one) =>
+        fold2(one.data.type) === hint ||
+        words.some(
+          (word) => fold2(one.title).includes(word) || fold2(one.data.type).includes(word),
+        ),
+    );
+    return found.length === 1 ? found[0]! : null;
+  };
   const fit = (data: Record<string, unknown>) => {
     if (!known) return data;
     const kept: Record<string, unknown> = {};
@@ -170,29 +198,51 @@ export async function fileSure(tx: Tx, actor: Actor, spaceId: string) {
   for (const one of await inboxOf(tx, spaceId)) {
     const guess = one.data.guess as Guess | undefined;
     if (!guess?.sure || guess.amount === undefined) continue;
+    const links: { field: string; to: string }[] = [];
+    const missing: string[] = [];
+    for (const field of required) {
+      const target = pickOne(field.name, field.name === 'account' ? guess.account : undefined);
+      if (target) links.push({ field: field.name, to: target.id });
+      else missing.push(field.name);
+    }
+    if (missing.length) {
+      waiting.push({ title: one.title, needs: missing.join(', ') });
+      continue;
+    }
     const text = String(one.data.text ?? one.title);
     const received = /\b(re[cç]u|salaire|rembours[ée] par|gagn[ée])\b/i.test(text);
-    await fileCapture(tx, actor, spaceId, one.id, [
-      {
-        kind: 'Transaction',
-        title:
-          text
-            .replace(/#[\p{L}\p{N}_-]+/gu, '')
-            .trim()
-            .slice(0, 120) || one.title,
-        data: fit({
-          amount: guess.amount,
-          ...(guess.currency ? { currency: guess.currency } : {}),
-          direction: received ? 'in' : 'out',
-          date: String(one.data.at ?? '').slice(0, 10),
-          ...(guess.account ? { account_hint: guess.account } : {}),
-        }),
-        origin: 'inferred',
-      },
-    ]);
+    const ref = 'move';
+    await save(tx, actor, spaceId, {
+      entries: [
+        {
+          ref,
+          kind: 'Transaction',
+          title:
+            text
+              .replace(/#[\p{L}\p{N}_-]+/gu, '')
+              .trim()
+              .slice(0, 120) || one.title,
+          data: fit({
+            amount: guess.amount,
+            ...(guess.currency ? { currency: guess.currency } : {}),
+            direction: received ? 'in' : 'out',
+            date: String(one.data.at ?? '').slice(0, 10),
+            ...(guess.account && !links.some((link) => link.field === 'account')
+              ? { account_hint: guess.account }
+              : {}),
+          }),
+          origin: 'inferred',
+        },
+        { id: one.id, data: { status: 'filed' } },
+      ],
+      links: [
+        { from: ref, to: one.id, role: 'from_capture' },
+        ...links.map((link) => ({ from: ref, to: link.to, role: link.field })),
+      ],
+    });
     filed.push(one.title);
   }
-  return { filed, left: (await inboxOf(tx, spaceId)).length };
+  return { filed, left: (await inboxOf(tx, spaceId)).length, waiting };
 }
 
 /** Who a Telegram chat belongs to: her own space, to capture what she writes to the bot. */

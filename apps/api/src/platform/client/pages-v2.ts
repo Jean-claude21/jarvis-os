@@ -225,4 +225,138 @@ function captureDrawer(text) {
     } catch (error) { alert(error.message); }
   });
 }
+
+// « Maintenant » in the mockup: what needs her, by group; the one chosen, its day, what she can do.
+let nowFilter = 'all';
+const NOW_GROUPS = ['fix', 'late', 'proposed', 'intent', 'today', 'week'];
+const NOW_ICONS = { fix: 'i-alert', late: 'i-bell', proposed: 'i-spark', intent: 'i-hand', today: 'i-cal', week: 'i-cal' };
+const NOW_TAGS = { fix: 'error', late: 'late', proposed: 'info', intent: 'info', today: 'ok', week: 'neutral' };
+function dayBandV2(occ, focus) {
+  const from = 6, to = 23;
+  const at = (iso) => { const d = new Date(iso); return d.getHours() + d.getMinutes() / 60; };
+  const pct = (h) => Math.max(0, Math.min(100, ((h - from) / (to - from)) * 100));
+  const hhmm2 = (iso) => new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  const blocks = occ.filter((o) => !o.allDay).map((o) => {
+    const a = at(o.start); const b = o.end ? at(o.end) || 24 : a + 0.5;
+    return '<a class="block ' + (o.proposed ? 'proposed' : o.repeated ? '' : 'event') + (o.id === focus ? ' focus' : '') + '" href="#/entree/' + esc(o.id) + '" title="' + esc(o.title) + '" style="left:' + pct(a) + '%;width:calc(' + (pct(b) - pct(a)) + '% - 3px)"><b>' + esc(o.title) + '</b><small>' + esc(hhmm2(o.start)) + '</small></a>';
+  }).join('');
+  const n = at(new Date().toISOString());
+  return v2panel(say(W.v2yourDay, { day: new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric' }) }),
+    '<div class="dayband"><div class="hours" style="grid-template-columns:repeat(' + (to - from) + ',1fr)">' + Array.from({ length: to - from }, (_, i) => '<span>' + (i % 2 ? '' : String(from + i).padStart(2, '0')) + '</span>').join('') + '</div>' + blocks +
+    (n >= from && n <= to ? '<div class="now-line" style="left:' + pct(n) + '%"></div>' : '') + '</div>' +
+    '<div class="legend pad" style="padding-top:10px;padding-bottom:12px"><span><i style="background:var(--sand);border:1px solid var(--rule-strong)"></i>' + esc(W.legendRepeated) + '</span><span><i style="background:var(--paper);border:1px solid var(--ink)"></i>' + esc(W.legendEvent) + '</span><span><i style="background:var(--info-surface);border:1px dashed var(--info)"></i>' + esc(W.legendProposed) + '</span></div>',
+    '<a class="btn small" href="#/agenda?v=jour">' + esc(W.navAgenda) + '</a>', 'i-cal');
+}
+v2Pages[''] = async function () {
+  const now = await api('/now');
+  const items = now.items;
+  const n = (g) => items.filter((i) => i.group === g).length;
+  const vis = items.filter((i) => nowFilter === 'all' || i.group === nowFilter);
+  const sel = vis.find((i) => i.id === pick) || vis[0];
+  const when = (i) => (i.when ? (i.allDay ? day(i.when) : time(i.when)) : '');
+  const sub = (i) => [kindName(i.kind), i.space, i.said ? say(W.v2saidTimes, { n: i.said.times, since: day(i.said.since) }) : when(i)].filter(Boolean).join(' · ');
+  const list = vis.length ? NOW_GROUPS.map((g) => {
+    const rows = vis.filter((i) => i.group === g);
+    return rows.length ? '<div class="group-title caps">' + esc(W['g_' + g]) + ' <span class="n">' + rows.length + '</span></div>' + rows.map((i) =>
+      '<button class="row" data-pick="' + esc(i.id) + '" aria-selected="' + (sel && i.id === sel.id) + '"><span class="kind' + (g === 'proposed' ? ' proposed' : '') + '">' + ic(NOW_ICONS[g]) + '</span><div><div class="t">' + esc(i.title) + '</div><div class="s">' + esc(sub(i)) + '</div></div><span class="tag ' + NOW_TAGS[g] + '">' + esc(W['r_' + i.reason] || i.reason) + '</span></button>').join('') : '';
+  }).join('') : '<div class="empty">' + esc(W.allClear) + '</div>';
+  let det = '<div class="panel"><div class="panel-body empty">' + esc(W.v2nothingToDecide) + '</div></div>';
+  if (sel) {
+    const e = await api('/entries/' + encodeURIComponent(sel.id) + '?space=' + encodeURIComponent(sel.spaceId));
+    const links = e.links.out.concat(e.links.in).filter((l) => l.entry.kind !== 'Comment').slice(0, 6);
+    const acts = [];
+    if (sel.group === 'proposed') acts.push(['accept', W.a_accept, W.a_acceptWhy, true], ['refuse', W.a_refuse, W.a_refuseWhy]);
+    else if (sel.group === 'fix') acts.push(['retry', W.a_retry, W.a_retryWhy, true], ['done', W.a_done, W.a_doneWhy]);
+    else if (sel.group === 'intent') acts.push(['plan', W.v2planIt, W.v2planItWhy, true], ['done', W.a_done, W.v2intentDoneWhy], ['drop', W.v2dropIt, W.v2dropItWhy]);
+    else {
+      acts.push(['done', W.a_done, W.a_doneWhy, sel.group === 'late']);
+      if (e.data.at || e.data.due || e.data.start) acts.push(['later', W.a_later, W.a_laterWhy, sel.group !== 'late']);
+      acts.push(['cancel', W.a_cancel, W.a_cancelWhy]);
+    }
+    const context = typeof e.data.text === 'string' ? e.data.text.slice(0, 360) + (e.data.text.length > 360 ? '…' : '') : sel.said ? say(W.v2intentContext, { n: sel.said.times, since: day(sel.said.since) }) : '';
+    det = '<button class="back" data-back>' + ic('i-left') + esc(W.v2backToList) + '</button>' +
+      '<section class="panel"><div class="panel-head"><span class="left caps">' + ic(NOW_ICONS[sel.group]) + esc(kindName(sel.kind) + ' · ' + W['g_' + sel.group]) + '</span><span class="tag ' + NOW_TAGS[sel.group] + '">' + esc(W['r_' + sel.reason] || sel.reason) + '</span></div>' +
+      '<div class="panel-body subject"><div class="subject-top"><div><h2>' + esc(e.title) + '</h2><div class="muted" style="font-size:13px">' + esc(sub(sel)) + '</div></div><a class="btn small" href="#/entree/' + esc(e.id) + '">' + ic('i-life') + esc(W.fullEntry) + '</a></div>' +
+      (context ? '<p class="context">' + esc(context) + '</p>' : '') +
+      (links.length ? '<div class="chips">' + links.map((l) => '<a class="chip" href="#/entree/' + esc(l.entry.id) + '">' + ic(l.entry.kind === 'Person' ? 'i-person' : l.entry.kind === 'Fichier' ? 'i-file' : 'i-link') + esc(l.entry.title) + '<small>' + esc(kindName(l.entry.kind)) + '</small></a>').join('') + '</div>' : '') + '</div></section>' +
+      dayBandV2(now.day, sel.id) +
+      '<div class="choices">' + acts.map((a) => '<article class="choice' + (a[3] ? ' recommended' : '') + '"><div class="choice-head"><h3>' + esc(a[1]) + '</h3>' + (a[3] ? '<span class="why">' + esc(W.v2recommended) + '</span>' : '') + '</div><p>' + esc(a[2]) + '</p><div class="choice-foot"><button class="btn' + (a[3] ? ' solid' : '') + '" ' + (a[0] === 'plan' || a[0] === 'drop' ? 'data-intent' : 'data-act') + '="' + a[0] + '" data-id="' + esc(sel.id) + '" data-space="' + esc(sel.spaceId) + '">' + (a[3] ? ic('i-check') : '') + esc(a[1]) + '</button></div></article>').join('') + '</div>';
+  }
+  const filters = [['all', W.v2all, items.length], ['fix', W.g_fix, n('fix')], ['late', W.g_late, n('late')], ['today', W.g_today, n('today')], ['proposed', W.g_proposed, n('proposed')]];
+  const today = new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
+  return v2head(esc(W.navNow), esc(today.charAt(0).toUpperCase() + today.slice(1) + ' · ' + say(W.nowLead, { fix: n('fix'), late: n('late'), proposed: n('proposed'), today: n('today') })),
+    '<div class="segmented">' + filters.map((f) => '<button data-now-filter="' + f[0] + '" aria-pressed="' + (nowFilter === f[0]) + '">' + esc(f[1]) + '<span class="n">' + f[2] + '</span></button>').join('') + '</div><a class="btn hide-s" href="#/agenda">' + ic('i-cal') + esc(W.v2openAgenda) + '</a>') +
+    '<div class="board' + (reading ? ' reading' : '') + '"><section class="panel list-panel"><div class="panel-head"><span class="left caps">' + ic('i-now') + esc(W.navNow) + ' · ' + esc(new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })) + '</span><span class="pill"><span class="live"></span>' + esc(W.v2live) + '</span></div><div class="panel-body list">' + list + '</div></section><section class="detail">' + det + '</section></div>';
+};
+v2Pages.accueil = v2Pages[''];
+
+// What « Maintenant » does beyond the usual gestures: its filter, an intention planned or dropped.
+function bindNow(root) {
+  root.querySelectorAll('[data-now-filter]').forEach((b) => b.addEventListener('click', () => { nowFilter = b.dataset.nowFilter; pick = null; show(); }));
+  root.querySelectorAll('[data-intent]').forEach((b) => b.addEventListener('click', async () => {
+    const id = b.dataset.id; const where = b.dataset.space;
+    if (b.dataset.intent === 'plan') {
+      const e = await api('/entries/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(where));
+      const t = new Date(Date.now() + 86400000);
+      newEvent(t.toLocaleDateString('en-CA') + 'T09:00', e.title);
+      return;
+    }
+    try { await api('/save?space=' + encodeURIComponent(where), { method: 'POST', body: { entries: [{ id, data: { status: 'dropped' } }] } }); pick = null; toast(W.v2dropped, { id, spaceId: where }); show(); } catch (error) { alert(error.message); }
+  }));
+}
+
+// « Entrées » in the mockup: everything she keeps, grouped as she thinks her life — by kind, by
+// space, by month, or by a link to a kind she chooses (« Mandat », « Projet »…). A kind opened shows
+// its own explorer (views, filters, bulk changes), as before.
+let entriesBy = 'type';
+let entriesLink = '';
+v2Pages.vie = async function (params) {
+  const ENGINE = ['Model', 'Rule', 'Script', 'Page', 'View', 'App', 'Channel', 'Reminder', 'Comment', 'Proposal', 'Capture'];
+  if (params.get('kind') || params.get('view')) {
+    const inner = await lifePages.vie(params);
+    const k = params.get('kind');
+    crumbs([W.navEntries, k ? kindName(k) : W.navEntries]);
+    return v2head(esc(k ? kindName(k) : W.navEntries), esc(W.v2entriesKindSub), '<a class="btn" href="#/vie">' + ic('i-left') + esc(W.navEntries) + '</a><a class="btn" href="#/collections/' + esc(encodeURIComponent(k || '')) + '">' + ic('i-shape') + esc(W.seeModel) + '</a>') + '<section class="panel"><div class="panel-body pad">' + inner + '</div></section>';
+  }
+  const q = params.get('q') || '';
+  const spacesToRead = me.spaces;
+  const lists = await Promise.all(spacesToRead.map((s) => api('/entries?limit=200&space=' + encodeURIComponent(s.id) + (q ? '&text=' + encodeURIComponent(q) : '')).then((rows) => rows.map((r) => Object.assign(r, { spaceName: s.name }))).catch(() => [])));
+  const all = lists.flat().filter((e) => !ENGINE.includes(e.kind));
+  // What each entry is linked to (both ways), for « lien vers ».
+  const linkRows = await Promise.all(spacesToRead.map((s) => api('/query?space=' + encodeURIComponent(s.id), { method: 'POST', body: { sql: 'select l.from_id as a, l.to_id as b, f.kind as fk, f.title as ft, t.kind as tk, t.title as tt from my_links l join my_entries f on f.id = l.from_id join my_entries t on t.id = l.to_id limit 5000' } }).then((r) => r.rows).catch(() => [])));
+  const linksOf = new Map();
+  for (const r of linkRows.flat()) {
+    linksOf.set(r.a, (linksOf.get(r.a) || []).concat([{ kind: r.tk, title: r.tt }]));
+    linksOf.set(r.b, (linksOf.get(r.b) || []).concat([{ kind: r.fk, title: r.ft }]));
+  }
+  for (const e of all) e.links = linksOf.get(e.id) || [];
+  const total = knownKinds.reduce((a, k) => a + (ENGINE.includes(k.kind) ? 0 : k.count || 0), 0);
+  // The kinds others link to: what « lien vers » can group by.
+  const linkKinds = [...new Set(all.flatMap((e) => (e.links || []).map((l) => l.kind)))].filter((k) => k && !ENGINE.includes(k));
+  if (entriesBy === 'lien' && !entriesLink) entriesLink = linkKinds[0] || '';
+  const monthOf = (e) => new Date(e.data.date || e.data.start || e.data.at || e.createdAt).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+  const keyOf = (e) => entriesBy === 'type' ? kindName(e.kind) : entriesBy === 'espace' ? e.spaceName : entriesBy === 'mois' ? monthOf(e) : ((e.links || []).find((l) => l.kind === entriesLink) || {}).title || '';
+  const groups = new Map();
+  for (const e of all) { const k = keyOf(e); groups.set(k, (groups.get(k) || []).concat([e])); }
+  const order = [...groups.keys()].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : entriesBy === 'mois' ? 0 : groups.get(b).length - groups.get(a).length));
+  const by = [['type', W.v2byKind], ['espace', W.space], ['mois', W.v2byMonth], ['lien', entriesLink ? say(W.v2linkTo, { kind: kindName(entriesLink) }) : W.v2byLink]];
+  const rows = order.map((g) => {
+    const list = groups.get(g);
+    const first = list[0];
+    const open = entriesBy === 'type' ? ' <a class="btn small" href="#/vie?kind=' + esc(encodeURIComponent(first.kind)) + '">' + esc(W.open) + '</a>' : '';
+    return '<tr class="total"><td colspan="4">' + esc(g || (entriesBy === 'lien' ? W.v2unlinked : '—')) + ' <span class="muted">' + list.length + '</span>' + open + '</td></tr>' +
+      list.slice(0, 40).map((e) => '<tr><td><div class="cell-title"><a href="#/entree/' + esc(e.id) + '">' + esc(e.title) + '</a></div></td><td>' + esc(kindName(e.kind)) + '</td><td>' + esc(e.spaceName) + '</td><td class="cell-sub">' + esc(monthOf(e)) + '</td></tr>').join('') +
+      (list.length > 40 ? '<tr><td colspan="4" class="cell-sub">' + esc(say(W.v2andMore, { n: list.length - 40 })) + '</td></tr>' : '');
+  }).join('');
+  return v2head(esc(W.navEntries), esc(say(W.v2entriesSub, { n: num(total) })) + (q ? ' · « ' + esc(q) + ' »' : ''),
+    '<div class="segmented">' + by.map((x) => '<button data-entries-by="' + x[0] + '" aria-pressed="' + (entriesBy === x[0]) + '">' + esc(x[1]) + '</button>').join('') + '</div>' +
+    (entriesBy === 'lien' && linkKinds.length ? '<select class="field" data-entries-link style="width:auto">' + linkKinds.map((k) => '<option value="' + esc(k) + '"' + (k === entriesLink ? ' selected' : '') + '>' + esc(kindName(k)) + '</option>').join('') + '</select>' : '')) +
+    v2panel(say(W.v2groupedBy, { by: (by.find((x) => x[0] === entriesBy) || by[0])[1].toLowerCase() }), all.length ? '<div class="scroll"><table style="min-width:560px"><thead><tr><th>' + esc(W.title) + '</th><th>' + esc(W.v2kind) + '</th><th>' + esc(W.space) + '</th><th>' + esc(W.v2byMonth) + '</th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>', '<span class="muted" style="font-size:12px">' + esc(say(W.v2latestN, { n: all.length })) + '</span>', 'i-life') +
+    '<div class="hint">' + ic('i-link') + '<span>' + W.v2linkHint + '</span></div>';
+};
+function bindEntries2(root) {
+  root.querySelectorAll('[data-entries-by]').forEach((b) => b.addEventListener('click', () => { entriesBy = b.dataset.entriesBy; show(); }));
+  const sel = root.querySelector('[data-entries-link]');
+  if (sel) sel.addEventListener('change', () => { entriesLink = sel.value; show(); });
+}
 `;

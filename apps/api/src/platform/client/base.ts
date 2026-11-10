@@ -100,7 +100,7 @@ let explorerNow = null;
 let reading = false;
 // The kinds of her space, kept by drawApps: a kind shows its label, not its technical name.
 let knownKinds = [];
-const kindName = (name) => { const k = knownKinds.find((one) => one.kind === name); return k ? kindLabel(k) : name; };
+const kindName = (name) => { const k = knownKinds.find((one) => one.kind === name); const l = k ? kindLabel(k) : name; return l === name ? W['knd_' + name] || name : l; };
 const areaOfApp = (kinds, app) => { const k = kinds.find((one) => one.model && one.model.app === app && one.model.area); return k ? k.model.area : ''; };
 async function drawApps() {
   const [kinds, appPages] = await Promise.all([api(inSpace('/kinds')), api(inSpace('/pages'))]);
@@ -114,7 +114,7 @@ async function drawApps() {
   // Her counts beside « Personnes », « Entrées », « Tableaux de bord ».
   const person = kinds.find((k) => k.kind === 'Person');
   navCounts.people = person && person.count ? num(person.count) : '';
-  navCounts.entries = num(kinds.reduce((a, k) => a + (['Model', 'Rule', 'Script', 'Page', 'View', 'App', 'Channel'].includes(k.kind) ? 0 : k.count || 0), 0));
+  navCounts.entries = num(kinds.reduce((a, k) => a + (['Model', 'Rule', 'Script', 'Page', 'View', 'App', 'Channel', 'Reminder', 'Comment', 'Proposal', 'Capture'].includes(k.kind) ? 0 : k.count || 0), 0));
   navCounts.boards = appPages.filter((p) => !p.app).length || '';
   const [path] = location.hash.replace(/^#[/]?/, '').split('?');
   const [name, id] = path.split('/');

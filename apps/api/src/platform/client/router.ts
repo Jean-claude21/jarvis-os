@@ -43,7 +43,7 @@ async function show() {
     const html = await pages[key](params, id ? decodeURIComponent(id) : undefined);
     if (ticket !== drawing) return;
     page().innerHTML = html; drawCrumbs(key, id ? decodeURIComponent(id) : undefined);
-    bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page());
+    bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page());
     page().scrollTop = 0; window.scrollTo(0, 0);
     document.querySelectorAll('.x-tabbar a[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === key));
     if (key === 'ranger' || key === '') counts();

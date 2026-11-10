@@ -491,4 +491,154 @@ function bindConnexions(root) {
     if (pick) pick.addEventListener('change', () => { form.querySelector('[name="auth"]').value = pick.value; });
   }
 }
+
+// The blocks of a page (an app's page, a dashboard), drawn in the mockup's markup: figures, gauges,
+// bars, a line, shares, tables with their total, things to act on, a form, a kanban, her days.
+const SERIES2 = ['var(--primary)', 'var(--ochre)', 'var(--info)', 'var(--success)', 'var(--verify)', 'var(--ink)'];
+function blocksHtml(drawn) {
+  const vocab = drawn.vocabulary || {};
+  const fLabel = (kind, name) => { const v = vocab[kind] && vocab[kind].fields[name]; return v && v.label ? tr(v.label) : name === 'title' ? W.title : W['lbl_' + name] || name; };
+  const oLabel = (kind, name, value) => { const v = vocab[kind] && vocab[kind].fields[name]; return v && v.options && typeof value === 'string' && v.options[value] ? tr(v.options[value]) : value; };
+  const isNum = (v) => typeof v === 'number' && isFinite(v);
+  const fmt = (v) => v === null || v === undefined || v === '' ? '—' : isNum(v) ? num(Math.round(v * 100) / 100) : Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : String(v);
+  const T = (b) => tr(b.title) || '';
+  const table = (columns, rows, kind, extra) => rows.length ? '<div class="scroll"><table><thead><tr>' + columns.map((c) => '<th class="' + (rows.every((r) => r[c] == null || isNum(r[c])) ? 'n' : '') + '">' + esc(c === 'group' ? '' : fLabel(kind, c)) + '</th>').join('') + '</tr></thead><tbody>' +
+    rows.map((r) => '<tr' + (r.id ? ' class="row-click" data-go="#/entree/' + esc(r.id) + '" style="cursor:pointer"' : '') + '>' + columns.map((c) => '<td class="' + (isNum(r[c]) ? 'n' : '') + '">' + (c === 'title' ? '<div class="cell-title">' + esc(fmt(r[c])) + '</div>' : esc(fmt(oLabel(kind, c, r[c])))) + '</td>').join('') + '</tr>').join('') + (extra || '') + '</tbody></table></div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>';
+  const bars = (b) => { const max = Math.max(1, ...b.points.map((p) => Math.abs(p.value))); return b.points.length ? '<div class="pad" style="display:flex;flex-direction:column;gap:8px">' + b.points.map((p) => '<div class="hbar" style="grid-template-columns:minmax(80px,30%) 1fr 90px"><span>' + esc(fmt(b.groupField ? oLabel(b.kind, b.groupField, p.label) : p.label)) + '</span><div class="track"><div class="fill" style="width:' + Math.max(1, Math.abs(p.value) / max * 100) + '%"></div></div><span class="mono" style="text-align:right;font-size:12px">' + esc(fmt(p.value)) + '</span></div>').join('') + '</div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>'; };
+  const draw = {
+    stat: (b) => v2kpi(T(b), esc(fmt(b.value)) + (b.unit ? '<small>' + esc(b.unit) + '</small>' : ''), '', isNum(b.value) && b.value < 0 ? 'alert' : ''),
+    stat_delta: (b) => v2kpi(T(b), esc(fmt(b.value)) + (b.unit ? '<small>' + esc(b.unit) + '</small>' : ''), b.delta == null ? esc(W.v2noCompare) : (b.delta > 0 ? '↑ ' : '↓ ') + esc(fmt(Math.abs(b.delta))) + ' % · ' + esc(say(W.v2vsBefore, { value: fmt(b.previous) }))),
+    gauge: (b) => v2panel(T(b), b.items.length ? '<div class="pad" style="display:flex;flex-direction:column;gap:12px">' + b.items.map((g) => { const p = isNum(g.max) && g.max > 0 && isNum(g.value) ? g.value / g.max * 100 : 0; return '<div><div style="display:flex;justify-content:space-between;gap:8px"><span>' + esc(fmt(g.label)) + '</span><span class="mono" style="font-size:12px">' + esc(fmt(g.value)) + ' / ' + esc(fmt(g.max)) + '</span></div><div class="bar ' + (p > 100 ? 'warn' : p >= 80 ? 'info' : 'ok') + '" style="margin-top:6px"><i style="width:' + Math.min(100, Math.max(1, p)) + '%"></i></div></div>'; }).join('') + '</div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>', '', 'i-chart'),
+    bar: (b) => v2panel(T(b), bars(b), '', 'i-chart'),
+    breakdown: (b) => { const total = b.points.reduce((t, p) => t + Math.max(0, p.value), 0) || 1; return v2panel(T(b), b.points.length ? '<div class="pad"><div style="display:flex;height:12px;border-radius:3px;overflow:hidden">' + b.points.map((p, i) => '<span style="flex:' + Math.max(0, p.value) + ';background:' + SERIES2[i % SERIES2.length] + '"></span>').join('') + '</div><div class="legend" style="margin-top:10px">' + b.points.map((p, i) => '<span><i style="background:' + SERIES2[i % SERIES2.length] + '"></i>' + esc(fmt(b.groupField ? oLabel(b.kind, b.groupField, p.label) : p.label)) + ' ' + Math.round(Math.max(0, p.value) / total * 100) + ' %</span>').join('') + '</div></div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>', '', 'i-chart'); },
+    line: (b) => {
+      const series = b.series && b.series.length ? b.series : [{ name: '', points: b.points }];
+      const labels = series[0].points.map((p) => p.label);
+      if (labels.length < 2) return draw.bar(b);
+      const all = series.flatMap((s) => s.points.map((p) => p.value));
+      const lo = Math.min(...all), hi = Math.max(...all), pad = (hi - lo) * 0.15 || Math.abs(hi) * 0.1 || 1, min = lo - pad, span = hi + pad - min;
+      const Wd = 520, H = 160, px = (i) => 28 + i * (Wd - 38) / (labels.length - 1), py = (x) => 10 + (1 - (x - min) / span) * (H - 30);
+      return v2panel(T(b), '<div class="pad"><svg class="chart" viewBox="0 0 ' + Wd + ' ' + H + '" role="img" aria-label="' + esc(T(b)) + '">' + series.map((s, n) => '<polyline fill="none" stroke="' + SERIES2[n % SERIES2.length] + '" stroke-width="2.2" points="' + s.points.map((p, i) => px(i).toFixed(1) + ',' + py(p.value).toFixed(1)).join(' ') + '"/>' + s.points.map((p, i) => '<circle cx="' + px(i) + '" cy="' + py(p.value) + '" r="3" fill="' + SERIES2[n % SERIES2.length] + '"><title>' + esc(p.label + ' : ' + fmt(p.value)) + '</title></circle>').join('')).join('') + '<text x="28" y="' + (H - 4) + '">' + esc(labels[0]) + '</text><text x="' + (Wd - 10) + '" y="' + (H - 4) + '" text-anchor="end">' + esc(labels[labels.length - 1]) + '</text></svg>' +
+        (series.length > 1 ? '<div class="legend">' + series.map((s, n) => '<span><i style="background:' + SERIES2[n % SERIES2.length] + '"></i>' + esc(fLabel(b.kind, s.name)) + '</span>').join('') + '</div>' : '') + '</div>', '', 'i-chart');
+    },
+    heatmap: (b) => v2panel(T(b), '<div class="pad"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(14px,1fr));gap:3px">' + b.cells.map((c) => '<span title="' + esc(c.day) + '" style="aspect-ratio:1;border-radius:3px;background:' + (c.done ? 'var(--success)' : 'var(--clay)') + '"></span>').join('') + '</div><div class="cell-sub" style="margin-top:8px">' + esc(say(W.v2daysDone, { n: b.done, of: b.cells.length })) + '</div></div>', '', 'i-routine'),
+    table: (b) => v2panel(T(b), table(b.columns, b.rows, b.kind, b.total ? '<tr class="total">' + b.columns.map((c, i) => '<td class="' + (c === b.total ? 'n' : '') + '">' + (i === 0 ? esc(W.total) : c === b.total ? esc(fmt(b.totalValue)) : '') + '</td>').join('') + '</tr>' : ''), '<span class="muted" style="font-size:12px">' + b.rows.length + '</span>', 'i-life'),
+    task_list: (b, at) => v2panel(T(b), b.items.length ? '<div class="pad x-rel">' + b.items.map((t) => '<div style="display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:8px;background:var(--sand)"><a href="#/entree/' + esc(t.id) + '" style="flex:1;color:inherit"><b>' + esc(t.title) + '</b>' + (t.detail != null ? ' <em class="muted" style="font-style:normal">· ' + esc(fmt(t.detail)) + '</em>' : '') + '</a><button class="btn small" data-block-set="' + esc(t.id) + ':' + at + '">' + ic('i-check') + esc(b.action.label) + '</button></div>').join('') + '</div>' : '<div class="pad muted">' + esc(W.allDone) + '</div>', '', 'i-check'),
+    kanban: (b) => v2panel(T(b), '<div class="pad"><div style="display:grid;grid-template-columns:repeat(' + Math.max(1, b.columns.length) + ',minmax(160px,1fr));gap:10px;overflow-x:auto">' + b.columns.map((c) => '<div style="background:var(--sand);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px"><div class="caps">' + esc(oLabel(b.kind, b.by, c.name)) + ' · ' + c.items.length + '</div>' + c.items.map((i) => '<a href="#/entree/' + esc(i.id) + '" style="background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:6px 8px;color:inherit">' + esc(i.title) + '</a>').join('') + '</div>').join('') + '</div></div>', '', 'i-life'),
+    calendar: (b) => v2panel(T(b), b.occurrences.length ? '<div class="x-day">' + b.occurrences.map((o) => '<div class="slot"><time>' + esc(new Date(o.start).toLocaleString(locale, o.allDay ? { weekday: 'short', day: 'numeric' } : { weekday: 'short', hour: '2-digit', minute: '2-digit' })) + '</time><div><b><a href="#/entree/' + esc(o.id) + '" style="color:inherit">' + esc(o.title) + '</a></b><div class="meta"><span class="cell-sub">' + esc(kindName(o.kind)) + '</span></div></div><span></span></div>').join('') + '</div>' : '<div class="pad muted">' + esc(W.noEvents) + '</div>', '', 'i-cal'),
+    form: (b, at) => v2panel(T(b) || say(W.addOne, { kind: kindName(b.kind) }), '<form class="pad" data-block-form="' + at + '" style="display:grid;gap:10px"><label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(W.title) + ' *<input class="field" name="__title" required></label>' +
+      b.fields.map((f) => '<label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(fLabel(b.kind, f.name) + (f.required ? ' *' : '') + (f.unit ? ' · ' + f.unit : '')) +
+        (f.type === 'choice' ? '<select class="field" name="' + esc(f.name) + '"><option value=""></option>' + f.options.map((o) => '<option value="' + esc(o) + '">' + esc(oLabel(b.kind, f.name, o)) + '</option>').join('') + '</select>'
+          : f.type === 'boolean' ? '<select class="field" name="' + esc(f.name) + '"><option value=""></option><option value="true">' + esc(W.yes) + '</option><option value="false">' + esc(W.no) + '</option></select>'
+          : '<input class="field" name="' + esc(f.name) + '" type="' + (f.type === 'date' ? 'date' : f.type === 'datetime' ? 'datetime-local' : ['number', 'amount'].includes(f.type) ? 'number' : 'text') + '" step="any">') + '</label>').join('') +
+      '<div><button class="btn solid">' + ic('i-plus') + esc(W.v2add) + '</button></div></form>', '', 'i-plus'),
+    sql: (b) => {
+      const x = b.columns[0];
+      const y = b.columns.find((c) => b.rows.some((r) => isNum(r[c]) || (r[c] !== null && r[c] !== '' && !isNaN(Number(r[c])))));
+      const points = y ? b.rows.map((r) => ({ label: r[x], value: Number(r[y]) || 0 })) : [];
+      if (b.chart === 'number') return draw.stat({ title: b.title, value: y && b.rows[0] ? Number(b.rows[0][y]) : null });
+      if ((b.chart === 'bar' || b.chart === 'line') && y) return draw[b.chart]({ title: b.title, points });
+      return v2panel(T(b), table(b.columns, b.rows), '', 'i-chart');
+    },
+    record: (b) => { const r = b.record; if (!r) return v2panel(T(b), '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>'); return v2panel(T(b), '<div class="scroll"><table><tbody>' + r.fields.map((f) => '<tr><td class="muted">' + esc(fLabel(r.kind, f.name)) + '</td><td><b>' + esc(fmt(oLabel(r.kind, f.name, f.value))) + '</b></td><td>' + (f.computed ? '<span class="origin inferred">' + esc(W.v2computed) + '</span>' : '') + '</td></tr>').join('') + '</tbody></table></div>' + r.relations.map((rel) => '<div class="caps pad" style="padding-bottom:0">' + esc(rel.name) + ' · ' + rel.rows.length + '</div>' + table(rel.columns, rel.rows, rel.kind)).join(''), '', 'i-life'); },
+    view: (b) => { const r = b.result; if (r.type === 'kanban') return draw.kanban({ title: b.title, kind: b.kind, by: r.kanban.by, columns: r.kanban.columns }); const rows = r.rows || (r.tree && r.tree.rows) || []; return v2panel(T(b), table(r.columns || ['title'], rows, b.kind), '', 'i-life'); },
+  };
+  // Figures side by side, as the mockup's KPIs; every other block in a panel.
+  const out = [];
+  let figures = [];
+  const flush = () => { if (figures.length) out.push('<div class="grid g' + Math.min(4, Math.max(2, figures.length)) + '">' + figures.join('') + '</div>'); figures = []; };
+  drawn.blocks.forEach((b, at) => {
+    const html = b.error ? v2panel(T(b), '<div class="pad error-text">' + esc(say(W.failed, { reason: b.error })) + '</div>') : draw[b.block] ? draw[b.block](b, at) : '';
+    if (!b.error && (b.block === 'stat' || b.block === 'stat_delta' || (b.block === 'sql' && b.chart === 'number'))) figures.push(html);
+    else { flush(); out.push(html); }
+  });
+  flush();
+  const filters = drawn.filters && drawn.filters.length ? '<div class="toolbar" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">' + drawn.filters.map((f) => '<label style="display:flex;gap:6px;align-items:center"><span class="caps">' + esc(tr(f.label) || f.name) + '</span>' +
+    (f.type === 'month' ? '<input class="field" type="month" data-page-filter="' + esc(f.name) + '" value="' + esc(f.value) + '" style="width:auto">' : f.type === 'choice' ? '<select class="field" data-page-filter="' + esc(f.name) + '" style="width:auto">' + (f.options || []).map((o) => '<option' + (o === f.value ? ' selected' : '') + '>' + esc(o) + '</option>').join('') + '</select>' : '<input class="field" data-page-filter="' + esc(f.name) + '" value="' + esc(f.value) + '" style="width:auto">') + '</label>').join('') + '</div>' : '';
+  return filters + '<div style="display:flex;flex-direction:column;gap:16px">' + out.join('') + '</div>';
+}
+
+// What blocks do: a filter changes the page, a gesture sets fields, a form adds an entry.
+let shownPage = null;
+async function drawPageInto(id, params) {
+  const q = new URLSearchParams(params || {}); q.set('space', space);
+  shownPage = await api('/pages/' + encodeURIComponent(id) + '?' + q.toString());
+  return shownPage;
+}
+function bindBlocks(root) {
+  root.querySelectorAll('[data-page-filter]').forEach((el) => el.addEventListener('change', () => {
+    const h = location.hash.split('?'); const q = new URLSearchParams(h[1] || ''); q.set('f_' + el.dataset.pageFilter, el.value); location.hash = h[0] + '?' + q.toString();
+  }));
+  root.querySelectorAll('[data-block-set]').forEach((b) => b.addEventListener('click', async () => {
+    const [id, at] = b.dataset.blockSet.split(':');
+    b.disabled = true;
+    try { await api(inSpace('/save'), { method: 'POST', body: { entries: [{ id, data: shownPage.blocks[Number(at)].action.set }] } }); toast(W.v2filed, { id, spaceId: space }); show(); } catch (error) { b.disabled = false; alert(error.message); }
+  }));
+  root.querySelectorAll('[data-block-form]').forEach((form) => form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const b = shownPage.blocks[Number(form.dataset.blockForm)];
+    const data = {};
+    for (const f of b.fields) {
+      const v = form.elements[f.name] && form.elements[f.name].value;
+      if (!v) continue;
+      data[f.name] = ['number', 'amount'].includes(f.type) ? Number(v) : f.type === 'boolean' ? v === 'true' : v;
+    }
+    try { const saved = await api(inSpace('/save'), { method: 'POST', body: { entries: [{ kind: b.kind, title: form.elements.__title.value, data }] } }); toast(say(W.added1, { kind: kindName(b.kind) }), { id: saved.entries[0].id, spaceId: space }); show(); } catch (error) { alert(error.message); }
+  }));
+}
+const pageParams = (params) => { const out = {}; params.forEach((v, k) => { if (k.startsWith('f_')) out[k.slice(2)] = v; }); return out; };
+
+// « Tableaux de bord » in the mockup: each one a card — its first figures, who made it, when — and
+// opened in full, recomputed each time, in the app as in Claude.
+const widgetsAsBlocks = (d) => ({ blocks: d.widgets.map((w) => ({ block: 'sql', title: w.title, chart: w.chart, columns: w.columns, rows: w.rows, error: w.error })), filters: [], vocabulary: {} });
+v2Pages.tableaux = async function (params) {
+  const id = params.get('id');
+  if (id) {
+    const d = await api(inSpace('/dashboard'), { method: 'POST', body: { id } });
+    crumbs([W.navDashboards, d.title]);
+    return v2head(esc(d.title), esc(say(W.v2computedAt, { when: time(d.computedAt) })), '<a class="btn" href="#/tableaux">' + ic('i-left') + esc(W.navDashboards) + '</a><a class="btn" href="#/entree/' + esc(id) + '">' + ic('i-shape') + esc(W.fullEntry) + '</a>') + blocksHtml(widgetsAsBlocks(d));
+  }
+  const list = await api(inSpace('/entries?kind=Dashboard&limit=50'));
+  const drawn = await Promise.all(list.slice(0, 8).map((d) => api(inSpace('/dashboard'), { method: 'POST', body: { id: d.id } }).catch(() => null)));
+  const cardOf = (d, i) => {
+    const w = drawn[i];
+    const figures = w ? w.widgets.filter((x) => x.chart === 'number' && !x.error).slice(0, 2) : [];
+    const firstBar = w ? w.widgets.find((x) => (x.chart === 'bar' || x.chart === 'line') && !x.error && x.rows.length) : null;
+    let body = '';
+    if (figures.length) body = '<div class="grid g2" style="gap:10px">' + figures.map((x) => { const y = x.columns.find((c) => x.rows[0] && !isNaN(Number(x.rows[0][c]))); return v2kpi(x.title, esc(y ? num(Number(x.rows[0][y])) : '—'), ''); }).join('') + '</div>';
+    else if (firstBar) { const y = firstBar.columns.find((c) => firstBar.rows.some((r) => !isNaN(Number(r[c])) && r[c] !== null)); const vals = firstBar.rows.slice(-8).map((r) => Number(r[y]) || 0); const max = Math.max(1, ...vals); body = '<svg class="chart" viewBox="0 0 200 60">' + vals.map((v, j) => '<rect x="' + (j * 25 + 4) + '" y="' + (56 - (v / max) * 50) + '" width="16" height="' + (v / max) * 50 + '" fill="var(--primary)" rx="1"/>').join('') + '</svg>'; }
+    else body = '<div class="cell-sub">' + esc(say(W.v2nWidgets, { n: w ? w.widgets.length : 0 })) + '</div>';
+    return '<section class="panel"><div class="panel-head"><span class="left"><span class="app-icon" style="background:' + appColor(d.title) + '">' + ic('i-chart') + '</span><b style="color:var(--ink);font-size:13.5px">' + esc(d.title) + '</b></span><a class="btn small" href="#/tableaux?id=' + esc(d.id) + '">' + esc(W.open) + '</a></div><div class="panel-body pad">' + body + '<div class="cell-sub" style="margin-top:10px">' + esc(say(W.v2boardMeta, { when: day(d.createdAt), n: w ? w.widgets.length : 0 })) + '</div></div></section>';
+  };
+  return v2head(esc(W.navDashboards), esc(say(W.v2boardsSub, { n: list.length })), '<button class="btn" data-ask-board>' + ic('i-chat') + esc(W.v2askBoard) + '</button>') +
+    (list.length ? '<div class="grid g2">' + list.map(cardOf).join('') + '</div>' : '<div class="panel"><div class="panel-body empty">' + esc(W.noDashboards) + '</div></div>') +
+    '<div class="hint">' + ic('i-chat') + '<span>' + W.v2boardsHint + '</span></div>';
+};
+
+// An app, in the mockup: its icon and name, its tabs (its pages, its kinds, its views, its role),
+// what the tab holds — a page in blocks, a kind in its explorer.
+v2Pages.app = async function (params, name) {
+  if (!name) return v2Pages.apps(new URLSearchParams());
+  const kinds = knownKinds.length ? knownKinds : await api(inSpace('/kinds'));
+  const models = kinds.filter((k) => k.model && k.model.app === name);
+  const [appPages, views] = await Promise.all([api(inSpace('/pages?app=' + encodeURIComponent(name))), api(inSpace('/views?app=' + encodeURIComponent(name))).catch(() => [])]);
+  const pageId = params.get('page') || (!params.get('kind') && !params.get('view') && appPages[0] ? appPages[0].id : null);
+  const tabs = '<nav class="tabs">' +
+    appPages.map((p) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?page=' + esc(encodeURIComponent(p.id)) + '"' + (p.id === pageId ? ' aria-current="page"' : '') + '>' + esc(tr(p.label) || p.title) + '</a>').join('') +
+    models.map((k) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '"' + (params.get('kind') === k.kind ? ' aria-current="page"' : '') + '>' + esc(kindLabel(k)) + '<span class="n">' + num(k.count || 0) + '</span></a>').join('') +
+    views.map((v) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?view=' + esc(encodeURIComponent(v.id)) + '"' + (params.get('view') === v.id ? ' aria-current="page"' : '') + '>' + esc(tr(v.label) || v.title) + '</a>').join('') +
+    '<a href="#/role/' + esc(encodeURIComponent(name)) + '">' + esc(W.v2appRoleTab) + '</a></nav>';
+  const head = v2head(esc(name) + ' <span class="built">' + esc(say(W.v2nKinds, { n: models.length })) + '</span>', esc(W.v2appSub), '', v2app(name));
+  crumbs([W.navApps, name]);
+  if (pageId) {
+    const drawn = await drawPageInto(pageId, pageParams(params));
+    return head + tabs + blocksHtml(drawn);
+  }
+  const inner = await dayPages.app(params, name);
+  return head + tabs + '<section class="panel"><div class="panel-body pad">' + inner.replace(/<nav class="tabs">[^]*?<[/]nav>/, '') + '</div></section>';
+};
+function bindBoards(root) {
+  const ask = root.querySelector('[data-ask-board]');
+  if (ask) ask.addEventListener('click', () => openDrawer(W.v2askBoard, '<p>' + esc(W.v2askBoardHow) + '</p>'));
+}
 `;

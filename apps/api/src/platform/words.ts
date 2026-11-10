@@ -3,6 +3,22 @@
 export const appWords = {
   fr: {
     brand: 'Jarvis OS',
+    allDone: 'Tout est fait.',
+    v2appRoleTab: 'Rôle de l’app',
+    v2appSub: 'Ses pages, ses types et son rôle, calculés à l’ouverture',
+    v2askBoard: 'Demander un tableau à Claude',
+    v2askBoardHow:
+      'Dis à Claude ce que tu veux voir, par exemple : « un tableau de mes dépenses par catégorie sur 6 mois ». Il le crée ; il apparaît ici, recalculé à chaque ouverture.',
+    v2boardMeta: 'Créé le {when} · {n} bloc(s)',
+    v2boardsHint:
+      'Un tableau est une entrée : ses blocs déclarent quoi calculer, jamais du code. Dis à Claude <em>« ajoute la part de la dîme sur 6 mois »</em> et le bloc apparaît ici aussi.',
+    v2boardsSub:
+      '{n} tableau(x) · chacun est recalculé à l’ouverture, dans l’app comme dans Claude',
+    v2computedAt: 'Calculé le {when}',
+    v2daysDone: '{n} jours sur {of}',
+    v2nWidgets: '{n} bloc(s)',
+    v2noCompare: 'rien à comparer encore',
+    v2vsBefore: 'avant : {value}',
     v2addMcp: 'Ajouter un serveur MCP',
     v2anyMcp: 'n’importe quel outil qui parle MCP',
     v2assistant: 'Assistant',
@@ -1107,6 +1123,21 @@ export const appWords = {
   },
   en: {
     brand: 'Jarvis OS',
+    allDone: 'All done.',
+    v2appRoleTab: 'The app’s role',
+    v2appSub: 'Its pages, its kinds and its role, computed when opened',
+    v2askBoard: 'Ask Claude for a dashboard',
+    v2askBoardHow:
+      'Tell Claude what you want to see, for instance: « a dashboard of my spending by category over 6 months ». It makes it; it shows here, computed again each time.',
+    v2boardMeta: 'Made on {when} · {n} block(s)',
+    v2boardsHint:
+      'A dashboard is an entry: its blocks say what to compute, never code. Tell Claude <em>« add the tithe’s share over 6 months »</em> and the block shows here too.',
+    v2boardsSub: '{n} dashboard(s) · each computed again when opened, in the app as in Claude',
+    v2computedAt: 'Computed on {when}',
+    v2daysDone: '{n} days of {of}',
+    v2nWidgets: '{n} block(s)',
+    v2noCompare: 'nothing to compare yet',
+    v2vsBefore: 'before: {value}',
     v2addMcp: 'Add an MCP server',
     v2anyMcp: 'any tool that speaks MCP',
     v2assistant: 'Assistant',

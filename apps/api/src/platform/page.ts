@@ -58,7 +58,10 @@ export function appPage(lang: Lang): string {
 svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .v2 #space-menu { position: absolute; top: 58px; left: 12px; right: 12px; z-index: 30; }
 .v2 .side { position: relative; }
-.v2 .chip-now::before { content: none; display: none; }</style></head>
+.v2 .chip-now::before { content: none; display: none; }
+.page.v2 > * { flex-shrink: 0; }
+.v2 .hbar .track { top: auto; left: auto; right: auto; }
+.v2 .panel svg.chart { max-height: 220px; width: 100%; }</style></head>
 <body class="v2">
 <div class="app">
   <aside class="side" id="side">

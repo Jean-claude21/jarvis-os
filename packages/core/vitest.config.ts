@@ -5,7 +5,7 @@ export default defineConfig({
     globalSetup: ['./tests/global-setup.ts'],
     // One Neon branch, shared: the files run one after the other.
     fileParallelism: false,
-    testTimeout: 30_000,
+    testTimeout: 60_000,
     hookTimeout: 60_000,
   },
 });

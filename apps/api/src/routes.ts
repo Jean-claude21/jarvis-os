@@ -1,5 +1,13 @@
 import { withWho } from './who';
-import { comment, commentsOf, goalsOf, patternsOf } from '@jarvis-os/core';
+import {
+  comment,
+  commentsOf,
+  goalsOf,
+  keepReview,
+  mirrorOf,
+  patternsOf,
+  timeOf,
+} from '@jarvis-os/core';
 import {
   addFile,
   agenda,
@@ -884,6 +892,52 @@ export function apiRoutes(deps: {
       ),
     ),
   );
+
+  // Her review (spec 043): the mirror of a period (the last seven days by default), and keeping it.
+  api.get('/review', async (c) => {
+    const to = c.req.query('to') ?? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    const from =
+      c.req.query('from') ?? new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10);
+    const start = timeOf(`${from.slice(0, 10)}T00:00`);
+    const end = timeOf(`${to.slice(0, 10)}T00:00`);
+    if (!start || !end) return c.json({ error: 'from and to are ISO days (« 2026-11-03 »).' }, 400);
+    return c.json(
+      await as(c, (tx) =>
+        mirrorOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+          start,
+          end,
+        ),
+      ),
+    );
+  });
+  api.post('/review', async (c) => {
+    const body = z
+      .object({
+        title: z.string().min(1).max(200),
+        from: z.string().min(10).max(10),
+        to: z.string().min(10).max(10),
+        answers: z
+          .array(z.object({ question: z.string().min(1), answer: z.string().min(1) }))
+          .max(20),
+        decisions: z
+          .array(z.object({ text: z.string().min(1).max(300), due: z.string().max(30).optional() }))
+          .max(20),
+      })
+      .parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        keepReview(tx, actor, space, {
+          ...body,
+          decisions: body.decisions.map((one) => ({
+            text: one.text,
+            ...(one.due ? { due: one.due } : {}),
+          })),
+        }),
+      ),
+    );
+  });
 
   // What comes back (spec 042), across her spaces.
   api.get('/patterns', async (c) =>

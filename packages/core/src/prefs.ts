@@ -33,6 +33,13 @@ export const preferencesSchema = z
     reminders: z
       .record(z.string().min(1).max(140), z.array(z.string().min(1).max(40)).max(5))
       .optional(),
+    /** Her review (spec 043): her own questions, and how often. */
+    review: z
+      .object({
+        questions: z.array(z.string().min(2).max(300)).max(12).optional(),
+        every: z.enum(['week', 'month']).optional(),
+      })
+      .optional(),
     /** The apps she said « not for me » to (spec 034): never proposed again. */
     appsDeclined: z.array(z.string().min(1).max(60)).max(200).optional(),
     /** The merges of kinds she said no to (spec 032): « dépense→Transaction ». */

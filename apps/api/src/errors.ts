@@ -38,7 +38,7 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
       message,
     ) ||
     // Repetitions, for whom, captures (specs 035–038).
-    /is no member of this space|names several members|does not repeat|has no occurrence on|is not a day \(|is not a time \(|^A capture needs|^A comment (needs|is larger)/.test(
+    /is no member of this space|names several members|does not repeat|has no occurrence on|is not a day \(|is not a time \(|^A capture needs|^A comment (needs|is larger)|^Give her answers/.test(
       message,
     ) ||
     // Views, her settings, her keys (spec 015).

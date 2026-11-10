@@ -84,6 +84,14 @@ export { comment, COMMENT_KIND, commentsOf } from './comments';
 export { GOAL_KIND, goalProgress, goalsOf, type GoalProgress } from './goals';
 export { patternsOf, type Pattern, type PatternKind } from './patterns';
 export {
+  DEFAULT_QUESTIONS,
+  keepReview,
+  mirrorOf,
+  REVIEW_KIND,
+  reviewsOf,
+  type Mirror,
+} from './review';
+export {
   closeIntentions,
   INTENTION_KIND,
   intentionIn,

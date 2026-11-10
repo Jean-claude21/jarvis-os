@@ -103,3 +103,20 @@ describe('through Claude', () => {
     expect(agenda.value.find((one) => one.id === id)?.status).toBe('done');
   });
 });
+
+describe('her review through Claude (spec 043)', () => {
+  it('prepares the mirror, then keeps her decisions as tasks', async () => {
+    const ama = await signUp('Ama');
+    const claude = await connect(ama);
+    const mirror = await claude.call<{ questions: string[] }>('review', {});
+    expect(mirror.isError).toBe(false);
+    expect(mirror.value.questions.length).toBeGreaterThan(0);
+    const kept = await claude.call<{ entries: { id: string }[] }>('review', {
+      action: 'keep',
+      answers: [{ question: 'Qu’est-ce qui a coincé ?', answer: 'Le sommeil.' }],
+      decisions: [{ text: 'Me coucher à 23h', due: 'demain' }],
+    });
+    expect(kept.isError).toBe(false);
+    expect(kept.value.entries).toHaveLength(2);
+  });
+});

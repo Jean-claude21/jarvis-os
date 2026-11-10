@@ -1,4 +1,4 @@
-import { goalsOf, patternsOf } from '@jarvis-os/core';
+import { goalsOf, keepReview, mirrorOf, patternsOf } from '@jarvis-os/core';
 import { withWho } from './who';
 import { OCCURRENCE_STATES, setOccurrence, type OccurrenceState } from '@jarvis-os/core';
 import { fileCapture, fileSure, inboxOf, type EntryInput } from '@jarvis-os/core';
@@ -970,6 +970,85 @@ export async function mcpServerFor(
       const ids = space ? [at(space)] : reach.map((one) => one.id);
       return act(async (tx) => (await Promise.all(ids.map((id) => goalsOf(tx, id)))).flat());
     }),
+  );
+
+  // Her review (spec 043): her questions, the mirror Jarvis prepares, her decisions as tasks.
+  server.registerTool(
+    'review',
+    {
+      description:
+        'Her review. `prepare` (default): the mirror of a period Jarvis prepares — what she kept and did, her money, what she said she would do and nothing followed, her goals, what comes back — with her own questions; ask them one by one, read the mirror with her (« déduit » for what you infer). `keep`: after her yes, her answers and her decisions, each decision becoming a task linked to the review. `from`/`to`: days or her words; the last seven days by default.',
+      inputSchema: {
+        action: z.enum(['prepare', 'keep']).default('prepare'),
+        from: z.string().min(2).optional(),
+        to: z.string().min(2).optional(),
+        title: z.string().min(1).max(200).optional(),
+        answers: z
+          .array(z.object({ question: z.string().min(1), answer: z.string().min(1) }))
+          .max(20)
+          .default([]),
+        decisions: z
+          .array(
+            z.object({
+              text: z.string().min(1).max(300),
+              due: z.string().optional(),
+              who: z.string().optional(),
+            }),
+          )
+          .max(20)
+          .default([]),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async (args: {
+        action: 'prepare' | 'keep';
+        from?: string | undefined;
+        to?: string | undefined;
+        title?: string | undefined;
+        answers: { question: string; answer: string }[];
+        decisions: { text: string; due?: string | undefined; who?: string | undefined }[];
+        space?: string | undefined;
+      }) =>
+        act(async (tx) => {
+          const zone = await zoneOf(tx);
+          const day = (said: string | undefined, fallback: Date) =>
+            said
+              ? (whenOf(said, zone)?.value ?? said).slice(0, 10)
+              : fallback.toISOString().slice(0, 10);
+          const to = day(args.to, new Date(Date.now() + 86_400_000));
+          const from = day(args.from, new Date(Date.now() - 6 * 86_400_000));
+          if (args.action === 'prepare') {
+            const ids = args.space ? [at(args.space)] : reach.map((one) => one.id);
+            return mirrorOf(tx, ids, new Date(`${from}T00:00:00Z`), new Date(`${to}T00:00:00Z`));
+          }
+          const space = at(args.space);
+          const decisions = await withWho(
+            deps.db,
+            tx,
+            space,
+            who.person,
+            args.decisions.map((one) => ({
+              data: {
+                ...(one.who ? { who: one.who } : {}),
+                ...(one.due ? { due: whenOf(one.due, zone)?.value ?? one.due } : {}),
+              },
+              text: one.text,
+            })),
+          );
+          return keepReview(tx, actor, space, {
+            title: args.title ?? `Revue du ${from} au ${to}`,
+            from,
+            to,
+            answers: args.answers,
+            decisions: decisions.map((one) => ({
+              text: one.text,
+              ...(typeof one.data.due === 'string' ? { due: one.data.due } : {}),
+              ...(typeof one.data.who === 'string' ? { who: one.data.who } : {}),
+            })),
+          });
+        }),
+    ),
   );
 
   // What comes back (spec 042): counted by Jarvis with its figures, read by the assistant.

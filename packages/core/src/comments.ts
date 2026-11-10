@@ -48,7 +48,8 @@ export async function commentsOf(tx: Tx, spaceId: string, id: string): Promise<E
   for (const row of rows) {
     const one = await get(tx, spaceId, row.id);
     if (one) {
-      const { links: _links, ...entry } = one;
+      const entry: Entry & { links?: unknown } = { ...one };
+      delete entry.links;
       out.push(entry);
     }
   }

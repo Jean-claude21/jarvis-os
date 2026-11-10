@@ -176,7 +176,15 @@ export {
   type ScriptRunner,
 } from './scripts';
 export { migrateKind, migrationSchema, type Migration, type MigrationReport } from './migrations';
-export { bundleSchema, exportApp, installApp, type Bundle, type InstallReport } from './bundles';
+export {
+  bundleSchema,
+  exportApp,
+  installApp,
+  type Bundle,
+  type InstallReport,
+  removeApp,
+  type RemoveReport,
+} from './bundles';
 export {
   checkView,
   filterFormula,

@@ -1,3 +1,4 @@
+import { COMMON_KINDS, removeApp } from '@jarvis-os/core';
 import {
   appLines,
   appsOf,
@@ -1190,7 +1191,9 @@ export async function mcpServerFor(
       description: [
         `Install an app in a space: one that ships with Jarvis by \`name\` (${shippedApps.map((one) => `« ${one.app} »: ${typeof one.description === 'object' ? (one.description.en ?? '') : (one.description ?? '')}`).join(' ')})`,
         'or a `bundle` (from `apps` (action `app_export`)). `dryRun` (default true) lists what would be created; what',
-        'is already there (same kind and title) is kept. Show her, then install with `dryRun: false`.',
+        'is already there (same kind and title) is kept; `reuse` lists what she already keeps under another name',
+        '(« tu as déjà 5 « Compte » : je les utilise ? ») — offer it, and merge after her yes with `apps` (action',
+        '`merge_kinds`). Show her, then install with `dryRun: false`: one step in the journal, undone at once.',
       ].join(' '),
       inputSchema: {
         name: z.string().min(1).optional(),
@@ -1214,6 +1217,28 @@ export async function mcpServerFor(
         if (!bundle) throw new Error('Give `name` (an app Jarvis ships) or `bundle`.');
         return act((tx) => installApp(tx, actor, at(args.space), bundle, args.dryRun));
       },
+    ),
+  );
+
+  // Removing an app (spec 034), in the family « apps »: her data stays.
+  server.registerTool(
+    'app_remove',
+    {
+      description:
+        'Remove an app from a space after her yes: its role, pages, rules, scripts and the models of its own kinds are set aside at once (one step in the journal, undone at once); every entry of hers stays, and the models of the common types stay for her other apps. `dryRun` (default true) lists what would go.',
+      inputSchema: {
+        name: z.string().min(1).max(60),
+        dryRun: z.boolean().default(true),
+        space: spaceArg,
+      },
+      annotations: { destructiveHint: true },
+    },
+    tool(async (args: { name: string; dryRun: boolean; space?: string | undefined }) =>
+      act((tx) =>
+        removeApp(tx, actor, at(args.space), args.name, args.dryRun, (kind) =>
+          COMMON_KINDS.some((one) => one.kind === kind),
+        ),
+      ),
     ),
   );
 

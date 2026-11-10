@@ -23,6 +23,8 @@ import {
   renewCalendarKey,
   upcoming,
   backupsOf,
+  COMMON_KINDS,
+  removeApp,
   mergeKind,
   mergeProposals,
   type MergeStep,
@@ -521,6 +523,29 @@ export function apiRoutes(deps: {
       await act(c, (tx, actor, space) =>
         installApp(tx, actor, space, bundle, body.dryRun !== false),
       ),
+    );
+  });
+
+  // Removing an app (spec 034): her data stays; and « not for me », remembered.
+  api.post('/apps/remove', async (c) => {
+    const body = (await c.req.json()) as { name?: string; dryRun?: boolean };
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        removeApp(tx, actor, space, String(body.name ?? ''), body.dryRun !== false, (kind) =>
+          COMMON_KINDS.some((one) => one.kind === kind),
+        ),
+      ),
+    );
+  });
+  api.post('/apps/decline', async (c) => {
+    const body = (await c.req.json()) as { name?: string };
+    const name = String(body.name ?? '').trim();
+    if (!name) return c.json({ error: 'Give the app.' }, 400);
+    return c.json(
+      await as(c, async (tx, actor) => {
+        const now = (await preferencesOf(tx)).appsDeclined ?? [];
+        return setPreferences(tx, actor, { appsDeclined: [...new Set([...now, name])] });
+      }),
     );
   });
 

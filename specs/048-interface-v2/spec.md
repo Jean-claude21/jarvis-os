@@ -30,6 +30,10 @@ Day (each occurrence of what repeats: done, missed, postponed — that day only,
 
 « What has Jarvis kept, exactly? »: its fields in the model's order with their labels (the model's, else the usual ones), dates in her words, each value corrected in place (as Jarvis keeps it, never as words; written « said », undone from the message), its links as sentences in her words, the apps it touches, its notes (C8), its history (each step undone from here), « see the structure ».
 
+## I13 / I6 / I7 / I14 — Her apps (P1)
+
+« Toutes les apps »: installed (pinned to her sidebar, in her order, every device alike), the catalog (each previewed before it is installed: what will be made, what of hers is reused, one journal line), how they talk (who reads and writes which common type, the active bridges). An app's role (I6): what it covers, when it is concerned, what it reads and writes, what it asks, what her assistants know of it; removed from there (her entries stay).
+
 ## I11 — The phone (P1, first part)
 
 A tab bar under the thumb: Maintenant · Agenda · Noter (a few words kept at once) · À ranger · Menu.

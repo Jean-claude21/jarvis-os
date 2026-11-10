@@ -14,6 +14,7 @@ import { router } from './client/router';
 import { v2Pages } from './client/pages-v2';
 import { v2Agenda } from './client/pages-v2-agenda';
 import { v2Entry } from './client/pages-v2-entry';
+import { v2Apps } from './client/pages-v2-apps';
 import { v2Css } from './client/styles-v2';
 import { SPRITE } from './client/sprite';
 
@@ -34,6 +35,7 @@ const script = [
   v2Pages,
   v2Agenda,
   v2Entry,
+  v2Apps,
   bind,
   router,
 ].join('\n\n');

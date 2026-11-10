@@ -9,7 +9,7 @@ const pages = Object.assign({}, dayPages, lifePages, settingsPages, v2Pages);
 const V2 = new Set(Object.keys(v2Pages));
 
 const titles = { '': 'navNow', accueil: 'navHome', collections: 'navCollections', fichiers: 'navFiles', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
-  rappels: 'navReminders', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
+  rappels: 'navReminders', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
 
 let drawing = 0;
 async function show() {
@@ -28,7 +28,7 @@ async function show() {
     const html = await pages[key](params, id ? decodeURIComponent(id) : undefined);
     if (ticket !== drawing) return;
     page().classList.toggle('v2', V2.has(key));
-    page().innerHTML = html; bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); window.scrollTo(0, 0);
+    page().innerHTML = html; bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); window.scrollTo(0, 0);
     document.querySelectorAll('.x-tabbar a[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === key));
     if (key === 'ranger') counts();
   } catch (error) { if (ticket === drawing) fail(error); }

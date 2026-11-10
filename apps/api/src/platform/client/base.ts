@@ -97,15 +97,19 @@ const areaOfApp = (kinds, app) => { const k = kinds.find((one) => one.model && o
 async function drawApps() {
   const [kinds, appPages] = await Promise.all([api(inSpace('/kinds')), api(inSpace('/pages'))]);
   knownKinds = kinds;
-  const apps = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app).concat(appPages.filter((p) => p.app).map((p) => p.app)))];
+  const all = [...new Set(kinds.filter((k) => k.model && k.model.app).map((k) => k.model.app).concat(appPages.filter((p) => p.app).map((p) => p.app)))];
+  // Her pinned apps, in her order (I13), when she pinned some; else all of them.
+  await prefsNow();
+  const pins = (prefs && Array.isArray(prefs.pinned) ? prefs.pinned : []).filter((a) => all.includes(a));
+  const apps = pins.length ? pins : all;
   // Apps grouped by the area she files them in (spec 015); those not filed last.
   const groups = {};
   for (const a of apps) (groups[areaOfApp(kinds, a) || ''] = groups[areaOfApp(kinds, a) || ''] || []).push(a);
   const names = Object.keys(groups).sort((x, y) => (x === '') - (y === '') || x.localeCompare(y));
   const link = (a) => '<a class="navi" data-app="' + esc(encodeURIComponent(a)) + '" href="#/app/' + esc(encodeURIComponent(a)) + '"><span class="app-dot">' + esc(a.slice(0, 1).toUpperCase()) + '</span><span>' + esc(a) + '</span></a>';
   document.getElementById('apps').innerHTML = '<div class="caps">' + esc(W.navApps) + '</div>' +
-    (names.length === 1 && names[0] === '' ? groups[''].map(link).join('') : names.map((n) => '<details class="area" open><summary class="caps">' + esc(n || W.unfiled) + '</summary>' + groups[n].map(link).join('') + '</details>').join('')) +
-    '<a class="navi ghost" href="#/app">' + ICON_PLUS + '<span>' + esc(W.navAllApps) + '</span></a>';
+    (pins.length ? pins.map(link).join('') : names.length === 1 && names[0] === '' ? groups[''].map(link).join('') : names.map((n) => '<details class="area" open><summary class="caps">' + esc(n || W.unfiled) + '</summary>' + groups[n].map(link).join('') + '</details>').join('')) +
+    '<a class="navi ghost" href="#/apps">' + ICON_PLUS + '<span>' + esc(W.navAllApps) + '</span></a>';
 }
 
 // A kind whose model links it, or that other models link to (spec 014): its record page shows them.

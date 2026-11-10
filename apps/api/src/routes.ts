@@ -1,4 +1,5 @@
 import { withWho } from './who';
+import { appLines, appsOf, bridgesOf } from '@jarvis-os/core';
 import {
   comment,
   commentsOf,
@@ -103,7 +104,7 @@ import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type pg from 'pg';
 import { z } from 'zod';
-import { shippedApp, shippedApps } from './apps';
+import { shippedApp, shippedApps, shippedRoles } from './apps';
 import { telegramLink } from './telegram';
 import { briefText, channelOf, sendTelegram } from './watcher';
 import type { Auth } from './auth';
@@ -536,6 +537,21 @@ export function apiRoutes(deps: {
   // The apps Jarvis ships (spec 014), and installing one: tried first unless `dryRun` is false.
   api.get('/apps', (c) =>
     c.json(shippedApps.map((one) => ({ app: one.app, description: one.description ?? '' }))),
+  );
+
+  // Her apps in this space (I6, I7): each with its role, the line her assistants read, and the
+  // bridges among them.
+  api.get('/apps/mine', async (c) =>
+    c.json(
+      await act(c, async (tx, _a, space) => {
+        const apps = await appsOf(tx, space, shippedRoles);
+        const lines = appLines(apps, 'fr');
+        return {
+          apps: apps.map((one, at) => ({ ...one, line: lines[at] })),
+          bridges: await bridgesOf(tx, space),
+        };
+      }),
+    ),
   );
 
   api.post('/apps/install', async (c) => {

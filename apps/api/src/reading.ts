@@ -27,9 +27,19 @@ export async function readWords(bytes: Uint8Array, mediaType: string): Promise<s
   }
   if (mediaType.startsWith('image/')) {
     const { createWorker } = await import('tesseract.js');
-    const worker = await createWorker(['fra', 'eng'], 1, { cachePath: tmpdir() });
+    // A broken image makes the OCR worker throw outside any promise: caught here, it fails this file
+    // only, never the watcher's process (found on her real files, spec 026).
+    let broken: unknown = null;
+    const worker = await createWorker(['fra', 'eng'], 1, {
+      cachePath: tmpdir(),
+      errorHandler: (error: unknown) => {
+        broken = error;
+      },
+    });
     try {
-      const { data } = await worker.recognize(Buffer.from(bytes));
+      const { data } = await worker.recognize(Buffer.from(bytes)).catch((error: unknown) => {
+        throw new Error(`the image cannot be read (${String((broken ?? error) as Error)})`);
+      });
       // A photo without writing still gives a few stray signs: only words count.
       const words = data.text.match(/\p{L}{3,}/gu) ?? [];
       return words.length >= 3 ? data.text.trim() : null;
@@ -55,6 +65,10 @@ export async function readOnce(
 ): Promise<{ read: number; failed: number }> {
   const report = { read: 0, failed: 0 };
   for (const file of await filesToRead(db, READS_PER_PASS)) {
+    // Marked first: a file whose reading stops the process is not tried again and again.
+    await asPerson(db, file.person, (tx) =>
+      setFileWords(tx, file.entryId, { error: 'its reading was interrupted' }),
+    );
     try {
       const bytes = await blobs.get(file.storageKey);
       const text = await within(readWords(bytes, file.mediaType), READ_TIMEOUT_MS);

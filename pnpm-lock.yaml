@@ -68,6 +68,9 @@ importers:
       better-auth:
         specifier: ^1.7.14
         version: 1.7.14(pg@8.23.1)(vitest@4.1.12(@types/node@22.20.5)(vite@8.3.5(@types/node@22.20.5)(esbuild@0.25.12)(tsx@4.23.15)(yaml@2.9.1)))
+      chrono-node:
+        specifier: 2.10.3
+        version: 2.10.3
       hono:
         specifier: ^4.13.14
         version: 4.13.14
@@ -1132,6 +1135,10 @@ packages:
   chalk@4.1.2:
     resolution: {integrity: sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==}
     engines: {node: '>=10'}
+
+  chrono-node@2.10.3:
+    resolution: {integrity: sha512-MOfrzXgSMZTH4SZ5gyRKQCVwiCrCKY+uYkSJiWoRLXS88DA6WGJm8UjgS+VVEuUQeew/UUXaxrO+SeDn/WCisg==}
+    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
   color-convert@2.0.1:
     resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==}
@@ -3067,6 +3074,8 @@ snapshots:
     dependencies:
       ansi-styles: 4.3.0
       supports-color: 7.2.0
+
+  chrono-node@2.10.3: {}
 
   color-convert@2.0.1:
     dependencies:

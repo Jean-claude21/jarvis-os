@@ -7,6 +7,7 @@
 // Environment: NEON_API_KEY, JARVIS_NEON_PROJECT_ID, and the URLs of « test » (JARVIS_TEST_OWNER_URL,
 // JARVIS_TEST_APP_URL): a child branch keeps their roles and passwords, only its host differs.
 import { appendFileSync } from 'node:fs';
+import process from 'node:process';
 
 const [, , command, name] = process.argv;
 const key = process.env.NEON_API_KEY;

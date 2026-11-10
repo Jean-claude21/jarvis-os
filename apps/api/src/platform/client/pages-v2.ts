@@ -433,4 +433,62 @@ function bindModels(root) {
   }));
   root.querySelectorAll('[data-ask-claude]').forEach((b) => b.addEventListener('click', () => openDrawer(W.v2changeWithClaude, '<p>' + esc(W.v2askClaudeModel) + '</p>')));
 }
+
+// « Connexions » in the mockup: those who use Jarvis, and what Jarvis uses for her — even when she
+// does not speak to it. A connection is a key, not a sentence: each key is cut here.
+v2Pages.connexions = async function (params) {
+  const [list, tools, catalog, health] = await Promise.all([api('/connections'), api('/connectors'), api('/connectors/catalog'), fetch('/health').then((r) => r.json()).catch(() => null)]);
+  const logo = (l) => '<span class="app-icon" style="background:#' + esc(l.hex) + ';color:' + esc(l.fg) + ';width:24px;height:24px">' + (l.path ? '<svg viewBox="0 0 24 24" aria-hidden="true" style="width:14px;height:14px;fill:currentColor"><path d="' + esc(l.path) + '"/></svg>' : '<span style="font:700 11px/1 Archivo,sans-serif">' + esc(l.initial) + '</span>') + '</span>';
+  const known = (t) => catalog.find((e) => e.url && e.url === t.url);
+  const logoOfTool = (t) => { const e = known(t); return logo(e ? e.logo : { hex: '6B4E43', fg: '#ffffff', path: null, initial: (t.name || '?').slice(0, 1) }); };
+  const spaceNames = (ids) => me.spaces.filter((s) => ids.includes(s.id)).map((s) => s.name).join(', ') || '—';
+  const stateTag = (st) => '<span class="tag ' + (st === 'connected' ? 'ok' : st === 'needs_sign_in' ? 'late' : st === 'failed' || st === 'refused' ? 'error' : 'neutral') + '">' + esc(W['con_' + st] || st) + '</span>';
+  const assistants = '<div class="scroll"><table style="min-width:560px"><thead><tr><th>' + esc(W.v2assistant) + '</th><th>' + esc(W.navSpaces) + '</th><th>' + esc(W.v2lastAccess) + '</th><th>' + esc(W.v2state) + '</th><th></th></tr></thead><tbody>' +
+    list.map((c) => '<tr><td><div class="cell-title">' + esc(c.name || c.clientId) + '</div><div class="cell-sub">' + esc(c.contextReadAt ? say(W.contextRead, { date: time(c.contextReadAt) }) : W.contextNotRead) + '</div></td><td>' + esc(spaceNames(c.spaces)) + '</td><td class="mono" style="font-size:12.5px">' + esc(c.used ? time(c.used) : '—') + '</td><td><span class="tag ok">' + esc(W.v2connected) + '</span></td><td><button class="btn small" data-manage-client="' + esc(c.clientId) + '">' + esc(W.v2manage) + '</button></td></tr>').join('') +
+    '<tr><td><div class="cell-title">ChatGPT · ' + esc(W.v2otherAssistants) + '</div><div class="cell-sub">' + esc(W.v2pasteAddress) + '</div></td><td>—</td><td>—</td><td><span class="tag neutral">' + esc(W.v2notConnected) + '</span></td><td><button class="btn small" data-copy="' + esc(location.origin + '/mcp') + '">' + esc(W.copy) + '</button></td></tr>' +
+    '<tr><td><div class="cell-title">' + esc(W.v2watcher) + '</div><div class="cell-sub">' + esc(W.v2watcherDoes) + '</div></td><td>' + esc(W.v2all) + '</td><td class="mono" style="font-size:12.5px">' + esc(health && health.watcher && health.watcher.lastPassAt ? time(health.watcher.lastPassAt) : '—') + '</td><td><span class="tag ' + (health && health.watcher && !health.watcher.late ? 'ok' : 'late') + '">' + esc(health && health.watcher && !health.watcher.late ? W.v2active : W.v2late) + '</span></td><td></td></tr>' +
+    '</tbody></table></div><div class="pad"><div class="x-path">' + esc(W.connectLead) + ' <code class="url mono">' + esc(location.origin + '/mcp') + '</code> <button class="btn small" data-copy="' + esc(location.origin + '/mcp') + '">' + esc(W.copy) + '</button></div></div>';
+  const used = '<div class="scroll"><table style="min-width:560px"><thead><tr><th>' + esc(W.v2tool) + '</th><th>' + esc(W.v2whatItReads) + '</th><th>' + esc(W.v2whatItCanDo) + '</th><th>' + esc(W.v2state) + '</th><th></th></tr></thead><tbody>' +
+    (tools.length ? tools.map((t) => '<tr><td><div class="cell-title" style="display:flex;gap:8px;align-items:center;overflow-wrap:anywhere">' + logoOfTool(t) + esc(t.name) + '</div><div class="cell-sub">' + esc(t.serverName || t.url) + '</div></td><td><div class="cell-sub">' + esc(t.tools.length ? say(W.conTools, { n: t.tools.length }) : '—') + '</div></td><td><div class="cell-sub">' + esc(W.v2withYourYes) + '</div></td><td>' + stateTag(t.state) + '</td><td style="white-space:nowrap">' + (t.state === 'needs_sign_in' ? '<button class="btn small solid" data-con-signin="' + esc(t.id) + '">' + esc(W.conSignIn) + '</button> ' : '') + '<button class="btn small" data-con-check="' + esc(t.id) + '">' + esc(W.conCheck) + '</button> <button class="btn small" data-con-cut="' + esc(t.id) + '" data-name="' + esc(t.name) + '">' + esc(W.conCut) + '</button></td></tr>').join('') : '<tr><td colspan="5" class="muted">' + esc(W.conNone) + '</td></tr>') +
+    '</tbody></table></div>' +
+    '<div class="pad"><form class="form" id="con-add" style="padding:0;display:grid;gap:10px"><div class="field-row" style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px;align-items:end">' +
+    '<label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(W.v2addMcp) + ' <small class="muted">' + esc(W.v2anyMcp) + '</small><input class="field" name="url" type="url" required placeholder="https://exemple.com/mcp"></label>' +
+    '<label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(W.conName) + '<input class="field" name="name" required maxlength="80"></label>' +
+    '<input type="hidden" name="auth" value="oauth"><button class="btn solid">' + ic('i-plus') + esc(W.conConnect) + '</button></div>' +
+    '<details><summary class="cell-sub" style="cursor:pointer">' + esc(W.v2withKey) + '</summary><div style="display:grid;gap:10px;margin-top:10px"><label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(W.conAuth) + '<select class="field" name="authPick"><option value="oauth">' + esc(W.conAuthOauth) + '</option><option value="none">' + esc(W.conAuthNone) + '</option><option value="bearer">' + esc(W.conAuthBearer) + '</option><option value="header">' + esc(W.conAuthHeader) + '</option></select></label><label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(W.conHeader) + '<input class="field" name="headerName" placeholder="x-api-key"></label><label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(W.conKey) + '<input class="field" name="secret" type="password" autocomplete="off"></label></div></details></form></div>';
+  // The catalog, the most relevant first (her everyday tools: Drive, Gmail, Agenda…), with their logos.
+  const groups = ['everyday', 'files', 'money', 'work', 'design'];
+  const shown = catalog.filter((e) => !tools.some((t) => e.url && t.url === e.url));
+  const discover = groups.map((g) => {
+    const here = shown.filter((e) => e.group === g);
+    if (!here.length) return '';
+    return '<div class="caps" style="margin:14px 0 8px">' + esc(W['conGroup_' + g] || g) + '</div><div class="x-across">' + here.map((e) => '<div class="x-app"><div class="top">' + logo(e.logo) + esc(e.name) + '</div><p>' + esc(LANG === 'en' ? e.en : e.fr) + '</p><p class="cell-sub" style="margin:0">' + esc(e.url ? W['conWay_' + e.auth] : W.conWay_url) + '</p>' +
+      (e.ready
+        ? '<form class="tool-form" data-con-pick="' + esc(e.id) + '" data-name="' + esc(e.name) + '" data-url="' + esc(e.url) + '" data-auth="' + esc(e.auth) + '" style="display:grid;gap:8px">' + (e.url ? '' : '<input class="field" name="url" type="url" required placeholder="https://…" aria-label="' + esc(W.conUrl) + '">') + (e.auth === 'bearer' ? '<input class="field" name="secret" type="password" required autocomplete="off" placeholder="' + esc(W.conKey) + '" aria-label="' + esc(W.conKey) + '">' : '') +
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn small solid">' + esc(e.auth === 'oauth' ? W.conPickSignIn : W.conPick) + '</button>' + (e.help ? '<a class="cell-sub" href="' + esc(e.help) + '" target="_blank" rel="noopener">' + esc(e.url ? W.conWhereKey : W.conWhereUrl) + '</a>' : '') + '</div></form>'
+        : '<p class="cell-sub">' + esc(W.conNeedsGoogle) + '</p>') + '</div>').join('') + '</div>';
+  }).join('');
+  return v2head(esc(W.navConnections), esc(W.v2connectionsSub), '') +
+    '<div class="grid" style="grid-template-columns:minmax(0,1fr);gap:16px">' +
+    v2panel(W.v2theyUseJarvis, assistants, '', 'i-chat') +
+    v2panel(W.v2jarvisUsesThem, used, '', 'i-plug') +
+    v2panel(W.v2toConnectH, '<div class="pad">' + discover + '</div>', '<span class="muted" style="font-size:12px">' + esc(W.v2relevantFirst) + '</span>', 'i-spark') +
+    '</div><div class="hint">' + ic('i-lock') + '<span>' + W.v2keyHint + '</span></div>';
+};
+
+// What the connections page does beyond the usual gestures: the reach of an assistant, cut there.
+function bindConnexions(root) {
+  root.querySelectorAll('[data-manage-client]').forEach((b) => b.addEventListener('click', async () => {
+    const list = await api('/connections');
+    const c = list.find((x) => x.clientId === b.dataset.manageClient);
+    if (!c) return;
+    openDrawer(c.name || c.clientId, '<form data-reach="' + esc(c.clientId) + '" style="display:grid;gap:8px"><div class="caps">' + esc(W.reach) + '</div>' + me.spaces.map((s) => '<label style="display:flex;gap:8px;align-items:center"><input type="checkbox" value="' + esc(s.id) + '"' + (c.spaces.includes(s.id) ? ' checked' : '') + '> ' + esc(s.name) + '</label>').join('') + '<div style="display:flex;gap:8px;margin-top:8px"><button class="btn solid">' + esc(W.save) + '</button><button type="button" class="btn" data-revoke="' + esc(c.clientId) + '" data-name="' + esc(c.name || c.clientId) + '">' + esc(W.revoke) + '</button></div></form>', '', say(W.since, { date: day(c.since) }));
+    bindCommon(drawer());
+  }));
+  const form = root.querySelector('#con-add');
+  if (form) {
+    const pick = form.querySelector('[name="authPick"]');
+    if (pick) pick.addEventListener('change', () => { form.querySelector('[name="auth"]').value = pick.value; });
+  }
+}
 `;

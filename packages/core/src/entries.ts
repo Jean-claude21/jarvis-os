@@ -9,6 +9,7 @@ import { zoneOf } from './zone';
 import { checkRule, runRulesAfterSave, type Changed } from './rules';
 import { preferencesOf, type Preferences } from './prefs';
 import { syncReminders } from './reminders';
+import { closeIntentions } from './intentions';
 import { TIME_FIELDS } from './time';
 import { checkScript } from './scripts';
 import { checkView } from './views';
@@ -532,6 +533,17 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
   }
   // Her rules (spec 014) run on what this save made or changed, in the same transaction.
   await runRulesAfterSave(tx, actor, spaceId, changed);
+  // An entry that does what she meant to do closes her intention (spec 040).
+  if (actor.client !== 'intentions' && actor.client !== 'reminders') {
+    const made = changed.filter((one) => one.created);
+    if (made.length) {
+      const { rows } = await tx.query<{ id: string; kind: string; title: string }>(
+        'select id, kind, title from entry where id = any($1)',
+        [made.map((one) => one.id)],
+      );
+      await closeIntentions(tx, actor, spaceId, rows);
+    }
+  }
   // The reminders attached to what moved, or to what says them (spec 037), kept in step.
   const timed = changed.filter(
     (one) =>

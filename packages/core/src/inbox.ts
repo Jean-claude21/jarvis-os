@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import type { Actor, Tx } from './db';
 import { find, get, save, type Entry } from './entries';
+import { noteIntention } from './intentions';
 import { modelOf } from './models';
 import type { EntryInput } from './schemas';
 
@@ -109,7 +110,13 @@ export async function capture(
       },
     ],
   });
-  return (await get(tx, spaceId, saved.entries[0]!.id))!;
+  const id = saved.entries[0]!.id;
+  // « Je vais appeler Paul »: an intention too, or the same one said once more (spec 040).
+  await noteIntention(tx, actor, spaceId, text, {
+    at: input.at ?? new Date().toISOString(),
+    from: id,
+  });
+  return (await get(tx, spaceId, id))!;
 }
 
 /** Her captures still to file, the oldest first. */

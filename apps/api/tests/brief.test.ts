@@ -42,10 +42,12 @@ describe('the morning brief', () => {
       agenda: [],
       habits: [{ title: 'Prière', space: 'Moi', today: 'todo', rate30: 86.7 }],
       inbox: 2,
+      intentions: [{ title: 'Appeler Paul', times: 4, since: '2026-10-20T08:00:00Z' }],
     });
     expect(text).toContain('samedi 31 octobre');
     expect(text).toContain('• Payer le loyer');
     expect(text).toContain('○ Prière (à faire · 86,7 % sur 30 j)');
     expect(text).toContain('📥 2 chose(s) à ranger');
+    expect(text).toContain('« Appeler Paul » — dit 4 fois depuis le 20 oct.');
   });
 });

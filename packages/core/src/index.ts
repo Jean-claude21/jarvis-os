@@ -81,6 +81,16 @@ export { DEFAULT_ZONE, inZone, nextTime, repetitionFromWords, repetitionOf, time
 export { watchOnce, type Due, type PassReport } from './watcher';
 export { defaultsFor, offsetOf, syncReminders } from './reminders';
 export { comment, COMMENT_KIND, commentsOf } from './comments';
+export {
+  closeIntentions,
+  INTENTION_KIND,
+  intentionIn,
+  lingering,
+  noteIntention,
+  openIntentions,
+  stemsOf,
+  type IntentionStatus,
+} from './intentions';
 export { upcoming, type Upcoming } from './upcoming';
 export {
   agenda,

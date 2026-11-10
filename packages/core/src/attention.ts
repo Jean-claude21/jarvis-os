@@ -1,5 +1,6 @@
 import { agenda, type Occurrence } from './agenda';
 import type { Tx } from './db';
+import { lingering, openIntentions } from './intentions';
 import { CLOSED } from './keywords';
 import { inZone } from './time';
 import { zoneOf } from './zone';
@@ -8,7 +9,7 @@ import { zoneOf } from './zone';
 // what went wrong, what is late, what Jarvis proposed, what comes today and this week. The
 // platform's « Maintenant » draws it; her day is the calendar of today.
 
-export type AttentionGroup = 'fix' | 'late' | 'proposed' | 'today' | 'week';
+export type AttentionGroup = 'fix' | 'late' | 'proposed' | 'intent' | 'today' | 'week';
 
 export interface AttentionItem {
   id: string;
@@ -25,6 +26,8 @@ export interface AttentionItem {
   reason: string;
   /** For whom (spec 038): her, or nobody in particular — what is for another stays theirs. */
   who: string | null;
+  /** An intention nothing followed (spec 040): how many times she said it, since when. */
+  said?: { times: number; since: string };
 }
 
 export interface Attention {
@@ -181,7 +184,33 @@ export async function attention(
     });
   }
 
-  const order: AttentionGroup[] = ['fix', 'late', 'proposed', 'today', 'week'];
+  // What she said she would do and nothing followed (spec 040): plan it, hand it over, or drop it.
+  for (const spaceId of spaceIds) {
+    const { rows: named } = await tx.query<{ name: string }>(
+      'select name from space where id = $1',
+      [spaceId],
+    );
+    for (const one of await openIntentions(tx, spaceId)) {
+      const said = lingering(one, now);
+      if (!said) continue;
+      add({
+        id: one.id,
+        kind: one.kind,
+        title: one.title,
+        space: named[0]?.name ?? '',
+        spaceId,
+        group: 'intent',
+        when: null,
+        allDay: false,
+        status: 'open',
+        reason: 'said',
+        who: typeof one.data.who === 'string' ? one.data.who : null,
+        said,
+      });
+    }
+  }
+
+  const order: AttentionGroup[] = ['fix', 'late', 'proposed', 'intent', 'today', 'week'];
   items.sort(
     (a, b) =>
       order.indexOf(a.group) - order.indexOf(b.group) ||

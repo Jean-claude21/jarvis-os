@@ -59,6 +59,9 @@ export function appPage(lang: Lang): string {
 <style>${brandCss}${appCss}${v2Css}
 svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .v2 #space-menu { position: absolute; top: 58px; left: 12px; right: 12px; z-index: 30; }
+.v2 .check-row { grid-template-columns: 22px minmax(0, 1fr) auto; }
+.v2 .check-row .t { white-space: normal; overflow-wrap: anywhere; }
+.v2 .actions { flex-wrap: wrap; }
 .v2 .side { position: relative; }
 .v2 .chip-now::before { content: none; display: none; }
 .page.v2 > * { flex-shrink: 0; }

@@ -1,5 +1,5 @@
 import { withWho } from './who';
-import { comment, commentsOf } from '@jarvis-os/core';
+import { comment, commentsOf, goalsOf } from '@jarvis-os/core';
 import {
   addFile,
   agenda,
@@ -875,6 +875,15 @@ export function apiRoutes(deps: {
       }),
     );
   });
+
+  // Her goals (spec 041), across her spaces, with their progress.
+  api.get('/goals', async (c) =>
+    c.json(
+      await as(c, async (tx) =>
+        (await Promise.all(c.get('spaces').map((one) => goalsOf(tx, one.id)))).flat(),
+      ),
+    ),
+  );
 
   // What needs her now (spec 013), across her spaces: to fix, late, proposed, today, this week.
   api.get('/now', async (c) =>

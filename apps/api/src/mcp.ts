@@ -1,3 +1,4 @@
+import { goalsOf } from '@jarvis-os/core';
 import { withWho } from './who';
 import { OCCURRENCE_STATES, setOccurrence, type OccurrenceState } from '@jarvis-os/core';
 import { fileCapture, fileSure, inboxOf, type EntryInput } from '@jarvis-os/core';
@@ -954,6 +955,21 @@ export async function mcpServerFor(
           return { ...result, fields: result.fields.map((field) => field.path) };
         }),
     ),
+  );
+
+  // Her goals (spec 041): progress computed from what is linked to them, never written by hand.
+  server.registerTool(
+    'goals',
+    {
+      description:
+        'Her open goals (kind « Goal »: `target` and `unit` when measurable, `deadline`), each with its progress computed from what is linked to it (a fund, an account, habits, tasks, a project): what they hold against the target, or how they are kept; days left. To make one move, link what advances it (role « advances »); never write a progress by hand.',
+      inputSchema: { space: spaceArg },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async ({ space }: { space?: string | undefined }) => {
+      const ids = space ? [at(space)] : reach.map((one) => one.id);
+      return act(async (tx) => (await Promise.all(ids.map((id) => goalsOf(tx, id)))).flat());
+    }),
   );
 
   // Collections, buttons, public links, viewers (spec 016).

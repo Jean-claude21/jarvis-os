@@ -40,8 +40,9 @@ export const TOOL_GROUPS: Record<string, { about: string; actions: string[] }> =
     actions: ['history', 'undo', 'archive'],
   },
   figures: {
-    about: 'Figures already shaped: a kind’s statistics, a collection’s, a saved view run.',
-    actions: ['stats', 'collection_stats', 'view'],
+    about:
+      'Figures already shaped: a kind’s statistics, a collection’s, a saved view run, her goals and how far they went.',
+    actions: ['stats', 'collection_stats', 'view', 'goals'],
   },
   files: {
     about: 'Small files through the conversation, and links to open a stored one.',

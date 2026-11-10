@@ -78,6 +78,8 @@ export const ruleDataSchema = z.object({
   if: z.string().trim().min(1).max(2000).optional(),
   then: z.array(actionSchema).min(1).max(10),
   active: z.boolean().optional(),
+  // A bridge between apps (spec 033): never blocks what she saves.
+  bridge: z.boolean().optional(),
   app: z.string().trim().min(1).max(60).optional(),
   // Kept by Jarvis: the next scheduled run, the last day a « before » rule ran, its last error.
   next: z.string().optional(),
@@ -316,10 +318,34 @@ export async function runRulesAfterSave(
           one.fields.some((field) => fold(field) === fold(when.changed.field)));
       // A rule does not fire again on its own change.
       if (!fires || actor.client === `rule:${rule.title}`) continue;
+      // A bridge never blocks what she saves: if the other app cannot take it as it is (a field it
+      // requires, unknown here), her entry is kept and a reminder says what to complete.
+      const bridge = rule.data.bridge === true;
+      if (bridge) await tx.query('savepoint jarvis_bridge');
       try {
         await act(tx, actor, spaceId, rule, one.id);
+        if (bridge) await tx.query('release savepoint jarvis_bridge');
       } catch (error) {
-        throw new Error(`Rule « ${rule.title} » failed: ${(error as Error).message}`);
+        const why = (error as Error).message;
+        if (!bridge) throw new Error(`Rule « ${rule.title} » failed: ${why}`);
+        await tx.query('rollback to savepoint jarvis_bridge');
+        await save(
+          tx,
+          { ...actor, client: `rule:${rule.title}`, depth: (actor.depth ?? 0) + 1 },
+          spaceId,
+          {
+            entries: [
+              {
+                ref: 'r',
+                kind: 'Reminder',
+                title: `À compléter : ${rule.title} — ${why.split('. ')[0]!.slice(0, 160)}`,
+                data: { at: new Date().toISOString(), status: 'planned' },
+                origin: 'inferred',
+              },
+            ],
+            links: [{ from: 'r', to: one.id, role: 'for' }],
+          },
+        );
       }
     }
   }

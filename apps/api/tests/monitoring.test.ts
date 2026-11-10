@@ -71,6 +71,6 @@ describe('the health of the server', () => {
     expect(later).toMatchObject({ status: 'unhealthy', watcher: { late: true } });
     const answer = await server.app.request('/health');
     expect([200, 503]).toContain(answer.status);
-    expect(Object.keys(await answer.json())).toEqual(['status', 'database', 'watcher']);
+    expect(Object.keys(await answer.json())).toEqual(['status', 'release', 'database', 'watcher']);
   });
 });

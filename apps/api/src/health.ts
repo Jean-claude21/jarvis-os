@@ -10,6 +10,8 @@ export const WATCHER_LATE_MS = 5 * 60_000;
 
 export interface Health {
   status: 'healthy' | 'unhealthy';
+  /** The commit this deploy was built from (set by `pnpm deploy:*`), else « local ». */
+  release: string;
   database: boolean;
   watcher: { lastPassAt: string | null; late: boolean; failed: boolean; failures: number };
 }
@@ -26,6 +28,8 @@ const failuresIn = (report: unknown): number => {
   return count;
 };
 
+const RELEASE = process.env.JARVIS_RELEASE ?? 'local';
+
 export async function healthOf(db: pg.Pool, now = Date.now()): Promise<Health> {
   try {
     const last = await lastPass(db, 'watcher');
@@ -35,12 +39,14 @@ export async function healthOf(db: pg.Pool, now = Date.now()): Promise<Health> {
     const failures = failuresIn(last?.report);
     return {
       status: late || failed || failures > 0 ? 'unhealthy' : 'healthy',
+      release: RELEASE,
       database: true,
       watcher: { lastPassAt: at?.toISOString() ?? null, late, failed, failures },
     };
   } catch {
     return {
       status: 'unhealthy',
+      release: RELEASE,
       database: false,
       watcher: { lastPassAt: null, late: true, failed: false, failures: 0 },
     };

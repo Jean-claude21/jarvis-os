@@ -119,10 +119,12 @@ describe('the new platform (spec 013)', () => {
     expect(down.headers.get('content-disposition')).toMatch(/^attachment/);
   });
 
-  it('draws the new shell: now, the apps, the files', async () => {
+  it('draws the shell of the mockup: the switcher, « Chercher ou noter », the nav, the drawer', async () => {
     const html = await (await ama.call('/app', { headers: { 'accept-language': 'fr' } })).text();
     expect(html).toContain('Maintenant');
-    expect(html).toContain('Fichiers');
-    expect(html).toContain('id="apps"');
+    for (const id of ['switcher', 'search', 'nav', 'crumbs', 'drawer', 'note', 'tab-ranger']) {
+      expect(html).toContain(`id="${id}"`);
+    }
+    expect(html).toContain('class="page v2"');
   });
 });

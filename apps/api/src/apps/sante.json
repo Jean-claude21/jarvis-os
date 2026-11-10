@@ -61,11 +61,7 @@
               "fr": "Statut",
               "en": "Status"
             },
-            "options": [
-              "planned",
-              "done",
-              "cancelled"
-            ],
+            "options": ["planned", "done", "cancelled"],
             "optionLabels": {
               "planned": {
                 "fr": "prévu",
@@ -82,11 +78,7 @@
             }
           }
         ],
-        "columns": [
-          "start",
-          "practitioner",
-          "status"
-        ]
+        "columns": ["start", "practitioner", "status"]
       }
     },
     {
@@ -148,12 +140,7 @@
             "formula": "if(end, days_between(today(), end), null)"
           }
         ],
-        "columns": [
-          "dose",
-          "start",
-          "end",
-          "days_left"
-        ]
+        "columns": ["dose", "start", "end", "days_left"]
       }
     },
     {
@@ -179,14 +166,7 @@
               "fr": "Type",
               "en": "Type"
             },
-            "options": [
-              "weight",
-              "blood_pressure",
-              "glucose",
-              "temperature",
-              "sleep",
-              "other"
-            ],
+            "options": ["weight", "blood_pressure", "glucose", "temperature", "sleep", "other"],
             "optionLabels": {
               "weight": {
                 "fr": "poids",
@@ -231,12 +211,7 @@
             }
           }
         ],
-        "columns": [
-          "date",
-          "type",
-          "value",
-          "unit"
-        ]
+        "columns": ["date", "type", "value", "unit"]
       }
     },
     {
@@ -272,11 +247,7 @@
             }
           }
         ],
-        "columns": [
-          "date",
-          "practitioner",
-          "until"
-        ]
+        "columns": ["date", "practitioner", "until"]
       }
     }
   ],
@@ -327,12 +298,7 @@
             "query": {
               "kind": "Appointment",
               "where": "start >= today()",
-              "fields": [
-                "start",
-                "practitioner",
-                "place",
-                "reason"
-              ],
+              "fields": ["start", "practitioner", "place", "reason"],
               "sort": "start"
             }
           },
@@ -344,12 +310,7 @@
             },
             "query": {
               "kind": "Treatment",
-              "fields": [
-                "dose",
-                "start",
-                "end",
-                "days_left"
-              ],
+              "fields": ["dose", "start", "end", "days_left"],
               "sort": "-start"
             }
           },
@@ -376,12 +337,7 @@
             },
             "query": {
               "kind": "Measure",
-              "fields": [
-                "date",
-                "type",
-                "value",
-                "unit"
-              ],
+              "fields": ["date", "type", "value", "unit"],
               "sort": "-date",
               "limit": 20
             }
@@ -428,23 +384,9 @@
       "vaccin",
       "analyse"
     ],
-    "watches": [
-      "Appointment",
-      "Treatment",
-      "Measure",
-      "Prescription"
-    ],
-    "reads": [
-      "Appointment",
-      "Treatment",
-      "Measure"
-    ],
-    "writes": [
-      "Appointment",
-      "Treatment",
-      "Measure",
-      "Prescription"
-    ],
+    "watches": ["Appointment", "Treatment", "Measure", "Prescription"],
+    "reads": ["Appointment", "Treatment", "Measure"],
+    "writes": ["Appointment", "Treatment", "Measure", "Prescription"],
     "ask": [
       {
         "fr": "Quel jour et à quelle heure ?",

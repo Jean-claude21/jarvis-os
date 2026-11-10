@@ -21,12 +21,7 @@
               "fr": "Statut",
               "en": "Status"
             },
-            "options": [
-              "idea",
-              "active",
-              "paused",
-              "done"
-            ],
+            "options": ["idea", "active", "paused", "done"],
             "optionLabels": {
               "idea": {
                 "fr": "idée",
@@ -89,13 +84,7 @@
             "formula": "count(milestones)"
           }
         ],
-        "columns": [
-          "status",
-          "deadline",
-          "next_step",
-          "milestones_done",
-          "milestones_all"
-        ]
+        "columns": ["status", "deadline", "next_step", "milestones_done", "milestones_all"]
       }
     },
     {
@@ -131,10 +120,7 @@
               "fr": "État",
               "en": "State"
             },
-            "options": [
-              "todo",
-              "done"
-            ],
+            "options": ["todo", "done"],
             "optionLabels": {
               "todo": {
                 "fr": "à faire",
@@ -148,11 +134,7 @@
             "default": "todo"
           }
         ],
-        "columns": [
-          "project",
-          "due",
-          "state"
-        ]
+        "columns": ["project", "due", "state"]
       }
     }
   ],
@@ -200,12 +182,7 @@
             "query": {
               "kind": "Project",
               "where": "status = 'active'",
-              "fields": [
-                "deadline",
-                "next_step",
-                "milestones_done",
-                "milestones_all"
-              ],
+              "fields": ["deadline", "next_step", "milestones_done", "milestones_all"],
               "sort": "deadline"
             }
           }
@@ -233,20 +210,9 @@
       "deadline",
       "milestone"
     ],
-    "watches": [
-      "Project",
-      "Milestone",
-      "Task"
-    ],
-    "reads": [
-      "Project",
-      "Milestone",
-      "Task"
-    ],
-    "writes": [
-      "Project",
-      "Milestone"
-    ],
+    "watches": ["Project", "Milestone", "Task"],
+    "reads": ["Project", "Milestone", "Task"],
+    "writes": ["Project", "Milestone"],
     "ask": [
       {
         "fr": "Pour quel projet ?",

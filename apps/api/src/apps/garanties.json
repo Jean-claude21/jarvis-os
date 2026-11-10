@@ -56,12 +56,7 @@
             "formula": "days_between(today(), ends)"
           }
         ],
-        "columns": [
-          "item",
-          "store",
-          "ends",
-          "days_left"
-        ]
+        "columns": ["item", "store", "ends", "days_left"]
       }
     }
   ],
@@ -98,12 +93,7 @@
             "query": {
               "kind": "Warranty",
               "where": "ends >= today()",
-              "fields": [
-                "item",
-                "store",
-                "ends",
-                "days_left"
-              ],
+              "fields": ["item", "store", "ends", "days_left"],
               "sort": "ends"
             }
           },
@@ -136,17 +126,9 @@
       "recu",
       "ticket de caisse"
     ],
-    "watches": [
-      "Warranty",
-      "Equipment",
-      "Transaction"
-    ],
-    "reads": [
-      "Warranty"
-    ],
-    "writes": [
-      "Warranty"
-    ],
+    "watches": ["Warranty", "Equipment", "Transaction"],
+    "reads": ["Warranty"],
+    "writes": ["Warranty"],
     "ask": [
       {
         "fr": "Jusqu’à quand est-ce garanti ?",

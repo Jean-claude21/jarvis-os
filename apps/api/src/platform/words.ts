@@ -24,7 +24,8 @@ export const appWords = {
     mv_optional: 'facultatif',
     mv_saved: 'Mouvement écrit.',
     mv_overTitle: 'Le fonds « {fund} » dépasse.',
-    mv_overText: 'Il lui reste {left} ce mois : choisis un autre fonds, ou garde-le en sachant qu’un rappel suivra.',
+    mv_overText:
+      'Il lui reste {left} ce mois : choisis un autre fonds, ou garde-le en sachant qu’un rappel suivra.',
     rd_jarvis: 'Jarvis',
     rd_ai: 'IA',
     rd_you: 'toi',
@@ -46,7 +47,8 @@ export const appWords = {
     rt_regularity: 'Régularité',
     rt_everyDay: 'tous les jours',
     rt_weekdays: 'lun–ven',
-    rt_noHabit: 'Aucune habitude avec ses jours encore. Dis à Claude « prière chaque jour à 4:30, non négociable » et elle apparaît ici.',
+    rt_noHabit:
+      'Aucune habitude avec ses jours encore. Dis à Claude « prière chaque jour à 4:30, non négociable » et elle apparaît ici.',
     rt_active: 'Habitudes actives',
     rt_habit: 'Habitude',
     rt_facet: 'Aspect',
@@ -57,7 +59,8 @@ export const appWords = {
     rt_30d: '30 jours',
     rt_yes: 'oui',
     rt_no: 'non',
-    rt_hint: 'Chaque habitude garde sa fiche : pourquoi, cadre et règles, stratégie en cours. Dis à Claude <em>« à partir de lundi, la gym passe à 6:00 »</em> : l’habitude, l’agenda et les rappels changent ensemble, et tout s’annule.',
+    rt_hint:
+      'Chaque habitude garde sa fiche : pourquoi, cadre et règles, stratégie en cours. Dis à Claude <em>« à partir de lundi, la gym passe à 6:00 »</em> : l’habitude, l’agenda et les rappels changent ensemble, et tout s’annule.',
     rt_mostlyOn: 'manqué surtout le {day} ({n} fois)',
     rt_missedN: '{n} jour(s) manqué(s) sur la période',
     rt_slipsNone: 'Rien ne glisse : toutes tes habitudes sont au-dessus de 70 %.',
@@ -78,7 +81,8 @@ export const appWords = {
     rt_now: 'En ce moment',
     rt_nnOfDay: 'Non-négociables du jour',
     rt_left: 'Encore {n} aujourd’hui',
-    rt_checkHow: 'Coche ici, ou dis-le à Claude : « prière faite, 4h35 ». L’heure que tu donnes est celle qui est notée.',
+    rt_checkHow:
+      'Coche ici, ou dis-le à Claude : « prière faite, 4h35 ». L’heure que tu donnes est celle qui est notée.',
     rt_streakN: 'série {n} j',
     rt_notToday: 'pas aujourd’hui',
     rt_checked: 'Pointé.',
@@ -88,7 +92,8 @@ export const appWords = {
     rv_off: 'pas prévu',
     rv_streak: 'série',
     rv_days: '{n} j',
-    rv_noHabit: 'Aucune habitude avec ses jours encore. Dis à Claude « méditer lundi, mercredi, vendredi » et elle apparaît ici.',
+    rv_noHabit:
+      'Aucune habitude avec ses jours encore. Dis à Claude « méditer lundi, mercredi, vendredi » et elle apparaît ici.',
     rv_planned: 'prévu (gabarit)',
     rv_real: 'réel',
     rv_noTime: 'Rien de répété avec une durée sur la période.',
@@ -1259,7 +1264,8 @@ export const appWords = {
     mv_optional: 'optional',
     mv_saved: 'Movement written.',
     mv_overTitle: 'The fund « {fund} » goes over.',
-    mv_overText: 'It has {left} left this month: choose another fund, or keep it knowing a reminder will follow.',
+    mv_overText:
+      'It has {left} left this month: choose another fund, or keep it knowing a reminder will follow.',
     rd_jarvis: 'Jarvis',
     rd_ai: 'AI',
     rd_you: 'you',
@@ -1281,7 +1287,8 @@ export const appWords = {
     rt_regularity: 'Consistency',
     rt_everyDay: 'every day',
     rt_weekdays: 'Mon–Fri',
-    rt_noHabit: 'No habit with its days yet. Tell Claude « prayer every day at 4:30, non-negotiable » and it shows here.',
+    rt_noHabit:
+      'No habit with its days yet. Tell Claude « prayer every day at 4:30, non-negotiable » and it shows here.',
     rt_active: 'Active habits',
     rt_habit: 'Habit',
     rt_facet: 'Facet',
@@ -1292,7 +1299,8 @@ export const appWords = {
     rt_30d: '30 days',
     rt_yes: 'yes',
     rt_no: 'no',
-    rt_hint: 'Each habit keeps its card: why, frame and rules, current strategy. Tell Claude <em>« from Monday, gym moves to 6:00 »</em>: the habit, the calendar and the reminders change together, and all can be undone.',
+    rt_hint:
+      'Each habit keeps its card: why, frame and rules, current strategy. Tell Claude <em>« from Monday, gym moves to 6:00 »</em>: the habit, the calendar and the reminders change together, and all can be undone.',
     rt_mostlyOn: 'missed mostly on {day} ({n} times)',
     rt_missedN: '{n} day(s) missed in the period',
     rt_slipsNone: 'Nothing slips: all your habits are above 70 %.',
@@ -1313,7 +1321,8 @@ export const appWords = {
     rt_now: 'Right now',
     rt_nnOfDay: 'Today’s non-negotiables',
     rt_left: '{n} more today',
-    rt_checkHow: 'Check here, or tell Claude: « prayer done, 4:35 ». The time you give is the one noted.',
+    rt_checkHow:
+      'Check here, or tell Claude: « prayer done, 4:35 ». The time you give is the one noted.',
     rt_streakN: 'streak {n} d',
     rt_notToday: 'not today',
     rt_checked: 'Checked in.',
@@ -1323,7 +1332,8 @@ export const appWords = {
     rv_off: 'not planned',
     rv_streak: 'streak',
     rv_days: '{n} d',
-    rv_noHabit: 'No habit with its days yet. Tell Claude « meditate Monday, Wednesday, Friday » and it shows here.',
+    rv_noHabit:
+      'No habit with its days yet. Tell Claude « meditate Monday, Wednesday, Friday » and it shows here.',
     rv_planned: 'planned (template)',
     rv_real: 'actual',
     rv_noTime: 'Nothing repeated with a duration in the period.',

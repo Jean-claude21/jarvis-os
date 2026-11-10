@@ -49,11 +49,7 @@
             }
           }
         ],
-        "columns": [
-          "date",
-          "with",
-          "place"
-        ]
+        "columns": ["date", "with", "place"]
       }
     },
     {
@@ -89,11 +85,7 @@
               "fr": "État",
               "en": "State"
             },
-            "options": [
-              "open",
-              "kept",
-              "dropped"
-            ],
+            "options": ["open", "kept", "dropped"],
             "optionLabels": {
               "open": {
                 "fr": "en cours",
@@ -111,11 +103,7 @@
             "default": "open"
           }
         ],
-        "columns": [
-          "to",
-          "due",
-          "state"
-        ]
+        "columns": ["to", "due", "state"]
       }
     },
     {
@@ -151,11 +139,7 @@
               "fr": "Type",
               "en": "Type"
             },
-            "options": [
-              "birthday",
-              "anniversary",
-              "other"
-            ],
+            "options": ["birthday", "anniversary", "other"],
             "optionLabels": {
               "birthday": {
                 "fr": "anniversaire",
@@ -172,11 +156,7 @@
             }
           }
         ],
-        "columns": [
-          "person",
-          "date",
-          "type"
-        ]
+        "columns": ["person", "date", "type"]
       }
     }
   ],
@@ -214,11 +194,7 @@
             },
             "query": {
               "kind": "Meeting",
-              "fields": [
-                "date",
-                "with",
-                "place"
-              ],
+              "fields": ["date", "with", "place"],
               "sort": "-date",
               "limit": 20
             }
@@ -231,11 +207,7 @@
             },
             "query": {
               "kind": "ImportantDate",
-              "fields": [
-                "person",
-                "date",
-                "type"
-              ],
+              "fields": ["person", "date", "type"],
               "sort": "date"
             }
           },
@@ -273,22 +245,9 @@
       "déjeuner",
       "dejeuner"
     ],
-    "watches": [
-      "Person",
-      "Meeting",
-      "Commitment",
-      "ImportantDate"
-    ],
-    "reads": [
-      "Person",
-      "Meeting",
-      "Commitment"
-    ],
-    "writes": [
-      "Meeting",
-      "Commitment",
-      "ImportantDate"
-    ],
+    "watches": ["Person", "Meeting", "Commitment", "ImportantDate"],
+    "reads": ["Person", "Meeting", "Commitment"],
+    "writes": ["Meeting", "Commitment", "ImportantDate"],
     "ask": [
       {
         "fr": "Avec qui ?",

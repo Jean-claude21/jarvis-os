@@ -29,12 +29,7 @@
               "fr": "Statut",
               "en": "Status"
             },
-            "options": [
-              "to_read",
-              "reading",
-              "read",
-              "dropped"
-            ],
+            "options": ["to_read", "reading", "read", "dropped"],
             "optionLabels": {
               "to_read": {
                 "fr": "à lire",
@@ -98,12 +93,7 @@
             "formula": "count(quotes)"
           }
         ],
-        "columns": [
-          "author",
-          "status",
-          "finished",
-          "rating"
-        ]
+        "columns": ["author", "status", "finished", "rating"]
       }
     },
     {
@@ -141,10 +131,7 @@
             }
           }
         ],
-        "columns": [
-          "book",
-          "page"
-        ]
+        "columns": ["book", "page"]
       }
     },
     {
@@ -182,10 +169,7 @@
             }
           }
         ],
-        "columns": [
-          "book",
-          "date"
-        ]
+        "columns": ["book", "date"]
       }
     }
   ],
@@ -230,10 +214,7 @@
             },
             "query": {
               "kind": "Quote",
-              "fields": [
-                "book",
-                "page"
-              ],
+              "fields": ["book", "page"],
               "sort": "-createdAt",
               "limit": 20
             }
@@ -269,19 +250,9 @@
       "roman",
       "book"
     ],
-    "watches": [
-      "Book",
-      "Quote",
-      "Insight"
-    ],
-    "reads": [
-      "Book"
-    ],
-    "writes": [
-      "Book",
-      "Quote",
-      "Insight"
-    ],
+    "watches": ["Book", "Quote", "Insight"],
+    "reads": ["Book"],
+    "writes": ["Book", "Quote", "Insight"],
     "ask": [
       {
         "fr": "Quel livre ?",

@@ -37,13 +37,7 @@
               "fr": "Humeur",
               "en": "Mood"
             },
-            "options": [
-              "great",
-              "good",
-              "neutral",
-              "low",
-              "hard"
-            ],
+            "options": ["great", "good", "neutral", "low", "hard"],
             "optionLabels": {
               "great": {
                 "fr": "très bien",
@@ -68,10 +62,7 @@
             }
           }
         ],
-        "columns": [
-          "date",
-          "mood"
-        ]
+        "columns": ["date", "mood"]
       }
     },
     {
@@ -107,10 +98,7 @@
             }
           }
         ],
-        "columns": [
-          "date",
-          "about"
-        ]
+        "columns": ["date", "about"]
       }
     },
     {
@@ -138,9 +126,7 @@
             }
           }
         ],
-        "columns": [
-          "date"
-        ]
+        "columns": ["date"]
       }
     }
   ],
@@ -186,10 +172,7 @@
             },
             "query": {
               "kind": "Journal",
-              "fields": [
-                "date",
-                "mood"
-              ],
+              "fields": ["date", "mood"],
               "sort": "-date",
               "limit": 20
             }
@@ -227,19 +210,9 @@
       "reflexion",
       "bilan"
     ],
-    "watches": [
-      "Journal",
-      "Reflection",
-      "Gratitude"
-    ],
-    "reads": [
-      "Journal"
-    ],
-    "writes": [
-      "Journal",
-      "Reflection",
-      "Gratitude"
-    ],
+    "watches": ["Journal", "Reflection", "Gratitude"],
+    "reads": ["Journal"],
+    "writes": ["Journal", "Reflection", "Gratitude"],
     "ask": [],
     "instructions": {
       "fr": "Ce qu’elle raconte de sa journée est un « Journal » (date, texte dans ses mots, humeur si elle la dit) ; une pensée sur un sujet est une « Reflection » ; un merci est une « Gratitude ». Garde ses mots.",

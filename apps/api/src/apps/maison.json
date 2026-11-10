@@ -64,12 +64,7 @@
             "formula": "sum(maintenances.cost)"
           }
         ],
-        "columns": [
-          "room",
-          "bought",
-          "price",
-          "next_service"
-        ]
+        "columns": ["room", "bought", "price", "next_service"]
       }
     },
     {
@@ -115,11 +110,7 @@
             }
           }
         ],
-        "columns": [
-          "equipment",
-          "date",
-          "cost"
-        ]
+        "columns": ["equipment", "date", "cost"]
       }
     }
   ],
@@ -156,10 +147,7 @@
             "query": {
               "kind": "Equipment",
               "where": "next_service != null",
-              "fields": [
-                "room",
-                "next_service"
-              ],
+              "fields": ["room", "next_service"],
               "sort": "next_service"
             }
           },
@@ -171,13 +159,7 @@
             },
             "query": {
               "kind": "Equipment",
-              "fields": [
-                "room",
-                "brand",
-                "bought",
-                "price",
-                "upkeep"
-              ],
+              "fields": ["room", "brand", "bought", "price", "upkeep"],
               "sort": "room"
             }
           },
@@ -218,18 +200,9 @@
       "équipement",
       "equipement"
     ],
-    "watches": [
-      "Equipment",
-      "Maintenance",
-      "Transaction"
-    ],
-    "reads": [
-      "Equipment"
-    ],
-    "writes": [
-      "Equipment",
-      "Maintenance"
-    ],
+    "watches": ["Equipment", "Maintenance", "Transaction"],
+    "reads": ["Equipment"],
+    "writes": ["Equipment", "Maintenance"],
     "ask": [
       {
         "fr": "Pour quel équipement ?",

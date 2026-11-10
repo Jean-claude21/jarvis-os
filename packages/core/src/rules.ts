@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import { z } from 'zod';
+import { callConnection, partOf, receive } from './agents';
 import { readerOf, type EntryView, type Reader } from './compute';
 import { asPerson, type Actor, type Tx } from './db';
 import { save } from './entries';
@@ -51,6 +52,27 @@ export const actionSchema = z.union([
       params: z.record(z.string(), z.string()).optional(),
     }),
   }),
+  /** One of her connections reached (spec 050): an agent's address, or an MCP server's tool. */
+  z.object({
+    call: z
+      .object({
+        connection: z.string().trim().min(1).max(80),
+        path: z.string().trim().max(300).optional(),
+        tool: z.string().trim().min(1).max(120).optional(),
+        body: z.record(z.string(), value).optional(),
+        /** Her entries of this kind sent along, under `entries` (her criteria). */
+        include: z.string().trim().min(1).max(80).optional(),
+        save: z
+          .object({
+            kind: z.string().trim().min(1).max(80),
+            at: z.string().trim().min(1).max(120).optional(),
+            match: z.string().trim().min(1).max(60).optional(),
+            title: z.string().trim().min(1).max(300).optional(),
+          })
+          .optional(),
+      })
+      .refine((call) => !(call.path && call.tool), 'A call has a path or a tool, not both.'),
+  }),
 ]);
 export type Action = z.infer<typeof actionSchema>;
 
@@ -96,7 +118,7 @@ export function checkRule(data: unknown): RuleData {
       .map((issue) => `${issue.path.join('.') || 'rule'}: ${issue.message}`)
       .join('; ');
     throw new Error(
-      `A « ${RULE_KIND} » is { when: { saved: kind } | { changed: { kind, field } } | { schedule: "0 8 1 * *" } | { before: { kind, field, days } }, if?, then: [{ create: { kind, title, data? } } | { update: { set } } | { link: { to, role } } | { remind: { text, at? } } | { run_script: { script, params? } }] } — ${issues}.`,
+      `A « ${RULE_KIND} » is { when: { saved: kind } | { changed: { kind, field } } | { schedule: "0 8 1 * *" } | { before: { kind, field, days } }, if?, then: [{ create: { kind, title, data? } } | { update: { set } } | { link: { to, role } } | { remind: { text, at? } } | { run_script: { script, params? } } | { call: { connection, path? | tool?, body?, include?, save?: { kind, at?, match?, title? } } }] } — ${issues}.`,
     );
   }
   const rule = parsed.data;
@@ -285,6 +307,63 @@ async function act(
         params: action.run_script.params ?? {},
         entryId: entryId ?? undefined,
       });
+    } else if ('call' in action) {
+      // The agent's answer, written as her entries; a failure says so in a reminder and stops the
+      // rule — nothing half-written (a savepoint holds what the answer would have made).
+      const body: Record<string, unknown> = {};
+      for (const [name, raw] of Object.entries(action.call.body ?? {}))
+        body[name] = await valueOf(raw, scope, reader);
+      if (action.call.include) {
+        const { rows } = await tx.query<{ title: string; data: Record<string, unknown> }>(
+          `select title, data - 'text' as data from entry
+            where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
+            order by updated_at desc limit 20`,
+          [spaceId, action.call.include],
+        );
+        body.entries = rows.map((row) => ({ title: row.title, ...row.data }));
+      }
+      if (entryId && scope) body.entry = { id: entryId, title: (await scope.get('title')) ?? null };
+      await tx.query('savepoint jarvis_call');
+      try {
+        const answer = await callConnection({
+          person: actor.person,
+          spaceId,
+          connection: action.call.connection,
+          ...(action.call.path !== undefined ? { path: action.call.path } : {}),
+          ...(action.call.tool ? { tool: action.call.tool } : {}),
+          body,
+        });
+        if (action.call.save) {
+          const part = partOf(answer, action.call.save.at);
+          const items = (Array.isArray(part) ? part : part ? [part] : []).filter(
+            (one): one is Record<string, unknown> => Boolean(one) && typeof one === 'object',
+          );
+          await receive(tx, by, spaceId, {
+            kind: action.call.save.kind,
+            items: items.slice(0, 200),
+            ...(action.call.save.match ? { match: action.call.save.match } : {}),
+            ...(action.call.save.title ? { title: action.call.save.title } : {}),
+          });
+        }
+        await tx.query('release savepoint jarvis_call');
+      } catch (error) {
+        await tx.query('rollback to savepoint jarvis_call');
+        await call({
+          entries: [
+            {
+              kind: 'Reminder',
+              title:
+                `Rule « ${rule.title} »: the call to « ${action.call.connection} » failed — ${(error as Error).message}`.slice(
+                  0,
+                  300,
+                ),
+              data: { at: reader.clock.now.toISOString(), status: 'planned' },
+              origin: 'inferred',
+            },
+          ],
+        });
+        return true;
+      }
     }
   }
   return true;

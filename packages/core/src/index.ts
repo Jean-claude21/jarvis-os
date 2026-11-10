@@ -82,7 +82,7 @@ export { watchOnce, type Due, type PassReport } from './watcher';
 export { defaultsFor, offsetOf, syncReminders } from './reminders';
 export { comment, COMMENT_KIND, commentsOf } from './comments';
 export { GOAL_KIND, goalProgress, goalsOf, type GoalProgress } from './goals';
-export { patternsOf, type Pattern, type PatternKind } from './patterns';
+export { appPatternsOf, patternsOf, type Pattern, type PatternKind } from './patterns';
 export { impactOf, replan, windowOf, type Impact, type Replan } from './impact';
 export { personCard, type PersonCard } from './people';
 export { answerOf, asksAFigure, periodOf, type Answer } from './answer';
@@ -245,7 +245,16 @@ export {
   type ViewResult,
 } from './views';
 export { isZone, setZone, zoneOf } from './zone';
-export { createKey, KEY_PREFIX, keyOwner, keysOf, revokeKey, type PersonalKey } from './keys';
+export {
+  createKey,
+  KEY_PREFIX,
+  keyOwner,
+  keyScope,
+  keysOf,
+  revokeKey,
+  type KeyScope,
+  type PersonalKey,
+} from './keys';
 export {
   collectionsOf,
   collectionStats,
@@ -381,3 +390,13 @@ export {
   type CaptureSource,
   type Guess,
 } from './inbox';
+export {
+  callConnection,
+  partOf,
+  receive,
+  receiveSchema,
+  setCallOut,
+  type CallOut,
+  type CallRequest,
+  type ReceiveInput,
+} from './agents';

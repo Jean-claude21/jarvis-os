@@ -27,6 +27,18 @@ export const bridgeSchema = z.object({
 });
 export type Bridge = z.infer<typeof bridgeSchema>;
 
+export const appPatternSchema = z.object({
+  about: words,
+  kind: z.string().trim().min(1).max(80),
+  /** A formula on each entry (« category = 'Transport' »). */
+  where: z.string().trim().min(1).max(500).optional(),
+  /** A field added up instead of counting (« amount »). */
+  sum: z.string().trim().min(1).max(60).optional(),
+  /** How much it must move, in percent, to come back to her (30 by default). */
+  rise: z.number().min(5).max(1000).optional(),
+});
+export type AppPattern = z.infer<typeof appPatternSchema>;
+
 export const roleSchema = z.object({
   covers: words,
   /** Her words that concern it (« achat », « payé »): accents and case aside. */
@@ -40,6 +52,8 @@ export const roleSchema = z.object({
   /** Its own instructions, read only when it is concerned. */
   instructions: words.optional(),
   bridges: z.array(bridgeSchema).max(20).default([]),
+  /** What it watches for in her life (spec 050): counted (or summed) over 30 days against the 30 before. */
+  patterns: z.array(appPatternSchema).max(20).default([]),
 });
 export type Role = z.infer<typeof roleSchema>;
 

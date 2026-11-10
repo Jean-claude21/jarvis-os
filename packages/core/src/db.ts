@@ -11,6 +11,8 @@ export interface Actor {
   client?: string;
   /** How deep in rules and scripts this change is (spec 014): rules stop at three. */
   depth?: number;
+  /** A program's key (spec 050): the only kinds it may write. */
+  kinds?: string[];
 }
 
 export function pool(connectionString: string): pg.Pool {

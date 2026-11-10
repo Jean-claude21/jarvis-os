@@ -93,6 +93,8 @@ export const lineFieldSchema = z.object({
 
 export const modelFieldSchema = lineFieldSchema.extend({
   type: z.enum(TYPES),
+  /** Other names it is given under (spec 050): an agent's `job_title` is written as this field. */
+  aliases: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
   /** The kind a `link` points to; the link's role is the field's name. */
   target: z.string().trim().min(1).max(80).optional(),
   /** `one` (default): a new link replaces the old one; `many`: links add up. */

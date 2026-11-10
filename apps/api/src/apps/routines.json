@@ -267,6 +267,16 @@
       "fr": "Une habitude faite est un « CheckIn » du jour relié à son « Habit » ; la série et le taux se calculent.",
       "en": "A habit done is a « CheckIn » of the day linked to its « Habit »; streak and rate are computed."
     },
-    "bridges": []
+    "bridges": [],
+    "patterns": [
+      {
+        "about": {
+          "fr": "Tes pointages d'habitudes",
+          "en": "Your habit check-ins"
+        },
+        "kind": "CheckIn",
+        "rise": 25
+      }
+    ]
   }
 }

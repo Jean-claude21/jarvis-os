@@ -16,6 +16,7 @@ import {
   spacesOf,
   renderPage,
   renderRecord,
+  setCallOut,
   useScriptRunner,
   zoneOf,
   shareOf,
@@ -71,6 +72,8 @@ export function makeApp(settings: Settings) {
     key: secretsKey(settings.authSecret),
     publicUrl: settings.publicUrl,
   });
+  // A rule's `call` (spec 050) reaches her connections through this service.
+  setCallOut(connectors.callOut);
   const auth = makeAuth({ db, secret: settings.authSecret, publicUrl: settings.publicUrl });
   const resource = mcpResource(settings.publicUrl);
   const app = new Hono();

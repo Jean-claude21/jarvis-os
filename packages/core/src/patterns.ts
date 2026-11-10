@@ -1,12 +1,15 @@
 import type { Tx } from './db';
+import { evaluate, parse } from './formula';
 import { planOf, rateOf } from './habits';
+import { dataInNewWords } from './keywords';
+import { appsOf } from './roles';
 
 // Patterns (spec 042, plan v2 C12): Jarvis counts what comes back — a state said again and again,
 // a habit that slips, spending that rises, a person often named — with the figures that justify
 // each, marked « inferred ». Counted without any AI; an assistant reads them at the brief and the
 // review and says what they may mean.
 
-export type PatternKind = 'state' | 'habit' | 'spending' | 'person';
+export type PatternKind = 'state' | 'habit' | 'spending' | 'person' | 'app';
 
 export interface Pattern {
   kind: PatternKind;
@@ -156,6 +159,92 @@ export async function patternsOf(tx: Tx, spaceIds: string[], now = new Date()): 
       ids: row.ids.slice(0, 10),
       origin: 'inferred',
     });
+  }
+  out.push(...(await appPatternsOf(tx, spaceIds, now)));
+  return out;
+}
+
+const said = (value: unknown, lang: 'fr' | 'en') =>
+  typeof value === 'string'
+    ? value
+    : value && typeof value === 'object'
+      ? String((value as Record<string, string>)[lang] ?? Object.values(value)[0] ?? '')
+      : '';
+
+/**
+ * What her apps watch for (spec 050): each pattern of an app's role, counted (or summed) on the
+ * entries of its kind matching `where`, the last 30 days against the 30 before; it comes back when
+ * it moved by `rise` percent (30 by default), up or down, named with its app.
+ */
+export async function appPatternsOf(
+  tx: Tx,
+  spaceIds: string[],
+  now = new Date(),
+  lang: 'fr' | 'en' = 'fr',
+): Promise<Pattern[]> {
+  const out: Pattern[] = [];
+  const split = new Date(now.getTime() - 30 * DAY);
+  const since = new Date(now.getTime() - 60 * DAY);
+  const clock = { now };
+  for (const spaceId of spaceIds) {
+    for (const app of await appsOf(tx, spaceId)) {
+      for (const pattern of app.role.patterns ?? []) {
+        const { rows } = await tx.query<{
+          id: string;
+          title: string;
+          data: Record<string, unknown>;
+          day: string;
+        }>(
+          `select id, title, data - 'text' as data,
+                  coalesce(left(data->>'date', 10), to_char(created_at, 'YYYY-MM-DD')) as day
+             from entry
+            where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
+              and coalesce(left(data->>'date', 10), to_char(created_at, 'YYYY-MM-DD')) >= $3
+            limit 2000`,
+          [spaceId, pattern.kind, dayOf(since)],
+        );
+        const test = pattern.where ? parse(pattern.where) : null;
+        let recent = 0;
+        let before = 0;
+        const ids: string[] = [];
+        for (const row of rows) {
+          if (row.day > dayOf(now)) continue;
+          if (test) {
+            // Her words for a field (« statut ») read as Jarvis keeps them (« status »).
+            const scope = {
+              get: (name: string) =>
+                name === 'title'
+                  ? row.title
+                  : (row.data[name] ??
+                    row.data[Object.keys(dataInNewWords({ [name]: 1 }))[0]!] ??
+                    null),
+            };
+            if (!(await evaluate(test, scope, clock).catch(() => false))) continue;
+          }
+          const value = pattern.sum ? Number(row.data[pattern.sum]) || 0 : 1;
+          if (row.day >= dayOf(split)) {
+            recent += value;
+            ids.push(row.id);
+          } else before += value;
+        }
+        if (!before) continue;
+        const change = Math.round((recent / before - 1) * 100);
+        if (Math.abs(change) < (pattern.rise ?? 30)) continue;
+        out.push({
+          kind: 'app',
+          about: said(pattern.about, lang) || pattern.kind,
+          figures: {
+            app: app.app,
+            recent: Math.round(recent),
+            before: Math.round(before),
+            change,
+            measure: pattern.sum ? 'sum' : 'count',
+          },
+          ids: ids.slice(0, 10),
+          origin: 'inferred',
+        });
+      }
+    }
   }
   return out;
 }

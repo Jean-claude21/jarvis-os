@@ -126,7 +126,7 @@ const settingsPages = {
         (linked ? '' : '<p class="muted">' + esc(W.briefNeedsTelegram) + '</p>') +
         '<div class="actions"><button class="quiet" id="brief-show">' + esc(W.briefShow) + '</button>' + (linked ? '<button id="brief-send">' + esc(W.briefSend) + '</button>' : '') + '</div>') +
       card(W.keysTitle, '<p class="muted">' + esc(W.keysLead) + '</p><div id="newkey"></div>' +
-        (keys.length ? '<ul class="list">' + keys.map((k) => '<li><span>' + esc(k.name) + ' <span class="muted">· ' + esc(say(W.keyMade, { day: day(k.createdAt) })) + (k.lastUsedAt ? ' · ' + esc(say(W.keyUsed, { day: day(k.lastUsedAt) })) : '') + '</span></span><button class="quiet" data-revoke="' + esc(k.id) + '">' + esc(W.keyRevoke) + '</button></li>').join('') + '</ul>' : '') +
+        (keys.length ? '<ul class="list">' + keys.map((k) => '<li><span>' + esc(k.name) + (k.spaceId || k.kinds ? ' <span class="tag info">' + esc(say(W.keyLimited, { space: k.spaceId ? ((me.spaces.find((x) => x.id === k.spaceId) || {}).name || '?') : W.keyAllSpaces, kinds: k.kinds ? k.kinds.join(', ') : W.keyAllKinds })) + '</span>' : '') + ' <span class="muted">· ' + esc(say(W.keyMade, { day: day(k.createdAt) })) + (k.lastUsedAt ? ' · ' + esc(say(W.keyUsed, { day: day(k.lastUsedAt) })) : '') + '</span></span><button class="quiet" data-revoke="' + esc(k.id) + '">' + esc(W.keyRevoke) + '</button></li>').join('') + '</ul>' : '') +
         '<div class="actions"><button id="key-new">' + esc(W.keyNew) + '</button></div>') +
       '</section>';
   },

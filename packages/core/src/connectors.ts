@@ -25,6 +25,8 @@ export interface Connector {
   url: string;
   auth: ConnectorAuth;
   headerName: string | null;
+  /** MCP, or plain HTTP: an agent's own address (spec 050). */
+  protocol: 'mcp' | 'http';
   /** Whether a secret is kept: never the secret itself. */
   hasSecret: boolean;
   state: ConnectorState;
@@ -45,7 +47,7 @@ export interface Probe {
   resources: Connector['resources'];
 }
 
-const columns = `id, space_id, name, url, auth, header_name, secret_sealed is not null as has_secret,
+const columns = `id, space_id, name, url, auth, header_name, protocol, secret_sealed is not null as has_secret,
   state, reason, server_name, tools, resources, checked_at, created_at`;
 
 const connectorOf = (row: Record<string, unknown>): Connector => ({
@@ -55,6 +57,7 @@ const connectorOf = (row: Record<string, unknown>): Connector => ({
   url: String(row.url),
   auth: row.auth as ConnectorAuth,
   headerName: (row.header_name as string | null) ?? null,
+  protocol: row.protocol === 'http' ? 'http' : 'mcp',
   hasSecret: row.has_secret === true,
   state: row.state as ConnectorState,
   reason: (row.reason as string | null) ?? null,
@@ -84,11 +87,12 @@ export async function addConnector(
     auth: ConnectorAuth;
     headerName?: string | null;
     sealed?: string | null;
+    protocol?: 'mcp' | 'http';
   },
 ): Promise<Connector> {
   const { rows } = await tx.query(
-    `insert into connector (id, space_id, name, url, auth, header_name, secret_sealed, created_by)
-     values ($1, $2, $3, $4, $5, $6, $7, $8) returning ${columns}`,
+    `insert into connector (id, space_id, name, url, auth, header_name, secret_sealed, created_by, protocol)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning ${columns}`,
     [
       prefixedId('con'),
       input.spaceId,
@@ -98,6 +102,7 @@ export async function addConnector(
       input.headerName ?? null,
       input.sealed ?? null,
       actor.person,
+      input.protocol ?? 'mcp',
     ],
   );
   const made = connectorOf(rows[0]!);

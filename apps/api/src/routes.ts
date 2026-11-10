@@ -8,6 +8,7 @@ import {
   replan,
   mirrorOf,
   patternsOf,
+  personCard,
   timeOf,
 } from '@jarvis-os/core';
 import {

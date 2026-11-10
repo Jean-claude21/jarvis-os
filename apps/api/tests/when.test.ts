@@ -144,3 +144,18 @@ describe('what it changes, through Claude (spec 044)', () => {
     expect(proposed.value.steps.map((one) => one.does)).toEqual(['to_reschedule', 'to_reschedule']);
   });
 });
+
+describe('a person’s card through Claude (spec 045)', () => {
+  it('finds them by name', async () => {
+    const ama = await signUp('Ama');
+    const claude = await connect(ama);
+    await claude.call('save', { entries: [{ kind: 'Person', title: 'Paul Agbo' }] });
+    const card = await claude.call<{ title: string; promises: unknown[] }>('person', {
+      person: 'Paul',
+    });
+    expect(card.isError).toBe(false);
+    expect(card.value.title).toBe('Paul Agbo');
+    const none = await claude.call<{ error: string }>('person', { person: 'Zoé' });
+    expect(none.value.error).toContain('No person');
+  });
+});

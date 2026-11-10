@@ -4,6 +4,7 @@ import {
   keepReview,
   mirrorOf,
   patternsOf,
+  personCard,
   replan,
   windowOf,
 } from '@jarvis-os/core';

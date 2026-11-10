@@ -12,6 +12,8 @@ export type Command =
   // A migration of a kind's entries, an app installed (spec 014): undone at once, like an import.
   | 'migration.run'
   | 'app.install'
+  // An app removed (spec 034): its pieces set aside at once, her data kept; undone at once.
+  | 'app.remove'
   // Many entries filed, retyped or set aside, a kind renamed (spec 017): undone at once.
   | 'entries.change'
   | 'kind.rename'
@@ -155,6 +157,7 @@ export async function undo(
     line.command === 'import.run' ||
     line.command === 'migration.run' ||
     line.command === 'app.install' ||
+    line.command === 'app.remove' ||
     line.command === 'entries.change' ||
     line.command === 'kind.rename'
   ) {

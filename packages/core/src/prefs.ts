@@ -18,6 +18,8 @@ export const preferencesSchema = z
       .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
       .nullable()
       .optional(),
+    /** The apps she said « not for me » to (spec 034): never proposed again. */
+    appsDeclined: z.array(z.string().min(1).max(60)).max(200).optional(),
     /** The merges of kinds she said no to (spec 032): « dépense→Transaction ». */
     mergesDismissed: z.array(z.string().min(3).max(200)).max(500).optional(),
   })

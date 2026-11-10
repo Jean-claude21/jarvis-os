@@ -663,7 +663,8 @@ v2Pages.app = async function (params, name) {
     models.map((k) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '"' + (params.get('kind') === k.kind ? ' aria-current="page"' : '') + '>' + esc(kindLabel(k)) + '<span class="n">' + num(k.count || 0) + '</span></a>').join('') +
     views.map((v) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?view=' + esc(encodeURIComponent(v.id)) + '"' + (params.get('view') === v.id ? ' aria-current="page"' : '') + '>' + esc(tr(v.label) || v.title) + '</a>').join('') +
     '<a href="#/role/' + esc(encodeURIComponent(name)) + '">' + esc(W.v2appRoleTab) + '</a></nav>';
-  const head = v2head(esc(name) + ' <span class="built">' + esc(say(W.v2nKinds, { n: models.length })) + '</span>', esc(W.v2appSub), '', v2app(name));
+  const moves = models.some((k) => k.kind === 'Transaction');
+  const head = v2head(esc(name) + ' <span class="built">' + esc(say(W.v2nKinds, { n: models.length })) + '</span>', esc(W.v2appSub), moves ? '<button class="btn solid" data-add-move>' + ic('i-plus') + esc(W.mv_title) + '</button>' : '', v2app(name));
   crumbs([W.navApps, name]);
   if (habitTab) {
     crumbs([W.navApps, name, { aujourdhui: W.rt_today, habitudes: W.rt_habits, regularite: W.rt_regularity }[habitTab] || '']);

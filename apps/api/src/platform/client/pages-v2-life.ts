@@ -18,13 +18,14 @@ Object.assign(v2Pages, {
     const s = spaces.find((x) => x.id === (id || space)) || spaces[0];
     const inS = (path) => path + (path.includes('?') ? '&' : '?') + 'space=' + encodeURIComponent(s.id);
     const [charters, routines] = await Promise.all([api(inS('/entries?kind=Charter&limit=5')), api(inS('/entries?kind=Routine&limit=50'))]);
+    shownRoutines = routines;
     const color = (person) => MEMBER_COLORS[Math.max(0, s.members.findIndex((m) => m.person === person)) % MEMBER_COLORS.length];
     const nameOf = (person) => person === me.person.id ? W.v2you : ((s.members.find((m) => m.person === person) || {}).name || '?');
     const av = (person, size) => person ? '<span title="' + esc(nameOf(person)) + '" style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;display:inline-grid;place-items:center;font-size:' + Math.round(size / 2.4) + 'px;font-weight:700;color:var(--on-primary);background:' + color(person) + ';flex:none">' + esc(initials(nameOf(person))) + '</span>' : '<span title="' + esc(W.v2nobody) + '" style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;display:inline-grid;place-items:center;border:1.5px dashed var(--rule-strong);color:var(--faint);font-size:12px;flex:none">?</span>';
     const charter = charters[0];
     const charterHtml = charter ? '<div class="pad"><p class="context" style="margin-top:0">' + esc(String(charter.data.text || '').replace(/[#>*_]+/g, '').replace(/ +/g, ' ').trim().slice(0, 420)) + (String(charter.data.text || '').length > 420 ? '…' : '') + '</p><p class="muted" style="font-size:12.5px">' + esc(say(W.chars, { n: num(String(charter.data.text || '').length) })) + ' · ' + esc(W.v2keptAsIs) + ' · <a href="#/entree/' + esc(charter.id) + '">' + esc(W.v2readAll) + '</a></p></div>' : '<div class="pad muted">' + esc(W.noCharter) + '</div>';
     const part = (r, k) => { const t = r.data.trigger || {}; return k === 'when' ? (t.repeat || (t.phrases || []).join(', ') || r.data.when || '—') : k === 'prep' ? (r.data.prepare || []).map((p) => typeof p === 'string' ? W['prep_' + p] || p : p.find ? kindName(p.find.kind) : '').join(', ') : k === 'result' ? (r.data.result && r.data.result.kind ? kindName(r.data.result.kind) : '—') : ''; };
-    const routinesHtml = routines.length ? '<div class="scroll"><table><thead><tr><th>' + esc(W.v2routine) + '</th><th>' + esc(W.v2trigger) + '</th><th>' + esc(W.v2jarvisPrepares) + ' <small class="faint">' + esc(W.v2noAi) + '</small></th><th>' + esc(W.v2produces) + '</th></tr></thead><tbody>' + routines.map((r) => '<tr data-go="#/entree/' + esc(r.id) + '" style="cursor:pointer"><td><div class="cell-title">' + esc(r.title) + '</div>' + (r.data.instructions ? '' : '<div class="cell-sub">' + esc(W.v2asText) + ' · <button class="btn small" data-structure-routine="' + esc(r.id) + ':' + esc(s.id) + '">' + esc(W.v2structureIt) + '</button></div>') + '</td><td class="mono" style="font-size:12px">' + esc(part(r, 'when')) + '</td><td><div class="cell-sub">' + esc(part(r, 'prep') || '—') + '</div></td><td><div class="cell-sub">' + esc(part(r, 'result')) + '</div></td></tr>').join('') + '</tbody></table></div>' : '<div class="pad muted">' + esc(W.v2noRoutine) + '</div>';
+    const routinesHtml = routines.length ? '<div class="scroll"><table><thead><tr><th>' + esc(W.v2routine) + '</th><th>' + esc(W.v2trigger) + '</th><th>' + esc(W.v2jarvisPrepares) + ' <small class="faint">' + esc(W.v2noAi) + '</small></th><th>' + esc(W.v2produces) + '</th></tr></thead><tbody>' + routines.map((r) => '<tr data-routine-open="' + esc(r.id) + '" style="cursor:pointer"><td><div class="cell-title">' + esc(r.title) + '</div>' + (r.data.instructions ? '' : '<div class="cell-sub">' + esc(W.v2asText) + ' · <button class="btn small" data-structure-routine="' + esc(r.id) + ':' + esc(s.id) + '">' + esc(W.v2structureIt) + '</button></div>') + '</td><td class="mono" style="font-size:12px">' + esc(part(r, 'when')) + '</td><td><div class="cell-sub">' + esc(part(r, 'prep') || '—') + '</div></td><td><div class="cell-sub">' + esc(part(r, 'result')) + '</div></td></tr>').join('') + '</tbody></table></div>' : '<div class="pad muted">' + esc(W.v2noRoutine) + '</div>';
     let shared = '';
     if (!s.personal) {
       const [tasks, hist, moves] = await Promise.all([api(inS('/entries?kind=Task&limit=100')), api(inS('/history?limit=12')), api(inS('/entries?kind=Transaction&limit=500&from=' + new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)))]);
@@ -125,7 +126,14 @@ Object.assign(v2Pages, {
 });
 
 // What these pages do: take a task, filter by person, the first launch's steps.
+let shownRoutines = [];
 function bindLife(root) {
+  root.querySelectorAll('[data-routine-open]').forEach((row) => row.addEventListener('click', (event) => {
+    if (event.target.closest('button')) return;
+    const r = shownRoutines.find((x) => x.id === row.dataset.routineOpen);
+    if (r) routineDrawer(r);
+  }));
+  root.querySelectorAll('[data-add-move]').forEach((b) => b.addEventListener('click', () => moveDrawer()));
   root.querySelectorAll('[data-who-filter]').forEach((b) => b.addEventListener('click', () => { whoFilter = b.dataset.whoFilter; show(); }));
   root.querySelectorAll('[data-take]').forEach((b) => b.addEventListener('click', async () => {
     const [id, where] = b.dataset.take.split(':');
@@ -175,5 +183,95 @@ async function answer(q) {
       (a.top.length ? '<div class="scroll"><table><thead><tr><th>' + esc(a.currency ? W.v2largest : W.v2latest) + '</th><th class="n">' + esc(a.currency ? W.v2amount : W.v2day) + '</th></tr></thead><tbody>' + a.top.map((t) => '<tr><td><a href="#/entree/' + esc(t.id) + '">' + esc(t.title) + '</a> <span class="cell-sub">· ' + esc(day(t.day)) + '</span></td><td class="n">' + esc(a.currency ? value(t.value) : day(t.day)) + '</td></tr>').join('') + '</tbody></table></div>' : '') + '</div>',
       '<a class="btn" href="#/vie?q=' + encodeURIComponent(a.question.words.join(' ')) + '">' + esc(W.v2seeEntries) + '</a><button class="btn solid" data-close>' + esc(W.v2understood2) + '</button>');
   } catch (error) { alert(error.message); }
+}
+
+// « Ajouter un mouvement » in the mockup: a form drawn from the Transaction model — amount, in or
+// out, label, account, fund (a warning when the fund is overspent by it), category, day and hour,
+// and a receipt kept with it.
+async function moveDrawer() {
+  const [accounts, funds, recent] = await Promise.all([
+    api(inSpace('/entries?kind=Account&limit=100')).catch(() => []),
+    api(inSpace('/entries?kind=Fund&limit=100')).catch(() => []),
+    api(inSpace('/entries?kind=Transaction&limit=200')).catch(() => []),
+  ]);
+  const cats = [...new Set(recent.map((t) => t.data.category).filter((c) => typeof c === 'string' && c))].slice(0, 30);
+  // The form follows her model of « Transaction »: a field it does not have is not asked.
+  const kindNow = knownKinds.find((k) => k.kind === 'Transaction');
+  const model = kindNow && kindNow.model;
+  const fieldOf = (n) => model ? model.fields.find((x) => x.name === n) : { name: n, type: n === 'date' ? 'date' : 'text' };
+  const hasCat = !!fieldOf('category');
+  const hasAcc = !!fieldOf('account');
+  const hasFund = !!fieldOf('fund');
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  const opt = (list, empty) => (empty ? '<option value="">' + esc(empty) + '</option>' : '') + list.map((e) => '<option value="' + esc(e.id) + '">' + esc(e.title) + '</option>').join('');
+  const body = '<form class="form" id="move-form">' +
+    '<div class="field-row"><div class="field"><label>' + esc(W.mv_amount) + '</label><input id="m-amt" class="mono" inputmode="decimal" required></div><div class="field"><label>' + esc(W.mv_nature) + '</label><select id="m-nat"><option value="out">' + esc(W.mv_out) + '</option><option value="in">' + esc(W.mv_in) + '</option></select></div></div>' +
+    '<div class="field"><label>' + esc(W.mv_label) + '</label><input id="m-label" required></div>' +
+    '<div class="field-row">' + (hasAcc ? '<div class="field"><label>' + esc(W.mv_account) + ' <small>' + esc(W.mv_where) + '</small></label><select id="m-acc">' + opt(accounts, fieldOf('account').required && accounts.length ? null : W.mv_toSay) + '</select></div>' : '') +
+    (hasFund ? '<div class="field"><label>' + esc(W.mv_fund) + ' <small>' + esc(W.mv_forWhat) + '</small></label><select id="m-fund">' + opt(funds, fieldOf('fund').required && funds.length ? null : W.mv_none) + '</select></div>' : '') + '</div>' +
+    '<div class="warnbox" id="m-warn"></div>' +
+    '<div class="field-row">' + (hasCat ? '<div class="field"><label>' + esc(W.mv_category) + '</label><input id="m-cat" list="m-cats"><datalist id="m-cats">' + cats.map((c) => '<option value="' + esc(c) + '">').join('') + '</datalist></div>' : '') + '<div class="field"><label>' + esc(W.mv_when) + '</label><input id="m-when" class="mono" type="' + (fieldOf('date') && fieldOf('date').type === 'datetime' ? 'datetime-local' : 'date') + '" value="' + (fieldOf('date') && fieldOf('date').type === 'datetime' ? local : local.slice(0, 10)) + '"></div></div>' +
+    '<div class="field"><label>' + esc(W.mv_receipt) + ' <small>' + esc(W.mv_optional) + '</small></label><input id="m-file" type="file"></div></form>';
+  const foot = '<button class="btn" data-close>' + esc(W.cancel) + '</button><button class="btn solid" id="m-save">' + ic('i-check') + esc(W.save) + '</button>';
+  openDrawer(W.mv_title, body, foot, W.mv_sub);
+  const el = (id) => document.getElementById(id);
+  const amountOf = () => Number(String(el('m-amt').value).replace(/[^0-9.,]/g, '').replace(',', '.')) || 0;
+  const sync = async () => {
+    const f = el('m-fund') && funds.find((x) => x.id === el('m-fund').value);
+    const warn = el('m-warn');
+    warn.classList.remove('show');
+    if (!f || el('m-nat').value !== 'out') return;
+    const full = await api(inSpace('/entries/' + encodeURIComponent(f.id))).catch(() => null);
+    const left = full && full.computed ? Number(full.computed.remaining) : NaN;
+    if (!isNaN(left) && amountOf() > left) { warn.innerHTML = '<b>' + esc(say(W.mv_overTitle, { fund: f.title })) + '</b> ' + esc(say(W.mv_overText, { left: money2(left) })); warn.classList.add('show'); }
+  };
+  ['m-fund', 'm-nat', 'm-amt'].forEach((id) => { if (el(id)) el(id).addEventListener('change', sync); });
+  if (hasAcc && fieldOf('account').required && !accounts.length) { const warn = el('m-warn'); warn.innerHTML = '<b>' + esc(W.mv_noAccount) + '</b> <a href="#/vie?kind=Account" data-close>' + esc(W.mv_addAccount) + '</a>'; warn.classList.add('show'); warn.querySelector('a').addEventListener('click', closeDrawer); }
+  el('m-save').addEventListener('click', async () => {
+    const amount = amountOf();
+    const title = el('m-label').value.trim();
+    if (!amount || !title) { el(amount ? 'm-label' : 'm-amt').focus(); return; }
+    const b = el('m-save');
+    b.disabled = true;
+    try {
+      const when = el('m-when').value;
+      const data = { amount: amount, direction: el('m-nat').value, date: when || localDay(new Date()) };
+      if (el('m-cat') && el('m-cat').value.trim()) data.category = el('m-cat').value.trim();
+      const links = [];
+      if (el('m-acc') && el('m-acc').value) links.push({ from: 'm', to: el('m-acc').value, role: 'account' });
+      if (el('m-fund') && el('m-fund').value) links.push({ from: 'm', to: el('m-fund').value, role: 'fund' });
+      const saved = await api(inSpace('/save'), { method: 'POST', body: { entries: [{ ref: 'm', kind: 'Transaction', title: title, data: data }], links: links } });
+      const file = el('m-file').files[0];
+      const id = saved.entries && saved.entries[0] && saved.entries[0].id;
+      if (file && id) {
+        const form = new FormData();
+        form.append('file', file);
+        form.append('links', JSON.stringify([{ to: id, role: 'receipt' }]));
+        await api(inSpace('/files'), { method: 'POST', body: form });
+      }
+      closeDrawer(); toast(W.mv_saved, null); show(); counts();
+    } catch (error) { b.disabled = false; const warn = el('m-warn'); warn.textContent = error.message; warn.classList.add('show'); }
+  });
+}
+
+// A routine in five parts, as the mockup draws it: what starts it, what Jarvis prepares (no AI),
+// her instructions, her references, what it gives — each said by who does it.
+function routineDrawer(r) {
+  const d = r.data || {};
+  const t = d.trigger || {};
+  const part = (k, title, who, text) => '<div class="x-app"><div class="top"><span class="tag ' + (who === 'jarvis' ? 'info' : who === 'ai' ? 'neutral' : 'ok') + '">' + esc(k) + '</span><span class="faint" style="margin-left:auto;font-size:11.5px">' + esc(W['rd_' + who]) + '</span></div><b style="font-size:14px">' + esc(title || '—') + '</b><p>' + esc(text) + '</p></div>';
+  const when = [t.repeat, t.saved ? say(W.rd_whenSaved, { kind: kindName(t.saved) }) : null, (t.phrases || []).map((p) => '« ' + p + ' »').join(', ')].filter(Boolean).join(' · ') || d.when || '';
+  const prep = (d.prepare || []).map((p) => typeof p === 'string' ? W['prep_' + p] || p : p.find ? kindName(p.find.kind) : '').filter(Boolean).join(', ');
+  const ref = d.references || {};
+  const refs = [ref.style, (ref.criteria || []).join(' · '), (ref.kinds || []).map(kindName).join(', ')].filter(Boolean).join(' — ');
+  const res = d.result || {};
+  const result = [res.kind ? kindName(res.kind) : null, (res.fields || []).join(', '), (res.actions || []).join(' · ')].filter(Boolean).join(' — ');
+  const instr = String(d.instructions || d.text || '').replace(/[#>*_]+/g, '').replace(/ +/g, ' ').trim();
+  const body = '<div style="display:flex;flex-direction:column;gap:10px">' +
+    part(W.rd_1, when, 'jarvis', W.rd_1how) + part(W.rd_2, prep, 'jarvis', W.rd_2how) +
+    part(W.rd_3, instr.slice(0, 160) + (instr.length > 160 ? '…' : ''), 'ai', W.rd_3how) +
+    part(W.rd_4, refs, 'ai', W.rd_4how) + part(W.rd_5, result, 'you', W.rd_5how) + '</div>';
+  openDrawer(r.title, body, '<a class="btn" href="#/entree/' + esc(r.id) + '">' + ic('i-doc') + esc(W.rd_read) + '</a><button class="btn solid" data-close>' + ic('i-check') + esc(W.close) + '</button>', d.instructions ? W.rd_structured : W.v2asText);
 }
 `;

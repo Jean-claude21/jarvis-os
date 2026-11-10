@@ -2,12 +2,11 @@
 // are checked side by side instead of waiting for one shared database. `create <name>` makes it —
 // after removing the run branches older than 90 minutes left by an interrupted run — and writes
 // JARVIS_TEST_OWNER_URL, JARVIS_TEST_APP_URL and JARVIS_MIGRATE_URL to $GITHUB_ENV, masked;
-// `delete <name>` removes it. Plain Node, no dependency. It prints no secret.
+// `delete <name>` removes it. It prints no secret.
 //
 // Environment: NEON_API_KEY, JARVIS_NEON_PROJECT_ID, and the URLs of « test » (JARVIS_TEST_OWNER_URL,
 // JARVIS_TEST_APP_URL): a child branch keeps their roles and passwords, only its host differs.
 import { appendFileSync } from 'node:fs';
-import process from 'node:process';
 
 const [, , command, name] = process.argv;
 const key = process.env.NEON_API_KEY;
@@ -21,7 +20,15 @@ if (!key || !project || !name || !['create', 'delete'].includes(command)) {
   process.exit(2);
 }
 
-const api = async (method, path, body) => {
+/** What the Neon API answers, as far as this tool reads it. */
+interface Neon {
+  branches: { id: string; name: string; created_at: string }[];
+  branch: { id: string };
+  endpoints: { id: string }[];
+  operations: { status: string }[];
+}
+
+const api = async (method: string, path: string, body?: unknown): Promise<Neon> => {
   for (let attempt = 0; ; attempt += 1) {
     const response = await fetch(`https://console.neon.tech/api/v2/projects/${project}${path}`, {
       method,
@@ -36,9 +43,9 @@ const api = async (method, path, body) => {
       await new Promise((resolve) => setTimeout(resolve, 2000));
       continue;
     }
-    if (method === 'DELETE' && response.status === 404) return null;
+    if (method === 'DELETE' && response.status === 404) return {} as Neon;
     if (!response.ok) throw new Error(`${method} ${path.split('?')[0]} → ${response.status}`);
-    return response.json();
+    return (await response.json()) as Neon;
   }
 };
 const branches = async () => (await api('GET', '/branches')).branches;
@@ -70,7 +77,7 @@ const made = await api('POST', '/branches', {
   branch: { name, parent_id: test.id },
   endpoints: [{ type: 'read_write' }],
 });
-const endpoint = made.endpoints[0];
+const endpoint = made.endpoints[0]!;
 // Ready when Neon has finished making it.
 for (let attempt = 0; attempt < 90; attempt += 1) {
   const { operations } = await api('GET', `/operations?branch_id=${made.branch.id}&limit=10`);
@@ -79,8 +86,8 @@ for (let attempt = 0; attempt < 90; attempt += 1) {
 }
 
 /** The URL of « test » pointed at the new branch: its endpoint, pooled or not as before. */
-const moved = (url) => {
-  const parsed = new URL(url);
+const moved = (url: string | undefined) => {
+  const parsed = new URL(url ?? '');
   parsed.hostname = parsed.hostname.replace(/^ep-[a-z0-9-]+?(-pooler)?\./, `${endpoint.id}$1.`);
   return parsed.toString();
 };

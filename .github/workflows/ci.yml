@@ -54,7 +54,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: A database of its own (a branch of « test »)
-        run: node tooling/ci-branch.mjs create "$RUN_BRANCH"
+        run: pnpm exec tsx tooling/ci-branch.ts create "$RUN_BRANCH"
         env:
           JARVIS_TEST_OWNER_URL: ${{ secrets.JARVIS_TEST_OWNER_URL }}
           JARVIS_TEST_APP_URL: ${{ secrets.JARVIS_TEST_APP_URL }}
@@ -71,4 +71,4 @@ jobs:
           JARVIS_TEST_AUTH_SECRET: ${{ secrets.JARVIS_TEST_AUTH_SECRET }}
       - name: Remove its database
         if: always()
-        run: node tooling/ci-branch.mjs delete "$RUN_BRANCH"
+        run: pnpm exec tsx tooling/ci-branch.ts delete "$RUN_BRANCH"

@@ -9,7 +9,7 @@
  * the environment; the site from JARVIS_NETLIFY_SITE (`.env`). Nothing secret is printed.
  *
  * Before production is deployed, the `main` branch's database takes the migrations not applied yet
- * (they are additive: the code running now keeps working). Its owner's address is asked of Neon
+ * (they are additive: the code running now keeps working), and so do Better Auth's own tables. Its owner's address is asked of Neon
  * (NEON_API_TOKEN, JARVIS_NEON_PROJECT_ID) and kept in memory only.
  */
 import { build } from 'esbuild';
@@ -19,6 +19,7 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrate } from '../packages/core/src/migrate';
+import { migrateAccounts } from '../apps/api/src/migrate';
 
 const CLI = 'netlify-cli@27.13.0';
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -75,6 +76,9 @@ if (prod) {
   owner.searchParams.set('sslmode', 'verify-full');
   const applied = await migrate(owner.toString());
   console.info(`[deploy] main: ${applied.length ? `applied ${applied.join(', ')}` : 'up to date'}`);
+  // Better Auth's own tables (sessions, OAuth, the counted attempts of spec 024) follow too.
+  const accounts = await migrateAccounts(owner.toString());
+  console.info(`[deploy] main accounts: ${accounts.length ? accounts.join(', ') : 'up to date'}`);
 }
 
 // The two functions, each one file; their `config` (path, schedule) stays an export Netlify reads.
@@ -89,6 +93,16 @@ await build({
   target: 'node22',
   format: 'esm',
   logLevel: 'warning',
+  // The commit it is built from, in `/health`: each release is new code, so no running instance
+  // keeps what it knew of the database before (Better Auth keeps a schema mismatch it saw).
+  define: {
+    'process.env.JARVIS_RELEASE': JSON.stringify(
+      spawnSync('git', ['rev-parse', '--short', 'HEAD'], {
+        cwd: root,
+        encoding: 'utf8',
+      }).stdout.trim() || 'unknown',
+    ),
+  },
   // Some dependencies still `require` Node's own modules.
   banner: {
     js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",

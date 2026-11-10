@@ -173,6 +173,7 @@ export async function watcherPass(
       await readTelegramLinks(db, delivery.telegramToken, wordsOf('fr').channelLinked, {
         kept: wordsOf('fr').captureKept,
         filed: wordsOf('fr').captureFiled,
+        unheard: wordsOf('fr').voiceUnheard,
       }).catch((error) => console.warn('[watcher] telegram', (error as Error).message));
     }
     report = await watchOnce(db, now, tellerFor(db, delivery));

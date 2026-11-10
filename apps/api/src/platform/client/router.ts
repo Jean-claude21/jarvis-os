@@ -1,15 +1,31 @@
-// Which page the hash names, drawn once; her space chosen; the start.
+// Which page the hash names, drawn once in J-C's mockup shell; her space chosen; the start.
 // Part of the script of her web account (see `../page.ts`): plain browser JavaScript inside a
-// template literal — no `${`, and every backslash written twice.
+// template literal — no dollar-brace, and every backslash written twice.
 
 export const router = `
 // Pages, by the hash: #/vie?kind=…, #/entree/<id>, …
 const pages = Object.assign({}, dayPages, lifePages, settingsPages, v2Pages);
-// The screens drawn in the mockup's markup: the page takes its styles (\`.v2\`).
-const V2 = new Set(Object.keys(v2Pages));
 
-const titles = { '': 'navNow', accueil: 'navHome', collections: 'navCollections', fichiers: 'navFiles', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
-  rappels: 'navReminders', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', espace: 'navSpaces', bienvenue: 'v2welcome', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
+// The title of each page, as the breadcrumb says it; the sidebar item it lights.
+const titles = { '': 'navNow', accueil: 'navNow', collections: 'navModels', modeles: 'navModels', fichiers: 'navDocuments', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
+  rappels: 'navAgenda', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', espace: 'navSpaces', bienvenue: 'v2welcome', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
+const navOf = { '': '', accueil: '', agenda: 'agenda', rappels: 'agenda', ranger: 'ranger', revue: 'revue', personnes: 'personnes', vie: 'vie', entree: 'vie', documents: 'documents', document: 'documents', fichiers: 'documents', tableaux: 'tableaux', apps: 'apps' };
+
+// The breadcrumb: « Jarvis › … › the page ». A page may say more (its kind, its entry).
+let crumbParts = null;
+function crumbs(parts) { crumbParts = parts; }
+function drawCrumbs(key, id) {
+  const parts = crumbParts || [W[titles[key]] || W.navNow].concat(key === 'app' && id ? [id] : key === 'role' && id ? [W.navApps, id] : []);
+  document.getElementById('crumbs').innerHTML = '<span class="hide-s">' + ic('i-panel') + '</span><span class="hide-s">' + esc(W.brand) + '</span>' +
+    parts.map((p, i) => i === parts.length - 1 ? '<span class="hide-s">›</span><b>' + esc(p) + '</b>' : '<span class="hide-s">›</span><span class="hide-s">' + esc(p) + '</span>').join('');
+  document.title = parts[parts.length - 1] + ' · ' + W.brand;
+}
+
+// The side and its menus, open or closed; the scrim behind what is open.
+function closeAll() {
+  ['side', 'scrim', 'me-menu', 'space-menu'].forEach((id) => { const el = document.getElementById(id); if (el) el.classList.remove('open'); });
+  closeDrawer();
+}
 
 let drawing = 0;
 async function show() {
@@ -17,64 +33,113 @@ async function show() {
   const [name, id] = path.split('/');
   const params = new URLSearchParams(query || '');
   const key = pages[name] ? name : '';
-  document.getElementById('title').textContent = key === 'app' && id ? decodeURIComponent(id) : key === 'collections' && id ? kindName(decodeURIComponent(id)) : W[titles[key]];
-  document.querySelectorAll('a[data-page]').forEach((a) => a.classList.toggle('on', a.dataset.page === (titles[key] || 'navNow')));
-  document.querySelectorAll('a[data-app]').forEach((a) => a.classList.toggle('on', key === 'app' && a.dataset.app === id));
-  document.querySelector('.shell').classList.remove('open'); closeDrawer();
-  page().innerHTML = '<p class="empty">' + esc(W.loading) + '</p>';
+  closeAll();
+  crumbParts = null;
+  drawNav(key, id ? decodeURIComponent(id) : undefined);
+  page().innerHTML = '<div class="empty">' + esc(W.loading) + '</div>';
   // Only the latest navigation is drawn: a slower earlier one never overwrites it.
   const ticket = ++drawing;
   try {
     const html = await pages[key](params, id ? decodeURIComponent(id) : undefined);
     if (ticket !== drawing) return;
-    page().classList.toggle('v2', V2.has(key));
-    page().innerHTML = html; bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); window.scrollTo(0, 0);
+    page().innerHTML = html; dress(page()); drawCrumbs(key, id ? decodeURIComponent(id) : undefined);
+    bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page()); bindConnexions(page()); bindBlocks(page()); bindBoards(page()); bindRoutines(page());
+    page().scrollTop = 0; window.scrollTo(0, 0);
     document.querySelectorAll('.x-tabbar a[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === key));
-    if (key === 'ranger') counts();
+    if (key === 'ranger' || key === '') counts();
   } catch (error) { if (ticket === drawing) fail(error); }
 }
 
+// The sidebar, as the mockup draws it: her day, her life, her apps, her spaces, each with its count.
+let navApps = [];
+let navCounts = {};
+const SPACE_COLORS2 = ['var(--primary)', 'var(--ochre)', 'var(--info)', 'var(--success)', 'var(--verify)'];
+function drawNav(key, id) {
+  const on = navOf[key] !== undefined ? navOf[key] : key;
+  const item = (href, label, icon, here, count, hot) => '<a class="nav-item" href="' + href + '"' + (here ? ' aria-current="page"' : '') + '>' + icon + esc(label) + (count ? '<span class="count' + (hot ? ' hot' : '') + '">' + esc(count) + '</span>' : '') + '</a>';
+  const group = (title, items, extra) => '<div class="nav-group"><div class="caps">' + esc(title) + (extra || '') + '</div>' + items.join('') + '</div>';
+  const appIcon = (a) => '<span class="app-icon" style="background:' + appColor(a) + '"><span style="font:700 10px/1 Archivo,sans-serif;color:var(--on-primary)">' + esc(String(a).slice(0, 1).toUpperCase()) + '</span></span>';
+  document.getElementById('nav').innerHTML =
+    group(W.navDaily, [
+      item('#/', W.navNow, ic('i-now'), on === '', navCounts.now, true),
+      item('#/agenda', W.navAgenda, ic('i-cal'), on === 'agenda'),
+      item('#/ranger', W.navToSort, ic('i-box'), on === 'ranger', navCounts.ranger, true),
+      item('#/revue', W.navReview, ic('i-eye'), on === 'revue'),
+    ]) +
+    group(W.navLife, [
+      item('#/personnes', W.navPeople, ic('i-person'), on === 'personnes', navCounts.people),
+      item('#/vie', W.navEntries, ic('i-life'), on === 'vie', navCounts.entries),
+      item('#/documents', W.navDocuments, ic('i-doc'), on === 'documents'),
+      item('#/tableaux', W.navDashboards, ic('i-chart'), on === 'tableaux', navCounts.boards),
+    ]) +
+    group(W.navApps, navApps.map((a) => item('#/app/' + encodeURIComponent(a), a, appIcon(a), (key === 'app' || key === 'role') && id === a)).concat(['<a class="nav-item ghost" href="#/apps"' + (on === 'apps' ? ' aria-current="page"' : '') + '>' + ic('i-plus') + esc(W.navAllApps) + '</a>'])) +
+    group(W.navSpacesTitle, me ? me.spaces.map((s, i) => '<a class="nav-item" href="#/espace/' + esc(s.id) + '"' + (key === 'espace' && id === s.id ? ' aria-current="page"' : '') + '><span class="space-dot" style="background:' + SPACE_COLORS2[i % SPACE_COLORS2.length] + '"></span>' + esc(s.name) + '</a>') : []);
+}
+
+// Her space: the switcher on top filters the whole app.
 function choose(id, again) {
   space = id; try { localStorage.setItem('jarvis.space', id); } catch {}
+  drawSwitcher();
   drawApps().catch(() => undefined);
-  document.getElementById('space').value = id;
   if (again !== false) show();
+}
+function drawSwitcher() {
+  const s = me.spaces.find((x) => x.id === space) || me.space;
+  document.getElementById('space-name').textContent = s.name + ' · ' + (s.personal ? W.own : W.shared);
+  document.getElementById('space-menu').innerHTML = me.spaces.map((x, i) => '<button data-space="' + esc(x.id) + '"' + (x.id === space ? ' aria-current="true" style="font-weight:600"' : '') + '><span class="space-dot" style="background:' + SPACE_COLORS2[i % SPACE_COLORS2.length] + '"></span>' + esc(x.name) + '<span class="muted" style="margin-left:auto;font-size:12px">' + esc(x.personal ? W.own : W.shared) + '</span></button>').join('') +
+    '<button data-go="#/espaces">' + ic('i-plus') + esc(W.newSpace) + '</button>';
+  document.querySelectorAll('#space-menu [data-space]').forEach((b) => b.addEventListener('click', () => choose(b.dataset.space)));
+  document.querySelectorAll('#space-menu [data-go]').forEach((b) => b.addEventListener('click', () => { location.hash = b.dataset.go; }));
 }
 
 async function load() {
   me = await api('/me');
   if (!space || !me.spaces.some((s) => s.id === space)) space = me.space.id;
-  const select = document.getElementById('space');
-  select.innerHTML = me.spaces.map((s) => '<option value="' + esc(s.id) + '">' + esc(s.name) + ' — ' + esc(s.personal ? W.own : W.shared) + '</option>').join('');
-  select.value = space;
-  document.getElementById('who').innerHTML = '<strong>' + esc(me.person.name) + '</strong><div class="muted" style="overflow-wrap:anywhere">' + esc(me.person.email) + '</div>';
+  drawSwitcher();
+  const name = me.person.name || me.person.email;
+  document.getElementById('me-initials').textContent = String(name).split(/ +/).map((w) => w.slice(0, 1)).join('').slice(0, 2).toUpperCase();
+  document.getElementById('me-name').textContent = name;
+  document.getElementById('me-sub').textContent = me.person.email;
 }
 
-document.getElementById('space').addEventListener('change', (event) => choose(event.target.value));
-document.getElementById('search').addEventListener('keydown', (event) => {
-  if (event.key !== 'Enter') return;
-  const q = event.target.value.trim();
-  // A question (« combien… », « how much… ») is answered with a figure (I8); words find entries.
-  if (/^(combien|how much|how many|total|quel total)/i.test(q)) answer(q);
-  else location.hash = '#/vie?q=' + encodeURIComponent(q);
-});
-document.getElementById('menu').addEventListener('click', () => document.querySelector('.shell').classList.toggle('open'));
-document.getElementById('tab-menu').addEventListener('click', () => document.querySelector('.shell').classList.toggle('open'));
-// What waits for her yes (I13): its count beside « À ranger », on the computer and the phone.
+// What needs her: counts beside « Maintenant » and « À ranger », the pip on the bell.
 async function counts() {
   try {
-    const n = (await api('/to-sort')).length;
-    for (const id of ['n-ranger', 'tab-ranger']) { const el = document.getElementById(id); if (el) { el.textContent = n; el.hidden = !n; el.style.display = n ? '' : 'none'; } }
+    const [toSort, now] = await Promise.all([api('/to-sort'), api('/now')]);
+    navCounts.ranger = toSort.length || '';
+    navCounts.now = now.items.length || '';
+    for (const id of ['tab-ranger']) { const el = document.getElementById(id); if (el) { el.textContent = toSort.length; el.style.display = toSort.length ? '' : 'none'; } }
+    document.getElementById('pip').style.display = now.items.some((i) => i.group === 'fix' || i.group === 'late') ? '' : 'none';
+    const [path] = location.hash.replace(/^#[/]?/, '').split('?');
+    const [name, id] = path.split('/');
+    drawNav(pages[name] ? name : '', id ? decodeURIComponent(id) : undefined);
   } catch {}
 }
-// Her spaces (I13): each opens its page; the selector on top filters the whole app.
-function drawSpaces() {
-  const colors = ['var(--primary)', 'var(--ochre)', 'var(--info)', 'var(--success)', 'var(--verify)'];
-  document.getElementById('spaces-nav').innerHTML = '<div class="caps">' + esc(W.navSpacesTitle) + '</div>' + me.spaces.map((s, i) =>
-    '<a class="navi" href="#/espace/' + esc(s.id) + '" data-space-link="' + esc(s.id) + '"><span class="space-dot" style="width:9px;height:9px;border-radius:50%;flex:none;background:' + colors[i % colors.length] + '"></span><span>' + esc(s.name) + '</span></a>').join('');
-  document.querySelectorAll('[data-space-link]').forEach((a) => a.addEventListener('click', () => choose(a.dataset.spaceLink, false)));
-  document.querySelectorAll('[data-space-link]').forEach((a) => a.classList.toggle('on', location.hash === '#/espace/' + a.dataset.spaceLink));
-}
+
+document.getElementById('switcher').addEventListener('click', (event) => { event.stopPropagation(); document.getElementById('space-menu').classList.toggle('open'); document.getElementById('me-menu').classList.remove('open'); });
+document.getElementById('me').addEventListener('click', (event) => { event.stopPropagation(); document.getElementById('me-menu').classList.toggle('open'); document.getElementById('space-menu').classList.remove('open'); });
+document.querySelectorAll('#me-menu [data-go]').forEach((b) => b.addEventListener('click', () => { location.hash = b.dataset.go; }));
+document.addEventListener('click', (event) => { if (!event.target.closest('#me-menu, #me, #space-menu, #switcher')) { document.getElementById('me-menu').classList.remove('open'); document.getElementById('space-menu').classList.remove('open'); } });
+const openSide = () => { document.getElementById('side').classList.add('open'); document.getElementById('scrim').classList.add('open'); };
+document.getElementById('open-side').addEventListener('click', openSide);
+document.getElementById('tab-menu').addEventListener('click', openSide);
+document.getElementById('scrim').addEventListener('click', closeAll);
+document.getElementById('open-journal').addEventListener('click', journalDrawer);
+document.getElementById('open-bell').addEventListener('click', bellDrawer);
+
+// « Chercher ou noter »: a question is answered (I8); other words are understood, to keep or file.
+document.addEventListener('keydown', (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); document.getElementById('search').focus(); }
+  if (event.key === 'Escape') closeAll();
+});
+document.getElementById('search').addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' || !event.target.value.trim()) return;
+  event.preventDefault();
+  const q = event.target.value.trim();
+  if (/[?]$|^(combien|how much|how many|total|quel total|quand|qui|quel|quelle)[ ]/i.test(q)) answer(q);
+  else captureDrawer(q);
+});
+
 // Her theme: light, dark, or as her device says; kept on this device.
 function applyTheme(t) { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
 try { applyTheme(localStorage.getItem('jarvis.theme')); } catch {}
@@ -85,7 +150,7 @@ document.getElementById('theme').addEventListener('click', () => {
 });
 // « Noter » (I11): a few words kept at once, as she said them, to file later.
 document.getElementById('note').addEventListener('click', () => {
-  openDrawer(W.navNote, '<textarea class="field" id="note-text" style="min-height:120px;font-family:inherit;font-size:15px" placeholder="' + esc(W.v2writeOrSay) + '"></textarea>', '<button class="primary" id="note-keep">' + esc(W.v2keep) + '</button>');
+  openDrawer(W.navNote, '<div class="x-q"><textarea id="note-text" style="min-height:140px;font-size:15px" placeholder="' + esc(W.v2writeOrSay) + '"></textarea></div>', '<button class="btn" data-close>' + esc(W.cancel) + '</button><button class="btn solid" id="note-keep">' + ic('i-check') + esc(W.v2keep) + '</button>', W.v2noteSub);
   const area = document.getElementById('note-text'); area.focus();
   document.getElementById('note-keep').addEventListener('click', async () => {
     const text = area.value.trim(); if (!text) return;
@@ -93,7 +158,7 @@ document.getElementById('note').addEventListener('click', () => {
   });
 });
 window.addEventListener('hashchange', show);
-load().then(() => { clock(); drawSpaces(); return drawApps(); }).then(() => {
+load().then(() => { clock(); return drawApps(); }).then(() => {
   // Her first time (I10): nothing kept yet, and no page asked: the welcome.
   if (!location.hash.replace(/^#[/]?/, '') && !knownKinds.some((k) => (k.count || 0) > 0)) location.hash = '#/bienvenue';
   return show();

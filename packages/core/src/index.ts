@@ -111,6 +111,7 @@ export {
   reviewsOf,
   type Mirror,
 } from './review';
+export { habitBoard, habitsWithDays, type HabitBoard } from './habit-board';
 export {
   closeIntentions,
   INTENTION_KIND,

@@ -75,6 +75,30 @@ export const COMMON_KINDS: CommonKind[] = [
     fields: ['target', 'unit', 'deadline', 'measure', 'status'],
   },
   {
+    kind: 'Note',
+    label: { fr: 'Note', en: 'Note' },
+    aliases: ['notes', 'memo', 'memos', 'pense-bete'],
+    fields: ['text', 'tags'],
+  },
+  {
+    kind: 'Project',
+    label: { fr: 'Projet', en: 'Project' },
+    aliases: ['projet', 'projets', 'projects'],
+    fields: ['status', 'deadline', 'goal'],
+  },
+  {
+    kind: 'Habit',
+    label: { fr: 'Habitude', en: 'Habit' },
+    aliases: ['habitude', 'habitudes', 'habits'],
+    fields: ['repeat', 'days', 'time', 'non_negotiable', 'facet'],
+  },
+  {
+    kind: 'Treatment',
+    label: { fr: 'Traitement', en: 'Treatment' },
+    aliases: ['traitement', 'traitements', 'medicament', 'medicaments', 'treatments'],
+    fields: ['dose', 'repeat', 'start', 'end'],
+  },
+  {
     kind: 'Fichier',
     label: { fr: 'Fichier', en: 'File' },
     aliases: ['file', 'files', 'fichiers'],

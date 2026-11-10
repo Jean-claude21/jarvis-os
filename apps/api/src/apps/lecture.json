@@ -1,0 +1,297 @@
+{
+  "app": "Lecture",
+  "version": 1,
+  "description": {
+    "fr": "Livres, notes, citations et révélations ; ce que tu lis, ce que tu en gardes.",
+    "en": "Books, notes, quotes and insights; what you read, what you keep from it."
+  },
+  "models": [
+    {
+      "title": "Book",
+      "data": {
+        "label": {
+          "fr": "Livre",
+          "en": "Book"
+        },
+        "fields": [
+          {
+            "name": "author",
+            "type": "text",
+            "label": {
+              "fr": "Auteur",
+              "en": "Author"
+            }
+          },
+          {
+            "name": "status",
+            "type": "choice",
+            "label": {
+              "fr": "Statut",
+              "en": "Status"
+            },
+            "options": [
+              "to_read",
+              "reading",
+              "read",
+              "dropped"
+            ],
+            "optionLabels": {
+              "to_read": {
+                "fr": "à lire",
+                "en": "to read"
+              },
+              "reading": {
+                "fr": "en cours",
+                "en": "reading"
+              },
+              "read": {
+                "fr": "lu",
+                "en": "read"
+              },
+              "dropped": {
+                "fr": "abandonné",
+                "en": "dropped"
+              }
+            },
+            "default": "to_read"
+          },
+          {
+            "name": "started",
+            "type": "date",
+            "label": {
+              "fr": "Commencé le",
+              "en": "Started"
+            }
+          },
+          {
+            "name": "finished",
+            "type": "date",
+            "label": {
+              "fr": "Fini le",
+              "en": "Finished"
+            }
+          },
+          {
+            "name": "rating",
+            "type": "rating",
+            "label": {
+              "fr": "Note",
+              "en": "Rating"
+            },
+            "max": 5
+          },
+          {
+            "name": "pages",
+            "type": "number",
+            "label": {
+              "fr": "Pages",
+              "en": "Pages"
+            }
+          },
+          {
+            "name": "quotes_n",
+            "type": "formula",
+            "label": {
+              "fr": "Citations",
+              "en": "Quotes"
+            },
+            "formula": "count(quotes)"
+          }
+        ],
+        "columns": [
+          "author",
+          "status",
+          "finished",
+          "rating"
+        ]
+      }
+    },
+    {
+      "title": "Quote",
+      "data": {
+        "label": {
+          "fr": "Citation",
+          "en": "Quote"
+        },
+        "fields": [
+          {
+            "name": "book",
+            "type": "link",
+            "label": {
+              "fr": "Livre",
+              "en": "Book"
+            },
+            "target": "Book",
+            "inverse": "quotes"
+          },
+          {
+            "name": "page",
+            "type": "number",
+            "label": {
+              "fr": "Page",
+              "en": "Page"
+            }
+          },
+          {
+            "name": "text",
+            "type": "long_text",
+            "label": {
+              "fr": "Texte",
+              "en": "Text"
+            }
+          }
+        ],
+        "columns": [
+          "book",
+          "page"
+        ]
+      }
+    },
+    {
+      "title": "Insight",
+      "data": {
+        "label": {
+          "fr": "Révélation",
+          "en": "Insight"
+        },
+        "fields": [
+          {
+            "name": "book",
+            "type": "link",
+            "label": {
+              "fr": "Livre",
+              "en": "Book"
+            },
+            "target": "Book",
+            "inverse": "insights"
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "label": {
+              "fr": "Date",
+              "en": "Date"
+            }
+          },
+          {
+            "name": "text",
+            "type": "long_text",
+            "label": {
+              "fr": "Ce que j’en retiens",
+              "en": "What I keep"
+            }
+          }
+        ],
+        "columns": [
+          "book",
+          "date"
+        ]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "title": "Reading",
+      "data": {
+        "label": {
+          "fr": "Mes lectures",
+          "en": "My reading"
+        },
+        "order": 1,
+        "blocks": [
+          {
+            "block": "stat",
+            "title": {
+              "fr": "Livres lus cette année",
+              "en": "Books read this year"
+            },
+            "query": {
+              "kind": "Book",
+              "where": "status = 'read' and year(finished) = year(today())",
+              "aggregate": {
+                "n": "count()"
+              }
+            }
+          },
+          {
+            "block": "kanban",
+            "title": {
+              "fr": "Livres",
+              "en": "Books"
+            },
+            "kind": "Book",
+            "by": "status"
+          },
+          {
+            "block": "table",
+            "title": {
+              "fr": "Dernières citations",
+              "en": "Latest quotes"
+            },
+            "query": {
+              "kind": "Quote",
+              "fields": [
+                "book",
+                "page"
+              ],
+              "sort": "-createdAt",
+              "limit": 20
+            }
+          },
+          {
+            "block": "form",
+            "title": {
+              "fr": "Ajouter un livre",
+              "en": "Add a book"
+            },
+            "kind": "Book"
+          }
+        ]
+      }
+    }
+  ],
+  "rules": [],
+  "scripts": [],
+  "role": {
+    "covers": {
+      "fr": "Tes lectures : les livres, ce que tu en notes, les citations.",
+      "en": "Your reading: books, what you note from them, quotes."
+    },
+    "intents": [
+      "livre",
+      "lecture",
+      "lu",
+      "lire",
+      "chapitre",
+      "citation",
+      "auteur",
+      "page",
+      "roman",
+      "book"
+    ],
+    "watches": [
+      "Book",
+      "Quote",
+      "Insight"
+    ],
+    "reads": [
+      "Book"
+    ],
+    "writes": [
+      "Book",
+      "Quote",
+      "Insight"
+    ],
+    "ask": [
+      {
+        "fr": "Quel livre ?",
+        "en": "Which book?"
+      }
+    ],
+    "instructions": {
+      "fr": "Un livre est un « Book » (auteur, statut) ; une phrase recopiée est une « Quote » reliée à son livre ; ce qu’elle en retient est un « Insight ».",
+      "en": "A book is a « Book » (author, status); a sentence copied is a « Quote » linked to its book; what she keeps from it is an « Insight »."
+    },
+    "bridges": []
+  }
+}

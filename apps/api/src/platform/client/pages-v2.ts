@@ -13,8 +13,10 @@ const v2kpi = (label, v, s, cls) => '<div class="kpi ' + (cls || '') + '"><div c
 const v2origin = (o) => '<span class="origin ' + esc(o) + '">' + esc(W[o] || o) + '</span>';
 // An app as the mockup shows it: its colour, its first letter.
 const APP_COLORS = ['var(--primary)', 'var(--success)', 'var(--info)', 'var(--ochre)', 'var(--verify)', 'var(--ink)'];
-const appColor = (name) => { let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) % 997; return APP_COLORS[h % APP_COLORS.length]; };
-const v2app = (name) => '<span class="app-icon" style="background:' + appColor(name) + ';color:var(--on-primary);font:700 11px/1 Archivo,sans-serif">' + esc(String(name).slice(0, 1).toUpperCase()) + '</span>';
+// The shipped apps keep the mockup's colour and icon; any other app its colour and first letter.
+const APP_LOOK = { Finances: ['var(--primary)', 'i-wallet'], Routines: ['var(--success)', 'i-routine'], Maison: ['var(--ochre)', 'i-box'], Garanties: ['var(--info)', 'i-lock'], Abonnements: ['var(--verify)', 'i-scale'], Agenda: ['var(--info)', 'i-cal'], Fichiers: ['var(--bark)', 'i-file'], Journal: ['var(--bark)', 'i-doc'], 'Santé': ['var(--error)', 'i-spark'], Projets: ['var(--ink)', 'i-shape'], Relations: ['var(--verify)', 'i-person'], Lecture: ['var(--ochre)', 'i-doc'] };
+const appColor = (name) => { if (APP_LOOK[name]) return APP_LOOK[name][0]; let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) % 997; return APP_COLORS[h % APP_COLORS.length]; };
+const v2app = (name) => APP_LOOK[name] ? '<span class="app-icon" style="background:' + APP_LOOK[name][0] + ';color:var(--on-primary)">' + ic(APP_LOOK[name][1]) + '</span>' : '<span class="app-icon" style="background:' + appColor(name) + ';color:var(--on-primary);font:700 11px/1 Archivo,sans-serif">' + esc(String(name).slice(0, 1).toUpperCase()) + '</span>';
 const v2touch = (name, href) => '<a class="x-touch" href="' + esc(href || '#/apps') + '">' + v2app(name) + esc(name) + '</a>';
 const money2 = (n, cur) => num(Math.round(n)) + ' ' + (!cur || cur === 'XOF' ? 'F' : cur === 'EUR' ? '€' : cur);
 const ago = (iso) => {

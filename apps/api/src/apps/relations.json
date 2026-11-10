@@ -1,0 +1,304 @@
+{
+  "app": "Relations",
+  "version": 1,
+  "description": {
+    "fr": "Tes personnes, vos rencontres, les dates à ne pas oublier et ce que tu as promis.",
+    "en": "Your people, your meetings, the dates not to forget and what you promised."
+  },
+  "models": [
+    {
+      "title": "Meeting",
+      "data": {
+        "label": {
+          "fr": "Rencontre",
+          "en": "Meeting"
+        },
+        "fields": [
+          {
+            "name": "date",
+            "type": "datetime",
+            "label": {
+              "fr": "Date",
+              "en": "Date"
+            }
+          },
+          {
+            "name": "with",
+            "type": "link",
+            "label": {
+              "fr": "Avec",
+              "en": "With"
+            },
+            "target": "Person",
+            "inverse": "meetings"
+          },
+          {
+            "name": "place",
+            "type": "text",
+            "label": {
+              "fr": "Lieu",
+              "en": "Place"
+            }
+          },
+          {
+            "name": "note",
+            "type": "long_text",
+            "label": {
+              "fr": "Ce qui s’est dit",
+              "en": "What was said"
+            }
+          }
+        ],
+        "columns": [
+          "date",
+          "with",
+          "place"
+        ]
+      }
+    },
+    {
+      "title": "Commitment",
+      "data": {
+        "label": {
+          "fr": "Engagement",
+          "en": "Commitment"
+        },
+        "fields": [
+          {
+            "name": "to",
+            "type": "link",
+            "label": {
+              "fr": "Envers",
+              "en": "To"
+            },
+            "target": "Person",
+            "inverse": "commitments"
+          },
+          {
+            "name": "due",
+            "type": "date",
+            "label": {
+              "fr": "Pour le",
+              "en": "Due"
+            }
+          },
+          {
+            "name": "state",
+            "type": "choice",
+            "label": {
+              "fr": "État",
+              "en": "State"
+            },
+            "options": [
+              "open",
+              "kept",
+              "dropped"
+            ],
+            "optionLabels": {
+              "open": {
+                "fr": "en cours",
+                "en": "open"
+              },
+              "kept": {
+                "fr": "tenu",
+                "en": "kept"
+              },
+              "dropped": {
+                "fr": "abandonné",
+                "en": "dropped"
+              }
+            },
+            "default": "open"
+          }
+        ],
+        "columns": [
+          "to",
+          "due",
+          "state"
+        ]
+      }
+    },
+    {
+      "title": "ImportantDate",
+      "data": {
+        "label": {
+          "fr": "Date importante",
+          "en": "Important date"
+        },
+        "fields": [
+          {
+            "name": "person",
+            "type": "link",
+            "label": {
+              "fr": "Personne",
+              "en": "Person"
+            },
+            "target": "Person",
+            "inverse": "dates"
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "label": {
+              "fr": "Date",
+              "en": "Date"
+            }
+          },
+          {
+            "name": "type",
+            "type": "choice",
+            "label": {
+              "fr": "Type",
+              "en": "Type"
+            },
+            "options": [
+              "birthday",
+              "anniversary",
+              "other"
+            ],
+            "optionLabels": {
+              "birthday": {
+                "fr": "anniversaire",
+                "en": "birthday"
+              },
+              "anniversary": {
+                "fr": "anniversaire de mariage",
+                "en": "anniversary"
+              },
+              "other": {
+                "fr": "autre",
+                "en": "other"
+              }
+            }
+          }
+        ],
+        "columns": [
+          "person",
+          "date",
+          "type"
+        ]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "title": "Relations",
+      "data": {
+        "label": {
+          "fr": "Mes relations",
+          "en": "My relations"
+        },
+        "order": 1,
+        "blocks": [
+          {
+            "block": "task_list",
+            "title": {
+              "fr": "Ce que tu as promis",
+              "en": "What you promised"
+            },
+            "kind": "Commitment",
+            "where": "state = 'open'",
+            "detail": "due",
+            "action": {
+              "label": "✓",
+              "set": {
+                "state": "kept"
+              }
+            }
+          },
+          {
+            "block": "table",
+            "title": {
+              "fr": "Dernières rencontres",
+              "en": "Latest meetings"
+            },
+            "query": {
+              "kind": "Meeting",
+              "fields": [
+                "date",
+                "with",
+                "place"
+              ],
+              "sort": "-date",
+              "limit": 20
+            }
+          },
+          {
+            "block": "table",
+            "title": {
+              "fr": "Dates à retenir",
+              "en": "Dates to remember"
+            },
+            "query": {
+              "kind": "ImportantDate",
+              "fields": [
+                "person",
+                "date",
+                "type"
+              ],
+              "sort": "date"
+            }
+          },
+          {
+            "block": "form",
+            "title": {
+              "fr": "Noter une rencontre",
+              "en": "Record a meeting"
+            },
+            "kind": "Meeting"
+          }
+        ]
+      }
+    }
+  ],
+  "rules": [],
+  "scripts": [],
+  "role": {
+    "covers": {
+      "fr": "Tes relations : les rencontres, les dates importantes, ce que tu as promis à chacun.",
+      "en": "Your relations: meetings, important dates, what you promised to each."
+    },
+    "intents": [
+      "rencontré",
+      "rencontre",
+      "vu",
+      "appelé",
+      "appele",
+      "promis",
+      "promesse",
+      "anniversaire",
+      "visite",
+      "dîner",
+      "diner",
+      "déjeuner",
+      "dejeuner"
+    ],
+    "watches": [
+      "Person",
+      "Meeting",
+      "Commitment",
+      "ImportantDate"
+    ],
+    "reads": [
+      "Person",
+      "Meeting",
+      "Commitment"
+    ],
+    "writes": [
+      "Meeting",
+      "Commitment",
+      "ImportantDate"
+    ],
+    "ask": [
+      {
+        "fr": "Avec qui ?",
+        "en": "With whom?"
+      }
+    ],
+    "instructions": {
+      "fr": "Une rencontre est un « Meeting » relié à la personne (with) ; une promesse faite à quelqu’un est un « Commitment » (to, due) ; un anniversaire est une « ImportantDate ». La personne reste une « Person ».",
+      "en": "A meeting is a « Meeting » linked to the person (with); a promise to someone is a « Commitment » (to, due); a birthday is an « ImportantDate ». The person stays a « Person »."
+    },
+    "bridges": []
+  }
+}

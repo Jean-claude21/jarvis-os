@@ -1,0 +1,162 @@
+{
+  "app": "Garanties",
+  "version": 1,
+  "description": {
+    "fr": "Fins de garantie et SAV ; ce qui est encore couvert, et jusqu’à quand.",
+    "en": "Warranty ends and after-sales service; what is still covered, and until when."
+  },
+  "models": [
+    {
+      "title": "Warranty",
+      "data": {
+        "label": {
+          "fr": "Garantie",
+          "en": "Warranty"
+        },
+        "fields": [
+          {
+            "name": "item",
+            "type": "text",
+            "label": {
+              "fr": "Objet",
+              "en": "Item"
+            }
+          },
+          {
+            "name": "store",
+            "type": "text",
+            "label": {
+              "fr": "Magasin",
+              "en": "Store"
+            }
+          },
+          {
+            "name": "ends",
+            "type": "date",
+            "label": {
+              "fr": "Fin de garantie",
+              "en": "Ends"
+            }
+          },
+          {
+            "name": "receipt",
+            "type": "url",
+            "label": {
+              "fr": "Reçu",
+              "en": "Receipt"
+            }
+          },
+          {
+            "name": "days_left",
+            "type": "formula",
+            "label": {
+              "fr": "Jours restants",
+              "en": "Days left"
+            },
+            "formula": "days_between(today(), ends)"
+          }
+        ],
+        "columns": [
+          "item",
+          "store",
+          "ends",
+          "days_left"
+        ]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "title": "Warranties",
+      "data": {
+        "label": {
+          "fr": "Mes garanties",
+          "en": "My warranties"
+        },
+        "order": 1,
+        "blocks": [
+          {
+            "block": "stat",
+            "title": {
+              "fr": "Encore couvertes",
+              "en": "Still covered"
+            },
+            "query": {
+              "kind": "Warranty",
+              "where": "ends >= today()",
+              "aggregate": {
+                "n": "count()"
+              }
+            }
+          },
+          {
+            "block": "table",
+            "title": {
+              "fr": "Garanties",
+              "en": "Warranties"
+            },
+            "query": {
+              "kind": "Warranty",
+              "where": "ends >= today()",
+              "fields": [
+                "item",
+                "store",
+                "ends",
+                "days_left"
+              ],
+              "sort": "ends"
+            }
+          },
+          {
+            "block": "form",
+            "title": {
+              "fr": "Noter une garantie",
+              "en": "Record a warranty"
+            },
+            "kind": "Warranty"
+          }
+        ]
+      }
+    }
+  ],
+  "rules": [],
+  "scripts": [],
+  "role": {
+    "covers": {
+      "fr": "Tes garanties : ce qui est couvert, jusqu’à quand, le reçu.",
+      "en": "Your warranties: what is covered, until when, the receipt."
+    },
+    "intents": [
+      "garantie",
+      "garanti",
+      "sav",
+      "service après-vente",
+      "service apres-vente",
+      "reçu",
+      "recu",
+      "ticket de caisse"
+    ],
+    "watches": [
+      "Warranty",
+      "Equipment",
+      "Transaction"
+    ],
+    "reads": [
+      "Warranty"
+    ],
+    "writes": [
+      "Warranty"
+    ],
+    "ask": [
+      {
+        "fr": "Jusqu’à quand est-ce garanti ?",
+        "en": "Until when is it covered?"
+      }
+    ],
+    "instructions": {
+      "fr": "Une garantie est une « Warranty » (objet, magasin, fin) ; relie-la à l’équipement ou à l’achat quand ils existent.",
+      "en": "A warranty is a « Warranty » (item, store, end); link it to the equipment or the purchase when they exist."
+    },
+    "bridges": []
+  }
+}

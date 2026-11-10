@@ -1,0 +1,262 @@
+{
+  "app": "Projets",
+  "version": 1,
+  "description": {
+    "fr": "Projets, jalons et tâches ; où en est chaque projet, ce qui est dû cette semaine.",
+    "en": "Projects, milestones and tasks; where each project stands, what is due this week."
+  },
+  "models": [
+    {
+      "title": "Project",
+      "data": {
+        "label": {
+          "fr": "Projet",
+          "en": "Project"
+        },
+        "fields": [
+          {
+            "name": "status",
+            "type": "choice",
+            "label": {
+              "fr": "Statut",
+              "en": "Status"
+            },
+            "options": [
+              "idea",
+              "active",
+              "paused",
+              "done"
+            ],
+            "optionLabels": {
+              "idea": {
+                "fr": "idée",
+                "en": "idea"
+              },
+              "active": {
+                "fr": "en cours",
+                "en": "active"
+              },
+              "paused": {
+                "fr": "en pause",
+                "en": "paused"
+              },
+              "done": {
+                "fr": "terminé",
+                "en": "done"
+              }
+            }
+          },
+          {
+            "name": "deadline",
+            "type": "date",
+            "label": {
+              "fr": "Échéance",
+              "en": "Deadline"
+            }
+          },
+          {
+            "name": "goal",
+            "type": "text",
+            "label": {
+              "fr": "But",
+              "en": "Goal"
+            }
+          },
+          {
+            "name": "next_step",
+            "type": "text",
+            "label": {
+              "fr": "Prochaine étape",
+              "en": "Next step"
+            }
+          },
+          {
+            "name": "milestones_done",
+            "type": "formula",
+            "label": {
+              "fr": "Jalons atteints",
+              "en": "Milestones reached"
+            },
+            "formula": "count(milestones where state = 'done')"
+          },
+          {
+            "name": "milestones_all",
+            "type": "formula",
+            "label": {
+              "fr": "Jalons",
+              "en": "Milestones"
+            },
+            "formula": "count(milestones)"
+          }
+        ],
+        "columns": [
+          "status",
+          "deadline",
+          "next_step",
+          "milestones_done",
+          "milestones_all"
+        ]
+      }
+    },
+    {
+      "title": "Milestone",
+      "data": {
+        "label": {
+          "fr": "Jalon",
+          "en": "Milestone"
+        },
+        "fields": [
+          {
+            "name": "project",
+            "type": "link",
+            "label": {
+              "fr": "Projet",
+              "en": "Project"
+            },
+            "target": "Project",
+            "inverse": "milestones"
+          },
+          {
+            "name": "due",
+            "type": "date",
+            "label": {
+              "fr": "Échéance",
+              "en": "Due"
+            }
+          },
+          {
+            "name": "state",
+            "type": "choice",
+            "label": {
+              "fr": "État",
+              "en": "State"
+            },
+            "options": [
+              "todo",
+              "done"
+            ],
+            "optionLabels": {
+              "todo": {
+                "fr": "à faire",
+                "en": "to do"
+              },
+              "done": {
+                "fr": "atteint",
+                "en": "reached"
+              }
+            },
+            "default": "todo"
+          }
+        ],
+        "columns": [
+          "project",
+          "due",
+          "state"
+        ]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "title": "Projects",
+      "data": {
+        "label": {
+          "fr": "Mes projets",
+          "en": "My projects"
+        },
+        "order": 1,
+        "blocks": [
+          {
+            "block": "kanban",
+            "title": {
+              "fr": "Projets",
+              "en": "Projects"
+            },
+            "kind": "Project",
+            "by": "status"
+          },
+          {
+            "block": "task_list",
+            "title": {
+              "fr": "Jalons à atteindre",
+              "en": "Milestones ahead"
+            },
+            "kind": "Milestone",
+            "where": "state = 'todo'",
+            "detail": "due",
+            "action": {
+              "label": "✓",
+              "set": {
+                "state": "done"
+              }
+            }
+          },
+          {
+            "block": "table",
+            "title": {
+              "fr": "Projets en cours",
+              "en": "Projects under way"
+            },
+            "query": {
+              "kind": "Project",
+              "where": "status = 'active'",
+              "fields": [
+                "deadline",
+                "next_step",
+                "milestones_done",
+                "milestones_all"
+              ],
+              "sort": "deadline"
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "rules": [],
+  "scripts": [],
+  "role": {
+    "covers": {
+      "fr": "Tes projets : leur statut, leurs jalons, la prochaine étape.",
+      "en": "Your projects: their status, their milestones, the next step."
+    },
+    "intents": [
+      "projet",
+      "jalon",
+      "étape",
+      "etape",
+      "livrable",
+      "lancer",
+      "lancement",
+      "échéance",
+      "echeance",
+      "deadline",
+      "milestone"
+    ],
+    "watches": [
+      "Project",
+      "Milestone",
+      "Task"
+    ],
+    "reads": [
+      "Project",
+      "Milestone",
+      "Task"
+    ],
+    "writes": [
+      "Project",
+      "Milestone"
+    ],
+    "ask": [
+      {
+        "fr": "Pour quel projet ?",
+        "en": "For which project?"
+      }
+    ],
+    "instructions": {
+      "fr": "Un projet est un « Project » (statut, échéance, prochaine étape) ; un jalon est un « Milestone » relié à son projet (project) ; une tâche d’un projet garde son champ project.",
+      "en": "A project is a « Project » (status, deadline, next step); a milestone is a « Milestone » linked to its project (project); a task of a project keeps its project field."
+    },
+    "bridges": []
+  }
+}

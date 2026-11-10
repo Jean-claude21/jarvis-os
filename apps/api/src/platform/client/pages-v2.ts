@@ -359,4 +359,78 @@ function bindEntries2(root) {
   const sel = root.querySelector('[data-entries-link]');
   if (sel) sel.addEventListener('change', () => { entriesLink = sel.value; show(); });
 }
+
+// « Modèles de type » in the mockup: each kind's fields, how it links, what it computes, where it
+// goes on export; changed here (journaled, undone) or by telling Claude.
+const natureOf = (f) => f.type === 'link' ? '→ ' + kindName(f.target || '') : W['nat_' + f.type] || f.type;
+v2Pages.collections = async function (params, kind) {
+  if (kind) return modelPage(kind);
+  const models = knownKinds.filter((k) => k.model && !['Model', 'Rule', 'Script', 'Page', 'View', 'App', 'Channel'].includes(k.kind));
+  const byApp = new Map();
+  for (const k of models) { const a = k.model.app || W.v2yours2; byApp.set(a, (byApp.get(a) || []).concat([k])); }
+  const apps = [...byApp.keys()].sort((a, b) => (a === W.v2yours2) - (b === W.v2yours2) || a.localeCompare(b));
+  crumbs([W.navModels]);
+  return v2head(esc(W.navModels), esc(W.v2modelsSub), '<button class="btn" data-ask-claude="model">' + ic('i-chat') + esc(W.v2createWithClaude) + '</button>') +
+    (apps.length ? '<div class="grid g3">' + apps.map((a) => v2panel(a, byApp.get(a).map((k) => '<a class="model-card" href="#/collections/' + esc(encodeURIComponent(k.kind)) + '"><span class="kind">' + ic('i-shape') + '</span><span><b>' + esc(kindLabel(k)) + '</b><div class="cell-sub">' + esc(say(W.v2fieldsEntries, { f: k.model.fields.length, n: num(k.count || 0) })) + '</div></span>' + ic('i-right') + '</a>').join(''), '', a === W.v2yours2 ? 'i-life' : 'i-box')).join('') + '</div>' : '<div class="panel"><div class="panel-body empty">' + esc(W.v2noModel) + '</div></div>') +
+    '<div class="hint">' + ic('i-chat') + '<span>' + W.v2modelsHint + '</span></div>';
+};
+v2Pages.modeles = v2Pages.collections;
+
+async function modelPage(kind) {
+  const k = knownKinds.find((x) => x.kind === kind);
+  if (!k || !k.model) return v2head(esc(kindName(kind)), esc(W.v2noModelFor), '<a class="btn" href="#/vie?kind=' + esc(encodeURIComponent(kind)) + '">' + esc(W.v2itsEntries) + '</a>');
+  const m = k.model;
+  const [rules, hist] = await Promise.all([api(inSpace('/entries?kind=Rule&limit=200')).catch(() => []), api(inSpace('/history?limit=1&target=' + encodeURIComponent(m.id))).catch(() => [])]);
+  const fold3 = (t) => String(t || '').toLowerCase();
+  const mine = rules.filter((r) => r.data.when && [r.data.when.saved, r.data.when.changed && r.data.when.changed.kind, r.data.when.before && r.data.when.before.kind].map(fold3).includes(fold3(kind)));
+  // What computes on this kind: its own formulas, and those of kinds linked to it.
+  const calcs = m.fields.filter((f) => f.type === 'formula').map((f) => [kindName(kind), labelOf(m, f.name), f.formula]);
+  for (const other of knownKinds.filter((x) => x.model && x.kind !== kind)) {
+    const linkedTo = m.fields.some((f) => f.type === 'link' && f.target === other.kind);
+    if (!linkedTo && !other.model.fields.some((f) => f.type === 'link' && f.target === kind)) continue;
+    for (const f of other.model.fields.filter((x) => x.type === 'formula')) calcs.push([kindName(other.kind), labelOf(other.model, f.name), f.formula]);
+  }
+  const ruleLine = (r) => { const w = r.data.when; const cond = w.saved ? say(W.v2whenSaved, { kind: kindName(w.saved) }) : w.changed ? say(W.v2whenChanged, { field: w.changed.field }) : w.before ? say(W.v2whenBefore, { n: w.before.days, field: w.before.field }) : w.schedule || ''; return '<div class="rule-line"><span><span class="kw">' + esc(W.v2when2) + '</span>' + esc(cond) + (r.data.if ? ' <span class="kw">' + esc(W.v2if) + '</span>' + esc(r.data.if) : '') + ' <span class="kw">' + esc(W.v2then2) + '</span>' + esc(r.title) + '</span>' + (r.data.active === false ? '<span class="tag neutral">' + esc(W.v2paused) + '</span>' : '') + '</div>'; };
+  const changed = hist[0];
+  const cols = m.columns || m.fields.filter((f) => f.type !== 'formula').slice(0, 6).map((f) => f.name);
+  const fieldsTable = '<div class="scroll"><table><thead><tr><th>' + esc(W.v2field) + '</th><th>' + esc(W.v2nature) + '</th><th>' + esc(W.v2required) + '</th><th>' + esc(W.v2precision) + '</th></tr></thead><tbody>' +
+    m.fields.map((f) => '<tr><td class="mono"><b>' + esc(labelOf(m, f.name)) + '</b>' + (labelOf(m, f.name) !== f.name ? ' <span class="cell-sub">' + esc(f.name) + '</span>' : '') + '</td><td><span class="nature' + (f.type === 'link' ? ' ref' : f.type === 'formula' ? ' calc' : '') + '">' + esc(natureOf(f)) + '</span></td><td>' + esc(f.required ? W.yes : W.no) + '</td><td class="cell-sub">' + esc([f.options ? f.options.map((o) => optionLabelOf(m, f.name, o)).join(' · ') : '', f.formula ? '= ' + f.formula : '', f.help || '', f.unit || ''].filter(Boolean).join(' · ')) + '</td></tr>').join('') + '</tbody></table></div>';
+  const path = m.path || '';
+  const example = path ? path.replace(/[{]year[}]/g, '2026').replace(/[{]month[}]/g, '11').replace(/[{]day[}]/g, '10').replace(/[{]date[}]/g, '2026-11-10').replace(/[{]title[}]/g, 'exemple') : '';
+  crumbs([W.navModels, kindLabel(k)]);
+  return v2head(esc(kindLabel(k)) + (changed ? ' <span class="built">' + esc(say(W.v2changedOn, { when: day(changed.at), who: changed.client || changed.door })) + '</span>' : ''), esc([m.app ? say(W.v2appOf, { app: m.app }) : W.v2yours2, say(W.v2nEntries, { n: num(k.count || 0) })].join(' · ')),
+    '<a class="btn" href="#/vie?kind=' + esc(encodeURIComponent(kind)) + '">' + ic('i-life') + esc(W.v2itsEntries) + '</a><button class="btn" data-model-history="' + esc(m.id) + '">' + ic('i-history') + esc(W.v2versions) + '</button><button class="btn solid" data-ask-claude="model">' + ic('i-chat') + esc(W.v2changeWithClaude) + '</button>',
+    v2app(m.app || kindName(kind))) +
+    '<div class="grid g21"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">' +
+    v2panel(W.v2fields, fieldsTable, '<span class="muted" style="font-size:12px">' + esc(W.v2checkedEachSave) + '</span>', 'i-shape') +
+    v2panel(W.v2calcs, calcs.length ? '<div>' + calcs.map((c) => '<div class="rule-line"><span class="nature calc">' + esc(c[0] + '.' + c[1]) + '</span><span class="muted">= ' + esc(c[2]) + '</span></div>').join('') + '</div>' : '<div class="pad muted">' + esc(W.v2noCalc) + '</div>', '', 'i-chart') +
+    v2panel(W.v2rules, mine.length ? '<div>' + mine.map(ruleLine).join('') + '</div>' : '<div class="pad muted">' + esc(W.v2noRule) + '</div>', '<span class="muted" style="font-size:12px">' + esc(W.v2rulesNote) + '</span>', 'i-scale') +
+    '</div><div style="display:flex;flex-direction:column;gap:16px;min-width:0">' +
+    v2panel(W.v2exportLayout, '<div class="form" style="display:grid;gap:12px"><label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(W.v2path) + ' <small class="muted">' + esc(W.v2pathHelp) + '</small><input class="field mono" data-model-path="' + esc(m.id) + '" value="' + esc(path) + '" placeholder="' + esc(kind.toLowerCase()) + '/{year}/{month}/{title}.md"></label>' + (example ? '<div class="cell-sub">' + esc(W.v2example) + ' <span class="path">' + esc(example) + '</span></div>' : '') + '<div class="cell-sub">' + esc(W.v2reimport) + '</div></div>', '', 'i-box') +
+    v2panel(W.v2display, '<div class="form" style="display:grid;gap:12px"><div><div class="caps" style="margin-bottom:6px">' + esc(W.v2columns) + '</div><div class="chips">' + m.fields.map((f) => '<button class="chip" data-model-col="' + esc(m.id) + ':' + esc(f.name) + '" aria-pressed="' + cols.includes(f.name) + '"' + (cols.includes(f.name) ? '' : ' style="opacity:.55"') + '>' + esc(labelOf(m, f.name)) + '</button>').join('') + '</div></div>' +
+      '<label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(W.v2groupByH) + '<select class="field" data-model-set="' + esc(m.id) + ':groupBy"><option value="">—</option>' + m.fields.filter((f) => ['choice', 'date', 'datetime', 'link', 'text'].includes(f.type)).map((f) => '<option value="' + esc(f.name) + '"' + (m.groupBy === f.name ? ' selected' : '') + '>' + esc(labelOf(m, f.name)) + '</option>').join('') + '</select></label>' +
+      '<label style="display:grid;gap:6px;font-weight:600;font-size:13px">' + esc(W.v2totalH) + '<select class="field" data-model-set="' + esc(m.id) + ':total"><option value="">—</option>' + m.fields.filter((f) => ['number', 'amount', 'duration', 'formula'].includes(f.type)).map((f) => '<option value="' + esc(f.name) + '"' + (m.total === f.name ? ' selected' : '') + '>' + esc(labelOf(m, f.name)) + '</option>').join('') + '</select></label>' +
+      '<div class="cell-sub">' + esc(W.v2formFrom) + ' <a href="#/vie?kind=' + esc(encodeURIComponent(kind)) + '">' + esc(W.v2seeForm) + '</a></div></div>', '', 'i-eye') +
+    '<div class="hint">' + ic('i-chat') + '<span>' + W.v2modelHint + '</span></div></div></div>';
+}
+
+// What the model page does: each change is one save of the model, journaled, undone at once.
+function bindModels(root) {
+  const keep = async (id, data) => {
+    try { await api(inSpace('/save'), { method: 'POST', body: { entries: [{ id, data }] } }); toast(W.v2modelChanged, { id, spaceId: space }); await drawApps(); show(); } catch (error) { alert(error.message); show(); }
+  };
+  root.querySelectorAll('[data-model-path]').forEach((el) => el.addEventListener('change', () => keep(el.dataset.modelPath, { path: el.value.trim() || null })));
+  root.querySelectorAll('[data-model-set]').forEach((el) => el.addEventListener('change', () => { const [id, field] = el.dataset.modelSet.split(':'); keep(id, { [field]: el.value || null }); }));
+  root.querySelectorAll('[data-model-col]').forEach((b) => b.addEventListener('click', () => {
+    const [id, field] = b.dataset.modelCol.split(':');
+    const now = [...root.querySelectorAll('[data-model-col][aria-pressed="true"]')].map((x) => x.dataset.modelCol.split(':')[1]);
+    keep(id, { columns: now.includes(field) ? now.filter((x) => x !== field) : now.concat([field]) });
+  }));
+  root.querySelectorAll('[data-model-history]').forEach((b) => b.addEventListener('click', async () => {
+    const hist = await api(inSpace('/history?limit=30&target=' + encodeURIComponent(b.dataset.modelHistory)));
+    openDrawer(W.v2versions, '<ul class="journal">' + hist.map((h) => '<li class="' + (h.undoneBy ? 'undone' : '') + '"><time>' + esc(day(h.at)) + '</time><span>' + esc(said(h.command)) + '<small>' + esc(say(W.by, { who: h.client || (h.actor === me.person.id ? W.v2you : h.actor), door: h.door })) + '</small></span>' + (h.undoneBy ? '' : '<button class="undo" data-undo-model="' + h.id + '">' + esc(W.undo) + '</button>') + '</li>').join('') + '</ul>');
+    drawer().querySelectorAll('[data-undo-model]').forEach((u) => u.addEventListener('click', async () => { await api(inSpace('/undo'), { method: 'POST', body: { journalId: Number(u.dataset.undoModel) } }); closeDrawer(); await drawApps(); show(); }));
+  }));
+  root.querySelectorAll('[data-ask-claude]').forEach((b) => b.addEventListener('click', () => openDrawer(W.v2changeWithClaude, '<p>' + esc(W.v2askClaudeModel) + '</p>')));
+}
 `;

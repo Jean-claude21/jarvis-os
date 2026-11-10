@@ -7,7 +7,7 @@ export const router = `
 const pages = Object.assign({}, dayPages, lifePages, settingsPages, v2Pages);
 
 // The title of each page, as the breadcrumb says it; the sidebar item it lights.
-const titles = { '': 'navNow', accueil: 'navNow', collections: 'navModels', fichiers: 'navDocuments', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
+const titles = { '': 'navNow', accueil: 'navNow', collections: 'navModels', modeles: 'navModels', fichiers: 'navDocuments', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
   rappels: 'navAgenda', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', espace: 'navSpaces', bienvenue: 'v2welcome', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
 const navOf = { '': '', accueil: '', agenda: 'agenda', rappels: 'agenda', ranger: 'ranger', revue: 'revue', personnes: 'personnes', vie: 'vie', entree: 'vie', documents: 'documents', document: 'documents', fichiers: 'documents', tableaux: 'tableaux', apps: 'apps' };
 
@@ -43,7 +43,7 @@ async function show() {
     const html = await pages[key](params, id ? decodeURIComponent(id) : undefined);
     if (ticket !== drawing) return;
     page().innerHTML = html; drawCrumbs(key, id ? decodeURIComponent(id) : undefined);
-    bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page());
+    bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page());
     page().scrollTop = 0; window.scrollTo(0, 0);
     document.querySelectorAll('.x-tabbar a[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === key));
     if (key === 'ranger' || key === '') counts();

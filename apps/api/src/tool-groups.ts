@@ -31,8 +31,8 @@ export const TOOL_GROUPS: Record<string, { about: string; actions: string[] }> =
   },
   inbox: {
     about:
-      'Raw capture and filing later: keep something at once as she said it, list what is to file, file one, or file everything sure.',
-    actions: ['capture', 'inbox', 'file_capture', 'file_sure'],
+      'Raw capture and filing later, and everything that waits for her yes: keep something at once as she said it, list what is to file, file one, or file everything sure; list all that waits (to_sort), propose several entries across her apps at once, give her answer (decide).',
+    actions: ['capture', 'inbox', 'file_capture', 'file_sure', 'to_sort', 'propose', 'decide'],
   },
   history: {
     about:

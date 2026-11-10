@@ -9,6 +9,8 @@ import {
   mirrorOf,
   patternsOf,
   personCard,
+  decide,
+  toSortOf,
   timeOf,
 } from '@jarvis-os/core';
 import {
@@ -895,6 +897,24 @@ export function apiRoutes(deps: {
       ),
     ),
   );
+
+  // What waits for her yes, in one place (spec 046).
+  api.get('/to-sort', async (c) =>
+    c.json(
+      await as(c, (tx) =>
+        toSortOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+        ),
+      ),
+    ),
+  );
+  api.post('/to-sort/:id', async (c) => {
+    const body = z.object({ yes: z.boolean() }).parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) => decide(tx, actor, space, c.req.param('id'), body.yes)),
+    );
+  });
 
   // A person's card across her apps (spec 045).
   api.get('/people/:id', async (c) =>

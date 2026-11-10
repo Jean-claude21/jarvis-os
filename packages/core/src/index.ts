@@ -86,6 +86,14 @@ export { patternsOf, type Pattern, type PatternKind } from './patterns';
 export { impactOf, replan, windowOf, type Impact, type Replan } from './impact';
 export { personCard, type PersonCard } from './people';
 export {
+  decide,
+  propose,
+  PROPOSAL_KIND,
+  toSortOf,
+  type ProposalInput,
+  type ToSort,
+} from './proposals';
+export {
   DEFAULT_QUESTIONS,
   keepReview,
   mirrorOf,

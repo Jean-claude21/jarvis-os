@@ -159,3 +159,20 @@ describe('a person’s card through Claude (spec 045)', () => {
     expect(none.value.error).toContain('No person');
   });
 });
+
+describe('a proposal across her apps, through Claude (spec 046)', () => {
+  it('proposes, lists what waits, and makes it on her yes', async () => {
+    const ama = await signUp('Ama');
+    const claude = await connect(ama);
+    const made = await claude.call<{ entries: { id: string }[] }>('propose', {
+      title: 'Frigo acheté',
+      apps: ['Finances'],
+      entries: [{ kind: 'Transaction', title: 'Frigo', data: { amount: 250000 } }],
+    });
+    expect(made.isError).toBe(false);
+    const waits = await claude.call<{ type: string }[]>('to_sort', {});
+    expect(waits.value.map((one) => one.type)).toContain('proposal');
+    const yes = await claude.call('decide', { id: made.value.entries[0]!.id, yes: true });
+    expect(yes.isError).toBe(false);
+  });
+});

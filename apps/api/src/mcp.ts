@@ -5,6 +5,10 @@ import {
   mirrorOf,
   patternsOf,
   personCard,
+  decide,
+  propose,
+  toSortOf,
+  type ProposalInput,
   replan,
   windowOf,
 } from '@jarvis-os/core';
@@ -1517,6 +1521,49 @@ export async function mcpServerFor(
     },
     tool(async ({ space }: { space?: string | undefined }) =>
       act((tx) => fileSure(tx, actor, at(space))),
+    ),
+  );
+
+  // What waits for her yes, in one place (spec 046), in the family « inbox ».
+  server.registerTool(
+    'to_sort',
+    {
+      description:
+        'Everything that waits for her yes (« À ranger »): her captures to file, the entries proposed, the proposals across her apps, the kinds that are one thing. Show them; act on her answer with `decide` (or `file_capture`, `merge_kinds`).',
+      inputSchema: { space: spaceArg },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async ({ space }: { space?: string | undefined }) =>
+      act((tx) => toSortOf(tx, space ? [at(space)] : reach.map((one) => one.id))),
+    ),
+  );
+  server.registerTool(
+    'propose',
+    {
+      description:
+        'Propose, for her yes, several entries across her apps at once — « j’ai acheté un frigo 250 000 F »: the expense (Finances), the thing and its warranty (Maison) — with the links among them (refs). Nothing is made until she says yes (`decide`). `why` in a sentence; `apps` the apps it touches (`which_apps`).',
+      inputSchema: {
+        title: z.string().min(1).max(200),
+        why: z.string().max(1000).optional(),
+        apps: z.array(z.string().min(1).max(60)).max(10).default([]),
+        entries: saveInputSchema.shape.entries,
+        links: saveInputSchema.shape.links,
+        space: spaceArg,
+      },
+    },
+    tool(async ({ space, ...input }: ProposalInput & { space?: string | undefined }) =>
+      act((tx) => propose(tx, actor, at(space), input)),
+    ),
+  );
+  server.registerTool(
+    'decide',
+    {
+      description:
+        'Her answer to a proposed entry or a proposal: `yes` makes it (one save, undone at once), no sets it aside.',
+      inputSchema: { id: z.string().min(1), yes: z.boolean(), space: spaceArg },
+    },
+    tool(async (args: { id: string; yes: boolean; space?: string | undefined }) =>
+      act((tx) => decide(tx, actor, at(args.space), args.id, args.yes)),
     ),
   );
 

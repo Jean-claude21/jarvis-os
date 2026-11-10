@@ -18,6 +18,14 @@ export const preferencesSchema = z
       .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
       .nullable()
       .optional(),
+    /** Per source, what a capture does (spec 035): kept to file, or filed at once when sure. */
+    capture: z
+      .object({
+        telegram: z.enum(['inbox', 'auto']).optional(),
+        claude: z.enum(['inbox', 'auto']).optional(),
+        app: z.enum(['inbox', 'auto']).optional(),
+      })
+      .optional(),
     /** The apps she said « not for me » to (spec 034): never proposed again. */
     appsDeclined: z.array(z.string().min(1).max(60)).max(200).optional(),
     /** The merges of kinds she said no to (spec 032): « dépense→Transaction ». */

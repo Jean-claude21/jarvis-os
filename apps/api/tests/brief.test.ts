@@ -40,9 +40,11 @@ describe('the morning brief', () => {
       ],
       agenda: [],
       habits: [{ title: 'Prière', space: 'Moi', today: 'todo', rate30: 86.7 }],
+      inbox: 2,
     });
     expect(text).toContain('samedi 31 octobre');
     expect(text).toContain('• Payer le loyer');
     expect(text).toContain('○ Prière (à faire · 86,7 % sur 30 j)');
+    expect(text).toContain('📥 2 chose(s) à ranger');
   });
 });

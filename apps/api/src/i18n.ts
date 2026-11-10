@@ -70,6 +70,9 @@ const words = {
     briefHabitTodo: 'à faire',
     briefRate: '{rate} % sur 30 j',
     briefQuiet: 'Rien de prévu ni en retard : une journée libre.',
+    briefInbox: '📥 {n} chose(s) à ranger dans ton inbox.',
+    captureKept: 'Gardé ✓ — à ranger.',
+    captureFiled: 'Gardé et rangé ✓',
     briefEnd: 'Dis à Claude ce que tu veux en faire.',
   },
   en: {
@@ -138,6 +141,9 @@ const words = {
     briefHabitTodo: 'to do',
     briefRate: '{rate} % over 30 d',
     briefQuiet: 'Nothing planned, nothing late: a free day.',
+    briefInbox: '📥 {n} thing(s) to file in your inbox.',
+    captureKept: 'Kept ✓ — to file.',
+    captureFiled: 'Kept and filed ✓',
     briefEnd: 'Tell Claude what you want to do with it.',
   },
 } as const;

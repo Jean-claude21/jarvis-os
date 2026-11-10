@@ -136,6 +136,40 @@ describe('apps and their roles', () => {
     ]);
   });
 
+  it('never blocks her save: what the other app needs is left as a reminder', async () => {
+    await ama.as(async (tx) =>
+      save(tx, ama.actor, ama.space, {
+        entries: [
+          {
+            id: (await find(tx, ama.space, { kind: 'Model', text: 'Transaction' }))[0]!.id,
+            data: {
+              fields: [
+                { name: 'amount', type: 'amount', required: true },
+                { name: 'direction', type: 'choice', options: ['in', 'out'] },
+                { name: 'account', type: 'text', required: true },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    await ama.as((tx) =>
+      save(tx, ama.actor, ama.space, {
+        entries: [{ kind: 'SubscriptionPayment', title: 'Spotify', data: { amount: 2000 } }],
+      }),
+    );
+    expect(
+      await ama.as((tx) => find(tx, ama.space, { kind: 'SubscriptionPayment', text: 'Spotify' })),
+    ).toHaveLength(1);
+    expect(
+      await ama.as((tx) => find(tx, ama.space, { kind: 'Transaction', text: 'Spotify' })),
+    ).toEqual([]);
+    const [reminder] = await ama.as((tx) =>
+      find(tx, ama.space, { kind: 'Reminder', text: 'compléter' }),
+    );
+    expect(reminder!.title).toMatch(/SubscriptionPayment → Transaction.*account/);
+  });
+
   it('makes a bridge on demand', async () => {
     await ama.as((tx) =>
       createBridge(tx, ama.actor, ama.space, {

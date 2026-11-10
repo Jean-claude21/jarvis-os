@@ -29,6 +29,11 @@ export const TOOL_GROUPS: Record<string, { about: string; actions: string[] }> =
       'bridge',
     ],
   },
+  inbox: {
+    about:
+      'Raw capture and filing later: keep something at once as she said it, list what is to file, file one, or file everything sure.',
+    actions: ['capture', 'inbox', 'file_capture', 'file_sure'],
+  },
   history: {
     about:
       'What changed and taking it back: the journal of a space, undoing a change, setting an entry aside.',

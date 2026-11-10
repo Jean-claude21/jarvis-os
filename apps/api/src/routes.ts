@@ -23,6 +23,10 @@ import {
   renewCalendarKey,
   upcoming,
   backupsOf,
+  fileCapture,
+  fileSure,
+  inboxOf,
+  type EntryInput,
   COMMON_KINDS,
   removeApp,
   mergeKind,
@@ -87,6 +91,7 @@ import { telegramLink } from './telegram';
 import { briefText, channelOf, sendTelegram } from './watcher';
 import type { Auth } from './auth';
 import { codeOf, failure } from './errors';
+import { captureAs } from './capture';
 import { catalogFor } from './catalog';
 import { searchByMeaning } from './embeddings';
 import { connectorChange, connectorInput, type ConnectorService } from './connector-service';
@@ -522,6 +527,29 @@ export function apiRoutes(deps: {
     return c.json(
       await act(c, (tx, actor, space) =>
         installApp(tx, actor, space, bundle, body.dryRun !== false),
+      ),
+    );
+  });
+
+  // Her inbox (spec 035): kept at once from the app, listed, filed one by one or all that is sure.
+  api.post('/inbox', async (c) => {
+    const { text } = z.object({ text: z.string().min(1).max(4000) }).parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) => captureAs(tx, actor, space, { text, source: 'app' })),
+      201,
+    );
+  });
+  api.get('/inbox', async (c) => c.json(await act(c, (tx, _a, space) => inboxOf(tx, space))));
+  api.post('/inbox/sure', async (c) =>
+    c.json(await act(c, (tx, actor, space) => fileSure(tx, actor, space))),
+  );
+  api.post('/inbox/:id/file', async (c) => {
+    const { entries } = z
+      .object({ entries: z.array(z.record(z.string(), z.unknown())).min(1).max(20) })
+      .parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        fileCapture(tx, actor, space, c.req.param('id'), entries as EntryInput[]),
       ),
     );
   });

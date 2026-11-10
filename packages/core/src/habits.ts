@@ -85,6 +85,25 @@ export function weekdaysOf(value: unknown): Weekday[] | null {
   return WEEKDAYS.filter((one) => days.has(one));
 }
 
+/** The weekdays of a five-field cadence (« 30 18 * * 2,3 », « 0 6 * * 1-5 »); null for any other. */
+export function cronWeekdays(value: unknown): Weekday[] | null {
+  if (typeof value !== 'string') return null;
+  const fields = value.trim().split(/\s+/);
+  if (fields.length !== 5 || fields[2] !== '*' || fields[3] !== '*') return null;
+  if (fields[4] === '*') return [...WEEKDAYS];
+  const days = new Set<Weekday>();
+  const at = (n: number) => WEEKDAYS[(n + 6) % 7]!;
+  for (const part of fields[4]!.split(',')) {
+    const range = /^(\d)(?:-(\d))?$/.exec(part);
+    if (!range) return null;
+    const from = Number(range[1]);
+    const to = range[2] === undefined ? from : Number(range[2]);
+    if (from > 7 || to > 7 || to < from) return null;
+    for (let n = from; n <= to; n++) days.add(at(n % 7));
+  }
+  return WEEKDAYS.filter((one) => days.has(one));
+}
+
 export interface HabitPlan {
   days: Weekday[];
   /** The field the days were read from, and its words. */
@@ -96,11 +115,15 @@ export interface HabitPlan {
 const isDay = (value: unknown): value is string =>
   typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value);
 
-/** What a habit plans: its days (from `days`, else her words in `jours` or `cadence`), since when. */
-export function planOf(data: Record<string, unknown>): HabitPlan | null {
-  for (const field of ['days', 'jours', 'cadence']) {
+/** What a habit plans: its days (from `days`, else her words in `jours` or `cadence`, else a Habit's `repeat`), since when. */
+export function planOf(data: Record<string, unknown>, kind?: string): HabitPlan | null {
+  // A five-field cadence (`repeat`) also says the days of a habit — not of any repeated event.
+  const habit = kind !== undefined && ['habit', 'habitude'].includes(fold(kind));
+  for (const field of habit
+    ? ['days', 'jours', 'cadence', 'repeat']
+    : ['days', 'jours', 'cadence']) {
     if (data[field] === undefined || data[field] === null || data[field] === '') continue;
-    const days = weekdaysOf(data[field]);
+    const days = field === 'repeat' ? cronWeekdays(data[field]) : weekdaysOf(data[field]);
     if (!days?.length) continue;
     const since = [data.since, data.depuis, data.start].find(isDay)?.slice(0, 10) ?? null;
     return {

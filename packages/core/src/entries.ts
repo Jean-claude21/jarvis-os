@@ -1,4 +1,5 @@
 import type { Actor, Tx } from './db';
+import { NEAR, SAID, wordsMatch, wordsOf } from './search';
 import { prefixedId } from './ids';
 import { record } from './journal';
 import { readerOf } from './compute';
@@ -6,10 +7,14 @@ import { formulaValue } from './formula';
 import { checkPage } from './pages';
 import { zoneOf } from './zone';
 import { checkRule, runRulesAfterSave, type Changed } from './rules';
+import { syncReminders } from './reminders';
+import { closeIntentions } from './intentions';
+import { TIME_FIELDS } from './time';
 import { checkScript } from './scripts';
 import { checkView } from './views';
 import { checkShare } from './shares';
 import { checkArea } from './areas';
+import { asCommon, COMMON_KINDS } from './common';
 import { dataInNewWords, KIND_RENAMES, modelInNewWords, ROLE_RENAMES } from './keywords';
 import {
   checkAgainst,
@@ -288,6 +293,29 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
       notes.push(`kind « ${wanted} » → « ${KIND_RENAMES[foldKind(wanted)]} »`);
       wanted = KIND_RENAMES[foldKind(wanted)];
     }
+    // The common types (spec 032): another name of one her space already uses becomes it, its
+    // fields in the engine's words — unless she keeps entries or a model under her own name: then
+    // her word stays, until she merges them.
+    let commonData: Record<string, unknown> | null = null;
+    const common = !one.id && wanted ? asCommon(wanted, one.data) : null;
+    if (wanted && common) {
+      const { rows: uses } = await tx.query<{ hers: boolean; common: boolean }>(
+        `select bool_or(jarvis_fold(kind) = jarvis_fold($2)
+                        or (kind = 'Model' and jarvis_fold(title) = jarvis_fold($2))) as hers,
+                bool_or(kind = $3 or (kind = 'Model' and title = $3)) as common
+           from entry where space_id = $1 and archived_at is null
+            and (jarvis_fold(kind) in (jarvis_fold($2), jarvis_fold($3)) or kind = 'Model')`,
+        [spaceId, wanted, common.kind],
+      );
+      if (uses[0]?.common && !uses[0]?.hers) {
+        notes.push(
+          `kind « ${wanted} » → « ${common.kind} » (a common type, its fields in its words)`,
+        );
+        wanted = common.kind;
+        commonData = common.data;
+      }
+    }
+    if (commonData) one.data = commonData;
     const current = one.id
       ? (
           await tx.query<{
@@ -504,6 +532,66 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
   }
   // Her rules (spec 014) run on what this save made or changed, in the same transaction.
   await runRulesAfterSave(tx, actor, spaceId, changed);
+  // What follows a save (specs 037, 040), read in one query: whether an intention is open, which
+  // of these entries have reminders attached, and her default reminders.
+  const own = actor.client === 'intentions' || actor.client === 'reminders';
+  const made = changed.filter((one) => one.created);
+  const timed = changed.filter(
+    (one) =>
+      !/^reminder$/i.test(one.kind) &&
+      one.fields.some(
+        (field) =>
+          field === 'remind' ||
+          (TIME_FIELDS as readonly string[]).includes(field) ||
+          ['occurrences', 'until', 'count', 'except', 'status'].includes(field),
+      ),
+  );
+  if (!own && (made.length || timed.length)) {
+    const { rows: after } = await tx.query<{
+      intents: boolean;
+      attached: string[] | null;
+      defaults: Record<string, string[]> | null;
+    }>(
+      `select exists(select 1 from entry where space_id = $1 and archived_at is null
+                       and jarvis_fold(kind) = 'intention' and coalesce(data->>'status', 'open') = 'open') as intents,
+              (select array_agg(distinct l.to_id) from link l join entry r on r.id = l.from_id
+                where l.space_id = $1 and l.to_id = any($2) and l.role = 'for'
+                  and jarvis_fold(r.kind) = 'reminder' and r.archived_at is null) as attached,
+              (select e.data->'preferences'->'reminders' from entry e join space s on s.id = e.space_id
+                where s.personal and s.created_by = current_setting('jarvis.person', true)
+                  and e.archived_at is null and jarvis_fold(e.kind) = 'channel'
+                order by e.created_at limit 1) as defaults`,
+      [spaceId, timed.map((one) => one.id)],
+    );
+    const { intents, attached, defaults } = after[0]!;
+    // An entry that does what she meant to do closes her intention (spec 040).
+    if (intents && made.length) {
+      const { rows } = await tx.query<{ id: string; kind: string; title: string }>(
+        'select id, kind, title from entry where id = any($1)',
+        [made.map((one) => one.id)],
+      );
+      await closeIntentions(tx, actor, spaceId, rows);
+    }
+    // The reminders attached to what moved, or to what says them (spec 037), kept in step.
+    const hasDefaults =
+      defaults !== null && typeof defaults === 'object' && Object.keys(defaults).length > 0;
+    const created = new Set(timed.filter((one) => one.created).map((one) => one.id));
+    const keep = timed.filter(
+      (one) =>
+        one.fields.includes('remind') ||
+        (attached ?? []).includes(one.id) ||
+        (hasDefaults && created.has(one.id)),
+    );
+    if (keep.length) {
+      await syncReminders(
+        tx,
+        actor,
+        spaceId,
+        keep.map((one) => one.id),
+        { created, ...(hasDefaults ? { defaults: defaults! } : {}) },
+      );
+    }
+  }
   return saved;
 }
 
@@ -537,40 +625,56 @@ export async function get(
   return { ...entry, links: { out: await ends('out'), in: await ends('in') } };
 }
 
-const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-
 /**
- * Entries by words (in the title, the fields and a text file's words, accents and case aside,
- * every word present), by
- * kind, by the day they were created; the latest first. Archived ones only when asked.
+ * Entries by words (in the title, the fields and a file's words, accents and case aside, every word
+ * present), by kind, by the day they were created. With words, the best first: a word in the title
+ * counts more than in a field, more than in a file (spec 027); without, the latest first. When no
+ * entry holds every word, words close to hers count (a typing slip, a plural). Archived ones only
+ * when asked.
  */
 export async function find(tx: Tx, spaceId: string, raw: FindInput = {}): Promise<Entry[]> {
   const input = findInputSchema.parse(raw);
-  const words = fold(input.text ?? '')
-    .split(/\s+/)
-    .filter((word) => word.length > 0);
-  const { rows } = await tx.query<Entry>(
-    `select ${columns} from entry
-      where space_id = $1
+  const words = wordsOf(input.text);
+  const params = [
+    spaceId,
+    input.archived,
+    input.kind ? (KIND_RENAMES[foldKind(input.kind)] ?? input.kind) : null,
+    input.from ?? null,
+    input.to ?? null,
+    words,
+    input.limit,
+  ];
+  const scope = `space_id = $1
         and ($2::boolean or archived_at is null)
         and ($3::text is null or jarvis_fold(kind) = jarvis_fold($3))
         and ($4::date is null or created_at >= $4::date)
-        and ($5::date is null or created_at < $5::date + 1)
-        and (select bool_and(jarvis_fold(title || ' ' || data::text || ' ' || jarvis_file_words(id))
-                             like '%' || word || '%')
-               from unnest($6::text[]) as word) is not false
-      order by updated_at desc limit $7`,
-    [
-      spaceId,
-      input.archived,
-      input.kind ? (KIND_RENAMES[foldKind(input.kind)] ?? input.kind) : null,
-      input.from ?? null,
-      input.to ?? null,
-      words,
-      input.limit,
-    ],
+        and ($5::date is null or created_at < $5::date + 1)`;
+  const { rows } = await tx.query<Entry>(
+    `select ${columns} from entry
+      where ${scope}
+        and ${wordsMatch(6)}
+      order by (select coalesce(sum(case
+                  when jarvis_fold(title) like '%' || word || '%' then 3
+                  when jarvis_fold(data::text) like '%' || word || '%' then 2
+                  else 1 end), 0)
+                  from unnest($6::text[]) as word) desc,
+               updated_at desc
+      limit $7`,
+    params,
   );
-  return rows;
+  if (rows.length > 0 || words.length === 0) return rows;
+  // Nothing holds every word: the words close to hers (spec 027).
+  const { rows: near } = await tx.query<Entry>(
+    `select ${columns} from (
+       select e.*, (select min(word_similarity(word, ${SAID}))
+                      from unnest($6::text[]) as word) as close
+         from entry e where ${scope}) e
+      where close >= ${NEAR}
+      order by close desc, updated_at desc
+      limit $7`,
+    params,
+  );
+  return near;
 }
 
 export interface Kind {
@@ -585,13 +689,25 @@ export interface Kind {
    */
   group: string | null;
   system: boolean;
+  /** A common type's name in her languages (spec 032). */
+  common?: { fr: string; en: string };
 }
 
 /** Jarvis's own kinds: the engine and her method, grouped apart from her life. */
 export const SYSTEM_KINDS = new Set(
-  ['Model', 'Page', 'Rule', 'Script', 'View', 'Share', 'Area', 'Charter', 'Routine', 'Channel'].map(
-    (kind) => kind.toLowerCase(),
-  ),
+  [
+    'Model',
+    'Page',
+    'Rule',
+    'Script',
+    'View',
+    'Share',
+    'Area',
+    'Charter',
+    'Routine',
+    'Channel',
+    'App',
+  ].map((kind) => kind.toLowerCase()),
 );
 
 /** The kinds of things in a space, the most used first, with the fields each uses. */
@@ -627,10 +743,17 @@ export async function kinds(tx: Tx, spaceId: string): Promise<Kind[]> {
       system,
     };
   };
+  // A common type (spec 032) shows by its name in her language, even without a model.
+  const commonOf = (kind: string) => {
+    const one = COMMON_KINDS.find((common) => common.kind === kind);
+    return one ? { common: one.label } : {};
+  };
   const out: Kind[] = rows.map((row) => {
     const model = models.get(fold(row.kind));
     models.delete(fold(row.kind));
-    return model ? { ...row, model, ...placed(row.kind, model) } : { ...row, ...placed(row.kind) };
+    return model
+      ? { ...row, model, ...placed(row.kind, model), ...commonOf(row.kind) }
+      : { ...row, ...placed(row.kind), ...commonOf(row.kind) };
   });
   for (const model of models.values())
     out.push({ kind: model.kind, count: 0, fields: [], model, ...placed(model.kind, model) });

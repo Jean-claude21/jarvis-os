@@ -82,14 +82,28 @@ const RANGES = [
   [0, 7],
 ] as const;
 
-/** The values a field allows: `*`, `5`, `1-5`, `1,15`, `*\/10`, `L` (the last day of the month). */
-function field(text: string, index: number): { values: Set<number>; last: boolean } {
+/**
+ * The values a field allows: `*`, `5`, `1-5`, `1,15`, `*\/10`, `L` (the last day of the month);
+ * for the weekday, `1#2` (the second Monday of the month) and `5#L` (its last Friday).
+ */
+function field(
+  text: string,
+  index: number,
+): { values: Set<number>; last: boolean; nth: Map<number, Set<number>> } {
   const [low, high] = RANGES[index]!;
   const values = new Set<number>();
+  const nth = new Map<number, Set<number>>();
   let last = false;
   for (const part of text.split(',')) {
     if (index === 2 && part.toUpperCase() === 'L') {
       last = true;
+      continue;
+    }
+    const ordinal = index === 4 ? /^([0-7])#([1-5]|L)$/i.exec(part) : null;
+    if (ordinal) {
+      const weekday = Number(ordinal[1]) % 7;
+      const which = ordinal[2]!.toUpperCase() === 'L' ? -1 : Number(ordinal[2]);
+      nth.set(weekday, (nth.get(weekday) ?? new Set()).add(which));
       continue;
     }
     const match = /^(\*|\d+)(?:-(\d+))?(?:\/(\d+))?$/.exec(part);
@@ -104,7 +118,7 @@ function field(text: string, index: number): { values: Set<number>; last: boolea
     for (let value = from; value <= to; value += step)
       values.add(index === 4 && value === 7 ? 0 : value);
   }
-  return { values, last };
+  return { values, last, nth };
 }
 
 /** Reads « 45 20 * * 0-5 »; throws a sentence she can act on when it is not one. */
@@ -141,7 +155,12 @@ export function nextTime(repeat: string, after: Date, zone = DEFAULT_ZONE): Date
     if (!rule.month.values.has(month)) continue;
     const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
     const byDay = rule.day.values.has(day) || (rule.day.last && day === lastDay);
-    const byWeekday = rule.weekday.values.has(date.getUTCDay());
+    const weekday = date.getUTCDay();
+    const which = rule.weekday.nth.get(weekday);
+    const byWeekday =
+      rule.weekday.values.has(weekday) ||
+      (which !== undefined &&
+        (which.has(Math.ceil(day / 7)) || (which.has(-1) && day + 7 > lastDay)));
     // As cron: when both are given, either matches; when one is « * », the other decides.
     const matches = rule.anyDay ? byWeekday : rule.anyWeekday ? byDay : byDay || byWeekday;
     if (!matches) continue;
@@ -167,4 +186,83 @@ export function minutesOf(value: unknown): number | null {
   if (hm) return Number(hm[1]) * 60 + Number(hm[2] ?? 0);
   const m = /^(\d+)\s*(?:min|mn|m)?$/.exec(text);
   return m ? Number(m[1]) : null;
+}
+
+const DAY_WORDS: [RegExp, number][] = [
+  [/^(lun|mon)/, 1],
+  [/^(mar|tue)/, 2],
+  [/^(mer|wed)/, 3],
+  [/^(jeu|thu)/, 4],
+  [/^(ven|fri)/, 5],
+  [/^(sam|sat)/, 6],
+  [/^(dim|sun)/, 0],
+];
+const ORDINALS: Record<string, string> = {
+  premier: '1',
+  '1er': '1',
+  first: '1',
+  deuxieme: '2',
+  second: '2',
+  '2e': '2',
+  troisieme: '3',
+  third: '3',
+  '3e': '3',
+  quatrieme: '4',
+  fourth: '4',
+  '4e': '4',
+  dernier: 'L',
+  last: 'L',
+};
+
+/**
+ * A repetition said in her words, as the five fields Jarvis keeps (spec 036): « tous les jours à
+ * 20h45 », « chaque lundi et jeudi à 7h », « le 2e lundi du mois à 18h », « le dernier vendredi »,
+ * « tous les mois le 5 », « en semaine à 6h30 ». Null when it is already fields, or says none.
+ */
+export function repetitionFromWords(text: string): string | null {
+  const said = text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’']/g, ' ').trim();
+  if (!said || /^[\d*,/#L-]+(\s+[\d*,/#L-]+){4}$/i.test(text.trim())) return null;
+  const clock = /(\d{1,2})\s*(?:h|:)\s*(\d{2})?|(\d{1,2})\s*(am|pm)/.exec(said);
+  let hour = 9;
+  let minute = 0;
+  if (clock) {
+    hour = Number(clock[1] ?? clock[3]);
+    minute = Number(clock[2] ?? 0);
+    if (clock[4] === 'pm' && hour < 12) hour += 12;
+    if (hour > 23 || minute > 59) return null;
+  }
+  const words = said.split(/[^a-z0-9]+/).filter(Boolean);
+  const days = [
+    ...new Set(
+      words.flatMap((word) =>
+        word.length >= 3 && word !== 'mars'
+          ? DAY_WORDS.filter(([re]) => re.test(word)).map(([, n]) => n)
+          : [],
+      ),
+    ),
+  ];
+  const ordinal = words.map((word) => ORDINALS[word]).find(Boolean);
+  const at = `${minute} ${hour}`;
+  if (ordinal && days.length === 1) return `${at} * * ${days[0]}#${ordinal}`;
+  if (/\b(mois|month|mensuel|monthly)\b/.test(said)) {
+    if (/\b(dernier jour|last day)\b/.test(said)) return `${at} L * *`;
+    const monthDay =
+      /\b(?:le|the|on the)\s+(\d{1,2})(?:er|e|st|nd|rd|th)?\b(?!\s*(?:h|:|am|pm))/.exec(said);
+    if (monthDay && Number(monthDay[1]) >= 1 && Number(monthDay[1]) <= 31) {
+      return `${at} ${Number(monthDay[1])} * *`;
+    }
+  }
+  if (/\b(en semaine|jours ouvres|weekdays?)\b/.test(said)) return `${at} * * 1-5`;
+  if (/\b(week-?ends?)\b/.test(said)) return `${at} * * 0,6`;
+  if (
+    /\b(tous les jours|chaque jour|quotidien|every day|daily|tous les (soirs|matins)|chaque (soir|matin))\b/.test(
+      said,
+    )
+  ) {
+    return `${at} * * *`;
+  }
+  if (days.length && /\b(tous|toutes|chaque|les|every|each|on)\b|s\b/.test(said)) {
+    return `${at} * * ${days.sort((a, b) => a - b).join(',')}`;
+  }
+  return null;
 }

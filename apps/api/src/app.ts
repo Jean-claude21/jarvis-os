@@ -37,6 +37,11 @@ import type { Settings } from './settings';
 import { objectStorage } from './storage';
 import { appPage } from './platform/page';
 import { spaceFor } from './spaces';
+import { actRoutes } from './act';
+import { connectorService } from './connector-service';
+import { embedderFor } from './embeddings';
+import { secretsKey } from './secrets';
+import { healthOf } from './health';
 import { computeDashboard, dashboardView, widgetsOf } from './views/dashboard';
 import { pageView } from './views/page';
 import { sharedView } from './views/shared';
@@ -58,12 +63,27 @@ export function makeApp(settings: Settings) {
   // Her scripts (spec 014) run in QuickJS, whichever door starts them.
   useScriptRunner(quickjsRunner);
   const blobs = objectStorage(settings.storage);
+  // Search by meaning (spec 028), when a model key is set.
+  const embedder = embedderFor();
+  // Her connectors (spec 025): their secrets sealed with the branch's key.
+  const connectors = connectorService({
+    db,
+    key: secretsKey(settings.authSecret),
+    publicUrl: settings.publicUrl,
+  });
   const auth = makeAuth({ db, secret: settings.authSecret, publicUrl: settings.publicUrl });
   const resource = mcpResource(settings.publicUrl);
   const app = new Hono();
 
-  app.get('/health', (c) => c.json({ status: 'healthy' }));
+  // For a monitor outside (spec 023): the database answers, the watcher passed lately and without
+  // failure. Nothing personal, nor who runs the watcher. 503 when something is wrong.
+  app.get('/health', async (c) => {
+    const health = await healthOf(db);
+    return c.json(health, health.status === 'healthy' ? 200 : 503);
+  });
   app.on(['GET', 'POST'], '/auth/*', (c) => auth.handler(c.req.raw));
+  // Actions from an e-mail (spec 020): a signed link, a page that asks, a button that acts.
+  app.route('/act', actRoutes({ db, secret: settings.authSecret }));
   // Discovery at the root, where MCP clients look first. The protected resource's metadata
   // (RFC 9728) is matched by the MCP plugin on the path as it is; the authorization server's
   // (RFC 8414, path-inserted) is answered by the same handler as under /auth.
@@ -78,7 +98,15 @@ export function makeApp(settings: Settings) {
 
   app.route(
     '/api',
-    apiRoutes({ auth, db, blobs, publicUrl: settings.publicUrl, secret: settings.authSecret }),
+    apiRoutes({
+      auth,
+      db,
+      blobs,
+      connectors,
+      embedder,
+      publicUrl: settings.publicUrl,
+      secret: settings.authSecret,
+    }),
   );
 
   /** The name the client gave itself when it registered, for the pages. */
@@ -412,7 +440,14 @@ export function makeApp(settings: Settings) {
         return Response.json({ error: 'No such account.' }, { status: 401 });
       }
       const server = await mcpServerFor(
-        { db, blobs, publicUrl: settings.publicUrl, secret: settings.authSecret },
+        {
+          db,
+          blobs,
+          connectors,
+          embedder,
+          publicUrl: settings.publicUrl,
+          secret: settings.authSecret,
+        },
         {
           person,
           name: rows[0].name,
@@ -430,5 +465,5 @@ export function makeApp(settings: Settings) {
   );
   app.all('/mcp', (c) => mcp(c.req.raw));
 
-  return { app, auth, db, blobs, resource, close: () => db.end() };
+  return { app, auth, db, blobs, connectors, resource, close: () => db.end() };
 }

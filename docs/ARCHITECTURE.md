@@ -257,6 +257,159 @@ flowchart LR
   H -->|link for| D[deeds] --> R
 ```
 
+## Every message, on her channel, and its trace (spec 020)
+
+- **The outbox** (`outbox.ts`, migration `0013`): the watcher no longer writes to Telegram. A
+  reminder due or a morning brief enters the table `outbox` once per channel (a dedupe key per
+  occurrence), then is delivered: sent, or tried again after 1, 5 and 30 minutes, then failed with
+  its reason. Each row is hers (`person_id`, its policy); `GET /api/outbox` shows her last days.
+- **Her channels** (`channels.ts`): Telegram by the bot, e-mail by any SMTP server
+  (`JARVIS_SMTP_URL`, `JARVIS_EMAIL_FROM`). She chooses per kind in her « Channel »
+  (`preferences.channels`); without a choice, Telegram when linked, else e-mail.
+- **Acting from an e-mail** (`act.ts`): a reminder's e-mail carries four links — done, in one hour,
+  tomorrow, not for me — signed with the branch's secret, valid seven days, used once. Opening one
+  shows a page; only its button (a POST) acts, as her, journaled through the door « email ».
+
+```mermaid
+flowchart LR
+  W[watcher, each minute] -->|reminders, briefs| E[enterMessage: once per channel]
+  E --> O[(outbox)]
+  W --> D[deliverOutbox] --> O
+  D -->|telegram| T[Telegram bot]
+  D -->|email| S[SMTP] --> M[her mailbox] -->|link| A[GET /act: a page] -->|POST| R[the reminder changed, journaled]
+```
+
+## One watcher at a time (spec 021)
+
+Any number of watchers may run on a database (Netlify each minute, a laptop through `pnpm serve`):
+before a pass, `watcherPass` takes the lease `watcher` (`lease.ts`, migration `0015`), and skips the
+pass while another holder has it. A pass gives the lease back when it ends, with its report or its
+error; a holder that stops in the middle loses it after five minutes. The lease row is the trace of
+the last pass: who, when, how it ended. The application reaches it through its functions only.
+
+```mermaid
+flowchart LR
+  N[watcher on Netlify] -->|jarvis_lease_take| L[(watcher_lease)]
+  P[watcher on a laptop] -->|jarvis_lease_take| L
+  L -->|free or expired: taken| R[the pass] -->|jarvis_lease_give: report or error| L
+  L -->|held by another| S[pass skipped]
+```
+
+## Backups (spec 022)
+
+- **Each space, each night** (`backups.ts`, migration `0017`): the watcher exports each space as a
+  Markdown folder (what `/api/export` gives, without the files' bytes, which stay once in the
+  storage) into `backups/<space>/<day>.zip`, a few spaces each pass, acting as a member. Thirty
+  days are kept. She lists them (`GET /api/backups`) and opens one by a ten-minute link; `import`
+  reads one back.
+- **The database, each night** (`pnpm backup` by hand; on Cloudflare, the Worker
+  `jarvis-os-backup` at 01:30 UTC, deployed by `pnpm cron:deploy`): `main` kept as a Neon
+  branch `backup-main-<day>`, the last three kept (Neon itself goes back six hours on its free
+  plan). `pnpm backup restore --from <backup> --into <branch>` shows what each holds; `--apply`
+  restores, keeping the state before as `<branch>_before_restore_<stamp>`. Neon then makes the
+  backup the restored branch's parent: it stays.
+
+```mermaid
+flowchart LR
+  W[watcher, each pass] -->|jarvis_backup_due| S[spaces without the day's backup]
+  S -->|as a member: exportMarkdown, zip| B[(storage: backups/space/day.zip)]
+  S --> R[(space_backup: 30 days)]
+  G[Cloudflare Worker, each night] -->|Neon API| N[Neon: backup-main-day, 3 kept]
+  N -->|pnpm backup restore --apply| M[(main)]
+```
+
+## Knowing when something went wrong (spec 023)
+
+- **For her**: a reminder whose message failed for good (three tries after the first) is saved
+  `failed`, its `error` saying the channel and the reason, as her through the door « watcher »:
+  « Maintenant » shows it to fix. « Retry » plans it again; the watcher enters the same message,
+  which, having failed, is queued again from its first try.
+- **For whoever runs it**: `/health` answers 200 or 503 with three parts: the database answers;
+  the watcher's last pass (from its lease, spec 021): when, late after five minutes, failed or not,
+  and how many failures it counted (reminders, outbox, backups, rules). Counts only. A monitor
+  outside (any uptime service) reads it and alerts.
+
+```mermaid
+flowchart LR
+  D[deliverOutbox] -->|failed for good| R[the reminder: failed, its reason]
+  R --> M[Maintenant: to fix] -->|Retry| P[planned] --> W[watcher] -->|same message, queued again| D
+  L[(watcher_lease: last pass, its report)] --> H[/health: 200 or 503/] --> U[a monitor outside]
+```
+
+## Who may come in, and how many tries (spec 024)
+
+- **Sign-up**: open by default; `JARVIS_SIGNUP=invite` lets in only an address invited to a space
+  (`jarvis_invited`, a boolean, before any account exists) or one `JARVIS_SIGNUP_ALLOW` names
+  (addresses, « @domain »). Refused, the sign-in page says why in her language.
+- **Attempts**: Better Auth's limiter, kept in the database (table `rateLimit`) so that every
+  server instance counts the same: five sign-ins a minute, five sign-ups an hour, a hundred other
+  `/auth` calls a minute, per client address (Netlify's `x-nf-client-connection-ip`, else
+  `x-forwarded-for`). The test suite turns it off (`JARVIS_RATE_LIMIT=off`) and proves it apart.
+- Passwords are hashed and the signing keys encrypted by Better Auth; the tokens of other services
+  will be encrypted with the connectors (S6).
+
+## Her tools, through Jarvis (spec 025)
+
+Jarvis is an MCP client as well as a server. A connector (migration `0019`, table `connector`, per
+space, its members only) is the address of any MCP server reached over HTTP (Streamable HTTP, else
+SSE) and how it is signed in to: no key, a bearer key, or a key in a header. The key is sealed by
+the server (`secrets.ts`, AES-256-GCM, `JARVIS_SECRETS_KEY` or a key derived from the branch's auth
+secret) and never returned, logged or journaled. A check reads the server's name, tools and
+resources and keeps them, so that listing them calls nothing.
+
+- **Signed in to (OAuth)**: a server that asks her to sign in gets Jarvis registered with it, her
+  passage through its sign-in page (PKCE, a state naming the connector) and back to
+  `/api/connectors/callback`; the tokens are sealed like a key (`oauth_sealed`, migration `0020`)
+  and renewed by the MCP client. Until then the connector is `needs_sign_in`.
+- **Discover** (`catalog.ts`): the servers their makers host (Notion, Asana, Linear, Atlassian,
+  Canva, PayPal, Stripe, GitHub, Hugging Face, Microsoft Learn, DeepWiki; Zapier for Gmail, Google
+  Calendar, Drive, Outlook…), added in one click; « Add my own connector » for any other.
+- **Resources**: `GET /api/connectors/:id/resources/read?uri=` reads one, framed as outside content.
+- **Every door**: the web account (Connections › « What Jarvis uses for you »: add, check, cut) and
+  `/api/connectors`; the MCP door has two tools whatever the number of servers: `connectors` (hers,
+  with their tools and parameters) and `connector_call`.
+- **Her yes**: a tool the server marks destructive or open-world, or with no hints and a name that
+  writes, is called only with `agreed: true`; otherwise the call says what to ask her.
+- **Trace**: `connector.add`, `.change`, `.cut`, `.call` in the journal (never undone); a call keeps
+  the tool and whether it worked, never its arguments nor its answer. An answer comes back framed
+  `{ from, content }`: content from outside, data only.
+
+```mermaid
+flowchart LR
+  C[Claude · ChatGPT] -->|connectors, connector_call| J[Jarvis]
+  W[web account › Connections] -->|/api/connectors| J
+  J -->|sealed key| K[(connector)]
+  J -->|connector.call| L[(journal)]
+  J -->|MCP client, her key| S1[an MCP server]
+  J --> S2[another]
+```
+
+## Her files, read (spec 026)
+
+A PDF, a Word document or a photo she gives is kept at once (`read_state: pending`, migration
+`0021`); the watcher reads a few each pass (`reading.ts`): unpdf for PDFs, mammoth for Word,
+tesseract.js for photos (French and English). The words go to `file.text` (up to 200 000
+characters), where `find` already looks. A file that cannot be read is `failed` with its reason,
+once; a photo without writing is `none`.
+
+## Search that finds (spec 027)
+
+One rule for every search by words (`search.ts`): every word present in the title, the fields or a
+file's words, accents and case aside; the best first (a word in the title counts 3, in a field 2,
+in a file 1). When no entry holds every word, words close to hers count, by trigrams (`pg_trgm`,
+migration `0022`, word similarity at least 0.6): a typing slip, a plural. Search by meaning waits
+for the author's choice of model.
+
+## Search by meaning (spec 028)
+
+Each entry's words (title, fields, a file's words; `jarvis_said`) are turned into a vector of 1024
+numbers by an outside model — Voyage AI (`VOYAGE_API_KEY`, voyage-3.5-lite) or OpenAI
+(`OPENAI_API_KEY`) — kept in `entry_vector` (pgvector, migration `0023`, members only). The watcher
+turns 64 entries a pass: those without a vector, or whose words or model changed (a hash). A
+question is turned the same way; `find` gives the entries found by words, then those near in
+meaning (`byMeaning`), and the Entries page shows them under « Near in meaning ». Without a key,
+search stays by words. Only the entries' words leave, to the model chosen.
+
 ## The doors
 
 | Door    | For                                                             | Authentication                       |
@@ -300,11 +453,13 @@ writes `.env` with the credentials of `dev` and `test` only: those of `main` liv
 Production runs on Netlify, built from this repository: `pnpm deploy:draft` bundles the two
 functions (esbuild, every dependency inside, QuickJS's WebAssembly file, the shipped apps and the
 routines beside them) and deploys them to a private address; `pnpm deploy:prod` does the same to
-the production site, from a clean `main` only.
+the production site, from a clean `main` only, after applying to Neon `main` the migrations not
+applied yet (its owner's address asked of Neon, kept in memory).
 
 ```mermaid
 flowchart LR
   R[main, this repository] -->|pnpm deploy:prod| N[Netlify]
+  R -->|its migrations first| M
   N --> A[function api · every request · Hono app]
   N --> W[function watcher · each minute · watcherPass]
   A --> M[(Neon main · her life)]

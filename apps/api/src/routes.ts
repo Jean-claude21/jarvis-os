@@ -1,3 +1,21 @@
+import { withWho } from './who';
+import { answerOf, appLines, appsOf, bridgesOf, proposeStructure } from '@jarvis-os/core';
+import {
+  comment,
+  commentsOf,
+  goalsOf,
+  impactOf,
+  keepReview,
+  replan,
+  mirrorOf,
+  patternsOf,
+  personCard,
+  decide,
+  OCCURRENCE_STATES,
+  setOccurrence,
+  toSortOf,
+  timeOf,
+} from '@jarvis-os/core';
 import {
   addFile,
   agenda,
@@ -22,6 +40,17 @@ import {
   readDocument,
   renewCalendarKey,
   upcoming,
+  backupsOf,
+  fileCapture,
+  fileSure,
+  inboxOf,
+  type EntryInput,
+  COMMON_KINDS,
+  removeApp,
+  mergeKind,
+  mergeProposals,
+  type MergeStep,
+  contextReadings,
   exportMarkdown,
   importMarkdown,
   invitationsOf,
@@ -38,6 +67,7 @@ import {
   withdrawInvitation,
   type Actor,
   type Blobs,
+  type Embedder,
   type Space,
   type Tx,
   withComputed,
@@ -48,6 +78,7 @@ import {
   viewsOf,
   setZone,
   zoneOf,
+  habitBoard,
   collectionsOf,
   collectionStats,
   preferencesOf,
@@ -67,17 +98,22 @@ import {
   keyOwner,
   keysOf,
   revokeKey,
+  recentMessages,
   type ViewData,
 } from '@jarvis-os/core';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import type pg from 'pg';
 import { z } from 'zod';
-import { shippedApp, shippedApps } from './apps';
+import { shippedApp, shippedApps, shippedRoles } from './apps';
 import { telegramLink } from './telegram';
 import { briefText, channelOf, sendTelegram } from './watcher';
 import type { Auth } from './auth';
 import { codeOf, failure } from './errors';
+import { captureAs } from './capture';
+import { catalogFor } from './catalog';
+import { searchByMeaning } from './embeddings';
+import { connectorChange, connectorInput, type ConnectorService } from './connector-service';
 import { invitationLink, namesOf, spaceFor } from './spaces';
 import { computeDashboard, widgetSchema, widgetsOf, type Widget } from './views/dashboard';
 import { DOCUMENT_HOURS, documentShown, documentToken } from './views/document';
@@ -137,6 +173,8 @@ export function apiRoutes(deps: {
   auth: Auth;
   db: pg.Pool;
   blobs: Blobs;
+  connectors: ConnectorService;
+  embedder?: Embedder | null;
   publicUrl: string;
   secret: string;
 }) {
@@ -364,6 +402,44 @@ export function apiRoutes(deps: {
     const body = await c.req.json();
     return c.json(await act(c, (tx, actor, space) => changeEntries(tx, actor, space, body)));
   });
+  // The common types and the duplicates of her life (spec 032): proposed, tried, merged on her yes.
+  const mergeInput = z.object({
+    from: z.string().min(1).max(80),
+    to: z.string().min(1).max(80),
+    steps: z.array(z.record(z.string(), z.unknown())).max(20).optional(),
+    dryRun: z.boolean().default(true),
+  });
+  api.get('/kinds/merges', async (c) =>
+    c.json(
+      await act(c, async (tx, _a, space) =>
+        mergeProposals(tx, space, (await preferencesOf(tx)).mergesDismissed ?? []),
+      ),
+    ),
+  );
+  api.post('/kinds/merge', async (c) => {
+    const input = mergeInput.parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        mergeKind(tx, actor, space, {
+          from: input.from,
+          to: input.to,
+          steps: (input.steps ?? []) as MergeStep[],
+          dryRun: input.dryRun,
+        }),
+      ),
+    );
+  });
+  api.post('/kinds/merges/dismiss', async (c) => {
+    const { from, to } = mergeInput.pick({ from: true, to: true }).parse(await c.req.json());
+    return c.json(
+      await as(c, async (tx, actor) => {
+        const now = (await preferencesOf(tx)).mergesDismissed ?? [];
+        return setPreferences(tx, actor, {
+          mergesDismissed: [...new Set([...now, `${from}→${to}`])],
+        });
+      }),
+    );
+  });
   api.post('/kinds/rename', async (c) => {
     const body = (await c.req.json()) as { from?: string; to?: string };
     return c.json(
@@ -464,6 +540,21 @@ export function apiRoutes(deps: {
     c.json(shippedApps.map((one) => ({ app: one.app, description: one.description ?? '' }))),
   );
 
+  // Her apps in this space (I6, I7): each with its role, the line her assistants read, and the
+  // bridges among them.
+  api.get('/apps/mine', async (c) =>
+    c.json(
+      await act(c, async (tx, _a, space) => {
+        const apps = await appsOf(tx, space, shippedRoles);
+        const lines = appLines(apps, 'fr');
+        return {
+          apps: apps.map((one, at) => ({ ...one, line: lines[at] })),
+          bridges: await bridgesOf(tx, space),
+        };
+      }),
+    ),
+  );
+
   api.post('/apps/install', async (c) => {
     const body = (await c.req.json()) as { name?: string; dryRun?: boolean };
     const bundle = shippedApp(String(body.name ?? ''));
@@ -471,6 +562,52 @@ export function apiRoutes(deps: {
       await act(c, (tx, actor, space) =>
         installApp(tx, actor, space, bundle, body.dryRun !== false),
       ),
+    );
+  });
+
+  // Her inbox (spec 035): kept at once from the app, listed, filed one by one or all that is sure.
+  api.post('/inbox', async (c) => {
+    const { text } = z.object({ text: z.string().min(1).max(4000) }).parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) => captureAs(tx, actor, space, { text, source: 'app' })),
+      201,
+    );
+  });
+  api.get('/inbox', async (c) => c.json(await act(c, (tx, _a, space) => inboxOf(tx, space))));
+  api.post('/inbox/sure', async (c) =>
+    c.json(await act(c, (tx, actor, space) => fileSure(tx, actor, space))),
+  );
+  api.post('/inbox/:id/file', async (c) => {
+    const { entries } = z
+      .object({ entries: z.array(z.record(z.string(), z.unknown())).min(1).max(20) })
+      .parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        fileCapture(tx, actor, space, c.req.param('id'), entries as EntryInput[]),
+      ),
+    );
+  });
+
+  // Removing an app (spec 034): her data stays; and « not for me », remembered.
+  api.post('/apps/remove', async (c) => {
+    const body = (await c.req.json()) as { name?: string; dryRun?: boolean };
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        removeApp(tx, actor, space, String(body.name ?? ''), body.dryRun !== false, (kind) =>
+          COMMON_KINDS.some((one) => one.kind === kind),
+        ),
+      ),
+    );
+  });
+  api.post('/apps/decline', async (c) => {
+    const body = (await c.req.json()) as { name?: string };
+    const name = String(body.name ?? '').trim();
+    if (!name) return c.json({ error: 'Give the app.' }, 400);
+    return c.json(
+      await as(c, async (tx, actor) => {
+        const now = (await preferencesOf(tx)).appsDeclined ?? [];
+        return setPreferences(tx, actor, { appsDeclined: [...new Set([...now, name])] });
+      }),
     );
   });
 
@@ -500,7 +637,46 @@ export function apiRoutes(deps: {
 
   api.post('/save', async (c) => {
     const body = await c.req.json();
-    return c.json(await act(c, (tx, actor, space) => save(tx, actor, space, body)));
+    return c.json(
+      await act(c, async (tx, actor, space) =>
+        save(tx, actor, space, {
+          ...body,
+          ...(Array.isArray(body?.entries)
+            ? { entries: await withWho(deps.db, tx, space, actor.person, body.entries) }
+            : {}),
+        }),
+      ),
+    );
+  });
+
+  // One occurrence of a repetition (spec 036): done, missed, postponed to a time, cancelled, or back.
+  api.post('/entries/:id/occurrences/:day', async (c) => {
+    const body = z
+      .object({
+        status: z.enum(OCCURRENCE_STATES).nullable().optional(),
+        at: z.string().min(10).max(40).nullable().optional(),
+      })
+      .parse(await c.req.json());
+    const change =
+      body.status === null && !body.at
+        ? null
+        : { ...(body.status ? { status: body.status } : {}), ...(body.at ? { at: body.at } : {}) };
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        setOccurrence(tx, actor, space, c.req.param('id'), c.req.param('day'), change),
+      ),
+    );
+  });
+
+  // Notes on an entry (spec 039): hers, as she wrote them, the oldest first.
+  api.get('/entries/:id/comments', async (c) =>
+    c.json(await act(c, (tx, _a, space) => commentsOf(tx, space, c.req.param('id')))),
+  );
+  api.post('/entries/:id/comments', async (c) => {
+    const body = z.object({ text: z.string().min(1).max(4000) }).parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) => comment(tx, actor, space, c.req.param('id'), body.text)),
+    );
   });
 
   api.post('/entries/:id/archive', async (c) => {
@@ -518,6 +694,12 @@ export function apiRoutes(deps: {
       ? [spaceFor(c.get('spaces'), named).id]
       : c.get('spaces').map((one) => one.id);
     return c.json(await as(c, (tx) => query(tx, { spaceIds, sql })));
+  });
+
+  // What Jarvis sent her (spec 020): the last days, on which channel, delivered or not.
+  api.get('/outbox', async (c) => {
+    const days = Math.min(30, Math.max(1, Number(c.req.query('days') ?? 7)));
+    return c.json(await as(c, (tx) => recentMessages(tx, days)));
   });
 
   api.get('/history', async (c) => {
@@ -605,6 +787,75 @@ export function apiRoutes(deps: {
     });
   });
 
+  // Her connectors (spec 025): the tools of other servers, reached through Jarvis. Never a secret
+  // in an answer.
+  api.get('/connectors', async (c) =>
+    c.json(
+      await deps.connectors.list(
+        c.get('person'),
+        c.get('spaces').map((one) => one.id),
+      ),
+    ),
+  );
+  api.post('/connectors', async (c) => {
+    const input = connectorInput.parse(await c.req.json());
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    return c.json(await deps.connectors.add(actorOf(c), space.id, input), 201);
+  });
+  // « Discover »: the servers their makers host, ready to connect.
+  api.get('/connectors/catalog', (c) => c.json(catalogFor()));
+  // Her sign-in to a server that asks for it (spec 025, US4): its page, then back here.
+  api.post('/connectors/:id/sign-in', async (c) =>
+    c.json({ url: await deps.connectors.signIn(c.get('person'), c.req.param('id')) }),
+  );
+  api.get('/connectors/callback', async (c) => {
+    const state = c.req.query('state') ?? '';
+    const code = c.req.query('code');
+    if (!code) return c.redirect('/app#/connexions');
+    await deps.connectors.finishSignIn(c.get('person'), state, code);
+    return c.redirect('/app#/connexions');
+  });
+  api.get('/connectors/:id/resources/read', async (c) =>
+    c.json(
+      await deps.connectors.read(c.get('person'), c.req.param('id'), c.req.query('uri') ?? ''),
+    ),
+  );
+  api.post('/connectors/:id/check', async (c) =>
+    c.json(await deps.connectors.check(c.get('person'), c.req.param('id'))),
+  );
+  api.patch('/connectors/:id', async (c) => {
+    const input = connectorChange.parse(await c.req.json());
+    return c.json(await deps.connectors.change(actorOf(c), c.req.param('id'), input));
+  });
+  api.delete('/connectors/:id', async (c) => {
+    await deps.connectors.cut(actorOf(c), c.req.param('id'));
+    return c.json({ cut: c.req.param('id') });
+  });
+
+  // Search by meaning (spec 028): her space's entries nearest to a question; none without a model.
+  api.get('/search/meaning', async (c) => {
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    const text = c.req.query('text') ?? '';
+    const kind = c.req.query('kind');
+    return c.json(
+      await searchByMeaning(deps.db, deps.embedder ?? null, c.get('person'), space.id, text, {
+        limit: Math.min(Math.max(Number(c.req.query('limit') ?? 10), 1), 50),
+        ...(kind ? { kind } : {}),
+      }),
+    );
+  });
+
+  // Her space's nightly backups (spec 022): the list, and a link that opens one for ten minutes.
+  api.get('/backups', async (c) => c.json(await act(c, (tx, _a, space) => backupsOf(tx, space))));
+  api.get('/backups/:day/link', async (c) => {
+    const day = c.req.param('day');
+    const backup = (await act(c, (tx, _a, space) => backupsOf(tx, space))).find(
+      (one) => one.day === day,
+    );
+    if (!backup) return c.json({ error: `No backup of ${day}.` }, 404);
+    return c.json({ url: await deps.blobs.link(backup.storageKey, 600), seconds: 600 });
+  });
+
   api.post(
     '/import',
     bodyLimit({
@@ -675,6 +926,173 @@ export function apiRoutes(deps: {
       }),
     );
   });
+
+  // Her goals (spec 041), across her spaces, with their progress.
+  api.get('/goals', async (c) =>
+    c.json(
+      await as(c, async (tx) =>
+        (await Promise.all(c.get('spaces').map((one) => goalsOf(tx, one.id)))).flat(),
+      ),
+    ),
+  );
+
+  // What waits for her yes, in one place (spec 046).
+  api.get('/to-sort', async (c) =>
+    c.json(
+      await as(c, (tx) =>
+        toSortOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+        ),
+      ),
+    ),
+  );
+  api.post('/to-sort/:id', async (c) => {
+    const body = z.object({ yes: z.boolean() }).parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) => decide(tx, actor, space, c.req.param('id'), body.yes)),
+    );
+  });
+
+  // A person's card across her apps (spec 045).
+  api.get('/people/:id', async (c) =>
+    c.json(await act(c, (tx, _a, space) => personCard(tx, space, c.req.param('id')))),
+  );
+
+  // What a period changes, and an absence replanned (spec 044).
+  api.get('/impact', async (c) => {
+    const from = timeOf(c.req.query('from') ?? '');
+    const to = timeOf(c.req.query('to') ?? '');
+    if (!from || !to || to <= from)
+      return c.json({ error: 'from and to are ISO times, to after from.' }, 400);
+    return c.json(
+      await as(c, (tx) =>
+        impactOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+          { from, to },
+        ),
+      ),
+    );
+  });
+  api.post('/replan', async (c) => {
+    const body = z
+      .object({
+        from: z.string().min(10),
+        to: z.string().min(10),
+        dryRun: z.boolean().default(true),
+      })
+      .parse(await c.req.json());
+    const from = timeOf(body.from.length === 10 ? `${body.from}T00:00` : body.from);
+    const to = timeOf(body.to.length === 10 ? `${body.to}T00:00` : body.to);
+    if (!from || !to || to <= from)
+      return c.json({ error: 'from and to are ISO days, to after from.' }, 400);
+    return c.json(
+      await act(c, (tx, actor, space) => replan(tx, actor, space, { from, to }, body.dryRun)),
+    );
+  });
+
+  // Her review (spec 043): the mirror of a period (the last seven days by default), and keeping it.
+  api.get('/review', async (c) => {
+    const to = c.req.query('to') ?? new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    const from =
+      c.req.query('from') ?? new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10);
+    const start = timeOf(`${from.slice(0, 10)}T00:00`);
+    const end = timeOf(`${to.slice(0, 10)}T00:00`);
+    if (!start || !end) return c.json({ error: 'from and to are ISO days (« 2026-11-03 »).' }, 400);
+    return c.json(
+      await as(c, (tx) =>
+        mirrorOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+          start,
+          end,
+        ),
+      ),
+    );
+  });
+  // The Routines page: her habits today, their streaks, the last days (her own day, in her zone).
+  api.get('/habits/board', async (c) => {
+    const span = Math.min(60, Math.max(7, Number(c.req.query('days') ?? 28) || 28));
+    return c.json(
+      await as(c, async (tx) => {
+        const zone = await zoneOf(tx);
+        const today = new Intl.DateTimeFormat('en-CA', {
+          timeZone: zone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        }).format(new Date());
+        return habitBoard(
+          tx,
+          c.get('spaces').map((one) => one.id),
+          today,
+          span,
+        );
+      }),
+    );
+  });
+  api.post('/review', async (c) => {
+    const body = z
+      .object({
+        title: z.string().min(1).max(200),
+        from: z.string().min(10).max(10),
+        to: z.string().min(10).max(10),
+        answers: z
+          .array(z.object({ question: z.string().min(1), answer: z.string().min(1) }))
+          .max(20),
+        decisions: z
+          .array(z.object({ text: z.string().min(1).max(300), due: z.string().max(30).optional() }))
+          .max(20),
+      })
+      .parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        keepReview(tx, actor, space, {
+          ...body,
+          decisions: body.decisions.map((one) => ({
+            text: one.text,
+            ...(one.due ? { due: one.due } : {}),
+          })),
+        }),
+      ),
+    );
+  });
+
+  // A routine kept as text, proposed in its five parts (spec 047): for her yes, in « À ranger ».
+  api.post('/routines/:id/structure', async (c) =>
+    c.json(
+      await act(c, (tx, actor, space) => proposeStructure(tx, actor, space, c.req.param('id'))),
+    ),
+  );
+
+  // A search that answers (spec 049): a figure computed from her entries, with what justifies it.
+  api.get('/answer', async (c) => {
+    const q = (c.req.query('q') ?? '').slice(0, 300);
+    if (!q.trim())
+      return c.json({ error: 'Ask a question (« combien en transport en octobre ? »).' }, 400);
+    return c.json(
+      await as(c, (tx) =>
+        answerOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+          q,
+        ),
+      ),
+    );
+  });
+
+  // What comes back (spec 042), across her spaces.
+  api.get('/patterns', async (c) =>
+    c.json(
+      await as(c, (tx) =>
+        patternsOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+        ),
+      ),
+    ),
+  );
 
   // What needs her now (spec 013), across her spaces: to fix, late, proposed, today, this week.
   api.get('/now', async (c) =>
@@ -837,7 +1255,15 @@ export function apiRoutes(deps: {
         all[row.clientId] = (await clientSpaces(tx, row.clientId)).map((one) => one.id);
       return all;
     });
-    return c.json(rows.map((row) => ({ ...row, spaces: reach[row.clientId] ?? [] })));
+    // When each assistant last read her context (spec 029).
+    const readings = await as(c, (tx) => contextReadings(tx));
+    return c.json(
+      rows.map((row) => ({
+        ...row,
+        spaces: reach[row.clientId] ?? [],
+        contextReadAt: readings[row.clientId] ?? null,
+      })),
+    );
   });
 
   api.delete('/connections/:client', async (c) => {

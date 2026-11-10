@@ -3,9 +3,11 @@ import {
   briefOnce,
   briefPeople,
   find,
+  giveLease,
   pool,
   save,
   spacesOf,
+  takeLease,
   watchOnce,
   runDueRules,
   useScriptRunner,
@@ -13,39 +15,34 @@ import {
   type Due,
   type PassReport,
 } from '@jarvis-os/core';
+import { randomBytes } from 'node:crypto';
+import { hostname } from 'node:os';
 import { parseArgs } from 'node:util';
 import type pg from 'pg';
+import { backupOnce } from './backups';
+import { readOnce } from './reading';
+import { embedOnce } from './embeddings';
+import {
+  channelOf,
+  deliverOutbox,
+  deliveryFor,
+  sendTelegram,
+  tellThrough,
+  type Delivery,
+} from './channels';
 import { wordsOf, type Lang } from './i18n';
 import { quickjsRunner } from './scripts';
 import { readTelegramLinks } from './telegram';
 import { settingsFor, type Branch } from './settings';
 
+/** Who this watcher is, for its lease (spec 021): the machine and this process. */
+export const WATCHER_HOLDER = `${process.env.NETLIFY ? 'netlify' : hostname()}:${process.pid}:${randomBytes(3).toString('hex')}`;
+
 /** How often the watcher looks: once a minute, the precision of a reminder. */
 export const WATCH_EVERY_MS = 60_000;
 
-/** Where she is told: an entry « Channel » of her own space, `telegram` the chat of her bot. */
-export async function channelOf(db: pg.Pool, person: string): Promise<{ telegram?: string }> {
-  return asPerson(db, person, async (tx) => {
-    const own = (await spacesOf(tx)).find((one) => one.personal);
-    if (!own) return {};
-    const [canal] = await find(tx, own.id, { kind: 'Channel', limit: 1 });
-    const telegram = canal?.data.telegram;
-    return typeof telegram === 'string' || typeof telegram === 'number'
-      ? { telegram: String(telegram) }
-      : {};
-  });
-}
-
-/** A message through the Telegram bot; true when Telegram took it. */
-export async function sendTelegram(token: string, chat: string, text: string): Promise<boolean> {
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ chat_id: chat, text, disable_web_page_preview: true }),
-  });
-  if (!response.ok) console.warn(`[watcher] Telegram answered ${response.status}`);
-  return response.ok;
-}
+// Her channels moved to `channels.ts` (spec 020); kept here for the doors that import them.
+export { channelOf, sendTelegram } from './channels';
 
 /** What she reads when a reminder is due. */
 export function reminderText(due: Due): string {
@@ -105,64 +102,142 @@ export function briefText(brief: Brief, lang: Lang = 'fr'): string {
           })`,
       ),
   );
+  // Her inbox (spec 035): what she captured and has not filed yet.
+  if (brief.inbox) blocks.push(say(words.briefInbox, { n: String(brief.inbox) }));
+  // What she said she would do, and nothing followed (spec 040).
+  for (const one of brief.intentions ?? []) {
+    blocks.push(
+      say(words.briefIntent, {
+        title: one.title,
+        n: String(one.times),
+        since: new Intl.DateTimeFormat(locale, {
+          day: 'numeric',
+          month: 'short',
+          timeZone: brief.zone,
+        }).format(new Date(one.since)),
+      }),
+    );
+  }
   if (blocks.length === 1) blocks.push(words.briefQuiet);
   blocks.push(words.briefEnd);
   return blocks.join('\n\n');
 }
 
-/** Tells a person through her channel; false when she has none. */
-export function tellerFor(db: pg.Pool, telegramToken: string | undefined) {
-  return async (due: Due) => {
-    const channel = await channelOf(db, due.person);
-    if (!channel.telegram || !telegramToken) return false;
-    return sendTelegram(telegramToken, channel.telegram, reminderText(due));
-  };
+/**
+ * Tells a person a reminder (spec 020): it enters the outbox on each of her channels, once per
+ * occurrence; false when she has no channel.
+ */
+export function tellerFor(db: pg.Pool, delivery: Delivery) {
+  return (due: Due) =>
+    tellThrough(db, delivery, {
+      person: due.person,
+      spaceId: due.spaceId,
+      kind: 'reminder',
+      subject: due.title,
+      body: due.message ?? (due.repeated ? '' : wordsOf('fr').reminderDone),
+      entryId: due.entryId,
+      key: `reminder:${due.entryId}:${due.at.toISOString()}`,
+    });
 }
 
 /**
- * One pass of the watcher (spec 010): the Telegram links, the reminders due, the morning briefs,
- * the rules on a schedule. The local loop runs it each minute; on Netlify, a scheduled function
- * runs it each minute too. Its failures are logged, never thrown.
+ * One pass of the watcher (specs 010, 020): the Telegram links, the reminders due and the morning
+ * briefs entered in the outbox, the outbox delivered, the rules on a schedule. The local loop runs
+ * it each minute; on Netlify, a scheduled function runs it each minute too. Its failures are
+ * logged, never thrown. It runs only while it holds the database's lease (spec 021).
  */
 export async function watcherPass(
   db: pg.Pool,
-  telegramToken: string | undefined,
+  delivery: Delivery,
   now: Date = new Date(),
+  holder: string = WATCHER_HOLDER,
 ): Promise<PassReport | null> {
   useScriptRunner(quickjsRunner);
+  // One watcher at a time on a database (spec 021): another holding the lease, this pass is skipped.
+  try {
+    if (!(await takeLease(db, 'watcher', holder))) {
+      console.info('[watcher] another watcher holds the lease: pass skipped');
+      return null;
+    }
+  } catch (error) {
+    console.error('[watcher] lease', (error as Error).message);
+    return null;
+  }
+  let report: PassReport | null = null;
+  let failure: string | undefined;
+  // What the pass did, kept with the lease (spec 023): `/health` reads its failures.
+  const done: Record<string, unknown> = {};
   try {
     // Who pressed « Start » with her code (spec 015), before telling anyone.
-    if (telegramToken) {
-      await readTelegramLinks(db, telegramToken, wordsOf('fr').channelLinked).catch((error) =>
-        console.warn('[watcher] telegram', (error as Error).message),
-      );
+    if (delivery.telegramToken) {
+      await readTelegramLinks(db, delivery.telegramToken, wordsOf('fr').channelLinked, {
+        kept: wordsOf('fr').captureKept,
+        filed: wordsOf('fr').captureFiled,
+        unheard: wordsOf('fr').voiceUnheard,
+      }).catch((error) => console.warn('[watcher] telegram', (error as Error).message));
     }
-    const report = await watchOnce(db, now, tellerFor(db, telegramToken));
+    report = await watchOnce(db, now, tellerFor(db, delivery));
+    done.reminders = report;
     // Her morning brief (spec 018), at the hour she chose, once a day.
-    if (telegramToken) {
-      for (const person of await briefPeople(db)) {
-        await briefOnce(db, person, now, async (brief) => {
-          const channel = await channelOf(db, person);
-          return channel.telegram
-            ? sendTelegram(telegramToken, channel.telegram, briefText(brief))
-            : false;
-        }).catch((error) => console.warn('[watcher] brief', (error as Error).message));
-      }
+    for (const person of await briefPeople(db)) {
+      await briefOnce(db, person, now, async (brief) => {
+        const own = (await channelOf(db, person)).spaceId;
+        if (!own) return false;
+        const [subject, ...rest] = briefText(brief).split('\n\n');
+        return tellThrough(db, delivery, {
+          person,
+          spaceId: own,
+          kind: 'brief',
+          subject: subject ?? '',
+          body: rest.join('\n\n'),
+          key: `brief:${brief.day}`,
+        });
+      }).catch((error) => console.warn('[watcher] brief', (error as Error).message));
+    }
+    // What entered the outbox (now or before, waiting for another try), delivered (spec 020).
+    const delivered = await deliverOutbox(db, now, delivery);
+    done.outbox = delivered;
+    if (delivered.failed) console.warn('[watcher] outbox', delivered);
+    // Each space's backup of the day (spec 022), a few each pass.
+    if (delivery.blobs) {
+      const backups = await backupOnce(db, delivery.blobs, now);
+      done.backups = backups;
+      if (backups.failed) console.warn('[watcher] backups', backups);
+    }
+    // Her files read (spec 026): PDF, Word, photos, a few each pass.
+    if (delivery.blobs) {
+      const reading = await readOnce(db, delivery.blobs);
+      done.reading = reading;
+      if (reading.failed) console.warn('[watcher] reading', reading);
+    }
+    // Her entries turned into vectors, for search by meaning (spec 028).
+    if (delivery.embedder) {
+      const meaning = await embedOnce(db, delivery.embedder);
+      done.meaning = meaning;
     }
     // Her scheduled rules and « before » rules (spec 014), on the same clock.
     const rules = await runDueRules(db, now);
+    done.rules = rules;
     if (rules.failed) console.warn('[watcher] rules', rules);
     return report;
   } catch (error) {
-    console.error('[watcher]', (error as Error).message);
+    failure = (error as Error).message;
+    console.error('[watcher]', failure);
     return null;
+  } finally {
+    await giveLease(
+      db,
+      'watcher',
+      holder,
+      failure ? { error: failure, report: done } : { report: done },
+    ).catch((error) => console.warn('[watcher] lease', (error as Error).message));
   }
 }
 
 /** The watcher's loop: a pass each minute, never two at once; it stops when `signal` aborts. */
 export function watch(
   db: pg.Pool,
-  telegramToken: string | undefined,
+  delivery: Delivery,
   onPass: (report: PassReport) => void = () => undefined,
   signal?: AbortSignal,
 ) {
@@ -171,7 +246,7 @@ export function watch(
     if (running || signal?.aborted) return;
     running = true;
     try {
-      const report = await watcherPass(db, telegramToken);
+      const report = await watcherPass(db, delivery);
       if (report) onPass(report);
     } finally {
       running = false;
@@ -218,7 +293,7 @@ if (process.argv[1]?.endsWith('watcher.ts')) {
     await db.end();
   } else {
     console.info(`[watcher] ${branch}: a pass every ${WATCH_EVERY_MS / 1000} s`);
-    watch(db, token, (report) => {
+    watch(db, deliveryFor(settingsFor(branch, process.env.JARVIS_PUBLIC_URL)), (report) => {
       if (report.sent || report.scheduled || report.skipped || report.failed) {
         console.info('[watcher]', report);
       }

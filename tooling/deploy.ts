@@ -7,6 +7,10 @@
  * the code reads next to itself (QuickJS's WebAssembly file, the shipped apps, Jarvis's routines).
  * Netlify ships them as they are. The Netlify token comes from `../.secrets/.admin.env` (NETLIFY_AUTH_TOKEN) or
  * the environment; the site from JARVIS_NETLIFY_SITE (`.env`). Nothing secret is printed.
+ *
+ * Before production is deployed, the `main` branch's database takes the migrations not applied yet
+ * (they are additive: the code running now keeps working). Its owner's address is asked of Neon
+ * (NEON_API_TOKEN, JARVIS_NEON_PROJECT_ID) and kept in memory only.
  */
 import { build } from 'esbuild';
 import { spawnSync } from 'node:child_process';
@@ -14,6 +18,7 @@ import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync } fro
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { migrate } from '../packages/core/src/migrate';
 
 const CLI = 'netlify-cli@27.13.0';
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -47,6 +52,29 @@ if (prod) {
     console.error('Production is deployed only from a clean `main`.');
     process.exit(2);
   }
+  const neonKey = secrets.NEON_API_KEY ?? secrets.NEON_API_TOKEN ?? process.env.NEON_API_KEY;
+  const project = local.JARVIS_NEON_PROJECT_ID;
+  if (!neonKey || !project) {
+    console.error('NEON_API_TOKEN (secrets file) and JARVIS_NEON_PROJECT_ID (.env) are required.');
+    process.exit(2);
+  }
+  const neon = async <T>(path: string): Promise<T> => {
+    const response = await fetch(`https://console.neon.tech/api/v2/projects/${project}${path}`, {
+      headers: { authorization: `Bearer ${neonKey}`, accept: 'application/json' },
+    });
+    if (!response.ok) throw new Error(`Neon ${path.split('?')[0]} → ${response.status}`);
+    return (await response.json()) as T;
+  };
+  const { branches } = await neon<{ branches: { id: string; name: string }[] }>('/branches');
+  const main = branches.find((one) => one.name === 'main');
+  if (!main) throw new Error('No Neon branch « main ».');
+  const { uri } = await neon<{ uri: string }>(
+    `/connection_uri?branch_id=${main.id}&database_name=neondb&role_name=neondb_owner`,
+  );
+  const owner = new URL(uri);
+  owner.searchParams.set('sslmode', 'verify-full');
+  const applied = await migrate(owner.toString());
+  console.info(`[deploy] main: ${applied.length ? `applied ${applied.join(', ')}` : 'up to date'}`);
 }
 
 // The two functions, each one file; their `config` (path, schedule) stays an export Netlify reads.

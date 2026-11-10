@@ -36,7 +36,7 @@ inverse?, formula?, fields?, unit?, help?, default?, min?, max?, unique?, action
    parmi ses `options` ; un `rating` va de 0 à 5 (ou `max`) ; un `progress` de 0 à 100 ; un `file`
    est l'id d'une entrée fichier (après `upload_link`) ; une `location` est `{ address?, lat, lng }`
    (donne les coordonnées que tu connais, origin « inferred », et dis-le). Un `button` n'est jamais
-   écrit : `action` `{ set?, rule?, script?, label? }` dit ce qu'il fait ; `press` l'appuie (sur sa
+   écrit : `action` `{ set?, rule?, script?, label? }` dit ce qu'il fait ; `apps` (action `press`) l'appuie (sur sa
    demande). Le temps reste dans les champs de
    l'agenda (`start`, `at`, `due`, `repeat`…) : ils sont admis par tout modèle.
 4. **Relations.** Un champ `link` (`target` : le type visé, `cardinality` : `one` par défaut ou
@@ -59,7 +59,7 @@ nature = 'sortie')`. Fonctions : sum, avg, count, min, max (avec `where`), if, c
    Rapprochement ; Routines : Habitude, Pointage) avec ses pages et ses règles (routine « Les
    apps »). Construis-la pas à pas avec elle : un modèle, quelques entrées réelles, puis le suivant.
 9. Changer un modèle, c'est changer son entrée « Model » (après lui avoir demandé). Si un nom de
-   champ change, corrige les entrées avec `migrate` (routine « Les apps »). Tout est journalisé et
+   champ change, corrige les entrées avec `apps` (action `migrate`) (routine « Les apps »). Tout est journalisé et
    s'annule.
 10. Si `save` refuse une entrée, ne contourne pas : lis la phrase, corrige le nom ou la valeur, ou
     demande-lui s'il faut changer le modèle. Si `save` répond des `notes` (anciens mots-clés

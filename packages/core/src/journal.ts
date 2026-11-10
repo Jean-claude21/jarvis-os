@@ -12,6 +12,8 @@ export type Command =
   // A migration of a kind's entries, an app installed (spec 014): undone at once, like an import.
   | 'migration.run'
   | 'app.install'
+  // An app removed (spec 034): its pieces set aside at once, her data kept; undone at once.
+  | 'app.remove'
   // Many entries filed, retyped or set aside, a kind renamed (spec 017): undone at once.
   | 'entries.change'
   | 'kind.rename'
@@ -22,7 +24,13 @@ export type Command =
   | 'space.withdraw'
   | 'space.join'
   | 'space.leave'
-  | 'space.role';
+  | 'space.role'
+  // Her connectors (spec 025): journaled without their secret, never undone through `undo`; a
+  // call through one is journaled without its arguments nor its answer.
+  | 'connector.add'
+  | 'connector.change'
+  | 'connector.cut'
+  | 'connector.call';
 
 export interface JournalLine {
   id: number;
@@ -139,6 +147,9 @@ export async function undo(
   if (!line) throw new Error(`No change ${input.journalId} in this space.`);
   if (line.undone_by !== null) throw new Error(`Change ${input.journalId} is already undone.`);
   if (line.command === 'journal.undo') throw new Error('An undo cannot be undone.');
+  if (line.command.startsWith('connector.')) {
+    throw new Error('A connector is not undone: change or cut it instead.');
+  }
   if (line.command.startsWith('space.')) {
     throw new Error('Who belongs to a space is not undone: invite, withdraw or leave instead.');
   }
@@ -146,6 +157,7 @@ export async function undo(
     line.command === 'import.run' ||
     line.command === 'migration.run' ||
     line.command === 'app.install' ||
+    line.command === 'app.remove' ||
     line.command === 'entries.change' ||
     line.command === 'kind.rename'
   ) {

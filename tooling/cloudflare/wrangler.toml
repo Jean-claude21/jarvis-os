@@ -1,0 +1,8 @@
+# The nightly backup Worker (spec 022), deployed by `pnpm cron:deploy`. No route: a cron only.
+name = "jarvis-os-backup"
+main = "backup-worker.ts"
+compatibility_date = "2026-10-01"
+workers_dev = false
+
+[triggers]
+crons = ["30 1 * * *"]

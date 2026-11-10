@@ -1,0 +1,223 @@
+{
+  "app": "Journal",
+  "version": 1,
+  "description": {
+    "fr": "Dépôts, réflexions et gratitudes ; tes jours écrits, et ce qui revient.",
+    "en": "Entries, reflections and gratitude; your days written, and what comes back."
+  },
+  "models": [
+    {
+      "title": "Journal",
+      "data": {
+        "label": {
+          "fr": "Journal",
+          "en": "Journal"
+        },
+        "fields": [
+          {
+            "name": "date",
+            "type": "datetime",
+            "label": {
+              "fr": "Date",
+              "en": "Date"
+            }
+          },
+          {
+            "name": "text",
+            "type": "long_text",
+            "label": {
+              "fr": "Texte",
+              "en": "Text"
+            }
+          },
+          {
+            "name": "mood",
+            "type": "choice",
+            "label": {
+              "fr": "Humeur",
+              "en": "Mood"
+            },
+            "options": ["great", "good", "neutral", "low", "hard"],
+            "optionLabels": {
+              "great": {
+                "fr": "très bien",
+                "en": "great"
+              },
+              "good": {
+                "fr": "bien",
+                "en": "good"
+              },
+              "neutral": {
+                "fr": "neutre",
+                "en": "neutral"
+              },
+              "low": {
+                "fr": "bas",
+                "en": "low"
+              },
+              "hard": {
+                "fr": "difficile",
+                "en": "hard"
+              }
+            }
+          }
+        ],
+        "columns": ["date", "mood"]
+      }
+    },
+    {
+      "title": "Reflection",
+      "data": {
+        "label": {
+          "fr": "Réflexion",
+          "en": "Reflection"
+        },
+        "fields": [
+          {
+            "name": "date",
+            "type": "date",
+            "label": {
+              "fr": "Date",
+              "en": "Date"
+            }
+          },
+          {
+            "name": "about",
+            "type": "text",
+            "label": {
+              "fr": "Sur",
+              "en": "About"
+            }
+          },
+          {
+            "name": "text",
+            "type": "long_text",
+            "label": {
+              "fr": "Texte",
+              "en": "Text"
+            }
+          }
+        ],
+        "columns": ["date", "about"]
+      }
+    },
+    {
+      "title": "Gratitude",
+      "data": {
+        "label": {
+          "fr": "Gratitude",
+          "en": "Gratitude"
+        },
+        "fields": [
+          {
+            "name": "date",
+            "type": "date",
+            "label": {
+              "fr": "Date",
+              "en": "Date"
+            }
+          },
+          {
+            "name": "text",
+            "type": "text",
+            "label": {
+              "fr": "Pour quoi",
+              "en": "For what"
+            }
+          }
+        ],
+        "columns": ["date"]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "title": "Journal",
+      "data": {
+        "label": {
+          "fr": "Mon journal",
+          "en": "My journal"
+        },
+        "order": 1,
+        "blocks": [
+          {
+            "block": "heatmap",
+            "title": {
+              "fr": "Jours écrits",
+              "en": "Days written"
+            },
+            "kind": "Journal",
+            "days": 60
+          },
+          {
+            "block": "breakdown",
+            "title": {
+              "fr": "Humeur, ces 30 jours",
+              "en": "Mood, these 30 days"
+            },
+            "query": {
+              "kind": "Journal",
+              "where": "date >= date_add(today(), -30)",
+              "groupBy": "mood",
+              "aggregate": {
+                "n": "count()"
+              }
+            }
+          },
+          {
+            "block": "table",
+            "title": {
+              "fr": "Derniers dépôts",
+              "en": "Latest entries"
+            },
+            "query": {
+              "kind": "Journal",
+              "fields": ["date", "mood"],
+              "sort": "-date",
+              "limit": 20
+            }
+          },
+          {
+            "block": "form",
+            "title": {
+              "fr": "Écrire",
+              "en": "Write"
+            },
+            "kind": "Journal"
+          }
+        ]
+      }
+    }
+  ],
+  "rules": [],
+  "scripts": [],
+  "role": {
+    "covers": {
+      "fr": "Ton journal : ce que tu vis, ce que tu en penses, ce pour quoi tu es reconnaissant.",
+      "en": "Your journal: what you live, what you think of it, what you are grateful for."
+    },
+    "intents": [
+      "journal",
+      "aujourd’hui j’ai",
+      "je me sens",
+      "je suis fatigué",
+      "fatigué",
+      "fatigue",
+      "reconnaissant",
+      "merci pour",
+      "gratitude",
+      "réflexion",
+      "reflexion",
+      "bilan"
+    ],
+    "watches": ["Journal", "Reflection", "Gratitude"],
+    "reads": ["Journal"],
+    "writes": ["Journal", "Reflection", "Gratitude"],
+    "ask": [],
+    "instructions": {
+      "fr": "Ce qu’elle raconte de sa journée est un « Journal » (date, texte dans ses mots, humeur si elle la dit) ; une pensée sur un sujet est une « Reflection » ; un merci est une « Gratitude ». Garde ses mots.",
+      "en": "What she tells of her day is a « Journal » (date, text in her words, mood if she says it); a thought on a subject is a « Reflection »; a thanks is a « Gratitude ». Keep her words."
+    },
+    "bridges": []
+  }
+}

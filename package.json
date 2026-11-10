@@ -18,6 +18,8 @@
     "deploy:draft": "tsx tooling/deploy.ts",
     "deploy:prod": "tsx tooling/deploy.ts --prod",
     "production": "tsx tooling/production.ts",
+    "backup": "tsx tooling/backup.ts",
+    "cron:deploy": "tsx tooling/cron-deploy.ts",
     "serve": "tsx tooling/serve.ts"
   },
   "devDependencies": {

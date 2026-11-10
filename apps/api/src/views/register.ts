@@ -231,7 +231,7 @@ export function registerViews(server: McpServer, ctx: ViewContext): void {
         `A link, valid ${UPLOAD_MINUTES} minutes, where files go straight into her life without passing`,
         'through the conversation: hosts that show views give her a drop zone; otherwise give her the',
         'link to open, or send a file yourself with `curl -F file=@<path> <link>`. Prefer it to',
-        '`add_file` for any photo or document. `links`: what each new file is for (`to` an id, a `role`).',
+        '`files` (action `add_file`) for any photo or document. `links`: what each new file is for (`to` an id, a `role`).',
       ].join(' '),
       inputSchema: {
         space: z.string().min(1).optional(),

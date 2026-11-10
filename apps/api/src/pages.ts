@@ -58,6 +58,8 @@ const follow = (words: Words, done = "location.href = '/';") => `
     if (data && data.url) { location.href = data.url; return; }
     if (!response.ok) {
       error.textContent = response.status === 401 ? ${JSON.stringify(words.wrong)}
+        : response.status === 429 ? ${JSON.stringify(words.tooMany)}
+        : data && data.code === 'SIGN_UP_BY_INVITATION' ? ${JSON.stringify(words.byInvitation)}
         : ${JSON.stringify(words.failed)}.replace('{reason}', (data && data.message) || response.status);
       return;
     }
@@ -68,6 +70,22 @@ const follow = (words: Words, done = "location.href = '/';") => `
 /** A page that only says one thing (an expired link). */
 export const messagePage = (lang: Lang, message: string) =>
   page(lang, message, `<p class="error">${escape(message)}</p>`, '');
+
+/** A page that says something done (spec 020): not an error. */
+export const donePage = (lang: Lang, message: string) =>
+  page(lang, message, `<p>${escape(message)}</p>`, '');
+
+/**
+ * An action from an e-mail (spec 020): the question and one button. Only the button acts (a POST):
+ * a mail scanner that opens the link changes nothing.
+ */
+export const actionPage = (lang: Lang, question: string, button: string) =>
+  page(
+    lang,
+    question,
+    `<p>${escape(question)}</p><form method="post"><button>${escape(button)}</button></form>`,
+    '',
+  );
 
 /** Signing in, or creating an account: the same form on every page that needs her. */
 const accountForm = (words: Words) => `

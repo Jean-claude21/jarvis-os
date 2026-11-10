@@ -15,6 +15,17 @@ if (existsSync(`${root}.env`)) {
   process.loadEnvFile(`${root}.env`);
   Object.assign(process.env, given);
 }
+// The keys of outside services (search by meaning, spec 028) stay in the secrets file beside the
+// repository; the server and its watcher read them from their environment.
+const secretsFile = `${root}../.secrets/.admin.env`;
+if (existsSync(secretsFile)) {
+  for (const line of readFileSync(secretsFile, 'utf8').split(/\r?\n/)) {
+    const match = /^(OPENAI_API_KEY|VOYAGE_API_KEY)=(.+)$/.exec(line.trim());
+    if (match?.[1] && match[2] && !process.env[match[1]]) {
+      process.env[match[1]] = match[2].replace(/^"|"$/g, '');
+    }
+  }
+}
 const domain = process.env.JARVIS_TUNNEL_DOMAIN;
 if (!domain) {
   console.error('JARVIS_TUNNEL_DOMAIN is not set (see .env.example).');
@@ -91,7 +102,9 @@ function keep(name: string, command: string, args: string[], env: NodeJS.Process
   run();
 }
 
-keep('api', 'pnpm', ['--filter', '@jarvis-os/api', 'start'], {
+// `pnpm serve --watch`: the API starts again by itself when its code changes (working on screens).
+const watch = process.argv.includes('--watch');
+keep('api', 'pnpm', ['--filter', '@jarvis-os/api', watch ? 'dev' : 'start'], {
   JARVIS_PUBLIC_URL: publicUrl,
   PORT: port,
 });

@@ -1,0 +1,402 @@
+{
+  "app": "Santé",
+  "version": 1,
+  "description": {
+    "fr": "Rendez-vous, traitements, mesures et ordonnances ; les prochains rendez-vous, les traitements en cours, l’évolution des mesures.",
+    "en": "Appointments, treatments, measures and prescriptions; the next appointments, the treatments under way, how the measures move."
+  },
+  "models": [
+    {
+      "title": "Appointment",
+      "data": {
+        "label": {
+          "fr": "Rendez-vous médical",
+          "en": "Medical appointment"
+        },
+        "fields": [
+          {
+            "name": "start",
+            "type": "datetime",
+            "label": {
+              "fr": "Début",
+              "en": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "type": "datetime",
+            "label": {
+              "fr": "Fin",
+              "en": "End"
+            }
+          },
+          {
+            "name": "practitioner",
+            "type": "text",
+            "label": {
+              "fr": "Praticien",
+              "en": "Practitioner"
+            }
+          },
+          {
+            "name": "place",
+            "type": "text",
+            "label": {
+              "fr": "Lieu",
+              "en": "Place"
+            }
+          },
+          {
+            "name": "reason",
+            "type": "text",
+            "label": {
+              "fr": "Motif",
+              "en": "Reason"
+            }
+          },
+          {
+            "name": "status",
+            "type": "choice",
+            "label": {
+              "fr": "Statut",
+              "en": "Status"
+            },
+            "options": ["planned", "done", "cancelled"],
+            "optionLabels": {
+              "planned": {
+                "fr": "prévu",
+                "en": "planned"
+              },
+              "done": {
+                "fr": "fait",
+                "en": "done"
+              },
+              "cancelled": {
+                "fr": "annulé",
+                "en": "cancelled"
+              }
+            }
+          }
+        ],
+        "columns": ["start", "practitioner", "status"]
+      }
+    },
+    {
+      "title": "Treatment",
+      "data": {
+        "label": {
+          "fr": "Traitement",
+          "en": "Treatment"
+        },
+        "fields": [
+          {
+            "name": "dose",
+            "type": "text",
+            "label": {
+              "fr": "Dose",
+              "en": "Dose"
+            }
+          },
+          {
+            "name": "repeat",
+            "type": "text",
+            "label": {
+              "fr": "Cadence",
+              "en": "Cadence"
+            },
+            "help": "Five fields (« 0 8 * * * »): it puts the doses in the calendar."
+          },
+          {
+            "name": "start",
+            "type": "date",
+            "label": {
+              "fr": "Début",
+              "en": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "type": "date",
+            "label": {
+              "fr": "Fin",
+              "en": "End"
+            }
+          },
+          {
+            "name": "for",
+            "type": "text",
+            "label": {
+              "fr": "Pour",
+              "en": "For"
+            }
+          },
+          {
+            "name": "days_left",
+            "type": "formula",
+            "label": {
+              "fr": "Jours restants",
+              "en": "Days left"
+            },
+            "formula": "if(end, days_between(today(), end), null)"
+          }
+        ],
+        "columns": ["dose", "start", "end", "days_left"]
+      }
+    },
+    {
+      "title": "Measure",
+      "data": {
+        "label": {
+          "fr": "Mesure",
+          "en": "Measure"
+        },
+        "fields": [
+          {
+            "name": "date",
+            "type": "datetime",
+            "label": {
+              "fr": "Date",
+              "en": "Date"
+            }
+          },
+          {
+            "name": "type",
+            "type": "choice",
+            "label": {
+              "fr": "Type",
+              "en": "Type"
+            },
+            "options": ["weight", "blood_pressure", "glucose", "temperature", "sleep", "other"],
+            "optionLabels": {
+              "weight": {
+                "fr": "poids",
+                "en": "weight"
+              },
+              "blood_pressure": {
+                "fr": "tension",
+                "en": "blood pressure"
+              },
+              "glucose": {
+                "fr": "glycémie",
+                "en": "glucose"
+              },
+              "temperature": {
+                "fr": "température",
+                "en": "temperature"
+              },
+              "sleep": {
+                "fr": "sommeil",
+                "en": "sleep"
+              },
+              "other": {
+                "fr": "autre",
+                "en": "other"
+              }
+            }
+          },
+          {
+            "name": "value",
+            "type": "number",
+            "label": {
+              "fr": "Valeur",
+              "en": "Value"
+            }
+          },
+          {
+            "name": "unit",
+            "type": "text",
+            "label": {
+              "fr": "Unité",
+              "en": "Unit"
+            }
+          }
+        ],
+        "columns": ["date", "type", "value", "unit"]
+      }
+    },
+    {
+      "title": "Prescription",
+      "data": {
+        "label": {
+          "fr": "Ordonnance",
+          "en": "Prescription"
+        },
+        "fields": [
+          {
+            "name": "date",
+            "type": "date",
+            "label": {
+              "fr": "Date",
+              "en": "Date"
+            }
+          },
+          {
+            "name": "practitioner",
+            "type": "text",
+            "label": {
+              "fr": "Praticien",
+              "en": "Practitioner"
+            }
+          },
+          {
+            "name": "until",
+            "type": "date",
+            "label": {
+              "fr": "Valable jusqu’au",
+              "en": "Valid until"
+            }
+          }
+        ],
+        "columns": ["date", "practitioner", "until"]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "title": "Health",
+      "data": {
+        "label": {
+          "fr": "Ma santé",
+          "en": "My health"
+        },
+        "order": 1,
+        "blocks": [
+          {
+            "block": "stat",
+            "title": {
+              "fr": "Rendez-vous à venir",
+              "en": "Appointments ahead"
+            },
+            "query": {
+              "kind": "Appointment",
+              "where": "start >= today()",
+              "aggregate": {
+                "n": "count()"
+              }
+            }
+          },
+          {
+            "block": "stat",
+            "title": {
+              "fr": "Traitements en cours",
+              "en": "Treatments under way"
+            },
+            "query": {
+              "kind": "Treatment",
+              "where": "end = null or end >= today()",
+              "aggregate": {
+                "n": "count()"
+              }
+            }
+          },
+          {
+            "block": "table",
+            "title": {
+              "fr": "Prochains rendez-vous",
+              "en": "Next appointments"
+            },
+            "query": {
+              "kind": "Appointment",
+              "where": "start >= today()",
+              "fields": ["start", "practitioner", "place", "reason"],
+              "sort": "start"
+            }
+          },
+          {
+            "block": "table",
+            "title": {
+              "fr": "Traitements",
+              "en": "Treatments"
+            },
+            "query": {
+              "kind": "Treatment",
+              "fields": ["dose", "start", "end", "days_left"],
+              "sort": "-start"
+            }
+          },
+          {
+            "block": "line",
+            "title": {
+              "fr": "Poids, mois par mois",
+              "en": "Weight, month by month"
+            },
+            "query": {
+              "kind": "Measure",
+              "where": "type = 'weight'",
+              "groupBy": "month(date)",
+              "aggregate": {
+                "weight": "avg(value)"
+              }
+            }
+          },
+          {
+            "block": "table",
+            "title": {
+              "fr": "Dernières mesures",
+              "en": "Latest measures"
+            },
+            "query": {
+              "kind": "Measure",
+              "fields": ["date", "type", "value", "unit"],
+              "sort": "-date",
+              "limit": 20
+            }
+          },
+          {
+            "block": "form",
+            "title": {
+              "fr": "Noter une mesure",
+              "en": "Record a measure"
+            },
+            "kind": "Measure"
+          }
+        ]
+      }
+    }
+  ],
+  "rules": [],
+  "scripts": [],
+  "role": {
+    "covers": {
+      "fr": "Ta santé : rendez-vous médicaux, traitements, mesures, ordonnances.",
+      "en": "Your health: medical appointments, treatments, measures, prescriptions."
+    },
+    "intents": [
+      "médecin",
+      "medecin",
+      "docteur",
+      "dentiste",
+      "rendez-vous médical",
+      "ordonnance",
+      "traitement",
+      "médicament",
+      "medicament",
+      "pharmacie",
+      "tension",
+      "poids",
+      "glycémie",
+      "glycemie",
+      "fièvre",
+      "fievre",
+      "malade",
+      "santé",
+      "sante",
+      "vaccin",
+      "analyse"
+    ],
+    "watches": ["Appointment", "Treatment", "Measure", "Prescription"],
+    "reads": ["Appointment", "Treatment", "Measure"],
+    "writes": ["Appointment", "Treatment", "Measure", "Prescription"],
+    "ask": [
+      {
+        "fr": "Quel jour et à quelle heure ?",
+        "en": "Which day and time?"
+      }
+    ],
+    "instructions": {
+      "fr": "Un rendez-vous chez un praticien est un « Appointment » avec start ; un médicament pris dans la durée est un « Treatment » (dose, cadence en cinq champs, début, fin) ; un chiffre de santé est une « Measure » (type, valeur, unité). Ne donne jamais d’avis médical.",
+      "en": "An appointment with a practitioner is an « Appointment » with start; a medicine taken over time is a « Treatment » (dose, five-field cadence, start, end); a health figure is a « Measure » (type, value, unit). Never give medical advice."
+    },
+    "bridges": []
+  }
+}

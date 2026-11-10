@@ -77,8 +77,51 @@ export {
   type Member,
   type Space,
 } from './spaces';
-export { DEFAULT_ZONE, inZone, nextTime, repetitionOf, timeOf } from './time';
+export { DEFAULT_ZONE, inZone, nextTime, repetitionFromWords, repetitionOf, timeOf } from './time';
 export { watchOnce, type Due, type PassReport } from './watcher';
+export { defaultsFor, offsetOf, syncReminders } from './reminders';
+export { comment, COMMENT_KIND, commentsOf } from './comments';
+export { GOAL_KIND, goalProgress, goalsOf, type GoalProgress } from './goals';
+export { patternsOf, type Pattern, type PatternKind } from './patterns';
+export { impactOf, replan, windowOf, type Impact, type Replan } from './impact';
+export { personCard, type PersonCard } from './people';
+export { answerOf, asksAFigure, periodOf, type Answer } from './answer';
+export {
+  decide,
+  propose,
+  PROPOSAL_KIND,
+  toSortOf,
+  type ProposalInput,
+  type ToSort,
+} from './proposals';
+export {
+  prepare,
+  proposeStructure,
+  routineToFollow,
+  structureFromText,
+  structureOf,
+  structureSchema,
+  type Structure,
+} from './routines';
+export {
+  DEFAULT_QUESTIONS,
+  keepReview,
+  mirrorOf,
+  REVIEW_KIND,
+  reviewsOf,
+  type Mirror,
+} from './review';
+export { habitBoard, habitsWithDays, type HabitBoard } from './habit-board';
+export {
+  closeIntentions,
+  INTENTION_KIND,
+  intentionIn,
+  lingering,
+  noteIntention,
+  openIntentions,
+  stemsOf,
+  type IntentionStatus,
+} from './intentions';
 export { upcoming, type Upcoming } from './upcoming';
 export {
   agenda,
@@ -87,10 +130,13 @@ export {
   calendarOwner,
   fingerprintOf,
   minutesOf,
+  OCCURRENCE_STATES,
   occurrencesOf,
   renewCalendarKey,
+  setOccurrence,
   TIME_FIELDS,
   type Occurrence,
+  type OccurrenceState,
 } from './agenda';
 export {
   checkAgainst,
@@ -176,7 +222,15 @@ export {
   type ScriptRunner,
 } from './scripts';
 export { migrateKind, migrationSchema, type Migration, type MigrationReport } from './migrations';
-export { bundleSchema, exportApp, installApp, type Bundle, type InstallReport } from './bundles';
+export {
+  bundleSchema,
+  exportApp,
+  installApp,
+  type Bundle,
+  type InstallReport,
+  removeApp,
+  type RemoveReport,
+} from './bundles';
 export {
   checkView,
   filterFormula,
@@ -237,3 +291,93 @@ export {
 } from './habits';
 export { preferencesOf, preferencesSchema, setPreferences, type Preferences } from './prefs';
 export { briefDue, briefOnce, briefPeople, localOf, morningBrief, type Brief } from './brief';
+export {
+  enterMessage,
+  markActed,
+  markFailed,
+  markSent,
+  messageOf,
+  messagePerson,
+  pendingMessages,
+  personEmail,
+  recentMessages,
+  RETRY_MINUTES,
+  type Message,
+} from './outbox';
+export { LEASE_SECONDS, giveLease, lastPass, takeLease, type LastPass } from './lease';
+export {
+  BACKUP_KEEP_DAYS,
+  backupsDue,
+  backupsOf,
+  forgetOldBackups,
+  recordBackup,
+  type SpaceBackup,
+} from './backups';
+export {
+  addConnector,
+  changeConnector,
+  connectorsOf,
+  connectorWithSecret,
+  cutConnector,
+  recordCall,
+  setOAuth,
+  setProbe,
+  type Connector,
+  type ConnectorAuth,
+  type ConnectorState,
+  type ConnectorTool,
+  type Probe,
+} from './connectors';
+export { filesToRead, READ_LATER, setFileWords, type FileToRead } from './files';
+export {
+  entriesToEmbed,
+  keepVector,
+  nearEntries,
+  saidOf,
+  saidOfMany,
+  VECTOR_DIMENSIONS,
+  type Embedder,
+} from './meaning';
+export {
+  changesSince,
+  clientKey,
+  CONTEXT_FRESH_HOURS,
+  contextReadings,
+  lastContextRead,
+  markContextRead,
+  type Change,
+} from './assistants';
+export {
+  canonicalKind,
+  COMMON_KINDS,
+  FIELD_SYNONYMS,
+  mergeKind,
+  mergeProposals,
+  type CommonKind,
+  type MergeProposal,
+  type MergeStep,
+} from './common';
+export {
+  APP_KIND,
+  appLines,
+  appsOf,
+  appsTouched,
+  bridgeSchema,
+  bridgesOf,
+  createBridge,
+  roleSchema,
+  type AppInSpace,
+  type Bridge,
+  type Role,
+} from './roles';
+export {
+  capture,
+  CAPTURE_KIND,
+  fileCapture,
+  fileSure,
+  inboxOf,
+  personByChat,
+  presort,
+  type CaptureSource,
+  type Guess,
+} from './inbox';

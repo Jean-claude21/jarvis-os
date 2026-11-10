@@ -1,0 +1,218 @@
+{
+  "app": "Maison",
+  "version": 1,
+  "description": {
+    "fr": "Équipements, achats et entretien de la maison ; ce qui doit être entretenu, ce que ça coûte.",
+    "en": "Equipment, purchases and upkeep of the home; what needs servicing, what it costs."
+  },
+  "models": [
+    {
+      "title": "Equipment",
+      "data": {
+        "label": {
+          "fr": "Équipement",
+          "en": "Equipment"
+        },
+        "fields": [
+          {
+            "name": "room",
+            "type": "text",
+            "label": {
+              "fr": "Pièce",
+              "en": "Room"
+            }
+          },
+          {
+            "name": "brand",
+            "type": "text",
+            "label": {
+              "fr": "Marque",
+              "en": "Brand"
+            }
+          },
+          {
+            "name": "bought",
+            "type": "date",
+            "label": {
+              "fr": "Acheté le",
+              "en": "Bought"
+            }
+          },
+          {
+            "name": "price",
+            "type": "amount",
+            "label": {
+              "fr": "Prix",
+              "en": "Price"
+            }
+          },
+          {
+            "name": "next_service",
+            "type": "date",
+            "label": {
+              "fr": "Prochain entretien",
+              "en": "Next service"
+            }
+          },
+          {
+            "name": "upkeep",
+            "type": "formula",
+            "label": {
+              "fr": "Coût d’entretien",
+              "en": "Upkeep cost"
+            },
+            "formula": "sum(maintenances.cost)"
+          }
+        ],
+        "columns": ["room", "bought", "price", "next_service"]
+      }
+    },
+    {
+      "title": "Maintenance",
+      "data": {
+        "label": {
+          "fr": "Entretien",
+          "en": "Maintenance"
+        },
+        "fields": [
+          {
+            "name": "equipment",
+            "type": "link",
+            "label": {
+              "fr": "Équipement",
+              "en": "Equipment"
+            },
+            "target": "Equipment",
+            "inverse": "maintenances"
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "label": {
+              "fr": "Date",
+              "en": "Date"
+            }
+          },
+          {
+            "name": "cost",
+            "type": "amount",
+            "label": {
+              "fr": "Coût",
+              "en": "Cost"
+            }
+          },
+          {
+            "name": "by",
+            "type": "text",
+            "label": {
+              "fr": "Fait par",
+              "en": "Done by"
+            }
+          }
+        ],
+        "columns": ["equipment", "date", "cost"]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "title": "Home",
+      "data": {
+        "label": {
+          "fr": "Ma maison",
+          "en": "My home"
+        },
+        "order": 1,
+        "blocks": [
+          {
+            "block": "stat",
+            "title": {
+              "fr": "Entretien cette année",
+              "en": "Upkeep this year"
+            },
+            "query": {
+              "kind": "Maintenance",
+              "where": "year(date) = year(today())",
+              "aggregate": {
+                "total": "sum(cost)"
+              }
+            }
+          },
+          {
+            "block": "table",
+            "title": {
+              "fr": "Entretiens à venir",
+              "en": "Upkeep ahead"
+            },
+            "query": {
+              "kind": "Equipment",
+              "where": "next_service != null",
+              "fields": ["room", "next_service"],
+              "sort": "next_service"
+            }
+          },
+          {
+            "block": "table",
+            "title": {
+              "fr": "Équipements",
+              "en": "Equipment"
+            },
+            "query": {
+              "kind": "Equipment",
+              "fields": ["room", "brand", "bought", "price", "upkeep"],
+              "sort": "room"
+            }
+          },
+          {
+            "block": "form",
+            "title": {
+              "fr": "Noter un entretien",
+              "en": "Record upkeep"
+            },
+            "kind": "Maintenance"
+          }
+        ]
+      }
+    }
+  ],
+  "rules": [],
+  "scripts": [],
+  "role": {
+    "covers": {
+      "fr": "Ta maison : les équipements, leur entretien, ce qu’ils coûtent.",
+      "en": "Your home: equipment, its upkeep, what it costs."
+    },
+    "intents": [
+      "frigo",
+      "réfrigérateur",
+      "machine",
+      "climatiseur",
+      "clim",
+      "plombier",
+      "électricien",
+      "electricien",
+      "réparation",
+      "reparation",
+      "entretien",
+      "vidange",
+      "maison",
+      "appartement",
+      "équipement",
+      "equipement"
+    ],
+    "watches": ["Equipment", "Maintenance", "Transaction"],
+    "reads": ["Equipment"],
+    "writes": ["Equipment", "Maintenance"],
+    "ask": [
+      {
+        "fr": "Pour quel équipement ?",
+        "en": "For which equipment?"
+      }
+    ],
+    "instructions": {
+      "fr": "Un appareil ou un meuble acheté est un « Equipment » (pièce, prix, date) ; une réparation ou un entretien est une « Maintenance » reliée à l’équipement. La dépense reste un mouvement de Finances.",
+      "en": "An appliance or furniture bought is an « Equipment » (room, price, date); a repair or a service is a « Maintenance » linked to the equipment. The spending stays a Finances transaction."
+    },
+    "bridges": []
+  }
+}

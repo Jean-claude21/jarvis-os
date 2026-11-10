@@ -38,45 +38,46 @@ describe('Jarvis’s method on connection (story 3)', () => {
 
   it('lists every tool, and reads a routine in full', async () => {
     const { tools } = await ama.client.listTools();
+    // Spec 031: the everyday tools and the visual ones on their own, the rarer ones in families.
     expect(tools.map((one) => one.name).sort()).toEqual(
       [
-        'add_file',
         'agenda',
-        'app_export',
-        'app_install',
-        'archive',
-        'collection_stats',
-        'group_kind',
-        'rename_kind',
-        'stats',
-        'press',
-        'set_role',
-        'share',
-        'migrate',
-        'page',
-        'rule_test',
-        'run_script',
-        'view',
-        'create_space',
+        'apps',
+        'connectors',
+        'context',
         'dashboard',
         'edit_document',
-        'file_link',
-        'invite',
-        'spaces',
+        'figures',
+        'files',
         'find',
         'get',
         'history',
+        'inbox',
         'kinds',
+        'review',
+        'occurrence',
+        'page',
+        'person',
         'query',
         'read_document',
+        'replan',
         'routine',
         'save',
         'show_entry',
-        'undo',
+        'spaces',
         'upload_link',
+        'which_apps',
         'write_document',
       ].sort(),
     );
+    const family = tools.find((one) => one.name === 'spaces')!;
+    expect(family.description).toContain('`invite`');
+    const wrong = (await ama.client.callTool({
+      name: 'spaces',
+      arguments: { action: 'invite', args: {} },
+    })) as { content: { text: string }[]; isError?: boolean };
+    expect(wrong.isError).toBe(true);
+    expect(wrong.content[0]!.text).toContain('invite:');
     const base = await ama.call<{ text: string }>('routine', { name: 'Le temps' });
     expect(base.value.text).toContain('Reminder');
     const hers = await ama.call<{ text: string }>('routine', { name: 'dépenses' });

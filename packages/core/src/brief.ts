@@ -23,6 +23,10 @@ export interface Brief {
   agenda: Occurrence[];
   /** Habits planned today: done already, or still to do; with their rate on thirty days. */
   habits: { title: string; space: string; today: 'done' | 'todo'; rate30: number | null }[];
+  /** Her captures still to file (spec 035), in all her spaces. */
+  inbox: number;
+  /** What she said she would do and nothing followed (spec 040). */
+  intentions: { title: string; times: number; since: string }[];
 }
 
 const LATE_MS = 3 * 3_600_000;
@@ -93,6 +97,17 @@ export async function morningBrief(tx: Tx, now = new Date()): Promise<Brief> {
     late: seen.items.filter((one) => one.group === 'late'),
     agenda: seen.day,
     habits: habits.sort((a, b) => a.title.localeCompare(b.title)),
+    intentions: seen.items
+      .filter((one) => one.group === 'intent' && one.said)
+      .slice(0, 3)
+      .map((one) => ({ title: one.title, ...one.said! })),
+    inbox: (
+      await tx.query<{ n: number }>(
+        `select count(*)::int as n from entry where space_id = any($1) and kind = 'Capture'
+            and archived_at is null and data->>'status' = 'to_file'`,
+        [spaces.map((one) => one.id)],
+      )
+    ).rows[0]!.n,
   };
 }
 

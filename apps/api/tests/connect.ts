@@ -2,6 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { Space } from '@jarvis-os/core';
 import { mcpServerFor } from '../src/mcp';
+import { GROUP_OF } from '../src/tool-groups';
 import { settingsFor } from '../src/settings';
 import { PUBLIC_URL, server, type Account } from './client';
 
@@ -24,6 +25,7 @@ export async function connect(account: Account, clientId = 'test'): Promise<Conn
     {
       db: server.db,
       blobs: server.blobs,
+      connectors: server.connectors,
       publicUrl: PUBLIC_URL,
       secret: settingsFor('test').authSecret,
       today: () => '2026-10-29',
@@ -41,8 +43,13 @@ export async function connect(account: Account, clientId = 'test'): Promise<Conn
   await mcp.connect(serverSide);
   const client = new Client({ name: 'jarvis-test', version: '1.0.0' });
   await client.connect(clientSide);
+  // A tool now in a family (spec 031) is called through it, as an assistant does.
   const call = async <T>(name: string, args: Record<string, unknown> = {}) => {
-    const result = (await client.callTool({ name, arguments: args })) as {
+    const family = GROUP_OF[name];
+    const request = family
+      ? { name: family, arguments: { action: name, args } }
+      : { name, arguments: args };
+    const result = (await client.callTool(request)) as {
       content: { text: string }[];
       isError?: boolean;
     };

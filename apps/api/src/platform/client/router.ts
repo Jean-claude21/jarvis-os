@@ -28,7 +28,7 @@ async function show() {
     const html = await pages[key](params, id ? decodeURIComponent(id) : undefined);
     if (ticket !== drawing) return;
     page().classList.toggle('v2', V2.has(key));
-    page().innerHTML = html; bind(); bindV2(page()); bindAgenda(page()); window.scrollTo(0, 0);
+    page().innerHTML = html; bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); window.scrollTo(0, 0);
     document.querySelectorAll('.x-tabbar a[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === key));
     if (key === 'ranger') counts();
   } catch (error) { if (ticket === drawing) fail(error); }

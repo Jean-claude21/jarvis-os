@@ -26,6 +26,10 @@ The list, then a person's card: last time, promises, next time, what she promise
 
 Day (each occurrence of what repeats: done, missed, postponed — that day only, undone with a second tap), Week (events, blocks that come back, deadlines, proposals, by space, a click on a free hour adds something), Month (deadlines and events; green dots: what repeats, kept that day), Reminders (what will ring, where it comes from, where it stands). Spaces shown or hidden. Her iCal address. Google and Outlook stay a connector (later).
 
+## I3 / C1 — An entry's card (P1)
+
+« What has Jarvis kept, exactly? »: its fields in the model's order with their labels (the model's, else the usual ones), dates in her words, each value corrected in place (as Jarvis keeps it, never as words; written « said », undone from the message), its links as sentences in her words, the apps it touches, its notes (C8), its history (each step undone from here), « see the structure ».
+
 ## I11 — The phone (P1, first part)
 
 A tab bar under the thumb: Maintenant · Agenda · Noter (a few words kept at once) · À ranger · Menu.

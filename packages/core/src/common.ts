@@ -1,7 +1,6 @@
 import type { Actor, Tx } from './db';
 import { archive } from './entries';
 import { renameKind } from './lists';
-import { modelsOf } from './models';
 import { migrateKind, type MigrationReport } from './migrations';
 
 // The common types (spec 032, plan v2 T1): what every life holds and every app shares — never
@@ -215,6 +214,22 @@ const SYSTEM = new Set([
 ]);
 
 /**
+ * The model entries of a space by the kind they describe, every one of them: two generations of an
+ * app may name the same thing in her language (« Mouvement »), and both count here.
+ */
+async function modelEntries(
+  tx: Tx,
+  spaceId: string,
+): Promise<Map<string, { id: string; app: string | null }>> {
+  const { rows } = await tx.query<{ id: string; title: string; app: string | null }>(
+    `select id, title, data->>'app' as app from entry
+      where space_id = $1 and kind = 'Model' and archived_at is null`,
+    [spaceId],
+  );
+  return new Map(rows.map((row) => [fold(row.title), { id: row.id, app: row.app }]));
+}
+
+/**
  * The merges Jarvis proposes in a space: a kind that is another name of a common or app kind, and
  * the variants of one name (« Doc », « Document », « document »), into the most used.
  */
@@ -229,7 +244,7 @@ export async function mergeProposals(
     [spaceId],
   );
   const counts = new Map(rows.map((row) => [row.kind, row.count]));
-  const models = new Map((await modelsOf(tx, spaceId)).map((one) => [fold(one.kind), one]));
+  const models = await modelEntries(tx, spaceId);
   const proposals: MergeProposal[] = [];
   const taken = new Set<string>();
   for (const { kind, count } of rows) {
@@ -308,9 +323,9 @@ export async function mergeKind(
   }
   // When both kinds have a model, the one merged in is set aside (journaled, undoable): its
   // entries follow the model of the kind they join, which stays the only one.
-  const models = await modelsOf(tx, spaceId);
-  const own = models.find((one) => fold(one.kind) === fold(input.from));
-  const target = models.find((one) => fold(one.kind) === fold(input.to));
+  const models = await modelEntries(tx, spaceId);
+  const own = models.get(fold(input.from));
+  const target = models.get(fold(input.to));
   if (own && target) await archive(tx, actor, { spaceId, id: own.id });
   const renamed = await renameKind(tx, actor, spaceId, { from: input.from, to: input.to });
   return {

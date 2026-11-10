@@ -41,8 +41,8 @@ export const TOOL_GROUPS: Record<string, { about: string; actions: string[] }> =
   },
   figures: {
     about:
-      'Figures already shaped: a kind’s statistics, a collection’s, a saved view run, her goals and how far they went.',
-    actions: ['stats', 'collection_stats', 'view', 'goals'],
+      'Figures already shaped: a kind’s statistics, a collection’s, a saved view run, her goals and how far they went, what comes back (patterns).',
+    actions: ['stats', 'collection_stats', 'view', 'goals', 'patterns'],
   },
   files: {
     about: 'Small files through the conversation, and links to open a stored one.',

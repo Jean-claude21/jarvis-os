@@ -1,4 +1,4 @@
-import { goalsOf } from '@jarvis-os/core';
+import { goalsOf, patternsOf } from '@jarvis-os/core';
 import { withWho } from './who';
 import { OCCURRENCE_STATES, setOccurrence, type OccurrenceState } from '@jarvis-os/core';
 import { fileCapture, fileSure, inboxOf, type EntryInput } from '@jarvis-os/core';
@@ -970,6 +970,20 @@ export async function mcpServerFor(
       const ids = space ? [at(space)] : reach.map((one) => one.id);
       return act(async (tx) => (await Promise.all(ids.map((id) => goalsOf(tx, id)))).flat());
     }),
+  );
+
+  // What comes back (spec 042): counted by Jarvis with its figures, read by the assistant.
+  server.registerTool(
+    'patterns',
+    {
+      description:
+        'What comes back in her life, counted by Jarvis (inferred, with the figures that justify it): a state said again and again (14 days), a habit that slips (30 days against the 30 before), spending that rises (a category over its usual), a person often named (30 days). At the brief and the review, say what they may mean — carefully, as « déduit », with the figures; never more than they say.',
+      inputSchema: { space: spaceArg },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async ({ space }: { space?: string | undefined }) =>
+      act((tx) => patternsOf(tx, space ? [at(space)] : reach.map((one) => one.id))),
+    ),
   );
 
   // Collections, buttons, public links, viewers (spec 016).

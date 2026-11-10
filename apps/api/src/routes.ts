@@ -1,5 +1,5 @@
 import { withWho } from './who';
-import { comment, commentsOf, goalsOf } from '@jarvis-os/core';
+import { comment, commentsOf, goalsOf, patternsOf } from '@jarvis-os/core';
 import {
   addFile,
   agenda,
@@ -881,6 +881,18 @@ export function apiRoutes(deps: {
     c.json(
       await as(c, async (tx) =>
         (await Promise.all(c.get('spaces').map((one) => goalsOf(tx, one.id)))).flat(),
+      ),
+    ),
+  );
+
+  // What comes back (spec 042), across her spaces.
+  api.get('/patterns', async (c) =>
+    c.json(
+      await as(c, (tx) =>
+        patternsOf(
+          tx,
+          c.get('spaces').map((one) => one.id),
+        ),
       ),
     ),
   );

@@ -68,6 +68,10 @@ export async function changesSince(
   return {
     since: from.toISOString(),
     count: Number(rows[0]?.total ?? 0),
-    changes: rows.map(({ total: _total, ...one }) => one),
+    changes: rows.map((row) => {
+      const one: Change & { total?: string } = { ...row };
+      delete one.total;
+      return one;
+    }),
   };
 }

@@ -1,6 +1,7 @@
 import type pg from 'pg';
 import { asPerson, type Actor } from './db';
 import { get, save } from './entries';
+import { syncReminders } from './reminders';
 import { nextTime, timeOf } from './time';
 import { zoneOf } from './zone';
 
@@ -77,8 +78,18 @@ export async function watchOnce(
         report.skipped += 1;
         continue;
       }
+      // For whom (spec 038): a member it names — its own `who`, else its thing's — alone.
+      const thingWho = entry.links.out.find((link) => link.role === 'for')
+        ? await asPerson(db, keeper, async (tx) => {
+            const id = entry.links.out.find((link) => link.role === 'for')!.entry.id;
+            return (await get(tx, row.space_id, id))?.data.who;
+          })
+        : undefined;
+      const who = [entry.data.who, thingWho].find(
+        (one): one is string => typeof one === 'string' && row.persons.includes(one),
+      );
       let reached = false;
-      for (const person of row.persons) {
+      for (const person of who ? [who] : row.persons) {
         reached =
           (await tell({
             person,
@@ -98,6 +109,13 @@ export async function watchOnce(
       );
       if (reached) report.sent += 1;
       else report.failed += 1;
+      // Attached to a thing that repeats (spec 037): the reminder of its next occurrence.
+      const thing = entry.links.out.find((link) => link.role === 'for')?.entry.id;
+      if (reached && thing && typeof entry.data.before === 'string') {
+        await asPerson(db, keeper, (tx) =>
+          syncReminders(tx, actor, row.space_id, [thing], { now }),
+        );
+      }
     } catch (error) {
       // A reminder she wrote wrong says so in its own fields, once, and stops.
       await write({ status: 'to_fix', error: (error as Error).message }).catch(() => undefined);

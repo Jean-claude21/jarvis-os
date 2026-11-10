@@ -23,6 +23,8 @@ export interface AttentionItem {
   status: string | null;
   /** Why it is here, in a word the app translates: « error », « late », « proposed », … */
   reason: string;
+  /** For whom (spec 038): her, or nobody in particular — what is for another stays theirs. */
+  who: string | null;
 }
 
 export interface Attention {
@@ -53,11 +55,17 @@ export async function attention(
   given?: string,
 ): Promise<Attention> {
   const zone = given ?? (await zoneOf(tx));
+  const { rows: me } = await tx.query<{ person: string | null }>(
+    "select current_setting('jarvis.person', true) as person",
+  );
+  const self = me[0]?.person ?? null;
+  // What is for another member is theirs: not in her « Maintenant ».
+  const others = (who: unknown) => typeof who === 'string' && who !== '' && who !== self;
   const { start, end } = dayBounds(now, zone);
   const items: AttentionItem[] = [];
   const seen = new Set<string>();
   const add = (item: AttentionItem) => {
-    if (seen.has(item.id)) return;
+    if (seen.has(item.id) || others(item.who)) return;
     seen.add(item.id);
     items.push(item);
   };
@@ -70,8 +78,10 @@ export async function attention(
     space: string;
     space_id: string;
     status: string;
+    who: string | null;
   }>(
-    `select e.id, e.kind, e.title, s.name as space, e.space_id, e.data->>'status' as status
+    `select e.id, e.kind, e.title, s.name as space, e.space_id, e.data->>'status' as status,
+            e.data->>'who' as who
        from entry e join space s on s.id = e.space_id
       where e.space_id = any($1) and e.archived_at is null and e.data->>'status' = any($2)
       order by e.updated_at desc limit 20`,
@@ -89,6 +99,7 @@ export async function attention(
       allDay: false,
       status: row.status,
       reason: 'error',
+      who: row.who,
     });
   }
 
@@ -104,6 +115,7 @@ export async function attention(
     allDay: one.allDay,
     status: one.status,
     reason,
+    who: one.who,
   });
 
   // Late: a deadline of the last month that passed and is not done, or a moment said to be done
@@ -145,8 +157,9 @@ export async function attention(
     title: string;
     space: string;
     space_id: string;
+    who: string | null;
   }>(
-    `select e.id, e.kind, e.title, s.name as space, e.space_id
+    `select e.id, e.kind, e.title, s.name as space, e.space_id, e.data->>'who' as who
        from entry e join space s on s.id = e.space_id
       where e.space_id = any($1) and e.archived_at is null and e.data->>'status' = 'proposed'
       order by e.created_at desc limit 20`,
@@ -164,6 +177,7 @@ export async function attention(
       allDay: false,
       status: 'proposed',
       reason: 'proposed',
+      who: row.who,
     });
   }
 
@@ -181,5 +195,8 @@ export async function attention(
               ? -1
               : 1),
   );
-  return { items, day: ahead.filter((one) => new Date(one.start) < end) };
+  return {
+    items,
+    day: ahead.filter((one) => new Date(one.start) < end && !others(one.who)),
+  };
 }

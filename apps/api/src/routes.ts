@@ -1,3 +1,4 @@
+import { withWho } from './who';
 import {
   addFile,
   agenda,
@@ -603,7 +604,16 @@ export function apiRoutes(deps: {
 
   api.post('/save', async (c) => {
     const body = await c.req.json();
-    return c.json(await act(c, (tx, actor, space) => save(tx, actor, space, body)));
+    return c.json(
+      await act(c, async (tx, actor, space) =>
+        save(tx, actor, space, {
+          ...body,
+          ...(Array.isArray(body?.entries)
+            ? { entries: await withWho(deps.db, tx, space, actor.person, body.entries) }
+            : {}),
+        }),
+      ),
+    );
   });
 
   api.post('/entries/:id/archive', async (c) => {

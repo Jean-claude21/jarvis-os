@@ -37,6 +37,10 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     /^No connector|has no tool «|ask her first|needs Jarvis's Google client|is reached with a key|gave no sign-in page|^A connector is not undone|^Not a sealed secret/.test(
       message,
     ) ||
+    // Repetitions, for whom, captures (specs 035–038).
+    /is no member of this space|names several members|does not repeat|has no occurrence on|is not a day \(|is not a time \(|^A capture needs/.test(
+      message,
+    ) ||
     // Views, her settings, her keys (spec 015).
     /^A « View » is|^No view |is not a time zone|^Telegram |^A key needs/.test(message) ||
     // Collections, buttons, shares, viewers (spec 016).

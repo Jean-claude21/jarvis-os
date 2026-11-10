@@ -79,6 +79,7 @@ export {
 } from './spaces';
 export { DEFAULT_ZONE, inZone, nextTime, repetitionFromWords, repetitionOf, timeOf } from './time';
 export { watchOnce, type Due, type PassReport } from './watcher';
+export { defaultsFor, offsetOf, syncReminders } from './reminders';
 export { upcoming, type Upcoming } from './upcoming';
 export {
   agenda,

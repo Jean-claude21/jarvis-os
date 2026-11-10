@@ -36,6 +36,7 @@ describe('the morning brief', () => {
           allDay: false,
           status: null,
           reason: 'late',
+          who: null,
         },
       ],
       agenda: [],

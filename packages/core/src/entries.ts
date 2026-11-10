@@ -7,6 +7,9 @@ import { formulaValue } from './formula';
 import { checkPage } from './pages';
 import { zoneOf } from './zone';
 import { checkRule, runRulesAfterSave, type Changed } from './rules';
+import { preferencesOf, type Preferences } from './prefs';
+import { syncReminders } from './reminders';
+import { TIME_FIELDS } from './time';
 import { checkScript } from './scripts';
 import { checkView } from './views';
 import { checkShare } from './shares';
@@ -529,6 +532,37 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
   }
   // Her rules (spec 014) run on what this save made or changed, in the same transaction.
   await runRulesAfterSave(tx, actor, spaceId, changed);
+  // The reminders attached to what moved, or to what says them (spec 037), kept in step.
+  const timed = changed.filter(
+    (one) =>
+      !/^reminder$/i.test(one.kind) &&
+      one.fields.some(
+        (field) =>
+          field === 'remind' ||
+          (TIME_FIELDS as readonly string[]).includes(field) ||
+          field === 'occurrences' ||
+          field === 'until' ||
+          field === 'count' ||
+          field === 'except' ||
+          field === 'status',
+      ),
+  );
+  if (timed.length && actor.client !== 'reminders') {
+    const created = new Set(timed.filter((one) => one.created).map((one) => one.id));
+    const defaults = created.size
+      ? (await preferencesOf(tx).catch(() => ({}) as Preferences)).reminders
+      : undefined;
+    await syncReminders(
+      tx,
+      actor,
+      spaceId,
+      timed.map((one) => one.id),
+      {
+        created,
+        ...(defaults ? { defaults } : {}),
+      },
+    );
+  }
   return saved;
 }
 

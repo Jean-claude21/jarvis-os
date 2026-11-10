@@ -1,3 +1,4 @@
+import { withWho } from './who';
 import { OCCURRENCE_STATES, setOccurrence, type OccurrenceState } from '@jarvis-os/core';
 import { fileCapture, fileSure, inboxOf, type EntryInput } from '@jarvis-os/core';
 import { captureAs } from './capture';
@@ -619,7 +620,10 @@ export async function mcpServerFor(
         'written in her words (« demain 9h », « vendredi prochain à 14h30 »): Jarvis reads it on her',
         'clock and says how it understood it (`understood`); tell her. So may a repetition (`repeat`:',
         '« tous les lundis à 7h », « le 2e lundi du mois à 18h », « le dernier vendredi »), with',
-        '`until` (a day) or `count` (so many times) to end it and `except` (days skipped).',
+        '`until` (a day) or `count` (so many times) to end it and `except` (days skipped). A dated',
+        'thing may say its reminders (`remind`: « 1 jour avant », « 15 min »): Jarvis keeps them,',
+        'moved with it; without `remind`, her defaults by kind apply. In a shared space, `who` says',
+        'for whom (a member’s name, « moi », or « personne »): her reminders go to her alone.',
       ].join(' '),
       inputSchema: { ...saveInputSchema.shape, space: spaceArg },
     },
@@ -631,7 +635,9 @@ export async function mcpServerFor(
         act(async (tx) => {
           // Dates in her words (spec 030), read on her clock before anything is written.
           const moments = momentsOf(args.entries ?? [], await zoneOf(tx));
-          const saved = await save(tx, actor, at(space), { ...args, entries: moments.entries });
+          // For whom (spec 038): a member by her name, « moi », or nobody in particular.
+          const entries = await withWho(deps.db, tx, at(space), who.person, moments.entries);
+          const saved = await save(tx, actor, at(space), { ...args, entries });
           return moments.understood.length ? { ...saved, understood: moments.understood } : saved;
         }),
     ),

@@ -31,6 +31,8 @@ export interface Occurrence {
   /** Of a repetition: moved from its day (« reporté »). */
   moved?: boolean;
   status: string | null;
+  /** For whom (spec 038): a member of its space, or nobody in particular. */
+  who: string | null;
   /** Jarvis proposed it; she has not accepted it yet. */
   proposed: boolean;
 }
@@ -107,6 +109,7 @@ export function occurrencesOf(
     space: row.space,
     spaceId: row.space_id,
     status,
+    who: typeof data.who === 'string' && data.who ? data.who : null,
     proposed: status !== null && PROPOSED.has(status.toLowerCase()),
   };
   const inside = (at: Date, end: Date | null) =>

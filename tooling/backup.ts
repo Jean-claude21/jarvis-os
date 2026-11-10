@@ -37,7 +37,7 @@ if (!neonKey || !projectId) {
   process.exit(2);
 }
 
-const KEEP = 3;
+const KEEP = 2;
 const { positionals, values } = parseArgs({
   allowPositionals: true,
   options: {

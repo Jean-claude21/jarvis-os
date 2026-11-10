@@ -1,6 +1,6 @@
 /**
  * The nightly backup on Cloudflare (spec 022): a Worker whose cron keeps the production database as
- * a Neon branch `backup-main-<day>`, the last three kept — what `pnpm backup` does from a laptop.
+ * a Neon branch `backup-main-<day>`, the last two kept — what `pnpm backup` does from a laptop.
  * Its secret NEON_API_KEY and its variable NEON_PROJECT_ID are set by `pnpm cron:deploy`. It prints
  * branch names only.
  */
@@ -15,7 +15,7 @@ interface Branch {
   parent_id?: string;
 }
 
-const KEEP = 3;
+const KEEP = 2;
 const SOURCE = 'main';
 
 async function neon<T>(env: Env, method: string, path: string, body?: unknown): Promise<T> {

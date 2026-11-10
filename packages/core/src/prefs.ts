@@ -6,18 +6,23 @@ import { spacesOf } from './spaces';
 // Her preferences (spec 017): how she shows her kinds, how each list opens, the hour of her morning
 // brief (spec 018) — kept in the « Channel » of her own space, so every device has them alike.
 
-export const preferencesSchema = z.object({
-  /** Her kinds flat, or in her groups. */
-  kinds: z.enum(['flat', 'grouped']).optional(),
-  /** How each kind's list opens: flat, by period, by folder. */
-  modes: z.record(z.string().min(1).max(80), z.enum(['flat', 'period', 'folder'])).optional(),
-  /** The hour of her morning brief on her clock (spec 018), « 07:00 »; null for none. */
-  brief: z
-    .string()
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
-    .nullable()
-    .optional(),
-});
+export const preferencesSchema = z
+  .object({
+    /** Her kinds flat, or in her groups. */
+    kinds: z.enum(['flat', 'grouped']).optional(),
+    /** How each kind's list opens: flat, by period, by folder. */
+    modes: z.record(z.string().min(1).max(80), z.enum(['flat', 'period', 'folder'])).optional(),
+    /** The hour of her morning brief on her clock (spec 018), « 07:00 »; null for none. */
+    brief: z
+      .string()
+      .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+      .nullable()
+      .optional(),
+    /** The merges of kinds she said no to (spec 032): « dépense→Transaction ». */
+    mergesDismissed: z.array(z.string().min(3).max(200)).max(500).optional(),
+  })
+  // What other features keep here (her channels per kind, spec 020) passes through untouched.
+  .passthrough();
 export type Preferences = z.infer<typeof preferencesSchema>;
 
 async function channelOf(tx: Tx) {

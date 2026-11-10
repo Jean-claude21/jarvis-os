@@ -293,3 +293,13 @@ export {
   markContextRead,
   type Change,
 } from './assistants';
+export {
+  canonicalKind,
+  COMMON_KINDS,
+  FIELD_SYNONYMS,
+  mergeKind,
+  mergeProposals,
+  type CommonKind,
+  type MergeProposal,
+  type MergeStep,
+} from './common';

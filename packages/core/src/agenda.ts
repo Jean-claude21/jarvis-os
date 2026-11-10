@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type pg from 'pg';
 import type { Actor, Tx } from './db';
-import { find, save } from './entries';
+import { find, get, save } from './entries';
 import { DEFAULT_ZONE, inZone, minutesOf, nextTime, TIME_FIELDS, timeOf } from './time';
 import { zoneOf } from './zone';
 
@@ -26,6 +26,10 @@ export interface Occurrence {
   /** A span (`start`), a moment (`at`, `repeat`), a deadline (`due`), a day (`date`). */
   type: 'span' | 'moment' | 'deadline' | 'day';
   repeated: boolean;
+  /** Of a repetition: the day it falls on, on her clock — how she names one occurrence. */
+  day?: string;
+  /** Of a repetition: moved from its day (« reporté »). */
+  moved?: boolean;
   status: string | null;
   /** Jarvis proposed it; she has not accepted it yet. */
   proposed: boolean;
@@ -62,6 +66,26 @@ interface Row {
   data: Record<string, unknown>;
   space: string;
   space_id: string;
+}
+
+/** The states one occurrence of a repetition can have. */
+export const OCCURRENCE_STATES = ['done', 'missed', 'postponed', 'cancelled'] as const;
+export type OccurrenceState = (typeof OCCURRENCE_STATES)[number];
+
+/** What she changed of single occurrences: by their day, a state and a new time. */
+function occurrenceChanges(raw: unknown): Map<string, { status?: OccurrenceState; at?: string }> {
+  const out = new Map<string, { status?: OccurrenceState; at?: string }>();
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [day, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!DAY_ONLY.test(day) || !value || typeof value !== 'object') continue;
+    const one = value as { status?: unknown; at?: unknown };
+    const status = OCCURRENCE_STATES.find((state) => state === one.status);
+    out.set(day, {
+      ...(status ? { status } : {}),
+      ...(typeof one.at === 'string' && one.at.trim() ? { at: one.at.trim() } : {}),
+    });
+  }
+  return out;
 }
 
 /** The occurrences of one entry in [from, to). */
@@ -102,9 +126,39 @@ export function occurrencesOf(
         .map((one) => one.trim().slice(0, 10)),
     );
     const localDay = (at: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(at);
+    // One occurrence she changed (spec 036): its state (done, missed, postponed, cancelled), and a
+    // new time when she moved it; the others follow the repetition.
+    const changed = occurrenceChanges(data.occurrences);
     // A repetition starts where it says it starts (`start`), else it always was.
     const begins = placed(data.start, zone)?.at;
-    const ends = placed(data.until, zone)?.at;
+    let ends = placed(data.until, zone)?.at;
+    // So many times (`count`), from its start: the last one ends it.
+    const count = Number(data.count);
+    if (begins && Number.isInteger(count) && count > 0) {
+      let at = new Date(begins.getTime() - 1);
+      try {
+        for (let n = 0; n < Math.min(count, 1000); n += 1) at = nextTime(data.repeat, at, zone);
+        if (!ends || at < ends) ends = at;
+      } catch {
+        // Said below, as any repetition she must correct.
+      }
+    }
+    const push = (at: Date, day: string, moved: boolean) => {
+      const one = changed.get(day);
+      const end = minutes ? new Date(at.getTime() + minutes * MINUTE) : null;
+      if (!inside(at, end)) return;
+      out.push({
+        ...base,
+        status: one?.status ?? base.status,
+        start: at.toISOString(),
+        end: end?.toISOString() ?? null,
+        allDay: false,
+        type: end ? 'span' : 'moment',
+        repeated: true,
+        day,
+        ...(moved ? { moved: true } : {}),
+      });
+    };
     let cursor = new Date(
       Math.max(from.getTime() - (minutes ?? 0) * MINUTE, begins?.getTime() ?? 0) - 1,
     );
@@ -113,22 +167,23 @@ export function occurrencesOf(
         const at = nextTime(data.repeat, cursor, zone);
         if (at >= to || (ends && at > ends)) break;
         cursor = at;
-        if (skipped.has(localDay(at))) continue;
-        const end = minutes ? new Date(at.getTime() + minutes * MINUTE) : null;
-        if (!inside(at, end)) continue;
-        out.push({
-          ...base,
-          start: at.toISOString(),
-          end: end?.toISOString() ?? null,
-          allDay: false,
-          type: end ? 'span' : 'moment',
-          repeated: true,
-        });
+        const day = localDay(at);
+        const one = changed.get(day);
+        if (skipped.has(day) || one?.status === 'cancelled') continue;
+        const moved = one?.at ? timeOf(one.at, zone) : null;
+        // Moved: shown at its new time, where that falls (below, if outside this window's days).
+        if (moved) continue;
+        push(at, day, false);
       }
     } catch {
       // A repetition she must correct (the watcher says so); it has no place in time yet.
     }
-    return out;
+    for (const [day, one] of changed) {
+      if (!one.at || one.status === 'cancelled' || skipped.has(day)) continue;
+      const moved = timeOf(one.at, zone);
+      if (moved) push(moved, day, true);
+    }
+    return out.sort((a, b) => a.start.localeCompare(b.start));
   }
 
   const span = placed(data.start, zone);
@@ -244,4 +299,54 @@ export async function calendarOwner(db: pg.Pool, key: string): Promise<string | 
     [fingerprintOf(key)],
   );
   return rows[0]?.owner ?? null;
+}
+
+/**
+ * One occurrence of a repetition changed (spec 036): done, missed, postponed (to a new time) or
+ * cancelled — the others stay as they are. `null` puts it back as the repetition says. One save:
+ * journaled, undone at once.
+ */
+export async function setOccurrence(
+  tx: Tx,
+  actor: Actor,
+  spaceId: string,
+  id: string,
+  day: string,
+  change: { status?: OccurrenceState | null; at?: string | null } | null,
+) {
+  if (!DAY_ONLY.test(day)) throw new Error(`« ${day} » is not a day (2026-11-12).`);
+  const entry = await get(tx, spaceId, id);
+  if (!entry) throw new Error(`No entry ${id} in this space.`);
+  const repeat = entry.data.repeat;
+  if (typeof repeat !== 'string' || !repeat.trim()) {
+    throw new Error(`« ${entry.title} » does not repeat: change it as a whole.`);
+  }
+  const zone =
+    typeof entry.data.timezone === 'string' && entry.data.timezone
+      ? entry.data.timezone
+      : await zoneOf(tx);
+  const from = dayStart(day, zone);
+  const to = new Date(from.getTime() + 24 * 60 * MINUTE);
+  const row = {
+    id,
+    kind: entry.kind,
+    title: entry.title,
+    data: { ...entry.data, occurrences: {} },
+    space: '',
+    space_id: spaceId,
+  };
+  if (!occurrencesOf(row, from, to, from, zone).length) {
+    throw new Error(`« ${entry.title} » has no occurrence on ${day}.`);
+  }
+  if (change?.at && !timeOf(change.at, zone)) {
+    throw new Error(`« ${change.at} » is not a time (2026-11-13T18:00).`);
+  }
+  const all = { ...((entry.data.occurrences as Record<string, unknown> | undefined) ?? {}) };
+  const next: Record<string, unknown> = {};
+  if (change?.status) next.status = change.status;
+  if (change?.at) next.at = change.at;
+  if (change?.at && !change.status) next.status = 'postponed';
+  if (Object.keys(next).length) all[day] = next;
+  else delete all[day];
+  return save(tx, actor, spaceId, { entries: [{ id, data: { occurrences: all } }] });
 }

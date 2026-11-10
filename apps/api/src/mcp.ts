@@ -1,3 +1,4 @@
+import { OCCURRENCE_STATES, setOccurrence, type OccurrenceState } from '@jarvis-os/core';
 import { fileCapture, fileSure, inboxOf, type EntryInput } from '@jarvis-os/core';
 import { captureAs } from './capture';
 import { COMMON_KINDS, removeApp } from '@jarvis-os/core';
@@ -616,7 +617,9 @@ export async function mcpServerFor(
         'away (`unlink`). One call for everything she said about that space. Every change is',
         'journaled and can be undone. A moment (`at`, `due`, `start`, `end`, `date`, `next`) may be',
         'written in her words (« demain 9h », « vendredi prochain à 14h30 »): Jarvis reads it on her',
-        'clock and says how it understood it (`understood`); tell her.',
+        'clock and says how it understood it (`understood`); tell her. So may a repetition (`repeat`:',
+        '« tous les lundis à 7h », « le 2e lundi du mois à 18h », « le dernier vendredi »), with',
+        '`until` (a day) or `count` (so many times) to end it and `except` (days skipped).',
       ].join(' '),
       inputSchema: { ...saveInputSchema.shape, space: spaceArg },
     },
@@ -800,7 +803,8 @@ export async function mcpServerFor(
       description: [
         'Her calendar for a window: every entry of any kind that has a time — `start`/`end`/`duration`',
         '(a span), `at` (a moment), `due` (a deadline), `date` (a day, from today on),',
-        '`repeat` (again and again, minus the days in `except`) — at its place, sorted. Answer « what do',
+        '`repeat` (again and again, minus the days in `except`; each occurrence with its `day` and its own',
+        '`status` — done, missed, postponed, cancelled) — at its place, sorted. Answer « what do',
         'I have Thursday? » from this, never from memory. `from`/`to`: ISO times or days, or her words (« demain », « lundi prochain »)',
         '(« 2026-10-29 »); at most 366 days. Every space this client reaches unless `space` is given.',
       ].join(' '),
@@ -833,6 +837,48 @@ export async function mcpServerFor(
         const ids = space ? [at(space)] : reach.map((one) => one.id);
         return act((tx) => agenda(tx, ids, { from: start, to: until }));
       },
+    ),
+  );
+
+  // One occurrence of a repetition (spec 036): done, missed, postponed to a time, cancelled.
+  server.registerTool(
+    'occurrence',
+    {
+      description:
+        'One occurrence of something that repeats, by its `day` (« 2026-11-12 », as `agenda` gives it): mark it done, missed or cancelled, or move it alone (`at`, a time or her words — « postponed »); the others stay as they are. `status: null` and no `at` puts it back. Journaled, undone at once.',
+      inputSchema: {
+        id: z.string().min(1),
+        day: z.string().min(2),
+        status: z.enum(OCCURRENCE_STATES).nullable().optional(),
+        at: z.string().min(2).max(60).nullable().optional(),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async (args: {
+        id: string;
+        day: string;
+        status?: OccurrenceState | null | undefined;
+        at?: string | null | undefined;
+        space?: string | undefined;
+      }) =>
+        act(async (tx) => {
+          const zone = await zoneOf(tx);
+          const day = whenOf(args.day, zone)?.value.slice(0, 10) ?? args.day;
+          const moved = args.at ? (whenOf(args.at, zone)?.value ?? args.at) : null;
+          const change = {
+            ...(args.status !== undefined ? { status: args.status } : {}),
+            ...(moved ? { at: moved } : {}),
+          };
+          return setOccurrence(
+            tx,
+            actor,
+            at(args.space),
+            args.id,
+            day,
+            Object.keys(change).length && (change.status !== null || moved) ? change : null,
+          );
+        }),
     ),
   );
 

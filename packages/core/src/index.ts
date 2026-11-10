@@ -77,7 +77,7 @@ export {
   type Member,
   type Space,
 } from './spaces';
-export { DEFAULT_ZONE, inZone, nextTime, repetitionOf, timeOf } from './time';
+export { DEFAULT_ZONE, inZone, nextTime, repetitionFromWords, repetitionOf, timeOf } from './time';
 export { watchOnce, type Due, type PassReport } from './watcher';
 export { upcoming, type Upcoming } from './upcoming';
 export {
@@ -87,10 +87,13 @@ export {
   calendarOwner,
   fingerprintOf,
   minutesOf,
+  OCCURRENCE_STATES,
   occurrencesOf,
   renewCalendarKey,
+  setOccurrence,
   TIME_FIELDS,
   type Occurrence,
+  type OccurrenceState,
 } from './agenda';
 export {
   checkAgainst,

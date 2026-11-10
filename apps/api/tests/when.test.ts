@@ -82,4 +82,24 @@ describe('through Claude', () => {
     });
     expect(agenda.isError).toBe(false);
   });
+
+  it('saves a repetition said in her words, and marks one occurrence done (spec 036)', async () => {
+    const saved = await claude.call<{
+      entries: { id: string }[];
+      understood: { field: string; date: string }[];
+    }>('save', {
+      entries: [{ kind: 'Event', title: 'Sport', data: { repeat: 'tous les jours à 7h' } }],
+    });
+    expect(saved.value.understood).toContainEqual(
+      expect.objectContaining({ field: 'repeat', date: '0 7 * * *' }),
+    );
+    const id = saved.value.entries[0]!.id;
+    const done = await claude.call('occurrence', { id, day: 'demain', status: 'done' });
+    expect(done.isError).toBe(false);
+    const agenda = await claude.call<{ id: string; status: string | null; day: string }[]>(
+      'agenda',
+      { from: 'demain', to: 'demain' },
+    );
+    expect(agenda.value.find((one) => one.id === id)?.status).toBe('done');
+  });
 });

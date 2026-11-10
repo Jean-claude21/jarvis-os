@@ -18,7 +18,7 @@ describe('what it changes', () => {
             ref: 'm',
             kind: 'Event',
             title: 'Réunion projet',
-            data: { start: '2027-02-15T10:00', end: '2027-02-15T11:00' },
+            data: { start: '2027-02-15T10:00', end: '2027-02-15T11:00', remind: '15 min' },
           },
           { kind: 'Event', title: 'Sport', data: { repeat: '0 7 * * *', duration: 60 } },
           { kind: 'Task', title: 'Rapport', data: { due: '2027-02-16T17:00', status: 'open' } },

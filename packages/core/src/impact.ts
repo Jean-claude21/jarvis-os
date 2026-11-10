@@ -182,6 +182,8 @@ export async function replan(
     byEntry.set(one.id, { due: before });
   }
   for (const one of impact.reminders) {
+    // A reminder attached to a thing (spec 037) follows it: never moved on its own.
+    if (typeof (await get(tx, spaceId, one.id))?.data.before === 'string') continue;
     steps.push({ id: one.id, title: one.title, does: 'remind_after', to: back });
     byEntry.set(one.id, { at: back, status: 'planned' });
   }

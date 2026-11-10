@@ -278,6 +278,29 @@ function linksOutOf(
  * links taken away — every change journaled. A field given `null` is removed. Each entry follows
  * its kind's model (fields, relations, lines, workflow); old keywords are renamed and noted.
  */
+/** Data in her model's words: a key that is another name of a field (`aliases`) becomes the field. */
+export function withAliases(
+  model: Model,
+  data: Record<string, unknown>,
+  notes: string[] = [],
+): Record<string, unknown> {
+  const fold = (one: string) => foldKind(one).replace(/[\s-]+/g, '_');
+  const byAlias = new Map<string, string>();
+  for (const field of model.fields)
+    for (const alias of (field as { aliases?: string[] }).aliases ?? [])
+      byAlias.set(fold(alias), field.name);
+  if (!byAlias.size) return data;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(data)) {
+    const to = byAlias.get(fold(key));
+    if (to && to !== key && !(to in data)) {
+      out[to] = value;
+      notes.push(`« ${key} » → « ${to} »`);
+    } else out[key] = value;
+  }
+  return out;
+}
+
 export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput): Promise<Saved> {
   const input = saveInputSchema.parse(raw);
   const refs = new Map<string, string>();
@@ -333,7 +356,12 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
     if (!one.id && (!wanted || !one.title))
       throw new Error('A new entry needs a kind and a title.');
     const kind = wanted ? await kindAsWritten(tx, spaceId, wanted) : current!.kind;
+    // A program's key writes only the kinds it was given (spec 050).
+    if (actor.kinds && !actor.kinds.some((one) => foldKind(one) === foldKind(kind)))
+      throw new Error(`This key may not write « ${kind} » (only ${actor.kinds.join(', ')}).`);
     const model = isModelKind(kind) ? null : await modelOf(tx, spaceId, kind);
+    // Her model's other names for a field (spec 050): what came as `job_title` is written as it.
+    if (model && one.data) one.data = withAliases(model, one.data, notes);
     const links: Omit<Pending, 'entry'>[] = [];
     const given = linksOutOf(
       model,

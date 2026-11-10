@@ -1,7 +1,7 @@
 import { ZodError } from 'zod';
 
 /** What went wrong, in words a person or a model can act on, with the status that says it. */
-export function failure(error: unknown): { status: 400 | 404 | 500; message: string } {
+export function failure(error: unknown): { status: 400 | 403 | 404 | 500; message: string } {
   if (error instanceof ZodError) {
     return {
       status: 400,
@@ -11,6 +11,8 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
     };
   }
   const message = error instanceof Error ? error.message : String(error);
+  // A program's key (spec 050) outside its limits.
+  if (/^This key (reaches|may not)/.test(message)) return { status: 403, message };
   if (
     /^No (entry|change|stored file|routine|open invitation|member|key|person|proposal|routine)/.test(
       message,
@@ -38,7 +40,7 @@ export function failure(error: unknown): { status: 400 | 404 | 500; message: str
       message,
     ) ||
     // Her connectors (spec 025): what to ask her, or which connector or tool exists.
-    /^No connector|has no tool «|ask her first|needs Jarvis's Google client|is reached with a key|gave no sign-in page|^A connector is not undone|^Not a sealed secret/.test(
+    /^No connector|has no tool «|ask her first|needs Jarvis's Google client|is reached with a key|gave no sign-in page|^A connector is not undone|^Not a sealed secret|^Call «|^A call /.test(
       message,
     ) ||
     // Repetitions, for whom, captures (specs 035–038).

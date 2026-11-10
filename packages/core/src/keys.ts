@@ -13,6 +13,9 @@ export const KEY_PREFIX = 'jos_';
 export interface PersonalKey {
   id: string;
   name: string;
+  /** A program's key (spec 050): the one space it reaches, the kinds it may write. */
+  spaceId: string | null;
+  kinds: string[] | null;
   createdAt: string;
   lastUsedAt: string | null;
 }
@@ -22,14 +25,24 @@ export async function createKey(
   tx: Tx,
   person: string,
   name: string,
+  limits: { spaceId?: string | null; kinds?: string[] | null } = {},
 ): Promise<{ key: string; id: string }> {
   const label = name.trim().slice(0, 80);
   if (!label) throw new Error('A key needs a name (« Jarvis desktop »).');
+  const kinds = (limits.kinds ?? [])
+    .map((one) => one.trim())
+    .filter(Boolean)
+    .slice(0, 30);
+  if (limits.spaceId) {
+    const { rowCount } = await tx.query('select 1 from space where id = $1', [limits.spaceId]);
+    if (!rowCount) throw new Error(`No space ${limits.spaceId} of hers for this key.`);
+  }
   const key = `${KEY_PREFIX}${randomBytes(24).toString('base64url')}`;
   const id = prefixedId('key');
   await tx.query(
-    'insert into personal_key (id, person_id, name, fingerprint) values ($1, $2, $3, $4)',
-    [id, person, label, fingerprintOf(key)],
+    `insert into personal_key (id, person_id, name, fingerprint, space_id, kinds)
+     values ($1, $2, $3, $4, $5, $6)`,
+    [id, person, label, fingerprintOf(key), limits.spaceId ?? null, kinds.length ? kinds : null],
   );
   return { key, id };
 }
@@ -37,7 +50,7 @@ export async function createKey(
 /** Her keys still valid, the latest first. */
 export async function keysOf(tx: Tx): Promise<PersonalKey[]> {
   const { rows } = await tx.query<PersonalKey>(
-    `select id, name,
+    `select id, name, space_id as "spaceId", kinds,
             to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
             to_char(last_used_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "lastUsedAt"
        from personal_key where revoked_at is null order by created_at desc`,
@@ -63,4 +76,28 @@ export async function keyOwner(db: pg.Pool, key: string): Promise<string | null>
     [fingerprint],
   );
   return rows[0]?.person ?? null;
+}
+
+export interface KeyScope {
+  person: string;
+  /** The one space it reaches, or null (all of hers). */
+  spaceId: string | null;
+  /** The kinds it may write, or null (any). */
+  kinds: string[] | null;
+  name: string;
+}
+
+/** Whose a key is and within what limits (spec 050), or null. */
+export async function keyScope(db: pg.Pool, key: string): Promise<KeyScope | null> {
+  if (!key.startsWith(KEY_PREFIX)) return null;
+  const { rows } = await db.query<{
+    person: string;
+    space_id: string | null;
+    kinds: string[] | null;
+    name: string;
+  }>('select person, space_id, kinds, name from jarvis_key_scope($1)', [fingerprintOf(key)]);
+  const row = rows[0];
+  return row
+    ? { person: row.person, spaceId: row.space_id, kinds: row.kinds, name: row.name }
+    : null;
 }

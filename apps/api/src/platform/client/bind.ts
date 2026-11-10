@@ -98,7 +98,8 @@ function bindCommon(root) {
   if (conAdd) conAdd.addEventListener('submit', async (event) => {
     event.preventDefault();
     const f = new FormData(conAdd);
-    const body = { name: f.get('name'), url: f.get('url'), auth: f.get('auth') };
+    const body = { name: f.get('name'), url: f.get('url'), auth: f.get('authPick') || f.get('auth') };
+    if (f.get('protocol') === 'http') { body.protocol = 'http'; if (body.auth === 'oauth') body.auth = f.get('secret') ? 'bearer' : 'none'; }
     if (f.get('headerName')) body.headerName = f.get('headerName');
     if (f.get('secret')) body.secret = f.get('secret');
     await addConnector(body, conAdd.querySelector('button'));
@@ -288,13 +289,28 @@ function bindActions(root) {
     catch (error) { alert(error.message); }
   });
   const keyNew = document.getElementById('key-new');
+  // A key (spec 015), and for a program its limits (spec 050): one space, the kinds it may write.
   if (keyNew) keyNew.addEventListener('click', async () => {
-    const name = prompt(W.keyName); if (!name) return;
-    try {
-      const made = await api('/me/keys', { method: 'POST', body: { name } });
-      await show();
-      document.getElementById('newkey').innerHTML = '<p class="badge read" style="white-space:normal">' + esc(W.keyOnce) + '</p><p><code class="url">' + esc(made.key) + '</code></p>';
-    } catch (error) { alert(error.message); }
+    const kinds = (knownKinds.length ? knownKinds : await api(inSpace('/kinds'))).filter((k) => (k.count || k.model) && !k.system && !['Model', 'Rule', 'Script', 'Page', 'View', 'App', 'Channel', 'Reminder', 'Comment', 'Proposal', 'Capture', 'Dashboard', 'Charter', 'Routine'].includes(k.kind)).map((k) => k.kind).sort((a, b) => kindName(a).localeCompare(kindName(b)));
+    const body = '<form class="form" id="key-form"><div class="field"><label>' + esc(W.keyName) + '</label><input id="k-name" required placeholder="' + esc(W.keyNameHint) + '"></div>' +
+      '<div class="field"><label>' + esc(W.keySpace) + '</label><select id="k-space"><option value="">' + esc(W.keyAllSpaces) + '</option>' + me.spaces.map((x) => '<option value="' + esc(x.id) + '">' + esc(x.name) + '</option>').join('') + '</select></div>' +
+      '<div class="field"><label>' + esc(W.keyKinds) + ' <small>' + esc(W.keyKindsHint) + '</small></label><div class="chips">' + kinds.slice(0, 60).map((k) => '<label class="chip"><input type="checkbox" value="' + esc(k) + '" style="margin-right:6px">' + esc(kindName(k)) + '</label>').join('') + '</div></div>' +
+      '<div class="hint">' + esc(W.keyLimitsHow) + '</div><div id="k-made"></div></form>';
+    openDrawer(W.keyNew, body, '<button class="btn" data-close>' + esc(W.cancel) + '</button><button class="btn solid" id="k-save">' + esc(W.keyMake) + '</button>', W.keysLead);
+    const el = (id) => document.getElementById(id);
+    el('k-save').addEventListener('click', async () => {
+      const name = el('k-name').value.trim();
+      if (!name) { el('k-name').focus(); return; }
+      const chosen = [...document.querySelectorAll('#key-form input[type=checkbox]:checked')].map((x) => x.value);
+      el('k-save').disabled = true;
+      try {
+        const made = await api('/me/keys', { method: 'POST', body: { name: name, space: el('k-space').value || null, kinds: chosen.length ? chosen : null } });
+        el('k-made').innerHTML = '<div class="warnbox show"><b>' + esc(W.keyOnce) + '</b></div><p><code class="url" style="word-break:break-all">' + esc(made.key) + '</code></p>';
+        el('k-save').remove();
+        document.querySelector('#drawer [data-close].btn').textContent = W.close;
+        document.querySelectorAll('#drawer [data-close]').forEach((b) => b.addEventListener('click', () => show()));
+      } catch (error) { el('k-save').disabled = false; el('k-made').innerHTML = '<div class="warnbox show">' + esc(error.message) + '</div>'; }
+    });
   });
   root.querySelectorAll('[data-revoke]').forEach((b) => b.addEventListener('click', async () => {
     if (!confirm(W.keyRevokeAsk)) return;

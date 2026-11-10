@@ -44,6 +44,42 @@ describe('her review', () => {
     expect(mirror.intentions.map((one) => one.title)).toContain('Réparer le vélo');
   });
 
+  it('shows her habits day by day, her commitments, her spending by fund and what she said', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+    await ama.as((tx) =>
+      save(tx, ama.actor, ama.space, {
+        entries: [
+          { ref: 'h', kind: 'Habit', title: 'Lecture', data: { days: 'tous les jours' } },
+          { ref: 'r', kind: 'Lecture', title: 'Lu 20 pages', data: { date: yesterday } },
+          { kind: 'Task', title: 'Rendre le livre', data: { status: 'open', due: yesterday } },
+          { ref: 'f', kind: 'Fund', title: 'Libre' },
+          {
+            ref: 't',
+            kind: 'Transaction',
+            title: 'Taxi',
+            data: { amount: 3000, direction: 'out', date: today },
+          },
+          { kind: 'Journal', title: 'Soir', data: { text: 'Bonne journée, calme.' } },
+        ],
+        links: [{ from: 't', to: 'f', role: 'fund' }],
+      }),
+    );
+    const from = new Date(Date.now() - 6 * 86_400_000);
+    const to = new Date(Date.now() + 86_400_000);
+    const mirror = await ama.as((tx) => mirrorOf(tx, [ama.space], from, to));
+    const lecture = mirror.habits.find((one) => one.title === 'Lecture')!;
+    expect(lecture.days.find((one) => one.day === yesterday)!.state).toBe('done');
+    expect(lecture.kept).toBe(1);
+    expect(mirror.commitments).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ title: 'Rendre le livre', state: 'late' }),
+      ]),
+    );
+    expect(mirror.spending.find((one) => one.name === 'Libre')!.now).toBe(3000);
+    expect(mirror.said.map((one) => one.text)).toContain('Bonne journée, calme.');
+  });
+
   it('keeps her answers and turns each decision into a task linked to the review', async () => {
     const kept = await ama.as((tx) =>
       keepReview(tx, ama.actor, ama.space, {

@@ -1,6 +1,8 @@
 import type { Actor, Tx } from './db';
 import { find, save } from './entries';
+import { agenda } from './agenda';
 import { goalsOf, type GoalProgress } from './goals';
+import { planOf, WEEKDAYS } from './habits';
 import { lingering, openIntentions } from './intentions';
 import { CLOSED } from './keywords';
 import { patternsOf, type Pattern } from './patterns';
@@ -42,6 +44,24 @@ export interface Mirror {
   patterns: Pattern[];
   /** Her questions, or the usual ones. */
   questions: string[];
+  /** Her habits day by day: done, missed, not planned (the days she meant, the days she did). */
+  habits: {
+    id: string;
+    title: string;
+    days: { day: string; state: 'done' | 'miss' | 'off' }[];
+    kept: number;
+    planned: number;
+  }[];
+  /** Her time: what repeats, planned against kept, in hours. */
+  time: { title: string; planned: number; kept: number }[];
+  /** Money out by fund or category, this period against its usual (the three before). */
+  spending: { name: string; now: number; usual: number }[];
+  /** What she committed to in the period (a due day): done, late, or still ahead. */
+  commitments: { id: string; title: string; due: string; state: 'done' | 'late' | 'ahead' }[];
+  /** Her people in the period: how many things with them, the last one. */
+  people: { id: string; title: string; n: number; last: string }[];
+  /** What she said in the period, in her words (captures, journal). */
+  said: { id: string; at: string; text: string; kind: string }[];
 }
 
 /** The mirror of [from, to) in her spaces, prepared by Jarvis. */
@@ -92,6 +112,155 @@ export async function mirrorOf(
     goals.push(...(await goalsOf(tx, spaceId, to.toISOString().slice(0, 10))));
   }
   const asked = (await preferencesOf(tx).catch(() => ({}) as Preferences)).review?.questions;
+  const dayOf = (at: Date) => at.toISOString().slice(0, 10);
+  const days: string[] = [];
+  for (let at = from.getTime(); at < to.getTime() && days.length < 31; at += 86_400_000) {
+    days.push(dayOf(new Date(at)));
+  }
+
+  // Her habits day by day: an entry that says its days; the days she did it are linked to it.
+  const { rows: habitRows } = await tx.query<{
+    id: string;
+    title: string;
+    data: Record<string, unknown>;
+    done: string[] | null;
+  }>(
+    `select h.id, h.title, h.data,
+            array(
+              select left(coalesce(d.data->>'date', d.data->>'day', d.data->>'start', to_char(d.created_at, 'YYYY-MM-DD')), 10)
+                from entry d
+               where d.archived_at is null and d.id <> h.id
+                 and not (d.data ? 'days' or d.data ? 'jours' or d.data ? 'cadence')
+                 and (exists (select 1 from link l
+                               where l.role = 'for' and ((l.from_id = d.id and l.to_id = h.id) or (l.from_id = h.id and l.to_id = d.id)))
+                      or (d.space_id = h.space_id
+                          and jarvis_fold(d.kind) = jarvis_fold(coalesce(h.data->>'tracks', h.title))))) as done
+       from entry h
+      where h.space_id = any($1) and h.archived_at is null
+        and (h.data ? 'days' or h.data ? 'jours' or h.data ? 'cadence')
+      order by h.title limit 20`,
+    [spaceIds],
+  );
+  const weekdayOf = (day: string) => WEEKDAYS[(new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7]!;
+  const habits: Mirror['habits'] = [];
+  const seen = new Set<string>();
+  for (const h of habitRows) {
+    const plan = planOf(h.data);
+    const name = h.title.trim().toLowerCase();
+    if (!plan || seen.has(name) || habits.length >= 10) continue;
+    seen.add(name);
+    const did = new Set(h.done ?? []);
+    const line = days.map((day) => ({
+      day,
+      state: (did.has(day)
+        ? 'done'
+        : plan.days.includes(weekdayOf(day)) && day < dayOf(new Date())
+          ? 'miss'
+          : 'off') as 'done' | 'miss' | 'off',
+    }));
+    habits.push({
+      id: h.id,
+      title: h.title,
+      days: line,
+      kept: line.filter((one) => one.state === 'done').length,
+      planned: days.filter((day) => plan.days.includes(weekdayOf(day))).length,
+    });
+  }
+
+  // Her time: what repeats with a duration, its occurrences planned, those she marked done.
+  const occurrences = await agenda(tx, spaceIds, { from, to, today: to });
+  const hours = new Map<string, { planned: number; kept: number }>();
+  for (const one of occurrences) {
+    if (!one.repeated || !one.end) continue;
+    const h = (new Date(one.end).getTime() - new Date(one.start).getTime()) / 3_600_000;
+    const now = hours.get(one.title) ?? { planned: 0, kept: 0 };
+    now.planned += h;
+    if (one.status === 'done') now.kept += h;
+    hours.set(one.title, now);
+  }
+  const time = [...hours]
+    .map(([title, v]) => ({
+      title,
+      planned: Math.round(v.planned * 10) / 10,
+      kept: Math.round(v.kept * 10) / 10,
+    }))
+    .sort((a, b) => b.planned - a.planned)
+    .slice(0, 8);
+
+  // Money out by fund (its link), else by category, against the three periods before.
+  const span = to.getTime() - from.getTime();
+  const { rows: spendRows } = await tx.query<{ name: string; now: string; usual: string }>(
+    `with t as (
+       select coalesce((select f.title from link l join entry f on f.id = l.to_id
+                         where l.from_id = e.id and jarvis_fold(l.role) in ('fund', 'fonds') limit 1),
+                       nullif(trim(e.data->>'category'), ''), '—') as name,
+              abs((e.data->>'amount')::numeric) as amount,
+              coalesce(left(e.data->>'date', 10), to_char(e.created_at, 'YYYY-MM-DD')) as day
+         from entry e
+        where e.space_id = any($1) and e.archived_at is null and jarvis_fold(e.kind) = 'transaction'
+          and coalesce(e.data->>'direction', 'out') = 'out' and (e.data->>'amount') ~ '^-?[0-9]+([.][0-9]+)?$')
+     select name, sum(case when day >= $2 and day < $3 then amount else 0 end) as now,
+            sum(case when day >= $4 and day < $2 then amount else 0 end) / 3 as usual
+       from t where day >= $4 and day < $3 group by name order by 2 desc limit 8`,
+    [spaceIds, dayOf(from), dayOf(to), dayOf(new Date(from.getTime() - 3 * span))],
+  );
+  const spending = spendRows
+    .map((one) => ({ name: one.name, now: Number(one.now), usual: Math.round(Number(one.usual)) }))
+    .filter((one) => one.now || one.usual);
+
+  // What she committed to: a due day in the period.
+  const { rows: dueRows } = await tx.query<{
+    id: string;
+    title: string;
+    due: string;
+    status: string | null;
+  }>(
+    `select id, title, left(data->>'due', 10) as due, data->>'status' as status from entry
+      where space_id = any($1) and archived_at is null and data ? 'due'
+        and left(data->>'due', 10) >= $2 and left(data->>'due', 10) < $3
+        and jarvis_fold(kind) not in ('reminder', 'capture')
+      order by data->>'due' limit 12`,
+    [spaceIds, dayOf(from), dayOf(to)],
+  );
+  const today = dayOf(new Date());
+  const commitments = dueRows.map((one) => ({
+    id: one.id,
+    title: one.title,
+    due: one.due,
+    state: (one.status && CLOSED.has(one.status.toLowerCase())
+      ? 'done'
+      : one.due < today
+        ? 'late'
+        : 'ahead') as 'done' | 'late' | 'ahead',
+  }));
+
+  // Her people: the things linked to them in the period.
+  const { rows: peopleRows } = await tx.query<{
+    id: string;
+    title: string;
+    n: number;
+    last: string;
+  }>(
+    `select p.id, p.title, count(distinct e.id)::int as n, max(e.created_at)::text as last
+       from entry p
+       join link l on l.to_id = p.id or l.from_id = p.id
+       join entry e on e.id = case when l.to_id = p.id then l.from_id else l.to_id end
+      where p.space_id = any($1) and p.archived_at is null and jarvis_fold(p.kind) = 'person'
+        and e.archived_at is null and e.created_at >= $2 and e.created_at < $3
+        and jarvis_fold(e.kind) not in ('person', 'comment')
+      group by p.id, p.title order by 3 desc limit 6`,
+    window,
+  );
+
+  // What she said: her captures and her journal, in her words.
+  const { rows: saidRows } = await tx.query<{ id: string; at: string; text: string; kind: string }>(
+    `select id, coalesce(data->>'at', created_at::text) as at, left(coalesce(data->>'text', title), 220) as text, kind
+       from entry
+      where space_id = any($1) and archived_at is null and created_at >= $2 and created_at < $3
+        and jarvis_fold(kind) in ('capture', 'journal', 'note')
+      order by created_at desc limit 6`,
+    window,
+  );
   return {
     from: from.toISOString(),
     to: to.toISOString(),
@@ -104,6 +273,12 @@ export async function mirrorOf(
     goals,
     patterns: await patternsOf(tx, spaceIds, to),
     questions: asked?.length ? asked : DEFAULT_QUESTIONS[lang],
+    habits,
+    time,
+    spending,
+    commitments,
+    people: peopleRows,
+    said: saidRows,
   };
 }
 

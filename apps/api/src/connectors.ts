@@ -44,10 +44,26 @@ async function connected(url: string, reach: Reach): Promise<Client> {
   }
 }
 
+const statusOf = (error: unknown) => {
+  const code = (error as { code?: unknown })?.code;
+  return typeof code === 'number' ? code : null;
+};
 const refusal = (error: unknown) =>
+  statusOf(error) === 401 ||
+  statusOf(error) === 403 ||
   /\b(401|403)\b|unauthori[sz]ed|forbidden|invalid[_ ]token/i.test(
     String((error as Error)?.message),
-  ) || (error as Error)?.name === 'UnauthorizedError';
+  ) ||
+  (error as Error)?.name === 'UnauthorizedError';
+
+/** Why it could not be read, in a few words: the status and the server's own error, never its body. */
+function reasonOf(error: unknown): string {
+  const status = statusOf(error);
+  const message = String((error as Error)?.message ?? error);
+  const said = /"(?:message|error_description|error)"\s*:\s*"([^"]{1,200})"/.exec(message)?.[1];
+  const head = message.replace(/\{[\s\S]*$/, '').replace(/[:\s]+$/, '');
+  return [status ? `HTTP ${status}` : null, said ?? head].filter(Boolean).join(' — ').slice(0, 300);
+}
 
 /** A check: the server's name, tools and resources, or why it could not be read. */
 export async function probe(url: string, reach: Reach): Promise<Probe> {
@@ -77,10 +93,16 @@ export async function probe(url: string, reach: Reach): Promise<Probe> {
       resources,
     };
   } catch (error) {
-    const message = String((error as Error)?.message ?? error).slice(0, 300);
+    // Refused with her sign-in kept: the server knows her but will not let her in (a service of
+    // Google left to enable, a right missing) — not a sign-in to do again.
+    const signedIn = Boolean(await reach.authProvider?.tokens());
     return {
-      state: refusal(error) ? (reach.authProvider ? 'needs_sign_in' : 'refused') : 'unreachable',
-      reason: message,
+      state: refusal(error)
+        ? reach.authProvider && !signedIn
+          ? 'needs_sign_in'
+          : 'refused'
+        : 'unreachable',
+      reason: reasonOf(error),
       serverName: null,
       tools: [],
       resources: [],

@@ -15,12 +15,16 @@ if (existsSync(`${root}.env`)) {
   process.loadEnvFile(`${root}.env`);
   Object.assign(process.env, given);
 }
-// The keys of outside services (search by meaning, spec 028) stay in the secrets file beside the
-// repository; the server and its watcher read them from their environment.
+// The keys of outside services (search by meaning, spec 028; voice notes; Google's client, spec 025)
+// stay in the secrets file beside the repository; the server and its watcher read them from their
+// environment.
 const secretsFile = `${root}../.secrets/.admin.env`;
 if (existsSync(secretsFile)) {
   for (const line of readFileSync(secretsFile, 'utf8').split(/\r?\n/)) {
-    const match = /^(OPENAI_API_KEY|VOYAGE_API_KEY)=(.+)$/.exec(line.trim());
+    const match =
+      /^(OPENAI_API_KEY|VOYAGE_API_KEY|JARVIS_GOOGLE_CLIENT_ID|JARVIS_GOOGLE_CLIENT_SECRET)=(.+)$/.exec(
+        line.trim(),
+      );
     if (match?.[1] && match[2] && !process.env[match[1]]) {
       process.env[match[1]] = match[2].replace(/^"|"$/g, '');
     }

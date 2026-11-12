@@ -1,3 +1,4 @@
+import type pg from 'pg';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Actor, Tx } from './db';
 import { prefixedId } from './ids';
@@ -50,13 +51,33 @@ export async function createSpace(
 }
 
 /** The spaces the acting person belongs to: her own first, then the shared ones, oldest first. */
-export async function spacesOf(tx: Tx): Promise<Space[]> {
-  const { rows } = await tx.query<Space>(
-    `select s.id, s.name, m.role, s.personal from space s join member m on m.space_id = s.id
+const SPACES_SQL = `select s.id, s.name, m.role, s.personal from space s join member m on m.space_id = s.id
       where m.person_id = jarvis_person()
-      order by (s.personal and s.created_by = jarvis_person()) desc, s.created_at`,
-  );
+      order by (s.personal and s.created_by = jarvis_person()) desc, s.created_at`;
+
+export async function spacesOf(tx: Tx): Promise<Space[]> {
+  const { rows } = await tx.query<Space>(SPACES_SQL);
   return rows;
+}
+
+/**
+ * Her spaces in one trip to the database (each request asks first): the transaction, whose it is,
+ * the reading and the end sent together. Always read fresh — a space made by another door (Claude)
+ * or a member gone is seen at the next request.
+ */
+export async function spacesOfPerson(db: pg.Pool, person: string): Promise<Space[]> {
+  const client = await db.connect();
+  try {
+    const results = (await client.query(
+      `begin; select set_config('jarvis.person', ${client.escapeLiteral(person)}, true); ${SPACES_SQL}; commit`,
+    )) as unknown as { rows: Space[] }[];
+    return results[2]?.rows ?? [];
+  } catch (error) {
+    await client.query('rollback').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 /** Who belongs to a space she belongs to. */

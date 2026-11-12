@@ -28,27 +28,89 @@ function closeAll() {
 }
 
 let drawing = 0;
-async function show() {
-  const [path, query] = location.hash.replace(/^#\\/?/, '').split('?');
+// What makes the app fluid: each page drawn is kept (its HTML and its breadcrumb); coming back shows
+// it at once, then it is drawn again behind and replaced only if something changed. Hovering a link
+// prepares its page. A page is never repainted under her while she types.
+const pageCache = new Map();
+let shownKey = null;
+let drawingNow = false;
+let prefetching = null;
+const cacheKeyOf = (hash) => (space || '') + '|' + (hash || '#/');
+const routeOf = (hash) => {
+  const [path, query] = String(hash || '').replace(/^#[/]?/, '').split('?');
   const [name, id] = path.split('/');
-  const params = new URLSearchParams(query || '');
-  const key = pages[name] ? name : '';
-  closeAll();
+  return { key: pages[name] ? name : '', id: id ? decodeURIComponent(id) : undefined, params: new URLSearchParams(query || '') };
+};
+let prefetchKey = null;
+let prefetchDiscard = false;
+async function renderTo(cacheKey, route, ahead) {
   crumbParts = null;
-  drawNav(key, id ? decodeURIComponent(id) : undefined);
-  page().innerHTML = '<div class="empty">' + esc(W.loading) + '</div>';
+  const html = await pages[route.key](route.params, route.id);
+  const entry = { html: html, crumbs: crumbParts, at: Date.now() };
+  if (ahead && prefetchDiscard) return entry;
+  pageCache.set(cacheKey, entry);
+  if (pageCache.size > 40) pageCache.delete(pageCache.keys().next().value);
+  return entry;
+}
+function paint(entry, route, first) {
+  const y = window.scrollY;
+  page().innerHTML = entry.html; dress(page());
+  crumbParts = entry.crumbs; drawCrumbs(route.key, route.id);
+  bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page()); bindConnexions(page()); bindBlocks(page()); bindBoards(page()); bindRoutines(page());
+  if (first) { page().scrollTop = 0; window.scrollTo(0, 0); } else window.scrollTo(0, y);
+}
+const typing = () => { const a = document.activeElement; return Boolean(a && page().contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)); };
+async function show() {
+  const route = routeOf(location.hash);
+  const cacheKey = cacheKeyOf(location.hash);
+  const same = cacheKey === shownKey;
+  closeAll();
+  drawNav(route.key, route.id);
+  // The page she hovered is being prepared: wait for it. Another one: ignore it (and keep nothing
+  // of it, its breadcrumb could cross this one's).
+  let overlap = false;
+  if (prefetching && prefetchKey === cacheKey) await prefetching.catch(() => undefined);
+  else if (prefetching) { prefetchDiscard = true; overlap = true; }
+  const cached = pageCache.get(cacheKey);
   // Only the latest navigation is drawn: a slower earlier one never overwrites it.
   const ticket = ++drawing;
+  drawingNow = true;
+  if (!same) {
+    if (cached) paint(cached, route, true);
+    else page().innerHTML = '<div class="empty">' + esc(W.loading) + '</div>';
+  }
+  shownKey = cacheKey;
+  document.querySelectorAll('.x-tabbar a[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === route.key));
   try {
-    const html = await pages[key](params, id ? decodeURIComponent(id) : undefined);
+    // Just prepared by a hover: shown as it is.
+    const entry = cached && !same && Date.now() - cached.at < 4000 ? cached : await renderTo(cacheKey, route);
+    if (overlap) entry.crumbs = null;
     if (ticket !== drawing) return;
-    page().innerHTML = html; dress(page()); drawCrumbs(key, id ? decodeURIComponent(id) : undefined);
-    bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page()); bindConnexions(page()); bindBlocks(page()); bindBoards(page()); bindRoutines(page());
-    page().scrollTop = 0; window.scrollTo(0, 0);
-    document.querySelectorAll('.x-tabbar a[data-tab]').forEach((a) => a.toggleAttribute('aria-current', a.dataset.tab === key));
-    if (key === 'ranger' || key === '') counts();
-  } catch (error) { if (ticket === drawing) fail(error); }
+    if (!cached || same || entry.html !== cached.html) {
+      if (cached && !same && typing()) return;
+      paint(entry, route, !cached && !same);
+    }
+    if (route.key === 'ranger' || route.key === '') counts();
+  } catch (error) { if (ticket === drawing && !cached) fail(error); }
+  finally { if (ticket === drawing) drawingNow = false; }
 }
+// A link hovered: its page prepared, when nothing is being drawn.
+let hoverTimer = null;
+document.addEventListener('mouseover', (event) => {
+  const a = event.target && event.target.closest ? event.target.closest('a[href^="#/"]') : null;
+  if (!a) return;
+  clearTimeout(hoverTimer);
+  hoverTimer = setTimeout(() => {
+    const hash = a.getAttribute('href');
+    const cacheKey = cacheKeyOf(hash);
+    const known = pageCache.get(cacheKey);
+    if (prefetching || cacheKey === shownKey || (known && Date.now() - known.at < 30000)) return;
+    if (drawingNow) return;
+    const saved = crumbParts;
+    prefetchKey = cacheKey; prefetchDiscard = false;
+    prefetching = renderTo(cacheKey, routeOf(hash), true).catch(() => undefined).finally(() => { if (!prefetchDiscard) crumbParts = saved; prefetching = null; prefetchKey = null; });
+  }, 120);
+});
 
 // The sidebar, as the mockup draws it: her day, her life, her apps, her spaces, each with its count.
 let navApps = [];

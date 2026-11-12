@@ -83,6 +83,9 @@ export function makeAuth(input: {
     // The JWT plugin signs the access tokens; its own session-to-JWT endpoint is not needed.
     disabledPaths: ['/token'],
     emailAndPassword: { enabled: true, autoSignIn: true, minPasswordLength: 10 },
+    // Her session read from its signed cookie for five minutes, not from the database on each
+    // request (the database is often far away); signing out ends it at once on this device.
+    session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
     rateLimit: {
       ...RATE_LIMIT,
       enabled: input.rateLimit ?? process.env.JARVIS_RATE_LIMIT !== 'off',

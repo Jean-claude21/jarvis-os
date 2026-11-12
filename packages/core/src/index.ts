@@ -72,6 +72,7 @@ export {
   renameSpace,
   setRole,
   spacesOf,
+  spacesOfPerson,
   withdrawInvitation,
   type Invitation,
   type Member,

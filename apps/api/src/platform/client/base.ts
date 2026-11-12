@@ -18,7 +18,23 @@ const num = (n) => new Intl.NumberFormat(locale).format(n || 0);
 let me = null; let space = null;
 try { space = localStorage.getItem('jarvis.space'); } catch {}
 
+// What changes rarely (her profile, her kinds, her apps' pages and views, her preferences) is kept
+// a minute; any change she makes forgets it, and every page drawn again behind (see the router).
+const apiMemo = new Map();
+const MEMO_PATHS = /^[/](me|kinds|pages|views|apps[/]mine|prefs|me[/]prefs|spaces)([?]|$)/;
 async function api(path, options) {
+  const method = ((options && options.method) || 'GET').toUpperCase();
+  if (method !== 'GET') { apiMemo.clear(); if (typeof pageCache !== 'undefined') pageCache.forEach((entry) => { entry.at = 0; }); }
+  else if (MEMO_PATHS.test(path)) {
+    const kept = apiMemo.get(path);
+    if (kept && Date.now() - kept.at < 60000) return kept.data;
+    const data = await apiFetch(path, options);
+    apiMemo.set(path, { at: Date.now(), data: data });
+    return data;
+  }
+  return apiFetch(path, options);
+}
+async function apiFetch(path, options) {
   const opts = Object.assign({ credentials: 'same-origin' }, options || {});
   if (opts.body && typeof opts.body !== 'string' && !(opts.body instanceof FormData)) {
     opts.headers = Object.assign({ 'content-type': 'application/json' }, opts.headers || {});

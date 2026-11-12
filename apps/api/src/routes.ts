@@ -923,6 +923,20 @@ export function apiRoutes(deps: {
       await deps.connectors.read(c.get('person'), c.req.param('id'), c.req.query('uri') ?? ''),
     ),
   );
+  // One of her connections' tools, called from her web account (spec 048, Documents): reading
+  // tools at once; a tool that changes, deletes or sends something only with her yes (`agreed`).
+  api.post('/connectors/:id/call', async (c) => {
+    const body = z
+      .object({
+        tool: z.string().min(1).max(120),
+        args: z.record(z.string(), z.unknown()).default({}),
+        agreed: z.boolean().default(false),
+      })
+      .parse(await c.req.json());
+    return c.json(
+      await deps.connectors.call(actorOf(c), c.req.param('id'), body.tool, body.args, body.agreed),
+    );
+  });
   api.post('/connectors/:id/check', async (c) =>
     c.json(await deps.connectors.check(c.get('person'), c.req.param('id'))),
   );

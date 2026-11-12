@@ -64,8 +64,9 @@ Object.assign(v2Pages, {
       api('/connectors').catch(() => []),
     ]);
     const has = (word) => connectors.some((c) => String(c.name || c.url || '').toLowerCase().includes(word));
+    const drive = connectors.find((c) => /drivemcp|drive/i.test(String(c.url) + ' ' + String(c.name)) && !/onedrive/i.test(String(c.url) + ' ' + String(c.name)) && c.state === 'connected');
     const received = files.filter((f) => /telegram|whatsapp|mail/i.test(f.title + ' ' + f.name));
-    const sources = [['ecrits', W.v2srcWritten, written.rows.length, 'i-doc'], ['deposes', W.v2srcKept, files.length, 'i-lock'], ['gdrive', 'Google Drive', has('drive') ? '' : '—', 'i-plug'], ['onedrive', 'OneDrive', has('onedrive') ? '' : '—', 'i-plug'], ['messages', W.v2received, received.length, 'i-chat']];
+    const sources = [['ecrits', W.v2srcWritten, written.rows.length, 'i-doc'], ['deposes', W.v2srcKept, files.length, 'i-lock'], ['gdrive', 'Google Drive', drive ? '✓' : '—', 'i-plug'], ['onedrive', 'OneDrive', has('onedrive') ? '' : '—', 'i-plug'], ['messages', W.v2received, received.length, 'i-chat']];
     const side = '<section class="panel"><div class="panel-head"><span class="left caps">' + ic('i-file') + esc(W.v2sources) + '</span></div><div class="panel-body pad"><div class="x-src">' + sources.map((x) => '<button data-go="#/documents?s=' + x[0] + '" aria-pressed="' + (src === x[0]) + '">' + ic(x[3]) + esc(x[1]) + '<span class="n">' + esc(String(x[2])) + '</span></button>').join('') + '</div><p class="muted" style="font-size:12px;margin:12px 4px 0">' + esc(W.v2sourcesNote) + '</p></div></section>';
     const typeOf = (f) => f.mediaType.startsWith('image/') ? 'img' : f.mediaType === 'application/pdf' ? 'pdf' : f.mediaType.includes('csv') || f.mediaType.includes('sheet') ? 'csv' : 'md';
     const fileRows = (list) => list.length ? '<div class="scroll"><table style="min-width:560px"><thead><tr><th>' + esc(W.fileName) + '</th><th>' + esc(W.added) + '</th><th>' + esc(W.v2linkedToH) + '</th><th></th></tr></thead><tbody>' + list.map((f) => '<tr><td><div class="fname"><span class="ficon ' + typeOf(f) + '">' + esc(typeOf(f).toUpperCase()) + '</span><div><div class="cell-title" style="overflow-wrap:anywhere">' + esc(f.name) + '</div><div class="cell-sub">' + esc(sizeOf(f.size)) + (f.read ? ' · ' + esc(W.fileRead) : '') + '</div></div></div></td><td class="cell-sub">' + esc(day(f.createdAt)) + '</td><td>' + (f.links.length ? f.links.map((l) => '<a class="tag ok" href="#/entree/' + esc(l.id) + '">' + esc(l.title) + '</a>').join(' ') : '<a class="btn small" href="#/entree/' + esc(f.entryId) + '">' + ic('i-link') + esc(W.v2linkToEntry) + '</a>') + '</td><td style="white-space:nowrap"><button class="btn small" data-file="' + esc(f.entryId) + '">' + ic('i-eye') + esc(W.preview) + '</button></td></tr>').join('') + '</tbody></table></div>' : '<div class="pad muted">' + esc(W.noFiles) + '</div>';
@@ -73,6 +74,7 @@ Object.assign(v2Pages, {
     if (src === 'ecrits') main = v2panel(W.v2srcWritten, written.rows.length ? '<div class="scroll"><table style="min-width:520px"><thead><tr><th>' + esc(W.v2document) + '</th><th>' + esc(W.v2nature) + '</th><th class="n">' + esc(W.size) + '</th><th></th></tr></thead><tbody>' + written.rows.map((d) => '<tr><td><div class="fname"><span class="ficon md">TXT</span><div class="cell-title">' + esc(d.title) + '</div></div></td><td class="cell-sub">' + esc(kindName(d.kind)) + ' · ' + esc(day(d.updated_at)) + '</td><td class="n cell-sub">' + esc(say(W.chars, { n: num(d.taille) })) + '</td><td><a class="btn small" href="#/document/' + esc(d.id) + '">' + ic('i-eye') + esc(W.v2read) + '</a></td></tr>').join('') + '</tbody></table></div><div class="pad muted" style="font-size:12.5px">' + esc(W.v2writtenNote) + '</div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>', '<span class="tag plain">' + written.rows.length + '</span>', 'i-doc');
     else if (src === 'deposes') main = v2panel(W.v2srcKept, fileRows(files), '<span class="tag plain">' + esc(sizeOf(files.reduce((a, f) => a + f.size, 0))) + '</span>', 'i-lock');
     else if (src === 'messages') main = v2panel(W.v2received, '<div class="pad" style="padding-bottom:0"><div class="x-path"><b>' + esc(W.v2receivedWhere) + '</b> · ' + esc(W.v2receivedNote) + '</div></div>' + fileRows(received), '', 'i-chat');
+    else if (src === 'gdrive' && drive) main = await driveFilesPanel(drive, params.get('q') || '');
     else main = v2panel(src === 'gdrive' ? 'Google Drive' : 'OneDrive', '<div class="pad" style="display:flex;flex-direction:column;gap:12px"><p class="context" style="margin:0">' + esc(say(W.v2driveNote, { name: src === 'gdrive' ? 'Google Drive' : 'OneDrive' })) + '</p><div><a class="btn solid" href="#/connexions?tab=mcps">' + ic('i-plug') + esc(say(W.v2connect, { name: src === 'gdrive' ? 'Google Drive' : 'OneDrive' })) + '</a></div></div>', '<span class="tag neutral">' + esc(W.v2toConnect) + '</span>', 'i-plug');
     return v2head(esc(W.navDocuments), esc(W.v2documentsSub), '<a class="btn" href="#/vie">' + ic('i-life') + esc(W.navEntries) + '</a>', '<span class="app-icon" style="background:var(--ink);color:var(--on-ink)">' + ic('i-doc') + '</span>') + '<div class="x-files">' + side + '<div style="min-width:0">' + main + '</div></div>';
   },
@@ -128,6 +130,11 @@ Object.assign(v2Pages, {
 // What these pages do: take a task, filter by person, the first launch's steps.
 let shownRoutines = [];
 function bindLife(root) {
+  root.querySelectorAll('form[data-drive-search]').forEach((f) => f.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const q = new FormData(f).get('q');
+    location.hash = '#/documents?s=gdrive' + (q ? '&q=' + encodeURIComponent(q) : '');
+  }));
   root.querySelectorAll('[data-routine-open]').forEach((row) => row.addEventListener('click', (event) => {
     if (event.target.closest('button')) return;
     const r = shownRoutines.find((x) => x.id === row.dataset.routineOpen);
@@ -273,5 +280,37 @@ function routineDrawer(r) {
     part(W.rd_3, instr.slice(0, 160) + (instr.length > 160 ? '…' : ''), 'ai', W.rd_3how) +
     part(W.rd_4, refs, 'ai', W.rd_4how) + part(W.rd_5, result, 'you', W.rd_5how) + '</div>';
   openDrawer(r.title, body, '<a class="btn" href="#/entree/' + esc(r.id) + '">' + ic('i-doc') + esc(W.rd_read) + '</a><button class="btn solid" data-close>' + ic('i-check') + esc(W.close) + '</button>', d.instructions ? W.rd_structured : W.v2asText);
+}
+
+// Her Drive, shown and never copied (I5): its recent files, or what she searches, through the
+// connection's own reading tools; each opens in Drive.
+function driveFilesOf(answer) {
+  let content = answer && answer.content;
+  if (Array.isArray(content)) {
+    const text = content.filter((x) => x && x.type === 'text').map((x) => x.text).join('');
+    try { content = JSON.parse(text); } catch { content = { text: text }; }
+  }
+  const list = content && (content.files || content.items || content.results || (Array.isArray(content) ? content : null));
+  return Array.isArray(list) ? list : [];
+}
+async function driveFilesPanel(drive, q) {
+  const call = (tool, args) => api('/connectors/' + encodeURIComponent(drive.id) + '/call', { method: 'POST', body: { tool: tool, args: args } });
+  let files = [];
+  let failed = '';
+  try {
+    const answer = q
+      ? await call('search_files', { query: "title contains '" + q.split("'").join(' ') + "'", pageSize: 30, excludeContentSnippets: true })
+      : await call('list_recent_files', { pageSize: 30, excludeContentSnippets: true });
+    if (answer.isError) failed = W.v2driveFailed;
+    files = driveFilesOf(answer);
+  } catch (error) { failed = error.message; }
+  const nameOf = (f) => f.title || f.name || f.fileName || f.id || '—';
+  const whenOf = (f) => f.modifiedTime || f.modified_time || f.lastModifiedTime || f.viewedByMeTime || f.createdTime || '';
+  const linkOf = (f) => f.webViewLink || f.web_view_link || f.url || f.alternateLink || (f.id ? 'https://drive.google.com/open?id=' + encodeURIComponent(f.id) : '');
+  const typeOf = (f) => { const m = String(f.mimeType || f.mime_type || ''); return m.includes('pdf') ? 'pdf' : m.includes('image') ? 'img' : m.includes('sheet') || m.includes('csv') ? 'csv' : 'md'; };
+  const search = '<form class="pad" data-drive-search style="display:flex;gap:8px;padding-bottom:0"><input class="field" name="q" value="' + esc(q) + '" placeholder="' + esc(W.v2driveSearch) + '" style="flex:1"><button class="btn">' + ic('i-search') + esc(W.v2driveFind) + '</button></form>';
+  const rows = files.length ? '<div class="scroll"><table style="min-width:520px"><thead><tr><th>' + esc(W.fileName) + '</th><th>' + esc(W.v2driveModified) + '</th><th></th></tr></thead><tbody>' + files.map((f) => '<tr><td><div class="fname"><span class="ficon ' + typeOf(f) + '">' + esc(typeOf(f).toUpperCase()) + '</span><div class="cell-title" style="overflow-wrap:anywhere">' + esc(nameOf(f)) + '</div></div></td><td class="cell-sub">' + esc(whenOf(f) ? day(whenOf(f)) : '—') + '</td><td>' + (linkOf(f) ? '<a class="btn small" target="_blank" rel="noopener" href="' + esc(linkOf(f)) + '">' + ic('i-eye') + esc(W.v2driveOpen) + '</a>' : '') + '</td></tr>').join('') + '</tbody></table></div>'
+    : '<div class="pad muted">' + esc(failed ? say(W.v2driveError, { why: failed }) : q ? W.v2driveNone : W.v2nothingYet) + '</div>';
+  return v2panel('Google Drive', search + rows + '<div class="pad muted" style="font-size:12.5px">' + esc(W.v2driveShown) + '</div>', '<span class="tag ok">' + esc(W.v2driveConnected) + '</span>', 'i-plug');
 }
 `;

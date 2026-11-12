@@ -301,7 +301,11 @@ async function driveFilesPanel(drive, q) {
     const answer = q
       ? await call('search_files', { query: "title contains '" + q.split("'").join(' ') + "'", pageSize: 30, excludeContentSnippets: true })
       : await call('list_recent_files', { pageSize: 30, excludeContentSnippets: true });
-    if (answer.isError) failed = W.v2driveFailed;
+    if (answer.isError) {
+      // Drive's own words: what to change (a right, a service of Google to enable, the query).
+      const said = Array.isArray(answer.content) ? answer.content.map((x) => x && x.text).filter(Boolean).join(' ') : typeof answer.content === 'string' ? answer.content : JSON.stringify(answer.content || '');
+      failed = W.v2driveFailed + (said ? ' ' + said.slice(0, 300) : '');
+    }
     files = driveFilesOf(answer);
   } catch (error) { failed = error.message; }
   const nameOf = (f) => f.title || f.name || f.fileName || f.id || '—';

@@ -63,6 +63,7 @@ import {
   save,
   modelsOf,
   spacesOf,
+  spacesOfPerson,
   undo,
   withdrawInvitation,
   type Actor,
@@ -183,6 +184,7 @@ export function apiRoutes(deps: {
   secret: string;
 }) {
   const api = new Hono<Env>();
+  const keyUsed = new Map<string, number>();
 
   api.use('*', async (c, next) => {
     // A personal key (spec 015) acts as her, like her session.
@@ -208,14 +210,16 @@ export function apiRoutes(deps: {
       : await deps.auth.api.getSession({ headers: c.req.raw.headers });
     if (!session) return c.json({ error: 'Sign in first.' }, 401);
     const person = session.user.id;
-    if (byKey) {
+    if (byKey && Date.now() - (keyUsed.get(bearer) ?? 0) > 5 * 60_000) {
+      keyUsed.set(bearer, Date.now());
       await asPerson(deps.db, person, (tx) =>
         tx.query('update personal_key set last_used_at = now() where fingerprint = $1', [
           fingerprintOf(bearer),
         ]),
       );
     }
-    const all = await asPerson(deps.db, person, (tx) => spacesOf(tx));
+    // Her spaces, read fresh in one trip (another door may have changed them).
+    const all = await spacesOfPerson(deps.db, person);
     const spaces = scope?.spaceId ? all.filter((one) => one.id === scope.spaceId) : all;
     if (spaces.length === 0) return c.json({ error: 'This account has no space.' }, 500);
     c.set('person', person);

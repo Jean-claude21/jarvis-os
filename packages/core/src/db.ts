@@ -30,8 +30,8 @@ export async function asPerson<T>(
 ): Promise<T> {
   const tx = await db.connect();
   try {
-    await tx.query('begin');
-    await tx.query("select set_config('jarvis.person', $1, true)", [person]);
+    // One trip, not two: the transaction and whose it is (the database is often far away).
+    await tx.query(`begin; select set_config('jarvis.person', ${tx.escapeLiteral(person)}, true)`);
     const result = await work(tx);
     await tx.query('commit');
     return result;

@@ -34,7 +34,30 @@ async function api(path, options) {
   }
   return apiFetch(path, options);
 }
-async function apiFetch(path, options) {
+// The reads asked at the same moment leave together, in one request (on Netlify, each request may
+// wake a server of its own): the server answers each as if asked alone.
+let batchQueue = [];
+function batched(path) {
+  return new Promise((resolve, reject) => {
+    batchQueue.push({ path: path, resolve: resolve, reject: reject });
+    if (batchQueue.length === 1) setTimeout(flushBatch, 0);
+  });
+}
+async function flushBatch() {
+  const now = batchQueue; batchQueue = [];
+  if (now.length === 1) { const one = now[0]; apiFetch(one.path, null, true).then(one.resolve, one.reject); return; }
+  try {
+    const answers = await apiFetch('/batch', { method: 'POST', body: { paths: now.map((x) => x.path) } }, true);
+    now.forEach((x, i) => {
+      const a = answers[i] || { status: 500, body: null };
+      if (a.status === 401) { location.href = '/connexion'; x.reject(new Error('401')); return; }
+      if (a.status >= 400) { const known = a.body && a.body.code && W['err_' + a.body.code]; x.reject(new Error(known ? known + ' — ' + a.body.error : (a.body && a.body.error) || a.status)); return; }
+      x.resolve(a.body);
+    });
+  } catch (error) { now.forEach((x) => x.reject(error)); }
+}
+async function apiFetch(path, options, direct) {
+  if (!direct && (!options || !options.method || options.method.toUpperCase() === 'GET') && !(options && options.headers)) return batched(path);
   const opts = Object.assign({ credentials: 'same-origin' }, options || {});
   if (opts.body && typeof opts.body !== 'string' && !(opts.body instanceof FormData)) {
     opts.headers = Object.assign({ 'content-type': 'application/json' }, opts.headers || {});

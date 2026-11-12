@@ -19,7 +19,10 @@ setCallOut(
 );
 
 export default async () => {
+  // The site's own server kept awake: a sleeping one takes seconds to start for her first click.
+  const awake = fetch(`${settings.publicUrl.replace(/\/$/, '')}/health`).catch(() => undefined);
   const report = await watcherPass(db, delivery);
+  await awake;
   console.info('[watcher] pass', report ? JSON.stringify(report) : 'failed');
 };
 

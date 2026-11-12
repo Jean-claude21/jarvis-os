@@ -51,8 +51,19 @@ describe('the app', () => {
     const app = await ama.call('/app', { headers: { 'accept-language': 'fr' } });
     expect(app.status).toBe(200);
     const html = await app.text();
-    expect(html).toContain('Tableaux de bord');
     expect(html).toContain('Connexions');
+    // Its script, style and words are files named after their content, kept for good.
+    const files = [...html.matchAll(/\/assets\/([a-z-]+-[0-9a-f]{12}\.(?:js|css))/g)].map(
+      (m) => m[1]!,
+    );
+    expect(files.map((one) => one.replace(/-[0-9a-f]{12}/, ''))).toEqual(
+      expect.arrayContaining(['app.css', 'words-fr.js', 'app.js']),
+    );
+    const words = await server.app.request(
+      `/assets/${files.find((one) => one.startsWith('words-fr'))}`,
+    );
+    expect(words.headers.get('cache-control')).toContain('immutable');
+    expect(await words.text()).toContain('Tableaux de bord');
   });
 
   it('frames a saved dashboard and a document with the clients’ views', async () => {

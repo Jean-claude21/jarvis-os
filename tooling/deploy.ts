@@ -14,12 +14,21 @@
  */
 import { build } from 'esbuild';
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrate } from '../packages/core/src/migrate';
 import { migrateAccounts } from '../apps/api/src/migrate';
+import { assets } from '../apps/api/src/platform/page';
 
 const CLI = 'netlify-cli@27.13.0';
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -80,6 +89,14 @@ if (prod) {
   const accounts = await migrateAccounts(owner.toString());
   console.info(`[deploy] main accounts: ${accounts.length ? accounts.join(', ') : 'up to date'}`);
 }
+
+// The page's script, style and words, each named after its content, as files of the site: the CDN
+// serves them, the browser keeps them for good (the function never wakes for them).
+const assetsDir = join(api, 'netlify', 'public', 'assets');
+rmSync(assetsDir, { recursive: true, force: true });
+mkdirSync(assetsDir, { recursive: true });
+for (const [name, content] of assets().files) writeFileSync(join(assetsDir, name), content);
+console.info(`[deploy] ${assets().files.size} page files written`);
 
 // The two functions, each one file; their `config` (path, schedule) stays an export Netlify reads.
 rmSync(out, { recursive: true, force: true });

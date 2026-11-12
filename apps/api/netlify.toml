@@ -19,3 +19,9 @@
     "apps/api/netlify/.build/functions/apps/**",
     "apps/api/netlify/.build/functions/routines/**",
   ]
+
+# The page's script, style and words: named after their content, kept for good.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

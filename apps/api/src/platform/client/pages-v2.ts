@@ -73,7 +73,9 @@ const v2Pages = {
         '<div class="panel-body subject"><div class="subject-top"><div><h2>' + esc(sel.title) + '</h2>' + (d.at ? '<div class="muted" style="font-size:13px">' + esc(time(d.at)) + '</div>' : '') + '</div></div>' + body + '</div></section><div class="choices">' + choices + '</div>';
     }
     const sure = items.filter((x) => x.type === 'capture' && x.detail.guess && x.detail.guess.sure).length;
-    return v2head(esc(W.v2toSort), esc(say(W.v2toSortSub, { n: items.length })), '<button class="btn solid" data-sure-all ' + (sure ? '' : 'disabled') + '>' + ic('i-check') + esc(say(W.v2fileSure, { n: sure })) + '</button>') +
+    const merges = items.filter((x) => x.type === 'merge');
+    const mergeSpaces = [...new Set(merges.map((x) => x.spaceId || space))].join(',');
+    return v2head(esc(W.v2toSort), esc(say(W.v2toSortSub, { n: items.length })), (merges.length > 1 ? '<button class="btn" data-merge-all="' + esc(mergeSpaces) + '">' + ic('i-shape') + esc(say(W.v2mergeAll, { n: merges.length })) + '</button>' : '') + '<button class="btn solid" data-sure-all ' + (sure ? '' : 'disabled') + '>' + ic('i-check') + esc(say(W.v2fileSure, { n: sure })) + '</button>') +
       '<div class="hint">' + ic('i-chat') + '<span>' + W.v2toSortHint + '</span></div>' +
       v2board(W.v2toSort, 'i-box', list, det);
   },
@@ -143,7 +145,7 @@ const v2Pages = {
   async personnes (params, id) {
     const people = await api(inSpace('/entries?kind=Person&limit=200'));
     people.sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
-    const chosen = id || pick || (people[0] && people[0].id);
+    const chosen = id || (people.some((p) => p.id === pick) ? pick : null) || (people[0] && people[0].id);
     const ini = (t) => String(t).split(/ +/).map((w) => w.slice(0, 1)).join('').slice(0, 2).toUpperCase();
     const list = people.length ? people.map((p) => '<button class="row" data-pick="' + esc(p.id) + '" aria-selected="' + (p.id === chosen) + '"><span class="kind" style="border-radius:50%">' + esc(ini(p.title)) + '</span><div><div class="t">' + esc(p.title) + '</div><div class="s">' + esc(p.data.relation || p.data.circle || kindName(p.kind)) + '</div></div></button>').join('') : '<div class="empty">' + esc(W.v2noPeople) + '</div>';
     let detail = '<section class="panel"><div class="panel-body empty">' + esc(W.v2noPeople) + '</div></section>';
@@ -179,6 +181,16 @@ function bindV2(root) {
   root.querySelectorAll('[data-file-move]').forEach((b) => b.addEventListener('click', () => run(b, () => api(inSpace('/inbox/sure'), { method: 'POST', body: {} }), filedSaid)));
   const all = root.querySelector('[data-sure-all]');
   if (all) all.addEventListener('click', () => run(all, () => api(inSpace('/inbox/sure'), { method: 'POST', body: {} }), filedSaid));
+  // Every pair offered, merged at once (each still undoable on its own).
+  root.querySelectorAll('[data-merge-all]').forEach((b) => b.addEventListener('click', () => run(b, async () => {
+    const done = { merged: [], failed: [] };
+    for (const where of b.dataset.mergeAll.split(',').filter(Boolean)) {
+      const one = await api('/kinds/merges/all?space=' + encodeURIComponent(where), { method: 'POST', body: {} });
+      done.merged.push(...one.merged); done.failed.push(...one.failed);
+    }
+    pick = null;
+    return done;
+  }, (done) => say(W.v2mergedAll, { n: done.merged.length }) + (done.failed.length ? ' ' + say(W.v2mergeLeft, { n: done.failed.length, why: done.failed[0].why }) : ''))));
   root.querySelectorAll('[data-merge]').forEach((b) => b.addEventListener('click', async () => {
     const [from, to] = b.dataset.merge.split('→');
     const proposals = await api(inSpace('/kinds/merges'));

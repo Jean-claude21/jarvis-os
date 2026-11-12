@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { Lang } from '../i18n';
 import { brandCss } from '../views/base';
 import { appWords } from './words';
@@ -56,17 +57,7 @@ export function appPage(lang: Lang): string {
 <title>${escape(words.brand)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
-<style>${brandCss}${appCss}${v2Css}
-svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-.v2 #space-menu { position: absolute; top: 58px; left: 12px; right: 12px; z-index: 30; }
-.v2 .check-row { grid-template-columns: 22px minmax(0, 1fr) auto; }
-.v2 .check-row .t { white-space: normal; overflow-wrap: anywhere; }
-.v2 .actions { flex-wrap: wrap; }
-.v2 .side { position: relative; }
-.v2 .chip-now::before { content: none; display: none; }
-.page.v2 > * { flex-shrink: 0; }
-.v2 .hbar .track { top: auto; left: auto; right: auto; }
-.v2 .panel svg.chart { max-height: 220px; width: 100%; }</style></head>
+<link rel="stylesheet" href="/assets/${assets().css}"></head>
 <body class="v2">
 <div class="app">
   <aside class="side" id="side">
@@ -109,10 +100,57 @@ ${SPRITE}
 <div class="scrim" id="scrim"></div>
 <aside class="drawer" id="drawer" role="dialog" aria-modal="true"></aside>
 <div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo">${escape(words.undo)}</button></div>
-<script>
-const LANG = ${JSON.stringify(lang)};
-const WORDS = ${JSON.stringify(words)};
+<script defer src="/assets/${assets().words[lang]}"></script>
+<script defer src="/assets/${assets().js}"></script></body></html>`;
+}
+
+/** The page's own rules beyond the mockup's (its shell's placement, a few fixes). */
+const SHELL_CSS = `
+svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.v2 #space-menu { position: absolute; top: 58px; left: 12px; right: 12px; z-index: 30; }
+.v2 .check-row { grid-template-columns: 22px minmax(0, 1fr) auto; }
+.v2 .check-row .t { white-space: normal; overflow-wrap: anywhere; }
+.v2 .actions { flex-wrap: wrap; }
+.v2 .side { position: relative; }
+.v2 .chip-now::before { content: none; display: none; }
+.page.v2 > * { flex-shrink: 0; }
+.v2 .hbar .track { top: auto; left: auto; right: auto; }
+.v2 .panel svg.chart { max-height: 220px; width: 100%; }`;
+
+/**
+ * The script, the style and the words of her web account as files, each named after its content:
+ * the browser and the CDN keep them for good, and a new version has a new name (`pnpm deploy:*`
+ * writes them to the site; the server also answers them, for a local Jarvis).
+ */
+let built: {
+  css: string;
+  js: string;
+  words: Record<Lang, string>;
+  files: Map<string, string>;
+} | null = null;
+export function assets() {
+  if (built) return built;
+  const files = new Map<string, string>();
+  const named = (prefix: string, ext: string, content: string) => {
+    const name = `${prefix}-${createHash('sha256').update(content).digest('hex').slice(0, 12)}.${ext}`;
+    files.set(name, content);
+    return name;
+  };
+  const css = named('app', 'css', `${brandCss}${appCss}${v2Css}${SHELL_CSS}`);
+  const js = named('app', 'js', script);
+  const words = Object.fromEntries(
+    (Object.keys(appWords) as Lang[]).map((lang) => [
+      lang,
+      named(
+        `words-${lang}`,
+        'js',
+        `const LANG = ${JSON.stringify(lang)};
+const WORDS = ${JSON.stringify(appWords[lang])};
 const ICON_PLUS = ${JSON.stringify(ICONS.plus)};
-${script}
-</script></body></html>`;
+`,
+      ),
+    ]),
+  ) as Record<Lang, string>;
+  built = { css, js, words, files };
+  return built;
 }

@@ -3,6 +3,9 @@
 export const appWords = {
   fr: {
     brand: 'Jarvis OS',
+    v2mergeAll: 'Tout fusionner ({n})',
+    v2mergedAll: '{n} fusion(s) faite(s), chacune annulable dans le journal.',
+    v2mergeLeft: '{n} n’a pas pu l’être : {why}',
     keyLimited: '{space} · {kinds}',
     keyAllSpaces: 'tous tes espaces',
     keyAllKinds: 'tous les types',
@@ -1259,6 +1262,9 @@ export const appWords = {
   },
   en: {
     brand: 'Jarvis OS',
+    v2mergeAll: 'Merge all ({n})',
+    v2mergedAll: '{n} merge(s) done, each undoable in the journal.',
+    v2mergeLeft: '{n} could not be: {why}',
     keyLimited: '{space} · {kinds}',
     keyAllSpaces: 'all your spaces',
     keyAllKinds: 'all kinds',

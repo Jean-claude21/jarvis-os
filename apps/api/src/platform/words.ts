@@ -3,6 +3,16 @@
 export const appWords = {
   fr: {
     brand: 'Jarvis OS',
+    v2driveFind: 'Chercher',
+    v2driveFailed: 'Drive a répondu par une erreur.',
+    v2driveSearch: 'Chercher dans ton Drive (par nom)',
+    v2driveModified: 'Modifié',
+    v2driveOpen: 'Ouvrir',
+    v2driveError: 'Drive n’a pas pu être lu : {why}',
+    v2driveNone: 'Aucun fichier de ce nom.',
+    v2driveShown:
+      'Affiché depuis ton Drive, jamais recopié. Pour garder un justificatif, dépose-le dans Jarvis.',
+    v2driveConnected: 'connecté',
     v2mergeAll: 'Tout fusionner ({n})',
     v2mergedAll: '{n} fusion(s) faite(s), chacune annulable dans le journal.',
     v2mergeLeft: '{n} n’a pas pu l’être : {why}',
@@ -1262,6 +1272,15 @@ export const appWords = {
   },
   en: {
     brand: 'Jarvis OS',
+    v2driveFind: 'Search',
+    v2driveFailed: 'Drive answered with an error.',
+    v2driveSearch: 'Search your Drive (by name)',
+    v2driveModified: 'Modified',
+    v2driveOpen: 'Open',
+    v2driveError: 'Drive could not be read: {why}',
+    v2driveNone: 'No file by that name.',
+    v2driveShown: 'Shown from your Drive, never copied. To keep a receipt, drop it into Jarvis.',
+    v2driveConnected: 'connected',
     v2mergeAll: 'Merge all ({n})',
     v2mergedAll: '{n} merge(s) done, each undoable in the journal.',
     v2mergeLeft: '{n} could not be: {why}',

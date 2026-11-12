@@ -8,4 +8,6 @@ const { app } = makeApp(settingsFor(branch, process.env.JARVIS_PUBLIC_URL));
 
 export default (request: Request) => app.fetch(request);
 
-export const config = { path: '/*', preferStatic: false };
+// The page's script, style and words are files of the site (written by `pnpm deploy:*`), served by
+// the CDN without waking this function.
+export const config = { path: '/*', excludedPath: ['/assets/*'], preferStatic: false };

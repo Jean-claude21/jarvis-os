@@ -36,7 +36,7 @@ import { apiRoutes } from './routes';
 import { quickjsRunner } from './scripts';
 import type { Settings } from './settings';
 import { objectStorage } from './storage';
-import { appPage } from './platform/page';
+import { appPage, assets } from './platform/page';
 import { spaceFor } from './spaces';
 import { actRoutes } from './act';
 import { connectorService } from './connector-service';
@@ -109,6 +109,7 @@ export function makeApp(settings: Settings) {
       embedder,
       publicUrl: settings.publicUrl,
       secret: settings.authSecret,
+      self: (request: Request) => app.fetch(request),
     }),
   );
 
@@ -204,6 +205,20 @@ export function makeApp(settings: Settings) {
   // reuse the clients' views for a dashboard and a document.
   const sessionOf = (request: Request) => auth.api.getSession({ headers: request.headers });
   app.get('/', (c) => c.redirect('/app'));
+  // The script, style and words of her web account, named after their content: kept for good by the
+  // browser (on Netlify, the CDN serves them from the site before this is ever reached).
+  app.get('/assets/:file', (c) => {
+    const content = assets().files.get(c.req.param('file'));
+    if (!content) return c.notFound();
+    c.header('cache-control', 'public, max-age=31536000, immutable');
+    c.header(
+      'content-type',
+      c.req.param('file').endsWith('.css')
+        ? 'text/css; charset=utf-8'
+        : 'text/javascript; charset=utf-8',
+    );
+    return c.body(content);
+  });
   app.get('/app', async (c) => {
     if (!(await sessionOf(c.req.raw))) return c.redirect(SIGN_IN_PAGE);
     // Never kept by the browser: a new version reaches her at the next open.

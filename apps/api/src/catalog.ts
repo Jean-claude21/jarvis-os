@@ -1,4 +1,5 @@
-import * as icons from 'simple-icons';
+// The logos used here only (see tooling/catalog-icons.ts), not the whole simple-icons set.
+import icons from './catalog-icons.json' with { type: 'json' };
 
 // « Discover » (spec 025): MCP servers their makers host, ready to connect, the everyday ones first.
 // Each says how it is signed in to; Google's ask a client registered once by whoever runs Jarvis

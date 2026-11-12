@@ -33,6 +33,7 @@ let drawing = 0;
 // prepares its page. A page is never repainted under her while she types.
 const pageCache = new Map();
 let shownKey = null;
+let shownRoute = null;
 let drawingNow = false;
 let prefetching = null;
 const cacheKeyOf = (hash) => (space || '') + '|' + (hash || '#/');
@@ -62,6 +63,8 @@ function paint(entry, route, first) {
 const typing = () => { const a = document.activeElement; return Boolean(a && page().contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)); };
 async function show() {
   const route = routeOf(location.hash);
+  // A row chosen on one page (« À ranger ») means nothing on another.
+  if (route.key !== shownRoute) { pick = null; shownRoute = route.key; }
   const cacheKey = cacheKeyOf(location.hash);
   const same = cacheKey === shownKey;
   closeAll();
@@ -72,6 +75,7 @@ async function show() {
   if (prefetching && prefetchKey === cacheKey) await prefetching.catch(() => undefined);
   else if (prefetching) { prefetchDiscard = true; overlap = true; }
   const cached = pageCache.get(cacheKey);
+  const wasStale = Boolean(cached && cached.at === 0);
   // Only the latest navigation is drawn: a slower earlier one never overwrites it.
   const ticket = ++drawing;
   drawingNow = true;
@@ -86,7 +90,11 @@ async function show() {
     const entry = cached && !same && Date.now() - cached.at < 4000 ? cached : await renderTo(cacheKey, route);
     if (overlap) entry.crumbs = null;
     if (ticket !== drawing) return;
-    if (!cached || same || entry.html !== cached.html) {
+    // Drawn again only when what she reads changed: a page just shown from memory is not redrawn for
+    // a minute gone by or a count moved (seen at the next visit); after a change of hers, it is.
+    const gist = (html) => html.replace(/[0-9]+/g, '#');
+    const stale = wasStale;
+    if (!cached || same || stale || gist(entry.html) !== gist(cached.html)) {
       if (cached && !same && typing()) return;
       paint(entry, route, !cached && !same);
     }

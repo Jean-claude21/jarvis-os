@@ -10,3 +10,4 @@ coverage/
 # The Netlify functions bundled by `pnpm deploy:*` (spec 010), rebuilt at each deploy; the CLI's state.
 apps/api/netlify/.build/
 .netlify/
+apps/api/netlify/public/assets/

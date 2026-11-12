@@ -182,6 +182,8 @@ export function apiRoutes(deps: {
   embedder?: Embedder | null;
   publicUrl: string;
   secret: string;
+  /** The whole server, for a batch of reads each answered as if asked alone. */
+  self?: (request: Request) => Promise<Response> | Response;
 }) {
   const api = new Hono<Env>();
   const keyUsed = new Map<string, number>();
@@ -454,6 +456,38 @@ export function apiRoutes(deps: {
       ),
     );
   });
+  // Every pair she was offered, merged in one gesture: each in turn, journaled as its own merge (so
+  // each can be undone); one that cannot be done is left offered, with why.
+  api.post('/kinds/merges/all', async (c) =>
+    c.json(
+      await act(c, async (tx, actor, space) => {
+        const proposals = await mergeProposals(
+          tx,
+          space,
+          (await preferencesOf(tx)).mergesDismissed ?? [],
+        );
+        const merged: string[] = [];
+        const failed: { pair: string; why: string }[] = [];
+        for (const one of proposals) {
+          await tx.query('savepoint jarvis_merge');
+          try {
+            await mergeKind(tx, actor, space, {
+              from: one.from,
+              to: one.to,
+              steps: (one.steps ?? []) as MergeStep[],
+              dryRun: false,
+            });
+            await tx.query('release savepoint jarvis_merge');
+            merged.push(`${one.from}→${one.to}`);
+          } catch (error) {
+            await tx.query('rollback to savepoint jarvis_merge');
+            failed.push({ pair: `${one.from}→${one.to}`, why: (error as Error).message });
+          }
+        }
+        return { merged, failed };
+      }),
+    ),
+  );
   api.post('/kinds/merges/dismiss', async (c) => {
     const { from, to } = mergeInput.pick({ from: true, to: true }).parse(await c.req.json());
     return c.json(
@@ -665,6 +699,43 @@ export function apiRoutes(deps: {
   api.post('/receive', async (c) => {
     const body = receiveSchema.parse(await c.req.json());
     return c.json(await act(c, (tx, actor, space) => receive(tx, actor, space, body)));
+  });
+
+  // Reads asked at the same moment, in one request (spec 048, speed): each read goes through the
+  // whole server as if asked alone — her session, her spaces, a key's limits — and its answer comes
+  // back in order. Reads only.
+  api.post('/batch', async (c) => {
+    const { paths } = z
+      .object({
+        paths: z
+          .array(
+            z
+              .string()
+              .max(2000)
+              .regex(/^\/[a-z]/, 'A path of the API (« /kinds »).')
+              .refine((one) => !one.includes('..') && !one.startsWith('/batch'), 'Not this path.'),
+          )
+          .min(1)
+          .max(12),
+      })
+      .parse(await c.req.json());
+    if (!deps.self) return c.json({ error: 'No batch here.' }, 400);
+    const headers = new Headers(c.req.raw.headers);
+    headers.delete('content-type');
+    headers.delete('content-length');
+    const answers = await Promise.all(
+      paths.map(async (path) => {
+        const response = await deps.self!(
+          new Request(new URL(`/api${path}`, c.req.url), { method: 'GET', headers }),
+        );
+        const type = response.headers.get('content-type') ?? '';
+        return {
+          status: response.status,
+          body: type.includes('json') ? await response.json() : null,
+        };
+      }),
+    );
+    return c.json(answers);
   });
 
   api.post('/save', async (c) => {

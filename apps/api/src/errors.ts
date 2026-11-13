@@ -14,7 +14,7 @@ export function failure(error: unknown): { status: 400 | 403 | 404 | 500; messag
   // A program's key (spec 050) outside its limits.
   if (/^This key (reaches|may not)/.test(message)) return { status: 403, message };
   if (
-    /^No (entry|change|stored file|routine|open invitation|member|key|person|proposal|routine)/.test(
+    /^No (entry|change|stored file|routine|open invitation|member|key|person|proposal|routine|execution)/.test(
       message,
     )
   ) {
@@ -47,6 +47,8 @@ export function failure(error: unknown): { status: 400 | 403 | 404 | 500; messag
     /is no member of this space|names several members|does not repeat|has no occurrence on|is not a day \(|is not a time \(|^A capture needs|^A comment (needs|is larger)|^Give her answers|^Give what the proposal|is already structured|has no text to read/.test(
       message,
     ) ||
+    // Executions (spec 057): closed once, written for while they run.
+    /^The execution .* is (already|closed)/.test(message) ||
     // Views, her settings, her keys (spec 015).
     /^A « View » is|^No view |is not a time zone|^Telegram |^A key needs/.test(message) ||
     // Collections, buttons, shares, viewers (spec 016).

@@ -4,12 +4,12 @@
 
 export const router = `
 // Pages, by the hash: #/vie?kind=…, #/entree/<id>, …
-const pages = Object.assign({}, dayPages, lifePages, settingsPages, v2Pages);
+const pages = Object.assign({}, dayPages, lifePages, settingsPages, v2Pages, tasksPages);
 
 // The title of each page, as the breadcrumb says it; the sidebar item it lights.
 const titles = { '': 'navNow', accueil: 'navNow', collections: 'navModels', modeles: 'navModels', fichiers: 'navDocuments', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
-  rappels: 'navAgenda', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', espace: 'navSpaces', bienvenue: 'v2welcome', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
-const navOf = { '': '', accueil: '', agenda: 'agenda', rappels: 'agenda', ranger: 'ranger', revue: 'revue', personnes: 'personnes', vie: 'vie', entree: 'vie', documents: 'documents', document: 'documents', fichiers: 'documents', tableaux: 'tableaux', apps: 'apps' };
+  rappels: 'navAgenda', taches: 'navTasks', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', espace: 'navSpaces', bienvenue: 'v2welcome', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
+const navOf = { '': '', accueil: '', agenda: 'agenda', taches: 'taches', rappels: 'agenda', ranger: 'ranger', revue: 'revue', personnes: 'personnes', vie: 'vie', entree: 'vie', documents: 'documents', document: 'documents', fichiers: 'documents', tableaux: 'tableaux', apps: 'apps' };
 
 // The breadcrumb: « Jarvis › … › the page ». A page may say more (its kind, its entry).
 let crumbParts = null;
@@ -57,7 +57,7 @@ function paint(entry, route, first) {
   const y = window.scrollY;
   page().innerHTML = entry.html; dress(page());
   crumbParts = entry.crumbs; drawCrumbs(route.key, route.id);
-  bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page()); bindConnexions(page()); bindBlocks(page()); bindBoards(page()); bindRoutines(page());
+  bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page()); bindConnexions(page()); bindBlocks(page()); bindBoards(page()); bindRoutines(page()); bindTasks(page());
   if (first) { page().scrollTop = 0; window.scrollTo(0, 0); } else window.scrollTo(0, y);
 }
 const typing = () => { const a = document.activeElement; return Boolean(a && page().contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)); };
@@ -98,7 +98,7 @@ async function show() {
       if (cached && !same && typing()) return;
       paint(entry, route, !cached && !same);
     }
-    if (route.key === 'ranger' || route.key === '') counts();
+    if (route.key === 'ranger' || route.key === '' || route.key === 'taches') counts();
   } catch (error) { if (ticket === drawing && !cached) fail(error); }
   finally { if (ticket === drawing) drawingNow = false; }
 }
@@ -133,6 +133,7 @@ function drawNav(key, id) {
     group(W.navDaily, [
       item('#/', W.navNow, ic('i-now'), on === '', navCounts.now, true),
       item('#/agenda', W.navAgenda, ic('i-cal'), on === 'agenda'),
+      item('#/taches', W.navTasks, ic('i-check'), on === 'taches', navCounts.tasks, true),
       item('#/ranger', W.navToSort, ic('i-box'), on === 'ranger', navCounts.ranger, true),
       item('#/revue', W.navReview, ic('i-eye'), on === 'revue'),
     ]) +
@@ -175,8 +176,9 @@ async function load() {
 // What needs her: counts beside « Maintenant » and « À ranger », the pip on the bell.
 async function counts() {
   try {
-    const [toSort, now] = await Promise.all([api('/to-sort'), api('/now')]);
+    const [toSort, now, todo] = await Promise.all([api('/to-sort'), api('/now'), api('/activities?limit=300').catch(() => [])]);
     navCounts.ranger = toSort.length || '';
+    navCounts.tasks = todo.filter((a) => a.group === 'late' || a.group === 'review' || a.group === 'today').length || '';
     navCounts.now = now.items.length || '';
     for (const id of ['tab-ranger']) { const el = document.getElementById(id); if (el) { el.textContent = toSort.length; el.style.display = toSort.length ? '' : 'none'; } }
     document.getElementById('pip').style.display = now.items.some((i) => i.group === 'fix' || i.group === 'late') ? '' : 'none';

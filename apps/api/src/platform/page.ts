@@ -18,6 +18,7 @@ import { v2Entry } from './client/pages-v2-entry';
 import { v2Apps } from './client/pages-v2-apps';
 import { v2Life } from './client/pages-v2-life';
 import { v2Routines } from './client/pages-v2-routines';
+import { v2Tasks } from './client/pages-v2-tasks';
 import { v2Css } from './client/styles-v2';
 import { SPRITE } from './client/sprite';
 
@@ -41,6 +42,7 @@ const script = [
   v2Apps,
   v2Life,
   v2Routines,
+  v2Tasks,
   bind,
   router,
 ].join('\n\n');

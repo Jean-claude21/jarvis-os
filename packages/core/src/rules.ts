@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import { z } from 'zod';
+import { closeExecution, countOnExecution, openExecution } from './activities';
 import { callConnection, partOf, receive } from './agents';
 import { readerOf, type EntryView, type Reader } from './compute';
 import { asPerson, type Actor, type Tx } from './db';
@@ -70,6 +71,12 @@ export const actionSchema = z.union([
             title: z.string().trim().min(1).max(300).optional(),
           })
           .optional(),
+        /** Spec 057: the service answers later, with a work token bound to the execution. */
+        long: z.boolean().optional(),
+        /** How long the long work may take, in minutes (30 by default, 360 at most). */
+        minutes: z.number().int().min(1).max(360).optional(),
+        /** Her connections the service may use through Jarvis while it works. */
+        lend: z.array(z.string().trim().min(1).max(80)).max(5).optional(),
       })
       .refine((call) => !(call.path && call.tool), 'A call has a path or a tool, not both.'),
   }),
@@ -323,6 +330,24 @@ async function act(
         body.entries = rows.map((row) => ({ title: row.title, ...row.data }));
       }
       if (entryId && scope) body.entry = { id: entryId, title: (await scope.get('title')) ?? null };
+      // Every call leaves its execution (spec 057): long work gets a token to answer with.
+      const execution = await openExecution(
+        tx,
+        by,
+        spaceId,
+        {
+          service: action.call.connection,
+          action: action.call.path ?? action.call.tool ?? null,
+          about: rule.id,
+          ...(action.call.long ? { long: true } : {}),
+          ...(action.call.minutes ? { minutes: action.call.minutes } : {}),
+          ...(action.call.save ? { kinds: [action.call.save.kind] } : {}),
+          ...(action.call.lend ? { lend: action.call.lend } : {}),
+        },
+        reader.clock.now,
+      );
+      if (execution.token)
+        body.jarvis = { execution: execution.id, token: execution.token, until: execution.until };
       await tx.query('savepoint jarvis_call');
       try {
         const answer = await callConnection({
@@ -333,35 +358,32 @@ async function act(
           ...(action.call.tool ? { tool: action.call.tool } : {}),
           body,
         });
-        if (action.call.save) {
+        if (action.call.save && !execution.token) {
           const part = partOf(answer, action.call.save.at);
           const items = (Array.isArray(part) ? part : part ? [part] : []).filter(
             (one): one is Record<string, unknown> => Boolean(one) && typeof one === 'object',
           );
-          await receive(tx, by, spaceId, {
+          const received = await receive(tx, by, spaceId, {
             kind: action.call.save.kind,
             items: items.slice(0, 200),
             ...(action.call.save.match ? { match: action.call.save.match } : {}),
             ...(action.call.save.title ? { title: action.call.save.title } : {}),
           });
+          await countOnExecution(tx, by, spaceId, execution.id, received);
         }
+        if (!execution.token)
+          await closeExecution(tx, by, spaceId, execution.id, { status: 'done' }, reader.clock.now);
         await tx.query('release savepoint jarvis_call');
       } catch (error) {
         await tx.query('rollback to savepoint jarvis_call');
-        await call({
-          entries: [
-            {
-              kind: 'Reminder',
-              title:
-                `Rule « ${rule.title} »: the call to « ${action.call.connection} » failed — ${(error as Error).message}`.slice(
-                  0,
-                  300,
-                ),
-              data: { at: reader.clock.now.toISOString(), status: 'planned' },
-              origin: 'inferred',
-            },
-          ],
-        });
+        await closeExecution(
+          tx,
+          by,
+          spaceId,
+          execution.id,
+          { status: 'failed', error: (error as Error).message.slice(0, 1000) },
+          reader.clock.now,
+        );
         return true;
       }
     }

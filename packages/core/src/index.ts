@@ -401,3 +401,22 @@ export {
   type CallRequest,
   type ReceiveInput,
 } from './agents';
+export {
+  ABOUT,
+  ACTIVITY_KINDS,
+  activities,
+  activitiesQuerySchema,
+  closeExecution,
+  closeSchema,
+  countOnExecution,
+  EXECUTION_KIND,
+  failOverdueWork,
+  groupOf,
+  lentBy,
+  MADE_BY,
+  openExecution,
+  type ActivitiesQuery,
+  type Activity,
+  type ActivityGroup,
+  type CloseInput,
+} from './activities';

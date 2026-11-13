@@ -14,8 +14,8 @@ seven days after it was sent; offers collected each morning) is the first use, n
 
 ## US1 — An activity is any entry with something to do (P1)
 
-An entry is an **activity** when its kind is one: the common `Task` and `Reminder`, the new
-`Execution` (US4), and any kind whose model says `activity: true` (« Relance », « Facture à
+An entry is an **activity** when its kind is one: the common `Task`, the new `Execution`
+(US4), and any kind whose model says `activity: true` (« Relance », « Facture à
 payer »). Its state is its `status` (`planned` by default, `done`, `cancelled`, `proposed` — « à
 valider », `failed`, `to_fix`), its time is its `due` (or `at`), and it may be for someone (`who`,
 spec 038). Nothing new is stored: the activity is read from what the entry already holds.

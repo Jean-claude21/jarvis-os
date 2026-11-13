@@ -8,12 +8,13 @@ import { CLOSED } from './keywords';
 import { zoneOf } from './zone';
 
 // Activities (spec 057): « something to do » is a property a kind can have, as time is (spec 011)
-// — a Task, a Reminder she wrote, an Execution, any kind whose model says `activity: true`. Its
+// — a Task, an Execution, any kind whose model says `activity: true`. Its
 // state is its `status`, its time its `due` (or `at`); nothing new is stored. Executions trace the
 // work programs do for her; long work answers later, with a work token bound to one execution.
 
 /** The kinds that are activities without a model saying so. */
-export const ACTIVITY_KINDS = ['Task', 'Reminder', 'Execution'];
+// A reminder tells her at a time (spec 006); it is not something to do, so it stays on the agenda.
+export const ACTIVITY_KINDS = ['Task', 'Execution'];
 export const EXECUTION_KIND = 'Execution';
 /** The link from an activity to what it concerns, and from an entry to the execution that made it. */
 export const ABOUT = 'about';
@@ -147,13 +148,7 @@ export async function activities(
       limit 2000`,
     [spaceIds, ACTIVITY_KINDS, query.kind ?? null, query.about ?? null],
   );
-  const seen = rows.filter((row) => {
-    // A reminder that repeats, or one Jarvis keeps before a thing (spec 037), tells her; it is
-    // not something to do.
-    if (row.kind === 'Reminder' && (row.data.repeat || row.data.before)) return false;
-    return true;
-  });
-  const items: Activity[] = seen.map((row) => {
+  const items: Activity[] = rows.map((row) => {
     const status = text(row.data.status) ?? (row.kind === EXECUTION_KIND ? 'running' : 'planned');
     const due = text(row.data.due) ?? text(row.data.at) ?? text(row.data.until);
     const counts =

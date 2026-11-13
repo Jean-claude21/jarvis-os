@@ -11,7 +11,9 @@ const taskDue = (due) => {
   const only = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(due);
   const d = only ? new Date(due + 'T12:00:00') : new Date(due);
   if (isNaN(d.getTime())) return due;
-  return d.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' }) + (only ? '' : ' · ' + d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }));
+  const opts = { weekday: 'short', day: 'numeric', month: 'short' };
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric';
+  return d.toLocaleDateString(locale, opts) + (only ? '' : ' · ' + d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }));
 };
 const execTag = (s) => s === 'done' ? ['ok', W.tk_execDone] : s === 'failed' ? ['error', W.tk_execFailed] : ['info', W.tk_execRunning];
 const countsText = (c) => ['created', 'updated', 'skipped'].filter((k) => c && c[k]).map((k) => say(W['tk_n_' + k], { n: c[k] })).join(' · ');
@@ -65,7 +67,10 @@ const tasksPages = {
       body = panels.length ? panels.join('') : v2panel(W.navTasks, '<div class="pad muted">' + esc(W.tk_nothing) + '</div>', '', 'i-check');
     }
     const work = runs.length ? v2panel(W.tk_work, runs.map(execRow).join(''), '<span class="muted" style="font-size:12px">' + esc(W.tk_workHow) + '</span>', 'i-plug') : '';
-    return kpis + add + filters + '<div class="grid g12"><div style="display:flex;flex-direction:column;gap:16px;min-width:0">' + body + '</div><div style="display:flex;flex-direction:column;gap:16px;min-width:0">' + work + '<div class="hint">' + ic('i-chat') + '<span>' + esc(W.tk_hint) + '</span></div></div></div>';
+    const hint = '<div class="hint">' + ic('i-chat') + '<span>' + esc(W.tk_hint) + '</span></div>';
+    const col = (html) => '<div style="display:flex;flex-direction:column;gap:16px;min-width:0">' + html + '</div>';
+    // The list takes the room; what programs did sits beside it, only when there is some.
+    return kpis + add + filters + (work ? '<div class="grid g21">' + col(body) + col(work + hint) + '</div>' : col(body + hint));
   },
 };
 

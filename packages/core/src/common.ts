@@ -99,6 +99,13 @@ export const COMMON_KINDS: CommonKind[] = [
     fields: ['dose', 'repeat', 'start', 'end'],
   },
   {
+    // Spec 057: a piece of work a program did for her (a rule's call, a service's long work).
+    kind: 'Execution',
+    label: { fr: 'Exécution', en: 'Execution' },
+    aliases: ['execution', 'executions', 'run', 'runs', 'job', 'jobs', 'travail', 'travaux'],
+    fields: ['service', 'action', 'status', 'started', 'ended', 'counts', 'error', 'log'],
+  },
+  {
     kind: 'Fichier',
     label: { fr: 'Fichier', en: 'File' },
     aliases: ['file', 'files', 'fichiers'],

@@ -145,6 +145,10 @@ export function connectorService(deps: { db: pg.Pool; key: Buffer; publicUrl: st
     if (!rows[0]) throw new Error(`Call «${request.connection}»: no connection of that name here.`);
     const { connector, headers } = await reach(request.person, rows[0].id);
     const actor: Actor = { person: request.person, door: 'rule' };
+    // Long work (spec 057): where the service answers, next to its token.
+    const work = request.body.jarvis;
+    if (work && typeof work === 'object' && !Array.isArray(work))
+      request.body.jarvis = { ...work, url: `${deps.publicUrl.replace(/\/$/, '')}/api` };
     let ok = false;
     try {
       if (request.tool) {

@@ -174,6 +174,8 @@ export const modelDataSchema = z
     /** Where she files it, in her words (« Personnel », « Professionnel »): apps are grouped by it. */
     area: z.string().trim().min(1).max(60).optional(),
     workflow: workflowSchema.optional(),
+    /** Spec 057: an entry of this kind is something to do — shown on « Tâches » by its status and due. */
+    activity: z.boolean().optional(),
   })
   .superRefine((model, context) => {
     const names = new Map<string, ModelField>();

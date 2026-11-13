@@ -99,6 +99,12 @@ import {
   keyScope,
   receive,
   receiveSchema,
+  activities,
+  activitiesQuerySchema,
+  closeExecution,
+  closeSchema,
+  countOnExecution,
+  lentBy,
   keysOf,
   revokeKey,
   recentMessages,
@@ -131,6 +137,8 @@ type Env = {
     client: string | undefined;
     /** A program's key (spec 050): the kinds it may write. */
     keyKinds: string[] | undefined;
+    /** A work token (spec 057): the one execution it answers for. */
+    keyExecution: string | undefined;
   };
 };
 
@@ -202,6 +210,15 @@ export function apiRoutes(deps: {
       return c.json({ error: 'This key reaches one space only.' }, 403);
     if (limited && /^\/api\/(me\/keys|connectors|spaces\/)/.test(c.req.path))
       return c.json({ error: 'This key may not manage keys, connections or spaces.' }, 403);
+    // A work token (spec 057) answers for its execution only: what it sends, its close, a lent call.
+    if (
+      scope?.executionId &&
+      !(
+        c.req.path === '/api/receive' ||
+        c.req.path.startsWith(`/api/executions/${scope.executionId}`)
+      )
+    )
+      return c.json({ error: 'This work token answers for its execution only.' }, 403);
     const session = byKey
       ? await deps.db
           .query<{ id: string; email: string; name: string }>(
@@ -231,6 +248,7 @@ export function apiRoutes(deps: {
     // What a key writes is named after it in her journal.
     c.set('client', scope ? `key:${scope.name}` : (c.req.header('x-jarvis-client') ?? undefined));
     c.set('keyKinds', scope?.kinds ?? undefined);
+    c.set('keyExecution', scope?.executionId ?? undefined);
     await next();
   });
 
@@ -697,8 +715,83 @@ export function apiRoutes(deps: {
   // What an agent sends (spec 050): a list written as her entries of one kind — her model's other
   // names for its fields understood, the entry already there (same `match`) updated, not doubled.
   api.post('/receive', async (c) => {
-    const body = receiveSchema.parse(await c.req.json());
-    return c.json(await act(c, (tx, actor, space) => receive(tx, actor, space, body)));
+    const raw = (await c.req.json()) as Record<string, unknown>;
+    const body = receiveSchema.parse(raw);
+    // Sent for an execution (spec 057): counted on it, each entry linked to it. A work token
+    // sends for its own execution only.
+    const own = c.get('keyExecution');
+    const given = typeof raw.execution === 'string' ? raw.execution : undefined;
+    if (own && given && given !== own)
+      return c.json({ error: 'This work token answers for its execution only.' }, 403);
+    const execution = given ?? own;
+    return c.json(
+      await act(c, async (tx, actor, space) => {
+        const got = await receive(tx, actor, space, body);
+        if (execution) await countOnExecution(tx, actor, space, execution, got);
+        return got;
+      }),
+    );
+  });
+
+  // Her activities (spec 057): everything to do across her spaces, what needs her first.
+  api.get('/activities', async (c) => {
+    const query = activitiesQuerySchema.parse(c.req.query());
+    const named = c.req.query('space') ?? c.req.header('x-jarvis-space');
+    const spaces = named ? [spaceFor(c.get('spaces'), named)] : c.get('spaces');
+    return c.json(
+      await as(c, (tx) =>
+        activities(
+          tx,
+          spaces.map((one) => one.id),
+          query,
+        ),
+      ),
+    );
+  });
+
+  // An execution closed by the service that did the work (spec 057), with its work token — or by
+  // her, from « Tâches ».
+  api.post('/executions/:id', async (c) => {
+    const id = c.req.param('id');
+    const own = c.get('keyExecution');
+    if (own && own !== id)
+      return c.json({ error: 'This work token answers for its execution only.' }, 403);
+    const body = closeSchema.parse(await c.req.json());
+    await act(c, (tx, actor, space) => closeExecution(tx, actor, space, id, body));
+    return c.json({ ok: true });
+  });
+
+  // A connection she lent for the work (spec 057, US6): called by Jarvis, its secret never sent.
+  api.post('/executions/:id/call', async (c) => {
+    const id = c.req.param('id');
+    const own = c.get('keyExecution');
+    if (!own || own !== id)
+      return c.json(
+        { error: 'A lent connection is called with the work token of its execution.' },
+        403,
+      );
+    const input = z
+      .object({
+        connection: z.string().trim().min(1).max(80),
+        tool: z.string().trim().min(1).max(120).optional(),
+        path: z.string().trim().max(300).optional(),
+        args: z.record(z.string(), z.unknown()).optional(),
+      })
+      .refine((one) => Boolean(one.tool) !== Boolean(one.path), 'A tool or a path.')
+      .parse(await c.req.json());
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    const lent = await asPerson(deps.db, c.get('person'), (tx) => lentBy(tx, space.id, id));
+    if (!lent.some((one) => one.toLowerCase() === input.connection.toLowerCase()))
+      return c.json({ error: `« ${input.connection} » is not lent for this work.` }, 403);
+    const answer = await deps.connectors.callOut({
+      person: c.get('person'),
+      spaceId: space.id,
+      connection: input.connection,
+      ...(input.tool ? { tool: input.tool } : {}),
+      ...(input.path !== undefined ? { path: input.path } : {}),
+      body: input.args ?? {},
+    });
+    return c.json({ answer });
   });
 
   // Reads asked at the same moment, in one request (spec 048, speed): each read goes through the

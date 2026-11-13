@@ -85,6 +85,8 @@ export interface KeyScope {
   /** The kinds it may write, or null (any). */
   kinds: string[] | null;
   name: string;
+  /** A work token (spec 057): the one execution it serves, else null. */
+  executionId: string | null;
 }
 
 /** Whose a key is and within what limits (spec 050), or null. */
@@ -95,9 +97,18 @@ export async function keyScope(db: pg.Pool, key: string): Promise<KeyScope | nul
     space_id: string | null;
     kinds: string[] | null;
     name: string;
-  }>('select person, space_id, kinds, name from jarvis_key_scope($1)', [fingerprintOf(key)]);
+    execution_id: string | null;
+  }>('select person, space_id, kinds, name, execution_id from jarvis_key_scope($1)', [
+    fingerprintOf(key),
+  ]);
   const row = rows[0];
   return row
-    ? { person: row.person, spaceId: row.space_id, kinds: row.kinds, name: row.name }
+    ? {
+        person: row.person,
+        spaceId: row.space_id,
+        kinds: row.kinds,
+        name: row.name,
+        executionId: row.execution_id,
+      }
     : null;
 }

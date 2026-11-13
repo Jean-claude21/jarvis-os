@@ -10,6 +10,7 @@ import {
   spacesOf,
   takeLease,
   watchOnce,
+  failOverdueWork,
   runDueRules,
   useScriptRunner,
   type Brief,
@@ -181,6 +182,11 @@ export async function watcherPass(
     }
     report = await watchOnce(db, now, tellerFor(db, delivery));
     done.reminders = report;
+    // Long work past its time without an answer (spec 057): closed as failed, its token revoked.
+    done.work = await failOverdueWork(db, now).catch((error) => {
+      console.warn('[watcher] work', (error as Error).message);
+      return 0;
+    });
     // Her morning brief (spec 018), at the hour she chose, once a day.
     for (const person of await briefPeople(db)) {
       await briefOnce(db, person, now, async (brief) => {

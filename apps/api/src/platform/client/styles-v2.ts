@@ -1926,6 +1926,20 @@ to {
   width: auto;
         max-width: 100%;
 }
+.v2 .task-selects {
+  display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+}
+.v2 .task-row.stream .kind-ic {
+  width: 28px;
+        height: 28px;
+        display: grid;
+        place-items: center;
+        border: 1px solid var(--rule);
+        border-radius: 6px;
+        color: var(--bark);
+}
 .v2 .task-row {
   display: grid;
         grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1975,6 +1989,13 @@ to {
 @media (max-width: 760px) {
   .v2 .task-row {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+  .v2 .task-row.stream {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .v2 .task-row.stream .tag {
+    grid-column: 2;
+    justify-self: start;
   }
   .v2 .task-actions {
     grid-column: 2;

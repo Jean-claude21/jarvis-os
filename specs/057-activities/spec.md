@@ -63,9 +63,18 @@ A call says `long: true` (the service then answers at once, `202` with `{ "accep
 The execution stays `running`, and Jarvis sends along, under `jarvis`:
 
 ```json
-{ "jarvis": { "execution": "ent_…", "token": "jos_…", "url": "https://…/api", "until": "…" } }
+{
+  "jarvis": {
+    "execution": "ent_…",
+    "token": "jos_…",
+    "url": "https://…/api",
+    "until": "…",
+    "save": { "kind": "Offre", "match": "url" }
+  }
+}
 ```
 
+- `save` is her rule's: where what the service finds goes (the service follows it, not its own idea);
 - the **work token** is a key limited to the rule's space, to the kinds of `save` (and
   `Execution`), to this execution, and to a time (`timeout`, 30 minutes by default, 6 hours at
   most); it is revoked when the execution closes;

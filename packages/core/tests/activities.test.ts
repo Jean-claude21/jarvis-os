@@ -174,6 +174,7 @@ describe('activities and executions', () => {
     );
     const work = asked[0]!.body.jarvis as { execution: string; token: string; until: string };
     expect(work.token).toMatch(/^jos_/);
+    expect(asked[0]!.body.jarvis).toMatchObject({ save: { kind: 'Offre', match: 'url' } });
     const scope = await keyScope(db, work.token);
     expect(scope).toMatchObject({
       person: ama.id,

@@ -346,8 +346,15 @@ async function act(
         },
         reader.clock.now,
       );
+      // Where what it finds goes is hers to say (her rule's `save`), not the service's: its token
+      // writes that kind only.
       if (execution.token)
-        body.jarvis = { execution: execution.id, token: execution.token, until: execution.until };
+        body.jarvis = {
+          execution: execution.id,
+          token: execution.token,
+          until: execution.until,
+          ...(action.call.save ? { save: action.call.save } : {}),
+        };
       await tx.query('savepoint jarvis_call');
       try {
         const answer = await callConnection({

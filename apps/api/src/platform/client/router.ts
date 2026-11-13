@@ -8,8 +8,8 @@ const pages = Object.assign({}, dayPages, lifePages, settingsPages, v2Pages, tas
 
 // The title of each page, as the breadcrumb says it; the sidebar item it lights.
 const titles = { '': 'navNow', accueil: 'navNow', collections: 'navModels', modeles: 'navModels', fichiers: 'navDocuments', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
-  rappels: 'navAgenda', taches: 'navTasks', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', espace: 'navSpaces', bienvenue: 'v2welcome', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
-const navOf = { '': '', accueil: '', agenda: 'agenda', taches: 'taches', rappels: 'agenda', ranger: 'ranger', revue: 'revue', personnes: 'personnes', vie: 'vie', entree: 'vie', documents: 'documents', document: 'documents', fichiers: 'documents', tableaux: 'tableaux', apps: 'apps' };
+  rappels: 'navAgenda', taches: 'navActivities', activites: 'navActivities', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', espace: 'navSpaces', bienvenue: 'v2welcome', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
+const navOf = { '': '', accueil: '', agenda: 'agenda', taches: 'activites', activites: 'activites', rappels: 'agenda', ranger: 'ranger', revue: 'revue', personnes: 'personnes', vie: 'vie', entree: 'vie', documents: 'documents', document: 'documents', fichiers: 'documents', tableaux: 'tableaux', apps: 'apps' };
 
 // The breadcrumb: « Jarvis › … › the page ». A page may say more (its kind, its entry).
 let crumbParts = null;
@@ -98,7 +98,7 @@ async function show() {
       if (cached && !same && typing()) return;
       paint(entry, route, !cached && !same);
     }
-    if (route.key === 'ranger' || route.key === '' || route.key === 'taches') counts();
+    if (route.key === 'ranger' || route.key === '' || route.key === 'taches' || route.key === 'activites') counts();
   } catch (error) { if (ticket === drawing && !cached) fail(error); }
   finally { if (ticket === drawing) drawingNow = false; }
 }
@@ -133,7 +133,7 @@ function drawNav(key, id) {
     group(W.navDaily, [
       item('#/', W.navNow, ic('i-now'), on === '', navCounts.now, true),
       item('#/agenda', W.navAgenda, ic('i-cal'), on === 'agenda'),
-      item('#/taches', W.navTasks, ic('i-check'), on === 'taches', navCounts.tasks, true),
+      item('#/activites', W.navActivities, ic('i-check'), on === 'activites', navCounts.tasks, true),
       item('#/ranger', W.navToSort, ic('i-box'), on === 'ranger', navCounts.ranger, true),
       item('#/revue', W.navReview, ic('i-eye'), on === 'revue'),
     ]) +

@@ -234,4 +234,42 @@ describe('activities and executions', () => {
     const reminders = await ama.as((tx) => find(tx, ama.space, { kind: 'Reminder', limit: 50 }));
     expect(reminders.some((one) => /Silencieux.*No answer/.test(one.title))).toBe(true);
   });
+
+  it('shows, in the whole stream, what happens to her beside what she does (spec 058)', async () => {
+    const bea = await person('Bea');
+    await bea.as((tx) =>
+      save(tx, bea.actor, bea.space, {
+        entries: [
+          { kind: 'Task', title: 'Préparer le point', data: { due: '2026-11-13' } },
+          {
+            kind: 'Réunion',
+            title: 'Point projet',
+            data: { start: '2026-11-13T14:00:00Z', end: '2026-11-13T15:00:00Z' },
+          },
+          { kind: 'Event', title: 'Dîner passé', data: { start: '2026-11-01T19:00:00Z' } },
+          { kind: 'Reminder', title: 'Passeport J-90', data: { at: '2026-12-14T08:00:00Z' } },
+        ],
+      }),
+    );
+    const todo = await bea.as((tx) => activities(tx, [bea.space], {}, now));
+    expect(todo.map((one) => one.title)).toEqual(['Préparer le point']);
+    const stream = await bea.as((tx) =>
+      activities(tx, [bea.space], { scope: 'all', state: 'all' }, now),
+    );
+    expect(stream.map((one) => one.title)).toEqual([
+      'Dîner passé',
+      'Préparer le point',
+      'Point projet',
+      'Passeport J-90',
+    ]);
+    expect(stream.find((one) => one.title === 'Dîner passé')).toMatchObject({
+      status: 'done',
+      todo: false,
+    });
+    expect(stream.find((one) => one.title === 'Préparer le point')!.todo).toBe(true);
+    const today = await bea.as((tx) =>
+      activities(tx, [bea.space], { scope: 'all', state: 'all', period: 'today' }, now),
+    );
+    expect(today.map((one) => one.title)).toEqual(['Préparer le point', 'Point projet']);
+  });
 });

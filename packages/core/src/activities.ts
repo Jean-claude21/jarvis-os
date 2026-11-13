@@ -9,12 +9,16 @@ import { zoneOf } from './zone';
 
 // Activities (spec 057): « something to do » is a property a kind can have, as time is (spec 011)
 // — a Task, an Execution, any kind whose model says `activity: true`. Its
-// state is its `status`, its time its `due` (or `at`); nothing new is stored. Executions trace the
+// state is its `status`, its time its `due` (or `at`); nothing new is stored. Spec 058: all of
+// them, as Dataverse shows its activities — what she does (`todo`) and also what happens to her
+// (reminders, meetings, any entry with a `start`), in one stream. Executions trace the
 // work programs do for her; long work answers later, with a work token bound to one execution.
 
 /** The kinds that are activities without a model saying so. */
 // A reminder tells her at a time (spec 006); it is not something to do, so it stays on the agenda.
 export const ACTIVITY_KINDS = ['Task', 'Execution'];
+/** What happens to her, shown with her activities in the whole stream (spec 058). */
+export const HAPPENING_KINDS = ['Reminder', 'Event'];
 export const EXECUTION_KIND = 'Execution';
 /** The link from an activity to what it concerns, and from an entry to the execution that made it. */
 export const ABOUT = 'about';
@@ -32,6 +36,10 @@ export interface Activity {
   status: string;
   /** Its time as written (« 2026-11-20 », or an instant), or null. */
   due: string | null;
+  /** When it happens or is due, whatever the field (due, at, start, next, started), or null. */
+  at: string | null;
+  /** Something to do (a task, an execution, a kind made one), or something that happens. */
+  todo: boolean;
   group: ActivityGroup | 'done';
   who: string | null;
   about: { id: string; kind: string; title: string }[];
@@ -51,6 +59,10 @@ export const activitiesQuerySchema = z.object({
   kind: z.string().trim().min(1).max(80).optional(),
   about: z.string().trim().min(1).max(64).optional(),
   when: z.enum(['late', 'today', 'week', 'later', 'undated']).optional(),
+  /** `todo` (default): what she has to do; `all`: reminders, meetings and anything dated too. */
+  scope: z.enum(['todo', 'all']).optional(),
+  /** Of the whole stream: when it happens, on her clock. */
+  period: z.enum(['today', 'week', 'month', 'upcoming', 'past', 'any']).optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
 });
 export type ActivitiesQuery = z.infer<typeof activitiesQuerySchema>;
@@ -103,6 +115,41 @@ export function groupOf(
   return 'later';
 }
 
+/** A time she wrote, as a sortable instant on her clock (« 2026-11-13 » sorts as that day). */
+function stamp(at: string | null, zone: string): string {
+  if (!at) return '9999';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(at)) return `${at}T00:00`;
+  const date = new Date(at);
+  if (Number.isNaN(date.getTime())) return '9999';
+  const time = new Intl.DateTimeFormat('en-GB', {
+    timeZone: zone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
+  return `${dayOf(date, zone)}T${time}`;
+}
+
+/** Whether an activity falls in a period of the stream, today being `today` on her clock. */
+function inPeriod(
+  at: string | null,
+  period: ActivitiesQuery['period'],
+  today: string,
+  zone: string,
+): boolean {
+  if (!period || period === 'any') return true;
+  const day = dueDay(at, zone);
+  if (!day) return false;
+  if (period === 'today') return day === today;
+  if (period === 'upcoming') return day >= today;
+  if (period === 'past') return day < today;
+  if (period === 'week') {
+    const monday = addDays(today, -((new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7));
+    return day >= monday && day <= addDays(monday, 6);
+  }
+  return day.slice(0, 7) === today.slice(0, 7);
+}
+
 interface Row {
   id: string;
   kind: string;
@@ -130,6 +177,7 @@ export async function activities(
   const zone = given ?? (await zoneOf(tx));
   const today = dayOf(now, zone);
   const state = query.state ?? 'open';
+  const all = query.scope === 'all';
   const { rows } = await tx.query<Row>(
     `with declared as (
        select jarvis_fold(title) as kind from entry
@@ -140,17 +188,44 @@ export async function activities(
        from entry e join space s on s.id = e.space_id
       where e.space_id = any($1) and e.archived_at is null
         and (jarvis_fold(e.kind) in (select jarvis_fold(k) from unnest($2::text[]) k)
-             or jarvis_fold(e.kind) in (select kind from declared))
+             or jarvis_fold(e.kind) in (select kind from declared)
+             or ($5 and (jarvis_fold(e.kind) in (select jarvis_fold(k) from unnest($6::text[]) k)
+                         or (e.data ? 'start'
+                             and jarvis_fold(e.kind) not in ('model', 'rule', 'page', 'view')))))
         and ($3::text is null or jarvis_fold(e.kind) = jarvis_fold($3))
         and ($4::text is null or exists (
-              select 1 from link l where l.from_id = e.id and l.to_id = $4 and l.role = '${ABOUT}'))
+              select 1 from link l where l.from_id = e.id and l.to_id = $4 and l.role in ('${ABOUT}', 'for')))
       order by e.updated_at desc
       limit 2000`,
-    [spaceIds, ACTIVITY_KINDS, query.kind ?? null, query.about ?? null],
+    [spaceIds, ACTIVITY_KINDS, query.kind ?? null, query.about ?? null, all, HAPPENING_KINDS],
   );
+  const { rows: made } = await tx.query<{ kind: string }>(
+    `select jarvis_fold(title) as kind from entry
+      where space_id = any($1) and archived_at is null and jarvis_fold(kind) = 'model'
+        and data->>'activity' = 'true'`,
+    [spaceIds],
+  );
+  const declared = new Set(made.map((row) => row.kind));
+  const folded = (kind: string) =>
+    kind
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
   const items: Activity[] = rows.map((row) => {
-    const status = text(row.data.status) ?? (row.kind === EXECUTION_KIND ? 'running' : 'planned');
+    const todo = ACTIVITY_KINDS.includes(row.kind) || declared.has(folded(row.kind));
+    const start = text(row.data.start);
     const due = text(row.data.due) ?? text(row.data.at) ?? text(row.data.until);
+    const at =
+      row.kind === EXECUTION_KIND
+        ? text(row.data.started)
+        : (due ?? start ?? text(row.data.next) ?? text(row.data.date));
+    // What happens to her is done once its time has passed, unless it says otherwise.
+    const ends = text(row.data.end) ?? start;
+    const passed = Boolean(ends) && new Date(ends!).getTime() < now.getTime();
+    const status =
+      text(row.data.status) ??
+      (row.kind === EXECUTION_KIND ? 'running' : !todo && passed ? 'done' : 'planned');
     const counts =
       row.data.counts && typeof row.data.counts === 'object'
         ? (row.data.counts as Record<string, number>)
@@ -163,7 +238,9 @@ export async function activities(
       spaceId: row.space_id,
       status,
       due: row.kind === EXECUTION_KIND ? null : due,
-      group: groupOf(status, row.kind === EXECUTION_KIND ? null : due, today, zone),
+      at,
+      todo,
+      group: groupOf(status, row.kind === EXECUTION_KIND ? null : todo ? due : at, today, zone),
       who: text(row.data.who),
       about: [],
       updatedAt: row.updated_at,
@@ -189,11 +266,17 @@ export async function activities(
       return one.group !== 'done';
     })
     .filter((one) => !query.when || one.group === query.when)
+    .filter((one) => inPeriod(one.at, query.period, today, zone))
     .sort(
-      (a, b) =>
-        ORDER[a.group] - ORDER[b.group] ||
-        (a.due ?? '9999').localeCompare(b.due ?? '9999') ||
-        b.updatedAt.localeCompare(a.updatedAt),
+      all
+        ? // The stream: by when it happens, what has no time last.
+          (a, b) =>
+            stamp(a.at, zone).localeCompare(stamp(b.at, zone)) ||
+            b.updatedAt.localeCompare(a.updatedAt)
+        : (a, b) =>
+            ORDER[a.group] - ORDER[b.group] ||
+            (a.due ?? '9999').localeCompare(b.due ?? '9999') ||
+            b.updatedAt.localeCompare(a.updatedAt),
     )
     .slice(0, query.limit ?? 300);
   if (kept.length) {
@@ -204,7 +287,7 @@ export async function activities(
       title: string;
     }>(
       `select l.from_id, e.id, e.kind, e.title from link l join entry e on e.id = l.to_id
-        where l.from_id = any($1) and l.role = '${ABOUT}' and e.archived_at is null`,
+        where l.from_id = any($1) and l.role in ('${ABOUT}', 'for') and e.archived_at is null`,
       [kept.map((one) => one.id)],
     );
     const byId = new Map(kept.map((one) => [one.id, one]));

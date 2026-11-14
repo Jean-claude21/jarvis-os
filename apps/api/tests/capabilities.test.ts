@@ -212,6 +212,41 @@ describe('the Atelier, reached by Jarvis itself', () => {
       }),
     });
     expect(((await received.json()) as { created: number }).created).toBe(1);
+    // A near shape is fitted to her model: a date with its time, a number as text.
+    await ama.json('/api/save', {
+      entries: [
+        {
+          kind: 'Model',
+          title: 'JobOffer',
+          data: {
+            fields: [
+              { name: 'url', type: 'url' },
+              { name: 'published', type: 'date' },
+              { name: 'score', type: 'number' },
+            ],
+          },
+        },
+      ],
+    });
+    const fitted = (await (
+      await withToken(work.token, '/api/receive', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'JobOffer',
+          match: 'url',
+          execution: work.execution,
+          items: [
+            { title: 'Stage NLP', url: 'https://ex.com/9', published: '2026-11-12T08:30:00Z' },
+          ],
+        }),
+      })
+    ).json()) as { ids: string[] };
+    expect(fitted.ids).toHaveLength(1);
+    const kept = (await (await ama.call(`/api/entries/${fitted.ids[0]}`)).json()) as {
+      data: { published: string };
+    };
+    expect(kept.data.published).toBe('2026-11-12');
     // What could not be structured is kept raw, with the same token.
     const raw = await withToken(work.token, '/api/receive', {
       method: 'POST',

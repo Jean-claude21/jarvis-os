@@ -42,3 +42,13 @@ The rule « Offres du matin » calls `parcourir` with
 - **Instructions**: the AI finds the sources (`chercher`), writes and tries their recipe
   (`parcourir`), and repairs a failing one.
 - **The page** adds the raw pages to sort and the sources.
+
+## US4 — Near shapes fitted on receive (P2)
+
+What a service sends in a near shape is made the one her model keeps before it is checked:
+
+- a date with its time, for a day;
+- a number written as text, for a number;
+- « oui » or « true », for a yes.
+
+What cannot be read so is refused by her model, as before.

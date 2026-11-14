@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { appPatternsOf, find, receive, save, setCallOut, type CallRequest } from '../src';
+import { appPatternsOf, find, receive, runView, save, setCallOut, type CallRequest } from '../src';
 import { person, type Person } from './people';
 
 // Spec 050: agents outside Jarvis — her model translates, an answer comes in once, a key stays
@@ -77,6 +77,45 @@ describe('agents outside Jarvis', () => {
     const offers = await ama.as((tx) => find(tx, ama.space, { kind: 'Offre', limit: 50 }));
     expect(offers.filter((one) => one.data.url === 'https://ex.com/a')).toHaveLength(1);
     expect(offers.find((one) => one.data.url === 'https://ex.com/b')!.title).toBe('Dev Web — B');
+  });
+
+  it('knows an item again by the first of several keys: its fingerprint, else its address', async () => {
+    await ama.as((tx) =>
+      save(tx, ama.actor, ama.space, {
+        entries: [
+          {
+            kind: 'Model',
+            title: 'Annonce',
+            data: {
+              fields: [
+                { name: 'url', type: 'url' },
+                { name: 'empreinte', type: 'text' },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    const send = (items: Record<string, unknown>[]) =>
+      ama.as((tx) =>
+        receive(tx, ama.actor, ama.space, { kind: 'Annonce', items, match: ['empreinte', 'url'] }),
+      );
+    expect(await send([{ title: 'Stage IA', url: 'https://a.com/1' }])).toMatchObject({
+      created: 1,
+    });
+    // The same, seen again with its fingerprint: found by its address, it gains the fingerprint.
+    expect(
+      await send([{ title: 'Stage IA', url: 'https://a.com/1', empreinte: 'stage ia|x' }]),
+    ).toMatchObject({ created: 0, updated: 1 });
+    // The same offer on another site: found by its fingerprint.
+    expect(
+      await send([{ title: 'Stage IA', url: 'https://b.com/9', empreinte: 'stage ia|x' }]),
+    ).toMatchObject({ created: 0, updated: 1 });
+    const kept = await ama.as((tx) => find(tx, ama.space, { kind: 'Annonce', limit: 10 }));
+    expect(kept).toHaveLength(1);
+    // A view gives the values its text fields hold, for a filter to choose from.
+    const view = await ama.as((tx) => runView(tx, ama.space, { kind: 'Annonce' }));
+    expect(view.values.url).toEqual(['https://b.com/9']);
   });
 
   it('keeps a key within its kinds', async () => {

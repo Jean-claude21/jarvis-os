@@ -182,6 +182,8 @@ function bindViews(root) {
         document.getElementById('vf_valuebox').style.display = ['empty', 'not_empty', 'this_month'].includes(op.value) ? 'none' : '';
         box.innerHTML = f.type === 'choice' ? '<select id="vf_v">' + (f.options || []).map((o) => '<option value="' + esc(o) + '">' + esc(f.optionLabels && f.optionLabels[o] ? tr(f.optionLabels[o]) : o) + '</option>').join('') + '</select>'
           : f.type === 'boolean' ? '<select id="vf_v"><option value="true">✓</option><option value="false">—</option></select>'
+          : (ex.r.values || {})[f.path] && ['eq', 'ne'].includes(op.value) ? '<select id="vf_v">' + ex.r.values[f.path].map((o) => '<option value="' + esc(o) + '">' + esc(o) + '</option>').join('') + '</select>'
+          : (ex.r.values || {})[f.path] && ['contains', 'not_contains'].includes(op.value) ? '<input id="vf_v" type="text" list="vf_list"><datalist id="vf_list">' + ex.r.values[f.path].map((o) => '<option value="' + esc(o) + '">').join('') + '</datalist>'
           : '<input id="vf_v" type="' + (op.value === 'last_days' || ['amount', 'number', 'formula'].includes(f.type) ? 'number' : ['date', 'datetime'].includes(f.type) ? 'date' : 'text') + '" step="any">';
       };
       op.onchange = value; value();

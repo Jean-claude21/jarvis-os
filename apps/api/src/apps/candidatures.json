@@ -84,6 +84,16 @@
               "fr": "À partir du",
               "en": "From"
             }
+          },
+          {
+            "name": "types",
+            "type": "long_text",
+            "label": {
+              "fr": "Types",
+              "en": "Types"
+            },
+            "help": "Un type par ligne et ses mots : « stage: stage|stagiaire|intern ».",
+            "default": "stage: stage|stagiaire|intern|internship\nalternance: alternance|alternant|apprentissage|apprenti\ncdi: cdi"
           }
         ],
         "columns": ["poste", "lieu", "contrat", "mots"]
@@ -185,8 +195,8 @@
             "type": "url",
             "unique": true,
             "label": {
-              "fr": "Adresse de l’offre",
-              "en": "Offer’s address"
+              "fr": "Voir l’offre",
+              "en": "See the offer"
             }
           },
           {
@@ -203,6 +213,33 @@
             "label": {
               "fr": "Contrat",
               "en": "Contract"
+            }
+          },
+          {
+            "name": "type",
+            "type": "choice",
+            "label": {
+              "fr": "Type",
+              "en": "Type"
+            },
+            "options": ["stage", "alternance", "cdi", "autre"],
+            "optionLabels": {
+              "stage": {
+                "fr": "stage",
+                "en": "internship"
+              },
+              "alternance": {
+                "fr": "alternance",
+                "en": "work-study"
+              },
+              "cdi": {
+                "fr": "CDI",
+                "en": "permanent"
+              },
+              "autre": {
+                "fr": "autre",
+                "en": "other"
+              }
             }
           },
           {
@@ -258,9 +295,26 @@
               }
             },
             "default": "new"
+          },
+          {
+            "name": "position",
+            "type": "location",
+            "label": {
+              "fr": "Position",
+              "en": "Position"
+            }
+          },
+          {
+            "name": "empreinte",
+            "type": "text",
+            "label": {
+              "fr": "Empreinte",
+              "en": "Fingerprint"
+            },
+            "help": "Mots du titre + entreprise : la même offre vue sur plusieurs sites ou plusieurs jours."
           }
         ],
-        "columns": ["company", "location", "score", "published", "status"]
+        "columns": ["url", "company", "location", "type", "score", "status"]
       }
     },
     {
@@ -520,10 +574,22 @@
       "title": "Applications",
       "data": {
         "label": {
-          "fr": "Mes candidatures",
-          "en": "My applications"
+          "fr": "Aujourd’hui",
+          "en": "Today"
         },
         "order": 1,
+        "filters": [
+          {
+            "name": "type",
+            "type": "choice",
+            "options": ["tous", "stage", "alternance", "cdi", "autre"],
+            "default": "tous",
+            "label": {
+              "fr": "Type",
+              "en": "Type"
+            }
+          }
+        ],
         "blocks": [
           {
             "block": "stat",
@@ -533,7 +599,7 @@
             },
             "query": {
               "kind": "JobOffer",
-              "where": "status = 'new' and score >= 100",
+              "where": "status = 'new' and score >= 100 and ({type} = 'tous' or type = {type})",
               "aggregate": {
                 "n": "count()"
               }
@@ -547,7 +613,7 @@
             },
             "query": {
               "kind": "JobOffer",
-              "where": "status = 'interesting'",
+              "where": "status = 'interesting' and ({type} = 'tous' or type = {type})",
               "aggregate": {
                 "n": "count()"
               }
@@ -602,8 +668,9 @@
               "en": "New offers that fit"
             },
             "kind": "JobOffer",
-            "where": "status = 'new' and score >= 100",
-            "detail": "reasons",
+            "where": "status = 'new' and score >= 100 and ({type} = 'tous' or type = {type})",
+            "detail": "company",
+            "link": "url",
             "action": {
               "label": "À creuser",
               "set": {
@@ -623,8 +690,63 @@
                   "status": "dismissed"
                 }
               }
-            ],
-            "link": "url"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Tracking",
+      "data": {
+        "label": {
+          "fr": "Suivi",
+          "en": "Tracking"
+        },
+        "order": 2,
+        "filters": [
+          {
+            "name": "type",
+            "type": "choice",
+            "options": ["tous", "stage", "alternance", "cdi", "autre"],
+            "default": "tous",
+            "label": {
+              "fr": "Type",
+              "en": "Type"
+            }
+          }
+        ],
+        "blocks": [
+          {
+            "block": "bar",
+            "title": {
+              "fr": "Où en sont mes offres",
+              "en": "Where my offers stand"
+            },
+            "query": {
+              "kind": "JobOffer",
+              "where": "score >= 100 and ({type} = 'tous' or type = {type})",
+              "groupBy": "status",
+              "aggregate": {
+                "n": "count()"
+              }
+            }
+          },
+          {
+            "block": "bar",
+            "title": {
+              "fr": "Ce que chaque site m’apporte",
+              "en": "What each site brings"
+            },
+            "query": {
+              "kind": "JobOffer",
+              "where": "score >= 100 and status != 'dismissed' and ({type} = 'tous' or type = {type})",
+              "groupBy": "source",
+              "aggregate": {
+                "n": "count()"
+              },
+              "sort": "-n",
+              "limit": 12
+            }
           },
           {
             "block": "kanban",
@@ -634,12 +756,41 @@
             },
             "kind": "JobOffer",
             "by": "status",
-            "where": "score >= 100",
+            "where": "score >= 100 and ({type} = 'tous' or type = {type})",
             "detail": "company",
             "badge": "score",
             "link": "url",
             "muted": ["dismissed"]
           },
+          {
+            "block": "kanban",
+            "title": {
+              "fr": "Candidatures",
+              "en": "Applications"
+            },
+            "kind": "Application",
+            "by": "status"
+          },
+          {
+            "block": "calendar",
+            "title": {
+              "fr": "Les jours qui viennent",
+              "en": "Days ahead"
+            },
+            "days": 14
+          }
+        ]
+      }
+    },
+    {
+      "title": "CVs",
+      "data": {
+        "label": {
+          "fr": "CV",
+          "en": "CVs"
+        },
+        "order": 3,
+        "blocks": [
           {
             "block": "table",
             "title": {
@@ -662,15 +813,29 @@
               "fields": ["poids", "instruction"],
               "sort": "ordre"
             }
-          },
+          }
+        ]
+      }
+    },
+    {
+      "title": "Settings",
+      "data": {
+        "label": {
+          "fr": "Réglages",
+          "en": "Settings"
+        },
+        "order": 4,
+        "blocks": [
           {
-            "block": "kanban",
+            "block": "table",
             "title": {
-              "fr": "Candidatures",
-              "en": "Applications"
+              "fr": "Ce que je cherche",
+              "en": "What I am looking for"
             },
-            "kind": "Application",
-            "by": "status"
+            "query": {
+              "kind": "JobSearch",
+              "fields": ["poste", "lieu", "contrat"]
+            }
           },
           {
             "block": "table",
@@ -686,8 +851,8 @@
           {
             "block": "form",
             "title": {
-              "fr": "Ce que je cherche",
-              "en": "What I am looking for"
+              "fr": "Ajouter une recherche",
+              "en": "Add a search"
             },
             "kind": "JobSearch"
           }
@@ -713,12 +878,15 @@
               },
               "save": {
                 "kind": "JobOffer",
-                "match": "url",
+                "match": ["empreinte", "url"],
                 "title": "{title}",
                 "raw": "Capture"
               },
               "long": true,
-              "minutes": 30
+              "minutes": 30,
+              "body": {
+                "situer": "location"
+              }
             }
           }
         ]

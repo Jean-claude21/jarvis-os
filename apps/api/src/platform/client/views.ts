@@ -126,8 +126,26 @@ async function drawMap() {
   const map = L.map(el, { scrollWheelZoom: false });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
   const items = explorerNow.r.map.items;
-  const marks = items.map((i) => L.circleMarker([i.lat, i.lng], { radius: 7, color: '#b83a1b', weight: 2, fillOpacity: 0.8 })
-    .bindPopup('<b>' + esc(i.title) + '</b>' + (i.address ? '<br>' + esc(i.address) : '') + '<br><a href="#/entree/' + esc(i.id) + '">' + esc(W.open) + ' →</a>').addTo(map));
+  const groups = [...new Set(items.map((i) => i.group).filter(Boolean))];
+  const COLORS = ['#185FA5', '#BA7517', '#0F6E56', '#993556', '#534AB7', '#5F5E5A'];
+  const colorOf = (g) => g ? COLORS[groups.indexOf(g) % COLORS.length] : '#b83a1b';
+  const places = new Map();
+  for (const i of items) { const k = i.lat.toFixed(4) + ',' + i.lng.toFixed(4); if (!places.has(k)) places.set(k, []); places.get(k).push(i); }
+  const by = explorerNow.r.map.by;
+  const marks = [...places.values()].map((here) => {
+    const count = new Map(); here.forEach((i) => count.set(i.group, (count.get(i.group) || 0) + 1));
+    const main = [...count.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    const list = here.slice(0, 25).map((i) => '<li><a href="#/entree/' + esc(i.id) + '">' + esc(i.title) + '</a>' + (i.link ? ' · <a target="_blank" rel="noopener" href="' + esc(i.link) + '">' + esc(W.open) + ' ↗</a>' : '') + '</li>').join('');
+    return L.circleMarker([here[0].lat, here[0].lng], { radius: Math.min(26, 6 + Math.sqrt(here.length) * 3), color: colorOf(main), weight: 2, fillOpacity: 0.75 })
+      .bindTooltip(String(here.length), { permanent: here.length > 1, direction: 'center', className: 'vmap-count' })
+      .bindPopup('<b>' + esc(here[0].address || '') + ' · ' + here.length + '</b><ul style="margin:6px 0 0 16px;padding:0;max-height:220px;overflow:auto">' + list + (here.length > 25 ? '<li>…</li>' : '') + '</ul>', { maxWidth: 360 })
+      .addTo(map);
+  });
+  if (groups.length) {
+    const legend = document.createElement('div'); legend.className = 'muted'; legend.style.cssText = 'display:flex;gap:12px;flex-wrap:wrap;margin-top:6px';
+    legend.innerHTML = groups.map((g) => '<span><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:' + colorOf(g) + ';margin-right:4px"></i>' + esc(((f) => f && f.optionLabels && f.optionLabels[g] ? tr(f.optionLabels[g]) : g)(explorerNow.r.fields.find((f) => f.path === by))) + '</span>').join('');
+    el.after(legend);
+  }
   map.fitBounds(L.featureGroup(marks).getBounds().pad(0.2), { maxZoom: 14 });
 }
 `;

@@ -78,7 +78,12 @@ export const actionSchema = z.union([
           .object({
             kind: z.string().trim().min(1).max(80),
             at: z.string().trim().min(1).max(120).optional(),
-            match: z.string().trim().min(1).max(60).optional(),
+            match: z
+              .union([
+                z.string().trim().min(1).max(60),
+                z.array(z.string().trim().min(1).max(60)).min(1).max(3),
+              ])
+              .optional(),
             title: z.string().trim().min(1).max(300).optional(),
             /** Where what could not be structured goes, as read (spec 061): « Capture ». */
             raw: z.string().trim().min(1).max(80).optional(),

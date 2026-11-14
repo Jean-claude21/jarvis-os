@@ -40,6 +40,27 @@ const titleOf = (item: Record<string, unknown>, template?: string) => {
   return first ? String(first).slice(0, 300) : null;
 };
 
+/**
+ * A value sent in a near shape made the one her model keeps (spec 061): a date with its time for a
+ * day, a number or a yes written as text. What cannot be read so is left for her model to refuse.
+ */
+function fit(fields: { name: string; type: string }[], data: Record<string, unknown>) {
+  for (const field of fields) {
+    const value = data[field.name];
+    if (typeof value !== 'string') continue;
+    const text = value.trim();
+    if (field.type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+      const time = Date.parse(text);
+      if (!Number.isNaN(time)) data[field.name] = new Date(time).toISOString().slice(0, 10);
+    } else if (['number', 'amount', 'rating', 'progress'].includes(field.type)) {
+      const number = Number(text.replace(/\s/g, '').replace(',', '.'));
+      if (text && Number.isFinite(number)) data[field.name] = number;
+    } else if (field.type === 'boolean' && /^(true|false|oui|non|yes|no)$/i.test(text)) {
+      data[field.name] = /^(true|oui|yes)$/i.test(text);
+    }
+  }
+}
+
 /** What an agent sent, written as her entries: made, or updated when `match` finds one. */
 export async function receive(
   tx: Tx,
@@ -79,6 +100,7 @@ export async function receive(
         }
       }
     }
+    if (model) fit(model.fields, data);
     const key = input.match ? data[input.match] : undefined;
     if (input.match && (key === undefined || key === null || key === '')) {
       skipped += 1;

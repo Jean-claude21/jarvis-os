@@ -107,6 +107,16 @@
             "help": "Ses {champs} prennent la valeur de chaque recherche : https://site/recherche?q={poste}&l={lieu}"
           },
           {
+            "name": "active",
+            "type": "boolean",
+            "default": true,
+            "label": {
+              "fr": "Parcourue chaque matin",
+              "en": "Read every morning"
+            },
+            "help": "Non : un site à ouvrir soi-même (il bloque les robots ou demande un compte) — gardé ici avec son lien."
+          },
+          {
             "name": "js",
             "type": "boolean",
             "label": {
@@ -134,7 +144,7 @@
             }
           }
         ],
-        "columns": ["url", "js"]
+        "columns": ["url", "active"]
       }
     },
     {
@@ -426,7 +436,21 @@
               "set": {
                 "status": "interesting"
               }
-            }
+            },
+            "more": [
+              {
+                "label": "Postulé",
+                "set": {
+                  "status": "applied"
+                }
+              },
+              {
+                "label": "Écarter",
+                "set": {
+                  "status": "dismissed"
+                }
+              }
+            ]
           },
           {
             "block": "table",
@@ -458,7 +482,7 @@
             },
             "query": {
               "kind": "Source",
-              "fields": ["url", "js"]
+              "fields": ["url", "active", "notes"]
             }
           },
           {

@@ -147,7 +147,7 @@ const draw = {
   },
   heatmap: (b) => card(b, '<div class="heat">' + b.cells.map((c) => '<span class="' + (c.done ? 'on' : '') + '" title="' + esc(c.day) + '"></span>').join('') + '</div><div class="muted" style="margin-top:6px">' + esc(say(words.daysDone, { n: b.done, of: b.cells.length })) + '</div>'),
   table: (b) => card(b, table(b.columns, b.rows, (b.total ? '<tr class="total">' + b.columns.map((c, i) => '<td class="' + (c === b.total ? 'n num' : '') + '">' + (i === 0 ? esc(words.total) : c === b.total ? fmt(b.totalValue) : '') + '</td>').join('') + '</tr>' : ''), b.kind), true),
-  task_list: (b) => card(b, b.items.length ? b.items.map((t) => '<div class="task"><span><a href="#" data-open="' + esc(t.id) + '">' + esc(t.title) + '</a>' + (t.detail != null ? ' <span class="muted">· ' + fmt(t.detail) + '</span>' : '') + '</span><button class="quiet" data-set="' + esc(t.id) + '" data-block="' + current.blocks.indexOf(b) + '">' + esc(b.action.label) + '</button></div>').join('') : '<p class="empty">' + esc(words.allDone) + '</p>'),
+  task_list: (b) => card(b, b.items.length ? b.items.map((t) => '<div class="task"><span><a href="#" data-open="' + esc(t.id) + '">' + esc(t.title) + '</a>' + (t.detail != null ? ' <span class="muted">· ' + fmt(t.detail) + '</span>' : '') + '</span><span>' + (b.actions || [b.action]).map((g, n) => '<button class="quiet" data-set="' + esc(t.id) + '" data-block="' + current.blocks.indexOf(b) + '" data-gesture="' + n + '">' + esc(g.label) + '</button>').join(' ') + '</span></div>').join('') : '<p class="empty">' + esc(words.allDone) + '</p>'),
   kanban: (b) => card(b, '<div class="kanban">' + b.columns.map((c) => '<div class="col"><div class="caps">' + esc(optionLabel(b.kind, b.by, c.name)) + ' · ' + c.items.length + '</div>' + c.items.map((i) => '<div class="item"><a href="#" data-open="' + esc(i.id) + '">' + esc(i.title) + '</a></div>').join('') + '</div>').join('') + '</div>', true),
   calendar: (b) => card(b, b.occurrences.length ? '<ul class="list">' + b.occurrences.map((o) => '<li><span>' + esc(o.title) + ' <span class="muted">· ' + esc(o.kind) + '</span></span><span class="num muted">' + esc(new Date(o.start).toLocaleString(words === WORDS.en ? 'en' : 'fr', o.allDay ? { weekday: 'short', day: 'numeric', month: 'short' } : { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })) + '</span></li>').join('') + '</ul>' : '<p class="empty">' + esc(words.empty) + '</p>'),
   form: (b) => card(b, '<form data-form="' + current.blocks.indexOf(b) + '"><div class="form-grid"><label>' + esc(words.titleCol) + ' *<input name="__title" required></label>' +
@@ -187,7 +187,8 @@ function render(data) {
   root.querySelectorAll('[data-open]').forEach((el) => el.addEventListener('click', (event) => { event.preventDefault(); open(el.dataset.open); }));
   root.querySelectorAll('[data-set]').forEach((el) => el.addEventListener('click', async () => {
     el.disabled = true;
-    try { await saveEntries([{ id: el.dataset.set, data: current.blocks[Number(el.dataset.block)].action.set }]); await reload(); }
+    const block = current.blocks[Number(el.dataset.block)];
+    try { await saveEntries([{ id: el.dataset.set, data: (block.actions || [block.action])[Number(el.dataset.gesture) || 0].set }]); await reload(); }
     catch (e) { el.disabled = false; alert(e.message); }
   }));
   root.querySelectorAll('[data-form]').forEach((form) => form.addEventListener('submit', async (event) => {

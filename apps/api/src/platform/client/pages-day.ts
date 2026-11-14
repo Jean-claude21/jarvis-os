@@ -62,11 +62,12 @@ const dayPages = {
     const appPages = await api(inSpace('/pages?app=' + encodeURIComponent(name)));
     if (!models.length && !appPages.length) return empty(W.noApp);
     const pageTabs = appPages.map((p) => '<a class="' + (p.id === params.get('page') || (!params.get('page') && !params.get('kind') && !params.get('view') && p === appPages[0]) ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?page=' + esc(encodeURIComponent(p.id)) + '">' + esc(tr(p.label) || p.title) + '</a>').join('');
-    const kindTabs = (on) => models.map((k) => '<a class="' + (k.kind === on ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '">' + esc(kindLabel(k)) + ' <span class="muted num">' + k.count + '</span></a>').join('');
+    const kindLinks = (on) => models.map((k) => '<a class="' + (k.kind === on ? 'on' : '') + '" href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '">' + esc(kindLabel(k)) + ' <span class="muted num">' + k.count + '</span></a>').join('');
+    const kindTabs = (on) => !appPages.length ? kindLinks(on) : '<details class="tabs-more"><summary class="' + (on ? 'on' : '') + '">' + esc(W.dataMenu) + ' ▾</summary><div class="tabs-menu">' + kindLinks(on) + '</div></details>';
     const shownPage = params.get('page') ? appPages.find((p) => p.id === params.get('page')) : !params.get('kind') && !params.get('view') ? appPages[0] : null;
     if (shownPage) {
       const q = new URLSearchParams(params); q.delete('page'); q.set('space', space);
-      return '<nav class="tabs">' + pageTabs + kindTabs(null) + (await api(inSpace('/views?app=' + encodeURIComponent(name)))).map((v) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?view=' + esc(encodeURIComponent(v.id)) + '">' + esc(tr(v.label) || v.title) + '</a>').join('') + '</nav>' + frame('/app/frame/page/' + encodeURIComponent(shownPage.id) + '?' + q.toString());
+      return '<nav class="tabs">' + pageTabs + (await api(inSpace('/views?app=' + encodeURIComponent(name)))).map((v) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?view=' + esc(encodeURIComponent(v.id)) + '">' + esc(tr(v.label) || v.title) + '</a>').join('') + kindTabs(null) + '</nav>' + frame('/app/frame/page/' + encodeURIComponent(shownPage.id) + '?' + q.toString());
     }
     // Her views (spec 015): the entries of a kind, filtered, sorted, as a table, a kanban or a calendar.
     const views = await api(inSpace('/views?app=' + encodeURIComponent(name)));
@@ -77,7 +78,7 @@ const dayPages = {
     const key = saved ? 'v:' + saved.id : 'k:' + current.kind;
     const st = explorers[key] || (explorers[key] = { id: saved ? saved.id : fallback ? fallback.id : null, view: saved || fallback ? {} : { kind: current.kind }, month: new Date().toISOString().slice(0, 7) });
     const { r, html } = await explore(key, st, { app: name, kind: current.kind, model: current.model });
-    const tabs = '<nav class="tabs">' + pageTabs + kindTabs(saved ? null : current.kind) + viewTabs(saved ? saved.id : null) + '</nav>';
+    const tabs = '<nav class="tabs">' + pageTabs + viewTabs(saved ? saved.id : null) + kindTabs(saved ? null : current.kind) + '</nav>';
     return '<div class="head"><div><p class="lead" style="margin:0">' + esc(saved ? tr(saved.label) || saved.title : kindLabel(current)) + ' · ' + r.rows.length + '</p></div><div class="actions"><button class="quiet" data-model="' + esc(current.kind) + '">' + esc(W.seeModel) + '</button><button data-add="' + esc(current.kind) + '">' + esc(say(W.addOne, { kind: kindLabel(current) })) + '</button></div></div>' + tabs +
       card('', html, true);
   },

@@ -167,7 +167,10 @@ describe('the Atelier, reached by Jarvis itself', () => {
                 call: {
                   connection: 'Atelier',
                   path: '/jobs/parcourir',
-                  include: { searches: 'JobSearch', sources: 'Source' },
+                  include: {
+                    searches: 'JobSearch',
+                    sources: { kind: 'Source', where: 'url != null', limit: 10 },
+                  },
                   long: true,
                   save: { kind: 'JobOffer', match: 'url', title: '{title}', raw: 'Capture' },
                 },

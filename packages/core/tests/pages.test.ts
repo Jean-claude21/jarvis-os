@@ -237,6 +237,13 @@ const page = {
       by: 'etat',
       steps: ['à payer', 'payée'],
     },
+    {
+      block: 'live',
+      title: 'Vivant',
+      data: { kind: 'Obligation', fields: ['etat'] },
+      height: 200,
+      code: '<div id="c"></div>',
+    },
   ],
 };
 
@@ -310,6 +317,7 @@ describe('a page', () => {
       all,
       one,
       funnel,
+      live,
     ] = drawn.blocks;
     // The data table, the list with its record and the funnel (spec 070).
     expect(all).toMatchObject({
@@ -325,6 +333,13 @@ describe('a page', () => {
     expect(
       (one as unknown as { items: { values: Record<string, unknown> }[] }).items[0]!.values,
     ).toHaveProperty('etat');
+    // A live block gets only the data it declared, its code and its height (spec 071).
+    expect(live).toMatchObject({ height: 200, code: '<div id="c"></div>' });
+    expect(
+      (live as unknown as { rows: { values: Record<string, unknown> }[] }).rows.map((one) =>
+        Object.keys(one.values),
+      ),
+    ).toEqual([['etat'], ['etat']]);
     expect(funnel).toMatchObject({
       steps: [
         { name: 'à payer', count: 1 },

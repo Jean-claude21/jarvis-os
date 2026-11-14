@@ -2496,7 +2496,8 @@ to {
 .v2 table.dt td.dt-check, .v2 table.dt th.dt-check { width: 28px; }
 .v2 table.dt { min-width: 100%; } .v2 table.dt td { vertical-align: top; }
 .v2 table.dt td .cell-title { display: block; min-width: 240px; max-width: 420px; font-weight: 600; }
-.v2 table.dt td:not(:first-child) { min-width: 84px; } .v2 table.dt .link, .v2 .dt-tag, .v2 table.dt .mono { white-space: nowrap; }
+.v2 table.dt td:not(:first-child) { min-width: 112px; max-width: 280px; }
+.v2 iframe.live { display: block; width: 100%; border: 0; background: var(--paper); } .v2 table.dt .link, .v2 .dt-tag, .v2 table.dt .mono { white-space: nowrap; }
 .v2 table.dt td.dt-acts { white-space: nowrap; text-align: right; } .v2 table.dt td.dt-acts .btn { margin-left: 4px; }
 .v2 .dt-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--sand); font-size: 12px; }
 .v2 .dt-pages { display: flex; gap: 8px; align-items: center; justify-content: flex-end; font-size: 13px; }

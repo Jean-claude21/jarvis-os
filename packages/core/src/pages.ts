@@ -165,6 +165,25 @@ export const blockSchema = z.discriminatedUnion('block', [
     action: gesture.optional(),
     more: z.array(gesture).max(3).optional(),
   }),
+  /**
+   * A live block (spec 071): a component the assistant wrote for one need, run in a sandboxed frame
+   * with only the data it declared.
+   */
+  z.object({
+    block: z.literal('live'),
+    title,
+    data: z
+      .object({
+        kind,
+        where: formula.optional(),
+        fields: z.array(z.string().trim().min(1).max(60)).max(30).default([]),
+        limit: z.number().int().min(1).max(2000).default(2000),
+      })
+      .optional(),
+    query: requestSchema.optional(),
+    height: z.number().int().min(120).max(1200).default(360),
+    code: z.string().min(1).max(60_000),
+  }),
   /** How many entries stand at each step of a choice (spec 070): a funnel. */
   z.object({
     block: z.literal('funnel'),
@@ -208,7 +227,7 @@ export function checkPage(data: unknown): PageData {
       .map((issue) => `${issue.path.join('.') || 'page'}: ${issue.message}`)
       .join('; ');
     throw new Error(
-      `A « ${PAGE_KIND} » is { app?, filters?: [{ name, type: month|choice|text|record, options?, default? }], blocks: [{ block: stat|stat_delta|gauge|bar|line|breakdown|heatmap|table|datatable|review|funnel|task_list|kanban|calendar|form|record|sql|view, … }] } — ${issues}.`,
+      `A « ${PAGE_KIND} » is { app?, filters?: [{ name, type: month|choice|text|record, options?, default? }], blocks: [{ block: stat|stat_delta|gauge|bar|line|breakdown|heatmap|table|datatable|review|funnel|live|task_list|kanban|calendar|form|record|sql|view, … }] } — ${issues}.`,
     );
   }
   for (const block of parsed.data.blocks) {
@@ -271,11 +290,12 @@ async function drawBlock(
   block: Block,
   params: Record<string, string>,
 ): Promise<DrawnBlock> {
-  const kindOf = 'query' in block ? block.query.kind : 'kind' in block ? block.kind : undefined;
+  const asked = 'query' in block ? block.query : undefined;
+  const kindOf =
+    asked?.kind ??
+    ('kind' in block ? block.kind : block.block === 'live' ? block.data?.kind : undefined);
   const groupField =
-    'query' in block && block.query.groupBy && /^[\p{L}\p{N}_]+$/u.test(block.query.groupBy)
-      ? block.query.groupBy
-      : undefined;
+    asked?.groupBy && /^[\p{L}\p{N}_]+$/u.test(asked.groupBy) ? asked.groupBy : undefined;
   const base = {
     block: block.block,
     title: block.title ?? null,
@@ -466,6 +486,36 @@ async function drawBlock(
         link: block.link ?? null,
         actions,
       };
+    }
+    case 'live': {
+      let rows: unknown = null;
+      let labels: Record<string, unknown> = {};
+      if (block.data) {
+        const views = await filtered(block.data.kind, block.data.where);
+        const items: { id: string; title: string; values: Record<string, unknown> }[] = [];
+        for (const view of views.slice(0, block.data.limit)) {
+          const values: Record<string, unknown> = {};
+          for (const name of block.data.fields) values[name] = plain(await view.get(name));
+          items.push({ id: view.row.id, title: view.row.title, values });
+        }
+        rows = items;
+        const model = reader.model(block.data.kind);
+        labels = Object.fromEntries(
+          (model?.fields ?? [])
+            .filter((one) => block.data!.fields.includes(one.name))
+            .map((one) => [
+              one.name,
+              {
+                label: (one as { label?: unknown }).label ?? one.name,
+                options: (one as { optionLabels?: unknown }).optionLabels ?? null,
+              },
+            ]),
+        );
+      } else if (block.query) {
+        const result = await runRequest(reader, block.query, params);
+        rows = { columns: result.columns, rows: result.rows };
+      }
+      return { ...base, height: block.height, code: block.code, rows, labels };
     }
     case 'funnel': {
       const views = await filtered(block.kind, block.where);

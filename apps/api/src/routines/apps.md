@@ -25,11 +25,26 @@ month|choice|text, options?, default?, label? }], blocks }`. Le `title` d'un blo
    - `table` (`query`, `total`?), `task_list` (`kind`, `where`, `detail`, `action: { label,
 set }` — un geste d'un clic), `kanban` (`kind`, `by` : un champ choice), `heatmap` (`kind`,
      `date`, `days`), `calendar` (`days`), `form` (`kind`), `record`.
-     Une `query` = `{ kind, where?, groupBy?, aggregate?, fields?, sort?, limit? }` : `where` et
-     `groupBy` sont des formules (« sens = 'sortie' and month(date) = {month} », « fonds.title »,
-     « month(date) ») ; `aggregate` = `{ total: "sum(montant)", n: "count()" }` ; `{month}` reçoit le
-     filtre de la page. Montre la page avec `page` (elle s'affiche chez elle, filtres et gestes
-     compris) ; dans l'app web, elle apparaît dans son app.
+   - Pour suivre des entrées comme un pro (specs 070, 071) :
+     - `datatable`, le grand tableau. Il prend `kind`, `where`, `columns`, `facets` (filtres rapides avec leurs nombres), `link`
+       (un champ adresse qui s'ouvre), `sort` (« -published »), `action` et `more` (des gestes). La
+       recherche, les pastilles, le filtre avancé ET / OU, le tri et la sélection sont fournis.
+     - `review`, une liste et la fiche de l'entrée choisie. Il prend `kind`, `where`, `subtitle`, `badge`, `fields`,
+       `facets`, `link`, `action`, `more`. Après un geste, il passe à la suivante.
+     - `funnel`, le nombre d'entrées à chaque étape d'un choice. Il prend `kind`, `where`, `by`, `steps`.
+     - `kanban` peut garder certaines colonnes seulement (`show`) et estomper les autres (`muted`).
+     - `live`, un bloc vivant : un petit composant que tu écris pour un besoin qu'aucun bloc ne couvre
+       (un graphe par jour et par type…).
+       - Il prend `data: { kind, where?, fields }` (ou une `query`), `height` et `code` : du HTML et du
+         JavaScript qui lisent `JARVIS.rows` (`[{ id, title, values }]`), `JARVIS.labels`,
+         `JARVIS.theme` (ses couleurs : `var(--primary)`…) et `JARVIS.lang`.
+       - Il tourne isolé : il ne lit que ses données et ne charge rien d'internet. Tout se dessine en SVG ou en HTML.
+       - Montre-lui ce qu'il dessinera avant de l'épingler. Ne dessine que ce que disent les données.
+         Une `query` = `{ kind, where?, groupBy?, aggregate?, fields?, sort?, limit? }` : `where` et
+         `groupBy` sont des formules (« sens = 'sortie' and month(date) = {month} », « fonds.title »,
+         « month(date) ») ; `aggregate` = `{ total: "sum(montant)", n: "count()" }` ; `{month}` reçoit le
+         filtre de la page. Montre la page avec `page` (elle s'affiche chez elle, filtres et gestes
+         compris) ; dans l'app web, elle apparaît dans son app.
 3. **Une règle** : une entrée de kind « Rule », `data` = `{ when, if?, then, active? }`.
    - `when` : `{ saved: kind }`, `{ changed: { kind, field } }`, `{ schedule: "0 8 1 * *" }` (cinq
      champs, comme `repeat`), `{ before: { kind, field, days } }`.

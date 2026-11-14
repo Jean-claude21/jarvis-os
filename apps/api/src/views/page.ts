@@ -88,11 +88,13 @@ function card(b, inner, wide, tone) {
   return '<article class="card' + (wide ? ' wide' : '') + (tone ? ' ' + tone : '') + '">' + (b.title ? '<h2>' + esc(tr(b.title)) + '</h2>' : '') + '<div class="body">' + inner + '</div></article>';
 }
 const figure = (b) => '<div class="kpi">' + fmt(b.value) + (b.unit ? '<small>' + esc(b.unit) + '</small>' : '') + '</div>';
+/** An address in a cell opens in a new tab; a click elsewhere on the row still opens the entry. */
+const webLink = (v) => typeof v === 'string' && /^https?:\\/\\/[^\\s{}<>"]+$/.test(v) ? '<a class="link" data-web target="_blank" rel="noopener" href="' + esc(v) + '">' + esc(v.replace(/^https?:\\/\\/(www\\.)?/, '').split('/')[0]) + ' ↗</a>' : null;
 function table(columns, rows, extra, kind) {
   if (!rows.length) return '<p class="empty">' + esc(words.empty) + '</p>';
   const nums = columns.map((c) => rows.every((r) => r[c] == null || numeric(r[c])));
   return '<div class="scroll"><table><thead><tr>' + columns.map((c, i) => '<th class="' + (nums[i] ? 'n' : '') + '">' + esc(c === 'title' ? words.titleCol : c === 'group' ? '' : fieldLabel(kind, c)) + '</th>').join('') + '</tr></thead><tbody>' +
-    rows.map((r) => '<tr class="' + (r.id ? 'go' : '') + '"' + (r.id ? ' data-open="' + esc(r.id) + '"' : '') + '>' + columns.map((c, i) => '<td class="' + (nums[i] ? 'n num' : '') + '">' + fmt(optionLabel(kind, c, r[c])) + '</td>').join('') + '</tr>').join('') + (extra || '') + '</tbody></table></div>';
+    rows.map((r) => '<tr class="' + (r.id ? 'go' : '') + '"' + (r.id ? ' data-open="' + esc(r.id) + '"' : '') + '>' + columns.map((c, i) => '<td class="' + (nums[i] ? 'n num' : '') + '">' + (webLink(r[c]) || fmt(optionLabel(kind, c, r[c]))) + '</td>').join('') + '</tr>').join('') + (extra || '') + '</tbody></table></div>';
 }
 const draw = {
   stat: (b) => card(b, figure(b), false, numeric(b.value) && b.value < 0 ? 'alert' : ''),
@@ -184,7 +186,7 @@ function render(data) {
   root.innerHTML = head + filters +
     '<section class="grid">' + data.blocks.map((b) => b.error ? card(b, '<p class="error-text">' + esc(say(words.failed, { reason: b.error })) + '</p>') : (draw[b.block] ? draw[b.block](b) : '')).join('') + '</section>';
   root.querySelectorAll('[data-filter]').forEach((el) => el.addEventListener('change', () => reload({ [el.dataset.filter]: el.value }).catch((e) => alert(e.message))));
-  root.querySelectorAll('[data-open]').forEach((el) => el.addEventListener('click', (event) => { event.preventDefault(); open(el.dataset.open); }));
+  root.querySelectorAll('[data-open]').forEach((el) => el.addEventListener('click', (event) => { if (event.target.closest('a[data-web]')) return; event.preventDefault(); open(el.dataset.open); }));
   root.querySelectorAll('[data-set]').forEach((el) => el.addEventListener('click', async () => {
     el.disabled = true;
     const block = current.blocks[Number(el.dataset.block)];

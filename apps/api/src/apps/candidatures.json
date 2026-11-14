@@ -312,6 +312,34 @@
               "en": "Fingerprint"
             },
             "help": "Mots du titre + entreprise : la même offre vue sur plusieurs sites ou plusieurs jours."
+          },
+          {
+            "name": "contenu",
+            "type": "long_text",
+            "label": {
+              "fr": "Contenu de l’offre",
+              "en": "Offer’s content"
+            },
+            "help": "Le texte complet de la page de l’offre, lu sans IA chaque matin, pour que l’IA le lise."
+          },
+          {
+            "name": "adequation",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "label": {
+              "fr": "Adéquation (IA)",
+              "en": "Fit (AI)"
+            },
+            "help": "L’IA lit le contenu et ton CV maître : à quel point l’offre te correspond, sur 100."
+          },
+          {
+            "name": "avis_ia",
+            "type": "long_text",
+            "label": {
+              "fr": "Avis de l’IA",
+              "en": "AI’s review"
+            }
           }
         ],
         "columns": ["url", "company", "location", "type", "score", "status"]
@@ -671,7 +699,18 @@
             "where": "status = 'new' and score >= 100 and ({type} = 'tous' or type = {type})",
             "subtitle": ["company", "location"],
             "badge": "score",
-            "fields": ["company", "location", "type", "contract", "published", "source", "reasons"],
+            "fields": [
+              "adequation",
+              "avis_ia",
+              "company",
+              "location",
+              "type",
+              "contract",
+              "published",
+              "source",
+              "reasons",
+              "contenu"
+            ],
             "facets": ["type", "source"],
             "link": "url",
             "sort": "-published",
@@ -716,7 +755,16 @@
             },
             "kind": "JobOffer",
             "where": "score >= 100",
-            "columns": ["company", "location", "type", "status", "score", "published", "url"],
+            "columns": [
+              "company",
+              "location",
+              "type",
+              "status",
+              "score",
+              "adequation",
+              "published",
+              "url"
+            ],
             "facets": ["type", "status", "source", "location"],
             "link": "url",
             "sort": "-published",
@@ -970,6 +1018,35 @@
           }
         ]
       }
+    },
+    {
+      "title": "Lire les offres",
+      "data": {
+        "when": {
+          "schedule": "30 7 * * *"
+        },
+        "then": [
+          {
+            "call": {
+              "connection": "Atelier",
+              "path": "/jobs/lire",
+              "include": {
+                "pages": {
+                  "kind": "JobOffer",
+                  "where": "score >= 100 and status != 'dismissed' and contenu = null",
+                  "limit": 80
+                }
+              },
+              "save": {
+                "kind": "JobOffer",
+                "match": "url"
+              },
+              "long": true,
+              "minutes": 30
+            }
+          }
+        ]
+      }
     }
   ],
   "scripts": [],
@@ -1029,10 +1106,10 @@
       }
     ],
     "instructions": {
-      "fr": "Sa recherche : « JobSearch » (poste, lieu, contrat ; « mots » : une idée par ligne, formes séparées par |). Ses sites : « Source » (recette ; essaie avec parcourir ; « lien » prêt à ouvrir). À 7 h les offres arrivent notées en « JobOffer ». CV : un « CV » maître (Markdown) et un modèle (HTML avec {{contenu}}). Pour une offre : lis-la (parcourir), renseigne-toi sur l’entreprise (chercher), écris un « CV » adapté relié à l’offre, sans rien inventer ; note-le sur 100 avec ses « Criterion » (poids, instruction) : appreciation + avis critère par critère. À 80 ou plus : pdf du modèle rempli, fichier relié, état prêt. Elle postule : une « Application », « due » = relance. Rien n’est envoyé sans son oui.",
-      "en": "Her search: « JobSearch » (role, place, contract; « mots »: one idea per line, forms separated by |). Her sites: « Source » (recipe; try with parcourir; « lien » ready to open). At 7 offers arrive scored as « JobOffer ». CVs: a master « CV » (Markdown) and a template (HTML with {{contenu}}). For an offer: read it (parcourir), learn about the company (chercher), write a tailored « CV » linked to the offer, inventing nothing; score it out of 100 with her « Criterion » entries (weight, instruction): appreciation + review per criterion. At 80 or more: pdf of the filled template, file linked, state ready. She applies: an « Application », « due » = follow-up. Nothing is sent without her yes."
+      "fr": "Sa recherche : « JobSearch » (poste, lieu, contrat ; « mots » : une idée par ligne, formes séparées par |). Ses sites : « Source » (recette ; essaie avec parcourir ; « lien » prêt à ouvrir). À 7 h les offres arrivent notées en « JobOffer ». CV : un « CV » maître (Markdown) et un modèle (HTML avec {{contenu}}). À 7 h 30, le texte complet des offres retenues est rangé dans « contenu ». Pour une offre : lis son « contenu », note « adequation » (0-100) et « avis_ia », renseigne-toi sur l’entreprise (chercher), écris un « CV » adapté relié à l’offre, sans rien inventer ; note-le sur 100 avec ses « Criterion » (poids, instruction) : appreciation + avis critère par critère. À 80 ou plus : pdf du modèle rempli, fichier relié, état prêt. Elle postule : une « Application », « due » = relance. Rien n’est envoyé sans son oui.",
+      "en": "Her search: « JobSearch » (role, place, contract; « mots »: one idea per line, forms separated by |). Her sites: « Source » (recipe; try with parcourir; « lien » ready to open). At 7 offers arrive scored as « JobOffer ». CVs: a master « CV » (Markdown) and a template (HTML with {{contenu}}). At 7:30 the full text of kept offers is filed in « contenu ». For an offer: read its « contenu », set « adequation » (0-100) and « avis_ia », learn about the company (chercher), write a tailored « CV » linked to the offer, inventing nothing; score it out of 100 with her « Criterion » entries (weight, instruction): appreciation + review per criterion. At 80 or more: pdf of the filled template, file linked, state ready. She applies: an « Application », « due » = follow-up. Nothing is sent without her yes."
     },
-    "capabilities": ["chercher", "parcourir", "pdf"],
+    "capabilities": ["chercher", "lire", "parcourir", "pdf", "situer"],
     "bridges": []
   }
 }

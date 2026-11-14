@@ -43,6 +43,7 @@ describe('Jarvis’s method on connection (story 3)', () => {
       [
         'agenda',
         'apps',
+        'capabilities',
         'connectors',
         'context',
         'dashboard',

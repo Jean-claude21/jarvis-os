@@ -29,6 +29,7 @@ import {
   createBridge,
 } from '@jarvis-os/core';
 import { shippedRoles } from './apps';
+import { runCapability, usedBy } from './atelier';
 import { mergeKind, mergeProposals, preferencesOf } from '@jarvis-os/core';
 import { gather } from './tool-groups';
 import { momentsOf, whenOf } from './when';
@@ -478,6 +479,84 @@ export async function mcpServerFor(
     },
     tool(async ({ text, space }: { text: string; space?: string | undefined }) =>
       act((tx) => appsTouched(tx, at(space), text, shippedRoles)),
+    ),
+  );
+
+  // What Jarvis can do for her beyond keeping things (spec 060): its Atelier's capabilities.
+  server.registerTool(
+    'capabilities',
+    {
+      description:
+        'What Jarvis can do for her beyond keeping things — find job offers, read a page, make a PDF… She never names one: from what she wants, pick the capability whose « does » and examples fit, tell her in plain words what will happen (how often, if a rule will do it, what is written where), and once she says yes, run it here (`run` with its `input`) or put it in a rule ({ call: { connection: "Atelier", path: "/jobs/<name>", long: true, save: { kind } } }); her apps already declare the ones they use. Without `run`: the list, each with what it does, its input and the apps that use it. Long work answers later: what it finds is written in her space, linked to its execution (see « Activités »). A capability whose effect is « sends » acts outside in her name: only with agreed: true after her yes. If none fits, say so plainly.',
+      inputSchema: {
+        run: z
+          .string()
+          .regex(/^[a-z0-9_]+$/)
+          .optional()
+          .describe('The capability to run now, by its name.'),
+        input: z.record(z.string(), z.unknown()).default({}),
+        save: z
+          .object({
+            kind: z.string().min(1).max(80),
+            match: z.string().min(1).max(60).optional(),
+            title: z.string().min(1).max(300).optional(),
+          })
+          .optional()
+          .describe('Where what it finds goes (a kind of hers); its own kind when absent.'),
+        about: z.string().min(1).max(64).optional().describe('The entry the work concerns.'),
+        agreed: z.boolean().default(false),
+        space: spaceArg,
+      },
+      annotations: { openWorldHint: true },
+    },
+    tool(
+      async (args: {
+        run?: string | undefined;
+        input: Record<string, unknown>;
+        save?: { kind: string; match?: string | undefined; title?: string | undefined } | undefined;
+        about?: string | undefined;
+        agreed: boolean;
+        space?: string | undefined;
+      }) => {
+        const service = deps.connectors?.atelier;
+        if (!service) throw new Error('This Jarvis reaches no Atelier yet (ATELIER_URL).');
+        if (!args.run) {
+          const by = usedBy(Object.entries(shippedRoles).map(([app, role]) => ({ app, role })));
+          return {
+            capabilities: (await service.capabilities()).map((one) => ({
+              name: one.name,
+              title: one.title,
+              does: one.does,
+              examples: one.examples,
+              effect: one.effect,
+              long: one.long,
+              ready: one.ready,
+              ...(one.writes ? { writes: one.writes.kind } : {}),
+              input: one.input,
+              apps: by[one.name] ?? [],
+            })),
+          };
+        }
+        const save = args.save
+          ? {
+              kind: args.save.kind,
+              ...(args.save.match ? { match: args.save.match } : {}),
+              ...(args.save.title ? { title: args.save.title } : {}),
+            }
+          : undefined;
+        return runCapability(
+          { db: deps.db, atelier: service, publicUrl: deps.publicUrl },
+          actor,
+          at(args.space),
+          {
+            name: args.run,
+            input: args.input,
+            ...(save ? { save } : {}),
+            ...(args.about ? { about: args.about } : {}),
+            agreed: args.agreed,
+          },
+        );
+      },
     ),
   );
 

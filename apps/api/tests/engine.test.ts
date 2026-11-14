@@ -31,7 +31,7 @@ describe('the Finances app', () => {
     expect(done.value.result.created).toContain('App « Finances »');
     const unknown = await claude.call<{ error: string }>('app_install', { name: 'Garden' });
     expect(unknown.value.error).toMatch(
-      /No app « Garden » ships with Jarvis: Finances, .*Routines/,
+      /No app « Garden » ships with Jarvis: .*Finances, .*Routines/,
     );
   });
 

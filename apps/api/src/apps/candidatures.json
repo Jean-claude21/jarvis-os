@@ -1,0 +1,281 @@
+{
+  "app": "Candidatures",
+  "version": 1,
+  "description": {
+    "fr": "Chercher un stage, une alternance ou un emploi : ses critères, les offres trouvées chaque matin et notées, ses candidatures et leurs relances.",
+    "en": "Looking for an internship, a work-study place or a job: her criteria, the offers found each morning and scored, her applications and their follow-ups."
+  },
+  "models": [
+    {
+      "title": "JobSearch",
+      "data": {
+        "label": { "fr": "Profil de recherche", "en": "Job search" },
+        "fields": [
+          {
+            "name": "poste",
+            "type": "text",
+            "required": true,
+            "label": { "fr": "Poste recherché", "en": "Role" },
+            "help": "Les mots de l’offre : « stage intelligence artificielle »",
+            "aliases": ["query", "role", "job"]
+          },
+          {
+            "name": "lieu",
+            "type": "text",
+            "label": { "fr": "Lieu", "en": "Place" },
+            "default": "France",
+            "aliases": ["location", "ville"]
+          },
+          {
+            "name": "contrat",
+            "type": "choice",
+            "label": { "fr": "Contrat", "en": "Contract" },
+            "options": ["stage", "alternance", "cdi", "cdd", "freelance"],
+            "optionLabels": {
+              "stage": { "fr": "Stage", "en": "Internship" },
+              "alternance": { "fr": "Alternance", "en": "Work-study" },
+              "cdi": { "fr": "CDI", "en": "Permanent" },
+              "cdd": { "fr": "CDD", "en": "Fixed-term" },
+              "freelance": { "fr": "Freelance", "en": "Freelance" }
+            },
+            "aliases": ["contract"]
+          },
+          {
+            "name": "debut",
+            "type": "date",
+            "label": { "fr": "À partir du", "en": "From" }
+          }
+        ],
+        "columns": ["poste", "lieu", "contrat", "debut"]
+      }
+    },
+    {
+      "title": "JobOffer",
+      "data": {
+        "label": { "fr": "Offre", "en": "Job offer" },
+        "fields": [
+          { "name": "company", "type": "text", "label": { "fr": "Entreprise", "en": "Company" } },
+          { "name": "location", "type": "text", "label": { "fr": "Lieu", "en": "Place" } },
+          {
+            "name": "url",
+            "type": "url",
+            "unique": true,
+            "label": { "fr": "Adresse de l’offre", "en": "Offer’s address" }
+          },
+          {
+            "name": "published",
+            "type": "date",
+            "label": { "fr": "Publiée le", "en": "Published" }
+          },
+          { "name": "contract", "type": "text", "label": { "fr": "Contrat", "en": "Contract" } },
+          { "name": "source", "type": "text", "label": { "fr": "Source", "en": "Source" } },
+          {
+            "name": "score",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "label": { "fr": "Score", "en": "Score" }
+          },
+          { "name": "reasons", "type": "text", "label": { "fr": "Pourquoi", "en": "Why" } },
+          {
+            "name": "status",
+            "type": "choice",
+            "label": { "fr": "Suite", "en": "Next" },
+            "options": ["new", "interesting", "applied", "dismissed"],
+            "optionLabels": {
+              "new": { "fr": "nouvelle", "en": "new" },
+              "interesting": { "fr": "à creuser", "en": "interesting" },
+              "applied": { "fr": "postulée", "en": "applied" },
+              "dismissed": { "fr": "écartée", "en": "dismissed" }
+            },
+            "default": "new"
+          }
+        ],
+        "columns": ["company", "location", "score", "published", "status"]
+      }
+    },
+    {
+      "title": "Application",
+      "data": {
+        "label": { "fr": "Candidature", "en": "Application" },
+        "activity": true,
+        "fields": [
+          {
+            "name": "offer",
+            "type": "link",
+            "target": "JobOffer",
+            "inverse": "applications",
+            "label": { "fr": "Offre", "en": "Offer" }
+          },
+          { "name": "company", "type": "text", "label": { "fr": "Entreprise", "en": "Company" } },
+          {
+            "name": "status",
+            "type": "choice",
+            "label": { "fr": "Où j’en suis", "en": "Where it stands" },
+            "options": ["to_send", "waiting", "interview", "done"],
+            "optionLabels": {
+              "to_send": { "fr": "à envoyer", "en": "to send" },
+              "waiting": { "fr": "envoyée, en attente", "en": "sent, waiting" },
+              "interview": { "fr": "entretien", "en": "interview" },
+              "done": { "fr": "terminée", "en": "over" }
+            },
+            "default": "to_send"
+          },
+          { "name": "sent_on", "type": "date", "label": { "fr": "Envoyée le", "en": "Sent on" } },
+          {
+            "name": "due",
+            "type": "date",
+            "label": { "fr": "Relancer le", "en": "Follow up on" },
+            "aliases": ["relance", "next_step"]
+          },
+          {
+            "name": "outcome",
+            "type": "choice",
+            "label": { "fr": "Réponse", "en": "Answer" },
+            "options": ["none", "yes", "no"],
+            "optionLabels": {
+              "none": { "fr": "pas encore", "en": "not yet" },
+              "yes": { "fr": "acceptée", "en": "accepted" },
+              "no": { "fr": "refusée", "en": "declined" }
+            },
+            "default": "none"
+          },
+          { "name": "contact", "type": "text", "label": { "fr": "Contact", "en": "Contact" } },
+          { "name": "notes", "type": "long_text", "label": { "fr": "Notes", "en": "Notes" } }
+        ],
+        "columns": ["company", "status", "sent_on", "due", "outcome"]
+      }
+    }
+  ],
+  "pages": [
+    {
+      "title": "Applications",
+      "data": {
+        "label": { "fr": "Mes candidatures", "en": "My applications" },
+        "order": 1,
+        "blocks": [
+          {
+            "block": "stat",
+            "title": { "fr": "Offres à regarder", "en": "Offers to look at" },
+            "query": {
+              "kind": "JobOffer",
+              "where": "status = 'new'",
+              "aggregate": { "n": "count()" }
+            }
+          },
+          {
+            "block": "stat",
+            "title": { "fr": "Candidatures en cours", "en": "Applications under way" },
+            "query": {
+              "kind": "Application",
+              "where": "status != 'done'",
+              "aggregate": { "n": "count()" }
+            }
+          },
+          {
+            "block": "task_list",
+            "title": {
+              "fr": "Nouvelles offres qui correspondent",
+              "en": "New offers that fit"
+            },
+            "kind": "JobOffer",
+            "where": "status = 'new' and score >= 50",
+            "detail": "reasons",
+            "action": { "label": "À creuser", "set": { "status": "interesting" } }
+          },
+          {
+            "block": "table",
+            "title": { "fr": "À creuser", "en": "Interesting" },
+            "query": {
+              "kind": "JobOffer",
+              "where": "status = 'interesting'",
+              "fields": ["company", "location", "score", "url"],
+              "sort": "-score"
+            }
+          },
+          {
+            "block": "kanban",
+            "title": { "fr": "Candidatures", "en": "Applications" },
+            "kind": "Application",
+            "by": "status"
+          },
+          {
+            "block": "form",
+            "title": { "fr": "Ce que je cherche", "en": "What I am looking for" },
+            "kind": "JobSearch"
+          }
+        ]
+      }
+    }
+  ],
+  "rules": [
+    {
+      "title": "Offres du matin",
+      "data": {
+        "when": { "schedule": "0 7 * * *" },
+        "then": [
+          {
+            "call": {
+              "connection": "Atelier",
+              "path": "/jobs/offres_emploi",
+              "include": "JobSearch",
+              "save": { "kind": "JobOffer", "match": "url", "title": "{title} — {company}" },
+              "long": true,
+              "minutes": 20
+            }
+          }
+        ]
+      }
+    },
+    {
+      "title": "Relance d’une candidature",
+      "data": {
+        "when": { "before": { "kind": "Application", "field": "due", "days": 0 } },
+        "if": "status = 'waiting'",
+        "then": [{ "remind": { "text": "Relancer : {title}" } }]
+      }
+    }
+  ],
+  "scripts": [],
+  "role": {
+    "covers": {
+      "fr": "Ta recherche de stage, d’alternance ou d’emploi : tes critères, les offres trouvées et notées chaque matin, tes candidatures et leurs relances.",
+      "en": "Your search for an internship, work-study or job: your criteria, the offers found and scored each morning, your applications and follow-ups."
+    },
+    "intents": [
+      "stage",
+      "alternance",
+      "emploi",
+      "job",
+      "offre",
+      "offres",
+      "candidature",
+      "candidater",
+      "postuler",
+      "postulé",
+      "postule",
+      "recrutement",
+      "recruteur",
+      "entretien",
+      "cv",
+      "lettre de motivation",
+      "relance",
+      "relancer",
+      "cdi",
+      "cdd"
+    ],
+    "watches": ["JobSearch", "JobOffer", "Application", "Fichier"],
+    "reads": ["JobSearch", "JobOffer", "Application"],
+    "writes": ["JobSearch", "JobOffer", "Application"],
+    "ask": [
+      { "fr": "Quel poste, où, et quel contrat ?", "en": "Which role, where, and which contract?" },
+      { "fr": "À partir de quand ?", "en": "From when?" }
+    ],
+    "instructions": {
+      "fr": "Ce qu’elle cherche est un « JobSearch » (poste, lieu, contrat) : chaque matin à 7 h, Jarvis cherche les offres pour chacun et les range en « JobOffer », notées sur 100 avec leurs raisons (capacité offres_emploi). Quand elle postule : une « Application » reliée à l’offre (offer), l’offre passe « applied » ; « due » est la date de relance, rappelée ce jour-là. Sa lettre ou son CV en PDF : la capacité pdf, rangée comme son fichier et reliée à la candidature. Lire une offre : la capacité lire_page. Rien n’est envoyé à un recruteur sans son oui.",
+      "en": "What she looks for is a « JobSearch » (role, place, contract): each morning at 7, Jarvis searches offers for each and files them as « JobOffer », scored out of 100 with their reasons (capability offres_emploi). When she applies: an « Application » linked to the offer (offer), the offer set « applied »; « due » is the follow-up date, recalled that day. Her letter or CV as PDF: the pdf capability, kept as her file and linked to the application. Reading an offer: the lire_page capability. Nothing is sent to a recruiter without her yes."
+    },
+    "capabilities": ["offres_emploi", "lire_page", "pdf"],
+    "bridges": []
+  }
+}

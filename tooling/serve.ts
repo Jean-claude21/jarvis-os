@@ -112,7 +112,10 @@ keep('api', 'pnpm', ['--filter', '@jarvis-os/api', watch ? 'dev' : 'start'], {
   JARVIS_PUBLIC_URL: publicUrl,
   PORT: port,
 });
-keep('watcher', 'pnpm', ['--filter', '@jarvis-os/api', 'watcher']);
+// The watcher runs rules that call out: long work answers at the public address too.
+keep('watcher', 'pnpm', ['--filter', '@jarvis-os/api', 'watcher'], {
+  JARVIS_PUBLIC_URL: publicUrl,
+});
 keep('tunnel', 'ngrok', [
   'http',
   port,

@@ -16,6 +16,9 @@ link, to open herself, without the morning reading failing on them.
     sent along but never read by the Atelier (`parcourir` skips `active: false`).
   - « Nouvelles offres qui correspondent » ticks each offer: « À creuser », « Postulé », « Écarter ».
   - « Où je cherche » shows each source's address, whether it is read, and its notes.
+- A rule's `include` sends up to 100 entries of each kind (was 20): her sources, paused ones too,
+  fit. The Atelier passes over a « Source » with neither address nor recipe (her notes may share
+  the kind's name).
 
 ## Done when
 

@@ -344,7 +344,7 @@ async function act(
         const { rows } = await tx.query<{ title: string; data: Record<string, unknown> }>(
           `select title, data - 'text' as data from entry
             where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
-            order by updated_at desc limit 20`,
+            order by updated_at desc limit 100`,
           [spaceId, kind],
         );
         body[name] = rows.map((row) => ({ title: row.title, ...row.data }));

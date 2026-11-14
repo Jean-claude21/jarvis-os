@@ -2,91 +2,241 @@
   "app": "Candidatures",
   "version": 1,
   "description": {
-    "fr": "Chercher un stage, une alternance ou un emploi : ses critères, les offres trouvées chaque matin et notées, ses candidatures et leurs relances.",
-    "en": "Looking for an internship, a work-study place or a job: her criteria, the offers found each morning and scored, her applications and their follow-ups."
+    "fr": "Chercher un stage, une alternance ou un emploi : ce que tu cherches et tes mots, les sites où chercher et leur recette, les offres ramenées chaque matin et notées, tes candidatures et leurs relances.",
+    "en": "Looking for an internship, a work-study place or a job: what you look for and your words, the sites to search and their recipe, the offers brought back each morning and scored, your applications and follow-ups."
   },
   "models": [
     {
       "title": "JobSearch",
       "data": {
-        "label": { "fr": "Profil de recherche", "en": "Job search" },
+        "label": {
+          "fr": "Profil de recherche",
+          "en": "Job search"
+        },
         "fields": [
           {
             "name": "poste",
             "type": "text",
             "required": true,
-            "label": { "fr": "Poste recherché", "en": "Role" },
+            "label": {
+              "fr": "Poste recherché",
+              "en": "Role"
+            },
             "help": "Les mots de l’offre : « stage intelligence artificielle »",
             "aliases": ["query", "role", "job"]
           },
           {
+            "name": "mots",
+            "type": "long_text",
+            "label": {
+              "fr": "Mes mots",
+              "en": "My words"
+            },
+            "help": "Une idée par ligne, ses façons de la dire séparées par | : intelligence artificielle|IA|AI|machine learning",
+            "aliases": ["words", "keywords", "mots_cles"]
+          },
+          {
             "name": "lieu",
             "type": "text",
-            "label": { "fr": "Lieu", "en": "Place" },
+            "label": {
+              "fr": "Lieu",
+              "en": "Place"
+            },
             "default": "France",
             "aliases": ["location", "ville"]
           },
           {
             "name": "contrat",
             "type": "choice",
-            "label": { "fr": "Contrat", "en": "Contract" },
+            "label": {
+              "fr": "Contrat",
+              "en": "Contract"
+            },
             "options": ["stage", "alternance", "cdi", "cdd", "freelance"],
             "optionLabels": {
-              "stage": { "fr": "Stage", "en": "Internship" },
-              "alternance": { "fr": "Alternance", "en": "Work-study" },
-              "cdi": { "fr": "CDI", "en": "Permanent" },
-              "cdd": { "fr": "CDD", "en": "Fixed-term" },
-              "freelance": { "fr": "Freelance", "en": "Freelance" }
+              "stage": {
+                "fr": "Stage",
+                "en": "Internship"
+              },
+              "alternance": {
+                "fr": "Alternance",
+                "en": "Work-study"
+              },
+              "cdi": {
+                "fr": "CDI",
+                "en": "Permanent"
+              },
+              "cdd": {
+                "fr": "CDD",
+                "en": "Fixed-term"
+              },
+              "freelance": {
+                "fr": "Freelance",
+                "en": "Freelance"
+              }
             },
             "aliases": ["contract"]
           },
           {
             "name": "debut",
             "type": "date",
-            "label": { "fr": "À partir du", "en": "From" }
+            "label": {
+              "fr": "À partir du",
+              "en": "From"
+            }
           }
         ],
-        "columns": ["poste", "lieu", "contrat", "debut"]
+        "columns": ["poste", "lieu", "contrat", "mots"]
+      }
+    },
+    {
+      "title": "Source",
+      "data": {
+        "label": {
+          "fr": "Source",
+          "en": "Source"
+        },
+        "fields": [
+          {
+            "name": "url",
+            "type": "text",
+            "label": {
+              "fr": "Adresse de recherche",
+              "en": "Search address"
+            },
+            "help": "Ses {champs} prennent la valeur de chaque recherche : https://site/recherche?q={poste}&l={lieu}"
+          },
+          {
+            "name": "js",
+            "type": "boolean",
+            "label": {
+              "fr": "Construite par script",
+              "en": "Built by script"
+            },
+            "default": false
+          },
+          {
+            "name": "recipe",
+            "type": "long_text",
+            "label": {
+              "fr": "Recette",
+              "en": "Recipe"
+            },
+            "help": "Écrite par l’IA (JSON) : schema { base, fields }, treg { route, body }, rename",
+            "aliases": ["recette"]
+          },
+          {
+            "name": "notes",
+            "type": "long_text",
+            "label": {
+              "fr": "Notes",
+              "en": "Notes"
+            }
+          }
+        ],
+        "columns": ["url", "js"]
       }
     },
     {
       "title": "JobOffer",
       "data": {
-        "label": { "fr": "Offre", "en": "Job offer" },
+        "label": {
+          "fr": "Offre",
+          "en": "Job offer"
+        },
         "fields": [
-          { "name": "company", "type": "text", "label": { "fr": "Entreprise", "en": "Company" } },
-          { "name": "location", "type": "text", "label": { "fr": "Lieu", "en": "Place" } },
+          {
+            "name": "company",
+            "type": "text",
+            "label": {
+              "fr": "Entreprise",
+              "en": "Company"
+            }
+          },
+          {
+            "name": "location",
+            "type": "text",
+            "label": {
+              "fr": "Lieu",
+              "en": "Place"
+            }
+          },
           {
             "name": "url",
             "type": "url",
             "unique": true,
-            "label": { "fr": "Adresse de l’offre", "en": "Offer’s address" }
+            "label": {
+              "fr": "Adresse de l’offre",
+              "en": "Offer’s address"
+            }
           },
           {
             "name": "published",
             "type": "date",
-            "label": { "fr": "Publiée le", "en": "Published" }
+            "label": {
+              "fr": "Publiée le",
+              "en": "Published"
+            }
           },
-          { "name": "contract", "type": "text", "label": { "fr": "Contrat", "en": "Contract" } },
-          { "name": "source", "type": "text", "label": { "fr": "Source", "en": "Source" } },
+          {
+            "name": "contract",
+            "type": "text",
+            "label": {
+              "fr": "Contrat",
+              "en": "Contract"
+            }
+          },
+          {
+            "name": "source",
+            "type": "text",
+            "label": {
+              "fr": "Source",
+              "en": "Source"
+            }
+          },
           {
             "name": "score",
             "type": "number",
             "min": 0,
             "max": 100,
-            "label": { "fr": "Score", "en": "Score" }
+            "label": {
+              "fr": "Score",
+              "en": "Score"
+            }
           },
-          { "name": "reasons", "type": "text", "label": { "fr": "Pourquoi", "en": "Why" } },
+          {
+            "name": "reasons",
+            "type": "text",
+            "label": {
+              "fr": "Pourquoi",
+              "en": "Why"
+            }
+          },
           {
             "name": "status",
             "type": "choice",
-            "label": { "fr": "Suite", "en": "Next" },
+            "label": {
+              "fr": "Suite",
+              "en": "Next"
+            },
             "options": ["new", "interesting", "applied", "dismissed"],
             "optionLabels": {
-              "new": { "fr": "nouvelle", "en": "new" },
-              "interesting": { "fr": "à creuser", "en": "interesting" },
-              "applied": { "fr": "postulée", "en": "applied" },
-              "dismissed": { "fr": "écartée", "en": "dismissed" }
+              "new": {
+                "fr": "nouvelle",
+                "en": "new"
+              },
+              "interesting": {
+                "fr": "à creuser",
+                "en": "interesting"
+              },
+              "applied": {
+                "fr": "postulée",
+                "en": "applied"
+              },
+              "dismissed": {
+                "fr": "écartée",
+                "en": "dismissed"
+              }
             },
             "default": "new"
           }
@@ -97,7 +247,10 @@
     {
       "title": "Application",
       "data": {
-        "label": { "fr": "Candidature", "en": "Application" },
+        "label": {
+          "fr": "Candidature",
+          "en": "Application"
+        },
         "activity": true,
         "fields": [
           {
@@ -105,43 +258,104 @@
             "type": "link",
             "target": "JobOffer",
             "inverse": "applications",
-            "label": { "fr": "Offre", "en": "Offer" }
+            "label": {
+              "fr": "Offre",
+              "en": "Offer"
+            }
           },
-          { "name": "company", "type": "text", "label": { "fr": "Entreprise", "en": "Company" } },
+          {
+            "name": "company",
+            "type": "text",
+            "label": {
+              "fr": "Entreprise",
+              "en": "Company"
+            }
+          },
           {
             "name": "status",
             "type": "choice",
-            "label": { "fr": "Où j’en suis", "en": "Where it stands" },
+            "label": {
+              "fr": "Où j’en suis",
+              "en": "Where it stands"
+            },
             "options": ["to_send", "waiting", "interview", "done"],
             "optionLabels": {
-              "to_send": { "fr": "à envoyer", "en": "to send" },
-              "waiting": { "fr": "envoyée, en attente", "en": "sent, waiting" },
-              "interview": { "fr": "entretien", "en": "interview" },
-              "done": { "fr": "terminée", "en": "over" }
+              "to_send": {
+                "fr": "à envoyer",
+                "en": "to send"
+              },
+              "waiting": {
+                "fr": "envoyée, en attente",
+                "en": "sent, waiting"
+              },
+              "interview": {
+                "fr": "entretien",
+                "en": "interview"
+              },
+              "done": {
+                "fr": "terminée",
+                "en": "over"
+              }
             },
             "default": "to_send"
           },
-          { "name": "sent_on", "type": "date", "label": { "fr": "Envoyée le", "en": "Sent on" } },
+          {
+            "name": "sent_on",
+            "type": "date",
+            "label": {
+              "fr": "Envoyée le",
+              "en": "Sent on"
+            }
+          },
           {
             "name": "due",
             "type": "date",
-            "label": { "fr": "Relancer le", "en": "Follow up on" },
+            "label": {
+              "fr": "Relancer le",
+              "en": "Follow up on"
+            },
             "aliases": ["relance", "next_step"]
           },
           {
             "name": "outcome",
             "type": "choice",
-            "label": { "fr": "Réponse", "en": "Answer" },
+            "label": {
+              "fr": "Réponse",
+              "en": "Answer"
+            },
             "options": ["none", "yes", "no"],
             "optionLabels": {
-              "none": { "fr": "pas encore", "en": "not yet" },
-              "yes": { "fr": "acceptée", "en": "accepted" },
-              "no": { "fr": "refusée", "en": "declined" }
+              "none": {
+                "fr": "pas encore",
+                "en": "not yet"
+              },
+              "yes": {
+                "fr": "acceptée",
+                "en": "accepted"
+              },
+              "no": {
+                "fr": "refusée",
+                "en": "declined"
+              }
             },
             "default": "none"
           },
-          { "name": "contact", "type": "text", "label": { "fr": "Contact", "en": "Contact" } },
-          { "name": "notes", "type": "long_text", "label": { "fr": "Notes", "en": "Notes" } }
+          {
+            "name": "contact",
+            "type": "text",
+            "label": {
+              "fr": "Contact",
+              "en": "Contact"
+            }
+          },
+          {
+            "name": "notes",
+            "type": "long_text",
+            "label": {
+              "fr": "Notes",
+              "en": "Notes"
+            }
+          }
         ],
         "columns": ["company", "status", "sent_on", "due", "outcome"]
       }
@@ -151,25 +365,51 @@
     {
       "title": "Applications",
       "data": {
-        "label": { "fr": "Mes candidatures", "en": "My applications" },
+        "label": {
+          "fr": "Mes candidatures",
+          "en": "My applications"
+        },
         "order": 1,
         "blocks": [
           {
             "block": "stat",
-            "title": { "fr": "Offres à regarder", "en": "Offers to look at" },
+            "title": {
+              "fr": "Offres à regarder",
+              "en": "Offers to look at"
+            },
             "query": {
               "kind": "JobOffer",
               "where": "status = 'new'",
-              "aggregate": { "n": "count()" }
+              "aggregate": {
+                "n": "count()"
+              }
             }
           },
           {
             "block": "stat",
-            "title": { "fr": "Candidatures en cours", "en": "Applications under way" },
+            "title": {
+              "fr": "Candidatures en cours",
+              "en": "Applications under way"
+            },
             "query": {
               "kind": "Application",
               "where": "status != 'done'",
-              "aggregate": { "n": "count()" }
+              "aggregate": {
+                "n": "count()"
+              }
+            }
+          },
+          {
+            "block": "stat",
+            "title": {
+              "fr": "Pages à trier (brut)",
+              "en": "Pages to sort (raw)"
+            },
+            "query": {
+              "kind": "Capture",
+              "aggregate": {
+                "n": "count()"
+              }
             }
           },
           {
@@ -181,11 +421,19 @@
             "kind": "JobOffer",
             "where": "status = 'new' and score >= 50",
             "detail": "reasons",
-            "action": { "label": "À creuser", "set": { "status": "interesting" } }
+            "action": {
+              "label": "À creuser",
+              "set": {
+                "status": "interesting"
+              }
+            }
           },
           {
             "block": "table",
-            "title": { "fr": "À creuser", "en": "Interesting" },
+            "title": {
+              "fr": "À creuser",
+              "en": "Interesting"
+            },
             "query": {
               "kind": "JobOffer",
               "where": "status = 'interesting'",
@@ -195,13 +443,30 @@
           },
           {
             "block": "kanban",
-            "title": { "fr": "Candidatures", "en": "Applications" },
+            "title": {
+              "fr": "Candidatures",
+              "en": "Applications"
+            },
             "kind": "Application",
             "by": "status"
           },
           {
+            "block": "table",
+            "title": {
+              "fr": "Où je cherche",
+              "en": "Where I search"
+            },
+            "query": {
+              "kind": "Source",
+              "fields": ["url", "js"]
+            }
+          },
+          {
             "block": "form",
-            "title": { "fr": "Ce que je cherche", "en": "What I am looking for" },
+            "title": {
+              "fr": "Ce que je cherche",
+              "en": "What I am looking for"
+            },
             "kind": "JobSearch"
           }
         ]
@@ -212,16 +477,26 @@
     {
       "title": "Offres du matin",
       "data": {
-        "when": { "schedule": "0 7 * * *" },
+        "when": {
+          "schedule": "0 7 * * *"
+        },
         "then": [
           {
             "call": {
               "connection": "Atelier",
-              "path": "/jobs/offres_emploi",
-              "include": "JobSearch",
-              "save": { "kind": "JobOffer", "match": "url", "title": "{title} — {company}" },
+              "path": "/jobs/parcourir",
+              "include": {
+                "searches": "JobSearch",
+                "sources": "Source"
+              },
+              "save": {
+                "kind": "JobOffer",
+                "match": "url",
+                "title": "{title}",
+                "raw": "Capture"
+              },
               "long": true,
-              "minutes": 20
+              "minutes": 30
             }
           }
         ]
@@ -230,9 +505,21 @@
     {
       "title": "Relance d’une candidature",
       "data": {
-        "when": { "before": { "kind": "Application", "field": "due", "days": 0 } },
+        "when": {
+          "before": {
+            "kind": "Application",
+            "field": "due",
+            "days": 0
+          }
+        },
         "if": "status = 'waiting'",
-        "then": [{ "remind": { "text": "Relancer : {title}" } }]
+        "then": [
+          {
+            "remind": {
+              "text": "Relancer : {title}"
+            }
+          }
+        ]
       }
     }
   ],
@@ -262,20 +549,28 @@
       "relance",
       "relancer",
       "cdi",
-      "cdd"
+      "cdd",
+      "site d’emploi",
+      "sites d’offres"
     ],
-    "watches": ["JobSearch", "JobOffer", "Application", "Fichier"],
-    "reads": ["JobSearch", "JobOffer", "Application"],
-    "writes": ["JobSearch", "JobOffer", "Application"],
+    "watches": ["JobSearch", "Source", "JobOffer", "Capture", "Application", "Fichier"],
+    "reads": ["JobSearch", "Source", "JobOffer", "Capture", "Application"],
+    "writes": ["JobSearch", "Source", "JobOffer", "Application"],
     "ask": [
-      { "fr": "Quel poste, où, et quel contrat ?", "en": "Which role, where, and which contract?" },
-      { "fr": "À partir de quand ?", "en": "From when?" }
+      {
+        "fr": "Quel poste, où, et quel contrat ?",
+        "en": "Which role, where, and which contract?"
+      },
+      {
+        "fr": "Je te propose des sites où chercher ?",
+        "en": "Shall I propose sites to search?"
+      }
     ],
     "instructions": {
-      "fr": "Ce qu’elle cherche est un « JobSearch » (poste, lieu, contrat) : chaque matin à 7 h, Jarvis cherche les offres pour chacun et les range en « JobOffer », notées sur 100 avec leurs raisons (capacité offres_emploi). Quand elle postule : une « Application » reliée à l’offre (offer), l’offre passe « applied » ; « due » est la date de relance, rappelée ce jour-là. Sa lettre ou son CV en PDF : la capacité pdf, rangée comme son fichier et reliée à la candidature. Lire une offre : la capacité lire_page. Rien n’est envoyé à un recruteur sans son oui.",
-      "en": "What she looks for is a « JobSearch » (role, place, contract): each morning at 7, Jarvis searches offers for each and files them as « JobOffer », scored out of 100 with their reasons (capability offres_emploi). When she applies: an « Application » linked to the offer (offer), the offer set « applied »; « due » is the follow-up date, recalled that day. Her letter or CV as PDF: the pdf capability, kept as her file and linked to the application. Reading an offer: the lire_page capability. Nothing is sent to a recruiter without her yes."
+      "fr": "Sa recherche est un « JobSearch » (poste, lieu, contrat ; « mots » : une idée par ligne, ses formes séparées par |). Les sites sont des « Source » : trouve-les avec chercher, écris leur recette (url avec {poste}, {lieu} ; js si construit par script ; schema { base, fields } vers les champs du « JobOffer » : title, url, company, location, published ; ou treg { route, body }) et essaie-la avec parcourir avant de la garder. À 7 h, chaque source est lue pour chaque recherche : le structuré devient des « JobOffer » notées, le reste une « Capture » à ranger quand elle le demande. Une source en échec : répare sa recette. Elle postule : une « Application » reliée à l’offre (offer), « due » = relance. Lettre ou CV : pdf. Rien n’est envoyé sans son oui.",
+      "en": "Her search is a « JobSearch » (role, place, contract; « mots »: one idea per line, forms separated by |). Sites are « Source » entries: find them with chercher, write their recipe (url with {poste}, {lieu}; js if built by script; schema { base, fields } into « JobOffer » fields: title, url, company, location, published; or treg { route, body }) and try it with parcourir before keeping it. At 7, each source is read for each search: structured items become scored « JobOffer », the rest a « Capture » to file when she asks. A failing source: repair its recipe. She applies: an « Application » linked to the offer (offer), « due » = follow-up. Letter or CV: pdf. Nothing is sent without her yes."
     },
-    "capabilities": ["offres_emploi", "lire_page", "pdf"],
+    "capabilities": ["chercher", "parcourir", "pdf"],
     "bridges": []
   }
 }

@@ -1,4 +1,4 @@
-import { asPerson, closeExecution, openExecution, type Actor } from '@jarvis-os/core';
+import { asPerson, closeExecution, openExecution, RAW_KIND, type Actor } from '@jarvis-os/core';
 import type pg from 'pg';
 
 // The Atelier (spec 060): Jarvis's own services — finding offers, reading a page, making a PDF… —
@@ -114,7 +114,7 @@ export async function runCapability(
   request: {
     name: string;
     input: Record<string, unknown>;
-    save?: { kind: string; match?: string; title?: string };
+    save?: { kind: string; match?: string; title?: string; raw?: string };
     about?: string;
     agreed?: boolean;
   },
@@ -141,7 +141,7 @@ export async function runCapability(
       ...(request.about ? { about: request.about } : {}),
       long: true,
       minutes: Math.max(one.minutes, 5),
-      ...(writes ? { kinds: [writes.kind] } : {}),
+      ...(writes ? { kinds: [writes.kind, request.save?.raw ?? RAW_KIND] } : {}),
     }),
   );
   try {

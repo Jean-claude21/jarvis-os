@@ -107,6 +107,8 @@ export const blockSchema = z.discriminatedUnion('block', [
     link: z.string().trim().min(1).max(60).optional(),
     /** Columns shown faded: what she set aside (« dismissed »). */
     muted: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
+    /** Only these columns, in this order (« interesting », « applied »). */
+    show: z.array(z.string().trim().min(1).max(60)).max(12).optional(),
   }),
   /** The days ahead of her calendar. */
   z.object({
@@ -482,11 +484,12 @@ async function drawBlock(
       const views = await filtered(block.kind, block.where);
       const field = reader.model(block.kind)?.fields.find((one) => one.name === block.by);
       const columns: Record<string, Record<string, unknown>[]> = {};
-      for (const option of field?.options ?? []) columns[option] = [];
+      for (const option of block.show ?? field?.options ?? []) columns[option] = [];
       const detail = block.detail ? parse(block.detail) : null;
       const badge = block.badge ? parse(block.badge) : null;
       for (const view of views.slice(0, 300)) {
         const value = String((await view.get(block.by)) ?? '—');
+        if (block.show && !block.show.includes(value)) continue;
         (columns[value] ??= []).push({
           id: view.row.id,
           title: view.row.title,

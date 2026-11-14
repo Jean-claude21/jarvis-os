@@ -816,11 +816,12 @@
             },
             "kind": "JobOffer",
             "by": "status",
-            "where": "score >= 100 and status != 'new' and ({type} = 'tous' or type = {type})",
+            "where": "score >= 100 and ({type} = 'tous' or type = {type})",
             "detail": "company",
             "badge": "score",
             "link": "url",
-            "muted": ["dismissed"]
+            "muted": ["dismissed"],
+            "show": ["interesting", "applied", "dismissed"]
           },
           {
             "block": "kanban",

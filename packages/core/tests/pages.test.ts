@@ -214,6 +214,29 @@ const page = {
     },
     { block: 'form', title: 'Ajouter', kind: 'Mouvement' },
     { block: 'stat', title: 'Cassé', query: { kind: 'Mouvement', where: 'sum(' } },
+    {
+      block: 'datatable',
+      title: 'Toutes les obligations',
+      kind: 'Obligation',
+      columns: ['etat', 'due'],
+      facets: ['etat'],
+      sort: 'title',
+      action: { label: 'Payée', set: { etat: 'payée' } },
+    },
+    {
+      block: 'review',
+      title: 'Une à une',
+      kind: 'Obligation',
+      fields: ['etat', 'due'],
+      subtitle: ['etat'],
+    },
+    {
+      block: 'funnel',
+      title: 'Où elles en sont',
+      kind: 'Obligation',
+      by: 'etat',
+      steps: ['à payer', 'payée'],
+    },
   ],
 };
 
@@ -272,8 +295,42 @@ describe('a page', () => {
     const [entry] = await ama.as((tx) => find(tx, ama.space, { kind: 'Page' }));
     const drawn = await ama.as((tx) => renderPage(tx, ama.space, entry!, {}, clock));
     expect(drawn.params).toEqual({ month: '2026-10' });
-    const [stat, delta, gauge, bar, line, table, tasks, kanban, heatmap, form, broken] =
-      drawn.blocks;
+    const [
+      stat,
+      delta,
+      gauge,
+      bar,
+      line,
+      table,
+      tasks,
+      kanban,
+      heatmap,
+      form,
+      broken,
+      all,
+      one,
+      funnel,
+    ] = drawn.blocks;
+    // The data table, the list with its record and the funnel (spec 070).
+    expect(all).toMatchObject({
+      columns: ['etat', 'due'],
+      facets: ['etat'],
+      types: { etat: expect.any(String) },
+      actions: [{ label: 'Payée' }],
+    });
+    expect((all as unknown as { items: { title: string }[] }).items.map((it) => it.title)).toEqual([
+      'Électricité',
+      'Loyer',
+    ]);
+    expect(
+      (one as unknown as { items: { values: Record<string, unknown> }[] }).items[0]!.values,
+    ).toHaveProperty('etat');
+    expect(funnel).toMatchObject({
+      steps: [
+        { name: 'à payer', count: 1 },
+        { name: 'payée', count: 1 },
+      ],
+    });
     // 100 000 + 300 000 − 30 000 − 25 000 − 5 000 − 40 000.
     expect(stat).toMatchObject({ value: 300000 });
     expect(delta).toMatchObject({ value: 60000, previous: 40000, delta: 50 });

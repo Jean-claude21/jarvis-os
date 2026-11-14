@@ -204,6 +204,9 @@ body { background: var(--clay); }
 .tag { display: inline-block; padding: 1px 7px; border-radius: 2px; font-size: 12px; margin: 1px 3px 1px 0; background: var(--clay); }
 .stars { color: var(--ochre); letter-spacing: 1px; white-space: nowrap; } .stars .off { color: var(--rule-strong); }
 .pbar { height: 6px; background: var(--clay); border-radius: 1px; overflow: hidden; min-width: 70px; } .pbar i { display: block; height: 100%; background: var(--ink); }
+.tabs-more { position: relative; display: inline-block; } .tabs-more > summary { list-style: none; cursor: pointer; } .tabs-more > summary::-webkit-details-marker { display: none; }
+.tabs-menu { position: absolute; z-index: 30; top: 100%; left: 0; min-width: 220px; background: var(--paper); border: 1px solid var(--rule-strong); box-shadow: 0 6px 18px rgba(0,0,0,.08); display: flex; flex-direction: column; padding: 4px; }
+.tabs-menu a { padding: 8px 10px; white-space: nowrap; border: 0 !important; } .tabs-menu a:hover, .tabs-menu a.on { background: var(--sand); }
 .vmap { height: 420px; border: 1px solid var(--rule); background: var(--clay); }
 .leaflet-tooltip.vmap-count { background: transparent; border: 0; box-shadow: none; color: #fff; font-weight: 600; font-size: 11px; padding: 0; }
 .leaflet-tooltip.vmap-count::before { display: none; }

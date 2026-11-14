@@ -96,7 +96,12 @@ function table(columns, rows, extra, kind) {
   return '<div class="scroll"><table><thead><tr>' + columns.map((c, i) => '<th class="' + (nums[i] ? 'n' : '') + '">' + esc(c === 'title' ? words.titleCol : c === 'group' ? '' : fieldLabel(kind, c)) + '</th>').join('') + '</tr></thead><tbody>' +
     rows.map((r) => '<tr class="' + (r.id ? 'go' : '') + '"' + (r.id ? ' data-open="' + esc(r.id) + '"' : '') + '>' + columns.map((c, i) => '<td class="' + (nums[i] ? 'n num' : '') + '">' + (webLink(r[c]) || fmt(optionLabel(kind, c, r[c]))) + '</td>').join('') + '</tr>').join('') + (extra || '') + '</tbody></table></div>';
 }
+const asRows = (b, cols) => b.items.map((it) => Object.assign({ id: it.id, title: it.title }, it.values));
 const draw = {
+  datatable: (b) => card(b, table(['title'].concat(b.columns), asRows(b), '', b.kind), true),
+  review: (b) => card(b, table(['title'].concat(b.subtitle || [], b.badge ? [b.badge] : [], b.link ? [b.link] : []), asRows(b), '', b.kind), true),
+  funnel: (b) => { const top = Math.max(1, b.steps[0] ? b.steps[0].count : 1);
+    return card(b, '<div class="bars">' + b.steps.map((s) => '<div class="bar"><span>' + fmt(optionLabel(b.kind, b.by, s.name)) + '</span><span class="track"><span class="fill" style="display:block;width:' + Math.max(2, s.count / top * 100) + '%"></span></span><span class="num">' + fmt(s.count) + '</span></div>').join('') + '</div>'); },
   stat: (b) => card(b, figure(b), false, numeric(b.value) && b.value < 0 ? 'alert' : ''),
   stat_delta: (b) => card(b, figure(b) +
     (b.delta == null ? '<div class="kpi-sub">' + esc(words.noCompare) + '</div>' : '<div class="kpi-sub delta ' + (b.delta > 0 ? 'up' : 'down') + '">' + (b.delta > 0 ? '↑ ' : '↓ ') + fmt(Math.abs(b.delta)) + ' % ' + esc(say(words.vsPrevious, { value: fmt(b.previous) })) + '</div>')),

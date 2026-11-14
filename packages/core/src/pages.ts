@@ -21,6 +21,9 @@ const gesture = z.object({
   label: z.string().trim().min(1).max(40),
   set: z.record(z.string(), z.unknown()),
 });
+/** A value that is a web address (http or https), or null. */
+const webAddress = (value: unknown) =>
+  typeof value === 'string' && /^https?:\/\/[^\s<>"]+$/.test(value) ? value : null;
 const formula = z.string().trim().min(1).max(1000);
 const kind = z.string().trim().min(1).max(80);
 
@@ -85,6 +88,8 @@ export const blockSchema = z.discriminatedUnion('block', [
     kind,
     where: formula.optional(),
     detail: formula.optional(),
+    /** A field holding a web address: each entry shows a link that opens it (spec 064). */
+    link: z.string().trim().min(1).max(60).optional(),
     action: gesture,
     more: z.array(gesture).max(3).optional(),
   }),
@@ -95,6 +100,13 @@ export const blockSchema = z.discriminatedUnion('block', [
     kind,
     by: z.string().trim().min(1).max(60),
     where: formula.optional(),
+    /** What each card says under its title, and a figure shown as a pill (« score »), spec 065. */
+    detail: formula.optional(),
+    badge: formula.optional(),
+    /** A field holding a web address: each card shows a link that opens it. */
+    link: z.string().trim().min(1).max(60).optional(),
+    /** Columns shown faded: what she set aside (« dismissed »). */
+    muted: z.array(z.string().trim().min(1).max(60)).max(10).optional(),
   }),
   /** The days ahead of her calendar. */
   z.object({
@@ -352,6 +364,7 @@ async function drawBlock(
           id: view.row.id,
           title: view.row.title,
           detail: detail ? plain(await evaluate(detail, view, reader.clock)) : null,
+          ...(block.link ? { link: webAddress(await view.get(block.link)) } : {}),
         });
       }
       return { ...base, items, action: block.action, actions };
@@ -359,16 +372,29 @@ async function drawBlock(
     case 'kanban': {
       const views = await filtered(block.kind, block.where);
       const field = reader.model(block.kind)?.fields.find((one) => one.name === block.by);
-      const columns: Record<string, { id: string; title: string }[]> = {};
+      const columns: Record<string, Record<string, unknown>[]> = {};
       for (const option of field?.options ?? []) columns[option] = [];
+      const detail = block.detail ? parse(block.detail) : null;
+      const badge = block.badge ? parse(block.badge) : null;
       for (const view of views.slice(0, 300)) {
         const value = String((await view.get(block.by)) ?? '—');
-        (columns[value] ??= []).push({ id: view.row.id, title: view.row.title });
+        (columns[value] ??= []).push({
+          id: view.row.id,
+          title: view.row.title,
+          ...(detail ? { detail: plain(await evaluate(detail, view, reader.clock)) } : {}),
+          ...(badge ? { badge: plain(await evaluate(badge, view, reader.clock)) } : {}),
+          ...(block.link ? { link: webAddress(await view.get(block.link)) } : {}),
+        });
       }
+      const muted = new Set(block.muted ?? []);
       return {
         ...base,
         by: block.by,
-        columns: Object.entries(columns).map(([name, items]) => ({ name, items })),
+        columns: Object.entries(columns).map(([name, items]) => ({
+          name,
+          items,
+          ...(muted.has(name) ? { muted: true } : {}),
+        })),
       };
     }
     case 'calendar': {

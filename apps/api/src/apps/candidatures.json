@@ -475,6 +475,44 @@
         ],
         "columns": ["role", "offer", "state", "appreciation"]
       }
+    },
+    {
+      "title": "Criterion",
+      "data": {
+        "label": {
+          "fr": "Critère de CV",
+          "en": "CV criterion"
+        },
+        "fields": [
+          {
+            "name": "poids",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "label": {
+              "fr": "Poids",
+              "en": "Weight"
+            }
+          },
+          {
+            "name": "instruction",
+            "type": "long_text",
+            "label": {
+              "fr": "Ce que l’IA vérifie",
+              "en": "What the AI checks"
+            }
+          },
+          {
+            "name": "ordre",
+            "type": "number",
+            "label": {
+              "fr": "Ordre",
+              "en": "Order"
+            }
+          }
+        ],
+        "columns": ["poids", "instruction"]
+      }
     }
   ],
   "pages": [
@@ -614,6 +652,18 @@
             }
           },
           {
+            "block": "table",
+            "title": {
+              "fr": "Ma grille d’appréciation des CV",
+              "en": "My CV grid"
+            },
+            "query": {
+              "kind": "Criterion",
+              "fields": ["poids", "instruction"],
+              "sort": "ordre"
+            }
+          },
+          {
             "block": "kanban",
             "title": {
               "fr": "Candidatures",
@@ -725,9 +775,18 @@
       "site d’emploi",
       "sites d’offres"
     ],
-    "watches": ["JobSearch", "Source", "JobOffer", "Capture", "Application", "Fichier", "CV"],
-    "reads": ["JobSearch", "Source", "JobOffer", "Capture", "Application", "CV"],
-    "writes": ["JobSearch", "Source", "JobOffer", "Application", "CV"],
+    "watches": [
+      "JobSearch",
+      "Source",
+      "JobOffer",
+      "Capture",
+      "Application",
+      "Fichier",
+      "CV",
+      "Criterion"
+    ],
+    "reads": ["JobSearch", "Source", "JobOffer", "Capture", "Application", "CV", "Criterion"],
+    "writes": ["JobSearch", "Source", "JobOffer", "Application", "CV", "Criterion"],
     "ask": [
       {
         "fr": "Quel poste, où, et quel contrat ?",
@@ -736,11 +795,15 @@
       {
         "fr": "Je te propose des sites où chercher ?",
         "en": "Shall I propose sites to search?"
+      },
+      {
+        "fr": "On fixe ta grille d’appréciation des CV ?",
+        "en": "Shall we set your CV grid?"
       }
     ],
     "instructions": {
-      "fr": "Sa recherche : « JobSearch » (poste, lieu, contrat ; « mots » : une idée par ligne, formes séparées par |). Ses sites : « Source » (recette : url avec {poste}, {lieu}, schema { base, fields } ou treg ; essaie avec parcourir ; « lien » prêt à ouvrir). À 7 h les offres arrivent notées en « JobOffer ». CV : un « CV » maître (Markdown) et un modèle (HTML avec {{contenu}}). Pour une offre : lis-la (parcourir url), écris un « CV » adapté relié à l’offre, puis pdf du modèle rempli ; le fichier se relie au CV, état prêt. Elle postule : une « Application » reliée à l’offre, « due » = relance. Rien n’est envoyé sans son oui.",
-      "en": "Her search: « JobSearch » (role, place, contract; « mots »: one idea per line, forms separated by |). Her sites: « Source » (recipe: url with {poste}, {lieu}, schema { base, fields } or treg; try with parcourir; « lien » ready to open). At 7 offers arrive scored as « JobOffer ». CVs: a master « CV » (Markdown) and a template (HTML with {{contenu}}). For an offer: read it (parcourir url), write a tailored « CV » linked to the offer, then pdf of the filled template; link the file to the CV, state ready. She applies: an « Application » linked to the offer, « due » = follow-up. Nothing is sent without her yes."
+      "fr": "Sa recherche : « JobSearch » (poste, lieu, contrat ; « mots » : une idée par ligne, formes séparées par |). Ses sites : « Source » (recette ; essaie avec parcourir ; « lien » prêt à ouvrir). À 7 h les offres arrivent notées en « JobOffer ». CV : un « CV » maître (Markdown) et un modèle (HTML avec {{contenu}}). Pour une offre : lis-la (parcourir), renseigne-toi sur l’entreprise (chercher), écris un « CV » adapté relié à l’offre, sans rien inventer ; note-le sur 100 avec ses « Criterion » (poids, instruction) : appreciation + avis critère par critère. À 80 ou plus : pdf du modèle rempli, fichier relié, état prêt. Elle postule : une « Application », « due » = relance. Rien n’est envoyé sans son oui.",
+      "en": "Her search: « JobSearch » (role, place, contract; « mots »: one idea per line, forms separated by |). Her sites: « Source » (recipe; try with parcourir; « lien » ready to open). At 7 offers arrive scored as « JobOffer ». CVs: a master « CV » (Markdown) and a template (HTML with {{contenu}}). For an offer: read it (parcourir), learn about the company (chercher), write a tailored « CV » linked to the offer, inventing nothing; score it out of 100 with her « Criterion » entries (weight, instruction): appreciation + review per criterion. At 80 or more: pdf of the filled template, file linked, state ready. She applies: an « Application », « due » = follow-up. Nothing is sent without her yes."
     },
     "capabilities": ["chercher", "parcourir", "pdf"],
     "bridges": []

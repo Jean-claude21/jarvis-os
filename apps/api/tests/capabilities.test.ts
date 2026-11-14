@@ -16,30 +16,30 @@ const port = vi.hoisted(() => {
 const catalog = {
   services: [
     {
-      name: 'offres_emploi',
-      title: 'Offres d’emploi',
-      does: 'Trouver des offres d’emploi',
-      examples: ['je cherche un stage'],
+      name: 'chercher',
+      title: 'Chercher sur le web',
+      does: 'Chercher sur le web',
+      examples: ['trouve les sites où chercher un stage'],
       effect: 'reads',
-      description: 'Finds job offers.',
-      input: { type: 'object', properties: { query: { type: 'string' } } },
-      writes: { kind: 'Offre', match: 'url' },
-      long: true,
+      description: 'Searches the web.',
+      input: { type: 'object', properties: { queries: { type: 'array' } } },
+      long: false,
       minutes: 15,
-      path: '/jobs/offres_emploi',
+      path: '/jobs/chercher',
       ready: true,
     },
     {
-      name: 'lire_page',
-      title: 'Lire une page',
-      does: 'Lire une page web',
-      examples: ['lis cette offre'],
+      name: 'parcourir',
+      title: 'Parcourir des sites',
+      does: 'Parcourir des sites selon une recette',
+      examples: ['regarde ces sites chaque matin'],
       effect: 'reads',
-      description: 'Reads a page.',
-      input: { type: 'object', properties: { url: { type: 'string' } } },
-      long: false,
-      minutes: 15,
-      path: '/jobs/lire_page',
+      description: 'Reads sites by a recipe.',
+      input: { type: 'object', properties: { sources: { type: 'array' } } },
+      writes: { kind: 'Capture', match: 'url', raw: 'Capture' },
+      long: true,
+      minutes: 20,
+      path: '/jobs/parcourir',
       ready: true,
     },
     {
@@ -79,7 +79,7 @@ beforeAll(async () => {
       if (request.url === '/catalog') return response.end(JSON.stringify(catalog));
       const read = JSON.parse(body || '{}') as Record<string, unknown>;
       asked.push({ url: request.url, auth: request.headers.authorization, body: read });
-      if (request.url === '/jobs/lire_page')
+      if (request.url === '/jobs/chercher')
         return response.end(JSON.stringify({ items: [{ title: 'Une offre', text: 'Stage IA' }] }));
       response.statusCode = 202;
       response.end(JSON.stringify({ accepted: true, job: 'job_1' }));
@@ -100,11 +100,7 @@ describe('the Atelier, reached by Jarvis itself', () => {
     const listed = (await (await ama.call('/api/capabilities')).json()) as {
       capabilities: { name: string; does: string; apps: string[] }[];
     };
-    expect(listed.capabilities.map((one) => one.name)).toEqual([
-      'offres_emploi',
-      'lire_page',
-      'pdf',
-    ]);
+    expect(listed.capabilities.map((one) => one.name)).toEqual(['chercher', 'parcourir', 'pdf']);
     expect(listed.capabilities[0]!.apps).toContain('Candidatures');
     const told = await claude.call<{ capabilities: { name: string; apps: string[] }[] }>(
       'capabilities',
@@ -118,11 +114,11 @@ describe('the Atelier, reached by Jarvis itself', () => {
 
   it('runs short work at once', async () => {
     const read = await claude.call<{ items: { title: string }[] }>('capabilities', {
-      run: 'lire_page',
-      input: { url: 'https://example.com/offre' },
+      run: 'chercher',
+      input: { queries: ['stage IA Rouen'] },
     });
     expect(read.value.items[0]!.title).toBe('Une offre');
-    expect(asked.at(-1)).toMatchObject({ url: '/jobs/lire_page', auth: 'Bearer atelier-test-key' });
+    expect(asked.at(-1)).toMatchObject({ url: '/jobs/chercher', auth: 'Bearer atelier-test-key' });
   });
 
   it('runs long work from a conversation: the PDF it makes is kept as her file', async () => {
@@ -170,10 +166,10 @@ describe('the Atelier, reached by Jarvis itself', () => {
               {
                 call: {
                   connection: 'Atelier',
-                  path: '/jobs/offres_emploi',
-                  include: 'JobSearch',
+                  path: '/jobs/parcourir',
+                  include: { searches: 'JobSearch', sources: 'Source' },
                   long: true,
-                  save: { kind: 'JobOffer', match: 'url', title: '{title} — {company}' },
+                  save: { kind: 'JobOffer', match: 'url', title: '{title}', raw: 'Capture' },
                 },
               },
             ],
@@ -182,14 +178,20 @@ describe('the Atelier, reached by Jarvis itself', () => {
       ],
     });
     await ama.json('/api/save', {
+      entries: [{ kind: 'Source', title: 'Un site', data: { url: 'https://s.com/?q={poste}' } }],
+    });
+    await ama.json('/api/save', {
       entries: [
         { kind: 'JobSearch', title: 'Stage IA', data: { poste: 'stage IA', lieu: 'Rouen' } },
       ],
     });
     const sent = asked.at(-1)!;
-    expect(sent).toMatchObject({ url: '/jobs/offres_emploi', auth: 'Bearer atelier-test-key' });
-    expect(sent.body.entries).toEqual([
+    expect(sent).toMatchObject({ url: '/jobs/parcourir', auth: 'Bearer atelier-test-key' });
+    expect(sent.body.searches).toEqual([
       expect.objectContaining({ title: 'Stage IA', poste: 'stage IA', lieu: 'Rouen' }),
+    ]);
+    expect(sent.body.sources).toEqual([
+      expect.objectContaining({ title: 'Un site', url: 'https://s.com/?q={poste}' }),
     ]);
     const work = sent.body.jarvis as {
       execution: string;
@@ -210,5 +212,18 @@ describe('the Atelier, reached by Jarvis itself', () => {
       }),
     });
     expect(((await received.json()) as { created: number }).created).toBe(1);
+    // What could not be structured is kept raw, with the same token.
+    const raw = await withToken(work.token, '/api/receive', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        kind: 'Capture',
+        match: 'url',
+        execution: work.execution,
+        items: [{ title: 'Une page', url: 'https://s.com/2', source: 's.com', text: '# Offres' }],
+      }),
+    });
+    expect(raw.status).toBe(200);
+    expect(((await raw.json()) as { created: number }).created).toBe(1);
   });
 });

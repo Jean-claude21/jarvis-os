@@ -500,9 +500,12 @@ export async function mcpServerFor(
             kind: z.string().min(1).max(80),
             match: z.string().min(1).max(60).optional(),
             title: z.string().min(1).max(300).optional(),
+            raw: z.string().min(1).max(80).optional(),
           })
           .optional()
-          .describe('Where what it finds goes (a kind of hers); its own kind when absent.'),
+          .describe(
+            'Where what it finds goes: structured items to `kind` (their fields by name), raw ones to `raw` (« Capture » by default).',
+          ),
         about: z.string().min(1).max(64).optional().describe('The entry the work concerns.'),
         agreed: z.boolean().default(false),
         space: spaceArg,
@@ -513,7 +516,14 @@ export async function mcpServerFor(
       async (args: {
         run?: string | undefined;
         input: Record<string, unknown>;
-        save?: { kind: string; match?: string | undefined; title?: string | undefined } | undefined;
+        save?:
+          | {
+              kind: string;
+              match?: string | undefined;
+              title?: string | undefined;
+              raw?: string | undefined;
+            }
+          | undefined;
         about?: string | undefined;
         agreed: boolean;
         space?: string | undefined;
@@ -542,6 +552,7 @@ export async function mcpServerFor(
               kind: args.save.kind,
               ...(args.save.match ? { match: args.save.match } : {}),
               ...(args.save.title ? { title: args.save.title } : {}),
+              ...(args.save.raw ? { raw: args.save.raw } : {}),
             }
           : undefined;
         return runCapability(

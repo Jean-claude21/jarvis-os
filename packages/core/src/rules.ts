@@ -61,14 +61,27 @@ export const actionSchema = z.union([
         path: z.string().trim().max(300).optional(),
         tool: z.string().trim().min(1).max(120).optional(),
         body: z.record(z.string(), value).optional(),
-        /** Her entries of this kind sent along, under `entries` (her criteria). */
-        include: z.string().trim().min(1).max(80).optional(),
+        /**
+         * Her entries sent along: of one kind, under `entries` (her criteria) — or several, each
+         * under its name ({ searches: "JobSearch", sources: "Source" }, spec 061).
+         */
+        include: z
+          .union([
+            z.string().trim().min(1).max(80),
+            z.record(
+              z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
+              z.string().trim().min(1).max(80),
+            ),
+          ])
+          .optional(),
         save: z
           .object({
             kind: z.string().trim().min(1).max(80),
             at: z.string().trim().min(1).max(120).optional(),
             match: z.string().trim().min(1).max(60).optional(),
             title: z.string().trim().min(1).max(300).optional(),
+            /** Where what could not be structured goes, as read (spec 061): « Capture ». */
+            raw: z.string().trim().min(1).max(80).optional(),
           })
           .optional(),
         /** Spec 057: the service answers later, with a work token bound to the execution. */
@@ -155,6 +168,9 @@ function formulasIn(template: string): string[] {
   if (template.startsWith('=')) return [template.slice(1)];
   return [...template.matchAll(/\{([^{}]+)\}/g)].map((match) => match[1]!);
 }
+
+/** Where long work keeps what it could not structure, as read (spec 061). */
+export const RAW_KIND = 'Capture';
 
 const fold = (one: string) => one.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
 
@@ -320,14 +336,18 @@ async function act(
       const body: Record<string, unknown> = {};
       for (const [name, raw] of Object.entries(action.call.body ?? {}))
         body[name] = await valueOf(raw, scope, reader);
-      if (action.call.include) {
+      const included =
+        typeof action.call.include === 'string'
+          ? { entries: action.call.include }
+          : (action.call.include ?? {});
+      for (const [name, kind] of Object.entries(included)) {
         const { rows } = await tx.query<{ title: string; data: Record<string, unknown> }>(
           `select title, data - 'text' as data from entry
             where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
             order by updated_at desc limit 20`,
-          [spaceId, action.call.include],
+          [spaceId, kind],
         );
-        body.entries = rows.map((row) => ({ title: row.title, ...row.data }));
+        body[name] = rows.map((row) => ({ title: row.title, ...row.data }));
       }
       if (entryId && scope) body.entry = { id: entryId, title: (await scope.get('title')) ?? null };
       // Every call leaves its execution (spec 057): long work gets a token to answer with.
@@ -341,7 +361,10 @@ async function act(
           about: rule.id,
           ...(action.call.long ? { long: true } : {}),
           ...(action.call.minutes ? { minutes: action.call.minutes } : {}),
-          ...(action.call.save ? { kinds: [action.call.save.kind] } : {}),
+          // What it structures goes to her kind; what it cannot, raw (« Capture »).
+          ...(action.call.save
+            ? { kinds: [action.call.save.kind, action.call.save.raw ?? RAW_KIND] }
+            : {}),
           ...(action.call.lend ? { lend: action.call.lend } : {}),
         },
         reader.clock.now,

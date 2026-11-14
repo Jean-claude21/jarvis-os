@@ -202,6 +202,7 @@ export {
   actionSchema,
   checkRule,
   RULE_DEPTH,
+  RAW_KIND,
   RULE_KIND,
   ruleDataSchema,
   rulesOf,

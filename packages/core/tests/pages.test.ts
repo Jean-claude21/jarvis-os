@@ -197,7 +197,14 @@ const page = {
       action: { label: 'Payée', set: { etat: 'payée' } },
       more: [{ label: 'Reportée', set: { etat: 'reportée' } }],
     },
-    { block: 'kanban', title: 'Obligations', kind: 'Obligation', by: 'etat' },
+    {
+      block: 'kanban',
+      title: 'Obligations',
+      kind: 'Obligation',
+      by: 'etat',
+      detail: 'due',
+      muted: ['payée'],
+    },
     {
       block: 'heatmap',
       title: 'Jours de dépense',
@@ -299,8 +306,12 @@ describe('a page', () => {
       'Reportée',
     ]);
     expect(kanban?.columns).toEqual([
-      { name: 'à payer', items: [{ id: ids.Loyer, title: 'Loyer' }] },
-      { name: 'payée', items: [{ id: ids['Électricité'], title: 'Électricité' }] },
+      { name: 'à payer', items: [{ id: ids.Loyer, title: 'Loyer', detail: '2026-11-05' }] },
+      {
+        name: 'payée',
+        items: [expect.objectContaining({ id: ids['Électricité'], title: 'Électricité' })],
+        muted: true,
+      },
     ]);
     expect(heatmap).toMatchObject({ done: 3 });
     expect((form?.fields as { name: string }[]).map((one) => one.name)).toEqual([

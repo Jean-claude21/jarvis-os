@@ -98,6 +98,15 @@
         },
         "fields": [
           {
+            "name": "lien",
+            "type": "url",
+            "label": {
+              "fr": "Lien",
+              "en": "Link"
+            },
+            "help": "Le site, prêt à ouvrir (une recherche déjà remplie)."
+          },
+          {
             "name": "url",
             "type": "text",
             "label": {
@@ -144,7 +153,7 @@
             }
           }
         ],
-        "columns": ["url", "active"]
+        "columns": ["lien", "active", "notes"]
       }
     },
     {
@@ -369,6 +378,103 @@
         ],
         "columns": ["company", "status", "sent_on", "due", "outcome"]
       }
+    },
+    {
+      "title": "CV",
+      "data": {
+        "label": {
+          "fr": "CV",
+          "en": "CV"
+        },
+        "fields": [
+          {
+            "name": "role",
+            "type": "choice",
+            "label": {
+              "fr": "Rôle",
+              "en": "Role"
+            },
+            "options": ["master", "tailored", "template"],
+            "optionLabels": {
+              "master": {
+                "fr": "CV maître",
+                "en": "master CV"
+              },
+              "tailored": {
+                "fr": "adapté à une offre",
+                "en": "tailored to an offer"
+              },
+              "template": {
+                "fr": "modèle de mise en page",
+                "en": "layout template"
+              }
+            },
+            "default": "tailored"
+          },
+          {
+            "name": "offer",
+            "type": "link",
+            "target": "JobOffer",
+            "inverse": "cvs",
+            "label": {
+              "fr": "Offre",
+              "en": "Offer"
+            }
+          },
+          {
+            "name": "content",
+            "type": "long_text",
+            "label": {
+              "fr": "Contenu",
+              "en": "Content"
+            },
+            "help": "Maître et adapté : Markdown. Modèle : une page HTML avec {{contenu}}."
+          },
+          {
+            "name": "appreciation",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "label": {
+              "fr": "Appréciation de l’IA",
+              "en": "AI appraisal"
+            }
+          },
+          {
+            "name": "avis",
+            "type": "long_text",
+            "label": {
+              "fr": "Avis",
+              "en": "Review"
+            }
+          },
+          {
+            "name": "state",
+            "type": "choice",
+            "label": {
+              "fr": "État",
+              "en": "State"
+            },
+            "options": ["draft", "ready", "sent"],
+            "optionLabels": {
+              "draft": {
+                "fr": "brouillon",
+                "en": "draft"
+              },
+              "ready": {
+                "fr": "prêt (PDF)",
+                "en": "ready (PDF)"
+              },
+              "sent": {
+                "fr": "envoyé",
+                "en": "sent"
+              }
+            },
+            "default": "draft"
+          }
+        ],
+        "columns": ["role", "offer", "state", "appreciation"]
+      }
     }
   ],
   "pages": [
@@ -384,12 +490,40 @@
           {
             "block": "stat",
             "title": {
-              "fr": "Offres à regarder",
-              "en": "Offers to look at"
+              "fr": "Nouvelles en IA",
+              "en": "New on AI"
             },
             "query": {
               "kind": "JobOffer",
-              "where": "status = 'new'",
+              "where": "status = 'new' and score >= 100",
+              "aggregate": {
+                "n": "count()"
+              }
+            }
+          },
+          {
+            "block": "stat",
+            "title": {
+              "fr": "À creuser",
+              "en": "To look into"
+            },
+            "query": {
+              "kind": "JobOffer",
+              "where": "status = 'interesting'",
+              "aggregate": {
+                "n": "count()"
+              }
+            }
+          },
+          {
+            "block": "stat",
+            "title": {
+              "fr": "CV prêts",
+              "en": "CVs ready"
+            },
+            "query": {
+              "kind": "CV",
+              "where": "state = 'ready'",
               "aggregate": {
                 "n": "count()"
               }
@@ -410,16 +544,17 @@
             }
           },
           {
-            "block": "stat",
+            "block": "table",
             "title": {
-              "fr": "Pages à trier (brut)",
-              "en": "Pages to sort (raw)"
+              "fr": "Dernière collecte",
+              "en": "Last collection"
             },
             "query": {
-              "kind": "Capture",
-              "aggregate": {
-                "n": "count()"
-              }
+              "kind": "Execution",
+              "where": "service = 'Atelier'",
+              "fields": ["status", "started", "error"],
+              "sort": "-started",
+              "limit": 1
             }
           },
           {
@@ -429,7 +564,7 @@
               "en": "New offers that fit"
             },
             "kind": "JobOffer",
-            "where": "status = 'new' and score >= 50",
+            "where": "status = 'new' and score >= 100",
             "detail": "reasons",
             "action": {
               "label": "À creuser",
@@ -450,19 +585,32 @@
                   "status": "dismissed"
                 }
               }
-            ]
+            ],
+            "link": "url"
+          },
+          {
+            "block": "kanban",
+            "title": {
+              "fr": "Mes offres en IA",
+              "en": "My AI offers"
+            },
+            "kind": "JobOffer",
+            "by": "status",
+            "where": "score >= 100",
+            "detail": "company",
+            "badge": "score",
+            "link": "url",
+            "muted": ["dismissed"]
           },
           {
             "block": "table",
             "title": {
-              "fr": "À creuser",
-              "en": "Interesting"
+              "fr": "Mes CV",
+              "en": "My CVs"
             },
             "query": {
-              "kind": "JobOffer",
-              "where": "status = 'interesting'",
-              "fields": ["company", "location", "score", "url"],
-              "sort": "-score"
+              "kind": "CV",
+              "fields": ["role", "offer", "state", "appreciation"]
             }
           },
           {
@@ -482,7 +630,7 @@
             },
             "query": {
               "kind": "Source",
-              "fields": ["url", "active", "notes"]
+              "fields": ["lien", "active", "notes"]
             }
           },
           {
@@ -577,9 +725,9 @@
       "site d’emploi",
       "sites d’offres"
     ],
-    "watches": ["JobSearch", "Source", "JobOffer", "Capture", "Application", "Fichier"],
-    "reads": ["JobSearch", "Source", "JobOffer", "Capture", "Application"],
-    "writes": ["JobSearch", "Source", "JobOffer", "Application"],
+    "watches": ["JobSearch", "Source", "JobOffer", "Capture", "Application", "Fichier", "CV"],
+    "reads": ["JobSearch", "Source", "JobOffer", "Capture", "Application", "CV"],
+    "writes": ["JobSearch", "Source", "JobOffer", "Application", "CV"],
     "ask": [
       {
         "fr": "Quel poste, où, et quel contrat ?",
@@ -591,8 +739,8 @@
       }
     ],
     "instructions": {
-      "fr": "Sa recherche est un « JobSearch » (poste, lieu, contrat ; « mots » : une idée par ligne, ses formes séparées par |). Les sites sont des « Source » : trouve-les avec chercher, écris leur recette (url avec {poste}, {lieu} ; js si construit par script ; schema { base, fields } vers les champs du « JobOffer » : title, url, company, location, published ; ou treg { route, body }) et essaie-la avec parcourir avant de la garder. À 7 h, chaque source est lue pour chaque recherche : le structuré devient des « JobOffer » notées, le reste une « Capture » à ranger quand elle le demande. Une source en échec : répare sa recette. Elle postule : une « Application » reliée à l’offre (offer), « due » = relance. Lettre ou CV : pdf. Rien n’est envoyé sans son oui.",
-      "en": "Her search is a « JobSearch » (role, place, contract; « mots »: one idea per line, forms separated by |). Sites are « Source » entries: find them with chercher, write their recipe (url with {poste}, {lieu}; js if built by script; schema { base, fields } into « JobOffer » fields: title, url, company, location, published; or treg { route, body }) and try it with parcourir before keeping it. At 7, each source is read for each search: structured items become scored « JobOffer », the rest a « Capture » to file when she asks. A failing source: repair its recipe. She applies: an « Application » linked to the offer (offer), « due » = follow-up. Letter or CV: pdf. Nothing is sent without her yes."
+      "fr": "Sa recherche : « JobSearch » (poste, lieu, contrat ; « mots » : une idée par ligne, formes séparées par |). Ses sites : « Source » (recette : url avec {poste}, {lieu}, schema { base, fields } ou treg ; essaie avec parcourir ; « lien » prêt à ouvrir). À 7 h les offres arrivent notées en « JobOffer ». CV : un « CV » maître (Markdown) et un modèle (HTML avec {{contenu}}). Pour une offre : lis-la (parcourir url), écris un « CV » adapté relié à l’offre, puis pdf du modèle rempli ; le fichier se relie au CV, état prêt. Elle postule : une « Application » reliée à l’offre, « due » = relance. Rien n’est envoyé sans son oui.",
+      "en": "Her search: « JobSearch » (role, place, contract; « mots »: one idea per line, forms separated by |). Her sites: « Source » (recipe: url with {poste}, {lieu}, schema { base, fields } or treg; try with parcourir; « lien » ready to open). At 7 offers arrive scored as « JobOffer ». CVs: a master « CV » (Markdown) and a template (HTML with {{contenu}}). For an offer: read it (parcourir url), write a tailored « CV » linked to the offer, then pdf of the filled template; link the file to the CV, state ready. She applies: an « Application » linked to the offer, « due » = follow-up. Nothing is sent without her yes."
     },
     "capabilities": ["chercher", "parcourir", "pdf"],
     "bridges": []

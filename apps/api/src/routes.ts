@@ -115,6 +115,7 @@ import { bodyLimit } from 'hono/body-limit';
 import type pg from 'pg';
 import { z } from 'zod';
 import { shippedApp, shippedApps, shippedRoles } from './apps';
+import { usedBy } from './atelier';
 import { telegramLink } from './telegram';
 import { briefText, channelOf, sendTelegram } from './watcher';
 import type { Auth } from './auth';
@@ -215,6 +216,8 @@ export function apiRoutes(deps: {
       scope?.executionId &&
       !(
         c.req.path === '/api/receive' ||
+        // A file it made (a PDF, spec 060), within the kinds of its token.
+        (c.req.path === '/api/files' && c.req.method === 'POST') ||
         c.req.path.startsWith(`/api/executions/${scope.executionId}`)
       )
     )
@@ -731,6 +734,26 @@ export function apiRoutes(deps: {
         return got;
       }),
     );
+  });
+
+  // What Jarvis can do for her through its Atelier (spec 060), each with the apps that use it.
+  api.get('/capabilities', async (c) => {
+    const service = deps.connectors.atelier;
+    if (!service) return c.json({ capabilities: [] });
+    const by = usedBy(Object.entries(shippedRoles).map(([app, role]) => ({ app, role })));
+    const list = await service.capabilities();
+    return c.json({
+      capabilities: list.map((one) => ({
+        name: one.name,
+        title: one.title,
+        does: one.does,
+        examples: one.examples,
+        effect: one.effect,
+        long: one.long,
+        ready: one.ready,
+        apps: by[one.name] ?? [],
+      })),
+    });
   });
 
   // Her activities (spec 057): everything to do across her spaces, what needs her first.

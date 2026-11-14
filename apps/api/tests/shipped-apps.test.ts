@@ -17,6 +17,7 @@ describe('the shipped apps', () => {
         'Maison',
         'Garanties',
         'Journal',
+        'Candidatures',
       ]),
     );
   });

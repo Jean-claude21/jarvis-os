@@ -21,6 +21,7 @@ import { callTool, headersOf, needsAgreement, probe, readResource, type Reach } 
 import { presetClientFor } from './catalog';
 import { signInProvider, type SignIn } from './oauth-client';
 import { open, seal } from './secrets';
+import { ATELIER, atelier as atelierOf, atelierFromEnv, type Atelier } from './atelier';
 
 // Her connectors as every door uses them (spec 025): the web account and the MCP door add, check,
 // change, cut and call them here. The server is reached outside any transaction; what it answered
@@ -69,7 +70,11 @@ async function knock(url: string, headers: Record<string, string>) {
   try {
     const answer = await fetch(url, { headers, signal: AbortSignal.timeout(10_000) });
     if (answer.status === 401 || answer.status === 403)
-      return { ...base, state: 'refused' as const, reason: `It answered ${answer.status}.` };
+      return {
+        ...base,
+        state: 'refused' as const,
+        reason: `It answered ${answer.status}.`,
+      };
     if (answer.status >= 500)
       return { ...base, state: 'unreachable' as const, reason: `It answered ${answer.status}.` };
     return { ...base, state: 'connected' as const };
@@ -78,7 +83,15 @@ async function knock(url: string, headers: Record<string, string>) {
   }
 }
 
-export function connectorService(deps: { db: pg.Pool; key: Buffer; publicUrl: string }) {
+export function connectorService(deps: {
+  db: pg.Pool;
+  key: Buffer;
+  publicUrl: string;
+  /** Jarvis's own Atelier (spec 060); read from ATELIER_URL / ATELIER_KEY when not given. */
+  atelier?: Atelier | null;
+}) {
+  const settings = deps.atelier === undefined ? atelierFromEnv() : null;
+  const builtIn: Atelier | null = deps.atelier ?? (settings ? atelierOf(settings) : null);
   /** Where a server sends her back after she signed in (spec 025, US4). */
   const redirectUrl = `${deps.publicUrl.replace(/\/$/, '')}/api/connectors/callback`;
   const as = <T>(person: string, work: Parameters<typeof asPerson<T>>[2]) =>
@@ -142,6 +155,14 @@ export function connectorService(deps: { db: pg.Pool; key: Buffer; publicUrl: st
         [request.spaceId, request.connection],
       ),
     );
+    // Jarvis's own Atelier (spec 060): reached by Jarvis, never one of her connections.
+    if (!rows[0] && builtIn && request.connection.trim().toLowerCase() === ATELIER.toLowerCase()) {
+      if (request.tool) throw new Error(`Call «${ATELIER}»: give a path (/jobs/<capability>).`);
+      const work = request.body.jarvis;
+      if (work && typeof work === 'object' && !Array.isArray(work))
+        request.body.jarvis = { ...work, url: `${deps.publicUrl.replace(/\/$/, '')}/api` };
+      return builtIn.post(request.path ?? '', request.body);
+    }
     if (!rows[0]) throw new Error(`Call «${request.connection}»: no connection of that name here.`);
     const { connector, headers } = await reach(request.person, rows[0].id);
     const actor: Actor = { person: request.person, door: 'rule' };
@@ -205,6 +226,8 @@ export function connectorService(deps: { db: pg.Pool; key: Buffer; publicUrl: st
   };
 
   return {
+    /** Jarvis's own Atelier, when this server reaches one (spec 060). */
+    atelier: builtIn,
     callOut,
     list: (person: string, spaceIds: string[]) => as(person, (tx) => connectorsOf(tx, spaceIds)),
 

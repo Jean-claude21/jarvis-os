@@ -54,6 +54,20 @@ export const roleSchema = z.object({
   bridges: z.array(bridgeSchema).max(20).default([]),
   /** What it watches for in her life (spec 050): counted (or summed) over 30 days against the 30 before. */
   patterns: z.array(appPatternSchema).max(20).default([]),
+  /**
+   * The capabilities of the Atelier it uses (spec 060): « offres_emploi », « pdf »… — Jarvis reaches
+   * them itself; she never connects or names them.
+   */
+  capabilities: z
+    .array(
+      z
+        .string()
+        .trim()
+        .regex(/^[a-z0-9_]+$/)
+        .max(60),
+    )
+    .max(20)
+    .default([]),
 });
 export type Role = z.infer<typeof roleSchema>;
 

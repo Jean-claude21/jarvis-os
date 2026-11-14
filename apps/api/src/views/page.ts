@@ -98,6 +98,7 @@ function table(columns, rows, extra, kind) {
 }
 const asRows = (b, cols) => b.items.map((it) => Object.assign({ id: it.id, title: it.title }, it.values));
 const draw = {
+  live: (b) => card(b, '<p class="muted">' + esc(lang() === 'en' ? 'A live block: open the page in Jarvis to see it.' : 'Un bloc vivant : ouvre la page dans Jarvis pour le voir.') + '</p>'),
   datatable: (b) => card(b, table(['title'].concat(b.columns), asRows(b), '', b.kind), true),
   review: (b) => card(b, table(['title'].concat(b.subtitle || [], b.badge ? [b.badge] : [], b.link ? [b.link] : []), asRows(b), '', b.kind), true),
   funnel: (b) => { const top = Math.max(1, b.steps[0] ? b.steps[0].count : 1);

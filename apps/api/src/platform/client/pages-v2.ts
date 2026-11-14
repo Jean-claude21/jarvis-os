@@ -552,7 +552,10 @@ const DT = {};
 const dtOps = ['eq', 'ne', 'contains', 'gte', 'lte'];
 function dtState(at) {
   const key = (shownPage && shownPage.id) + ':' + at;
-  return DT[key] || (DT[key] = { q: '', facets: {}, adv: [], join: 'and', sort: null, page: 0, sel: [], pick: null, advOpen: false });
+  if (DT[key]) return DT[key];
+  let kept = {};
+  try { kept = JSON.parse(localStorage.getItem('jos.dt.' + key) || '{}') || {}; } catch (e) { kept = {}; }
+  return (DT[key] = Object.assign({ q: '', facets: {}, adv: [], join: 'and', sort: null, page: 0, sel: [], pick: null, advOpen: false }, kept, { page: 0, sel: [] }));
 }
 const dtText = (v) => v == null ? '' : Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? String(v.address || '') : String(v);
 function dtVal(it, f) { return f === 'title' ? it.title : it.values[f]; }
@@ -672,7 +675,10 @@ function dtReviewHtml(b, at, lab, olab, webLink, fmt) {
 function dtMount(el, at, draw) {
   const b = shownPage.blocks[at];
   const st = dtState(at);
-  const redraw = () => { el.innerHTML = draw(); };
+  const redraw = () => {
+    try { localStorage.setItem('jos.dt.' + (shownPage && shownPage.id) + ':' + at, JSON.stringify({ q: st.q, facets: st.facets, adv: st.adv, join: st.join, sort: st.sort })); } catch (e) { /* a private window keeps nothing */ }
+    el.innerHTML = draw();
+  };
   const save = async (ids, n) => {
     const set = b.actions[n].set;
     await api(inSpace('/save'), { method: 'POST', body: { entries: ids.map((id) => ({ id, data: set })) } });
@@ -712,6 +718,20 @@ function dtMount(el, at, draw) {
   });
 }
 
+
+// A live block (spec 071): the component the assistant wrote, in a sandboxed frame — scripts only,
+// no session, no page, no API — given the data its block declared, her colours and her language.
+function liveDoc(b) {
+  const css = getComputedStyle(document.documentElement);
+  const theme = {};
+  ['ink', 'paper', 'sand', 'clay', 'rule', 'rule-strong', 'bark', 'primary', 'ochre', 'info', 'success', 'verify', 'error'].forEach((n) => { theme[n] = css.getPropertyValue('--' + n).trim(); });
+  const payload = { rows: b.rows, labels: b.labels || {}, theme, lang: String(typeof locale === 'string' ? locale : 'fr').slice(0, 2), title: tr(b.title) || '' };
+  const data = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{' +
+    Object.keys(theme).map((k) => '--' + k + ':' + theme[k]).join(';') +
+    '} html,body{margin:0;background:var(--paper);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif} a{color:var(--primary)}</style>' +
+    '<script>window.JARVIS=JSON.parse(decodeURIComponent(escape(atob("' + data + '"))));</scr' + 'ipt></head><body>' + b.code + '</body></html>';
+}
 const DT_DRAW = {};
 
 // The blocks of a page (an app's page, a dashboard), drawn in the mockup's markup: figures, gauges,
@@ -734,6 +754,7 @@ function blocksHtml(drawn) {
   const draw = {
     datatable: (b, at) => { DT_DRAW[at] = () => dtTableHtml(b, at, lab(b), olab(b), webLink, fmt); return v2panel(T(b), '<div class="dt-wrap" data-dt="' + at + '">' + DT_DRAW[at]() + '</div>', '', 'i-life'); },
     review: (b, at) => { DT_DRAW[at] = () => dtReviewHtml(b, at, lab(b), olab(b), webLink, fmt); return v2panel(T(b), '<div class="dt-wrap" data-dt="' + at + '">' + DT_DRAW[at]() + '</div>', '', 'i-check'); },
+    live: (b, at) => v2panel(T(b), '<iframe class="live" data-live="' + at + '" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" title="' + esc(T(b)) + '" style="height:' + Number(b.height || 360) + 'px"></iframe>', '<span class="caps faint">' + esc(W.liveBlock) + '</span>', 'i-chart'),
     funnel: (b) => { const top = Math.max(1, b.steps[0] ? b.steps[0].count : 1);
       return v2panel(T(b), '<div class="pad fn">' + b.steps.map((s, i) => '<div class="fn-row"><span class="fn-l">' + esc(oLabel(b.kind, b.by, s.name)) + '</span><div class="fn-track"><div class="fn-bar" style="width:' + Math.max(2, s.count / top * 100) + '%;background:' + SERIES2[i % SERIES2.length] + '"></div></div><span class="mono">' + esc(fmt(s.count)) + (i ? ' <small class="muted">' + Math.round(s.count / top * 100) + ' %</small>' : '') + '</span></div>').join('') + '</div>', '', 'i-chart'); },
     stat: (b) => v2kpi(T(b), esc(fmt(b.value)) + (b.unit ? '<small>' + esc(b.unit) + '</small>' : ''), '', isNum(b.value) && b.value < 0 ? 'alert' : ''),
@@ -801,6 +822,7 @@ async function drawPageInto(id, params) {
   return shownPage;
 }
 function bindBlocks(root) {
+  root.querySelectorAll('iframe[data-live]').forEach((f) => { const b = shownPage.blocks[Number(f.dataset.live)]; if (b && b.code) f.srcdoc = liveDoc(b); });
   root.querySelectorAll('[data-dt]').forEach((el) => { const at = Number(el.dataset.dt); if (DT_DRAW[at]) dtMount(el, at, DT_DRAW[at]); });
   root.querySelectorAll('[data-page-filter]').forEach((el) => el.addEventListener('change', () => {
     const h = location.hash.split('?'); const q = new URLSearchParams(h[1] || ''); q.set('f_' + el.dataset.pageFilter, el.value); location.hash = h[0] + '?' + q.toString();

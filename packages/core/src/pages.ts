@@ -16,6 +16,11 @@ export const PAGE_KIND = 'Page';
 
 /** A title: one text, or one per language `{ fr, en }`. */
 const title = z.union([z.string().trim().min(1).max(120), labelSchema]).optional();
+/** One gesture on an entry: its button, and the fields it sets. */
+const gesture = z.object({
+  label: z.string().trim().min(1).max(40),
+  set: z.record(z.string(), z.unknown()),
+});
 const formula = z.string().trim().min(1).max(1000);
 const kind = z.string().trim().min(1).max(80);
 
@@ -70,17 +75,18 @@ export const blockSchema = z.discriminatedUnion('block', [
     query: requestSchema,
     total: z.string().optional(),
   }),
-  /** Entries to act on, each with one gesture: the fields `set` sets. */
+  /**
+   * Entries to act on, each ticked by a gesture: the fields `set` sets — `action` first, then the
+   * `more` she can choose instead (« À creuser », « Postulé », « Écarter »), spec 062.
+   */
   z.object({
     block: z.literal('task_list'),
     title,
     kind,
     where: formula.optional(),
     detail: formula.optional(),
-    action: z.object({
-      label: z.string().trim().min(1).max(40),
-      set: z.record(z.string(), z.unknown()),
-    }),
+    action: gesture,
+    more: z.array(gesture).max(3).optional(),
   }),
   /** Entries in columns by a choice field. */
   z.object({
@@ -337,6 +343,7 @@ async function drawBlock(
       };
     }
     case 'task_list': {
+      const actions = [block.action, ...(block.more ?? [])];
       const views = await filtered(block.kind, block.where);
       const detail = block.detail ? parse(block.detail) : null;
       const items = [];
@@ -347,7 +354,7 @@ async function drawBlock(
           detail: detail ? plain(await evaluate(detail, view, reader.clock)) : null,
         });
       }
-      return { ...base, items, action: block.action };
+      return { ...base, items, action: block.action, actions };
     }
     case 'kanban': {
       const views = await filtered(block.kind, block.where);

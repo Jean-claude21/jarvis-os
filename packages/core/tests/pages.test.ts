@@ -195,6 +195,7 @@ const page = {
       where: "etat = 'à payer'",
       detail: 'due',
       action: { label: 'Payée', set: { etat: 'payée' } },
+      more: [{ label: 'Reportée', set: { etat: 'reportée' } }],
     },
     { block: 'kanban', title: 'Obligations', kind: 'Obligation', by: 'etat' },
     {
@@ -292,6 +293,11 @@ describe('a page', () => {
       compte: 'Banque',
     });
     expect(tasks?.items).toEqual([{ id: ids.Loyer, title: 'Loyer', detail: '2026-11-05' }]);
+    // Each entry ticked by one of her gestures, the first one first (spec 062).
+    expect((tasks as { actions?: { label: string }[] }).actions?.map((one) => one.label)).toEqual([
+      'Payée',
+      'Reportée',
+    ]);
     expect(kanban?.columns).toEqual([
       { name: 'à payer', items: [{ id: ids.Loyer, title: 'Loyer' }] },
       { name: 'payée', items: [{ id: ids['Électricité'], title: 'Électricité' }] },

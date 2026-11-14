@@ -47,11 +47,20 @@ const titleOf = (item: Record<string, unknown>, template?: string) => {
 function fit(fields: { name: string; type: string }[], data: Record<string, unknown>) {
   for (const field of fields) {
     const value = data[field.name];
+    // A day as a count of seconds (or milliseconds) since 1970, as some sites give it.
+    if (field.type === 'date' && typeof value === 'number' && Number.isFinite(value)) {
+      data[field.name] = new Date(value < 1e11 ? value * 1000 : value).toISOString().slice(0, 10);
+      continue;
+    }
     if (typeof value !== 'string') continue;
     const text = value.trim();
     if (field.type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-      const time = Date.parse(text);
-      if (!Number.isNaN(time)) data[field.name] = new Date(time).toISOString().slice(0, 10);
+      const time = /^\d{9,13}$/.test(text)
+        ? Number(text) * (text.length <= 11 ? 1000 : 1)
+        : Date.parse(text);
+      // A day it cannot read is left out rather than refusing everything sent with it.
+      if (Number.isNaN(time)) delete data[field.name];
+      else data[field.name] = new Date(time).toISOString().slice(0, 10);
     } else if (['number', 'amount', 'rating', 'progress'].includes(field.type)) {
       const number = Number(text.replace(/\s/g, '').replace(',', '.'));
       if (text && Number.isFinite(number)) data[field.name] = number;

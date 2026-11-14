@@ -205,6 +205,8 @@ body { background: var(--clay); }
 .stars { color: var(--ochre); letter-spacing: 1px; white-space: nowrap; } .stars .off { color: var(--rule-strong); }
 .pbar { height: 6px; background: var(--clay); border-radius: 1px; overflow: hidden; min-width: 70px; } .pbar i { display: block; height: 100%; background: var(--ink); }
 .vmap { height: 420px; border: 1px solid var(--rule); background: var(--clay); }
+.vmap-count { background: transparent; border: 0; box-shadow: none; color: #fff; font-weight: 600; font-size: 11px; padding: 0; }
+.vmap-count::before { display: none; }
 .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
 .gcard { display: block; background: var(--paper); border: 1px solid var(--rule); color: var(--ink); text-decoration: none; }
 .gimg { position: relative; aspect-ratio: 4 / 3; background: var(--clay); display: grid; place-items: center; overflow: hidden; }

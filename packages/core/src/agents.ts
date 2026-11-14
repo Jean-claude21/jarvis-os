@@ -13,7 +13,12 @@ export const receiveSchema = z.object({
   kind: z.string().trim().min(1).max(80),
   items: z.array(z.record(z.string(), z.unknown())).max(200),
   /** A field whose value finds the entry already there (« url »). */
-  match: z.string().trim().min(1).max(60).optional(),
+  match: z
+    .union([
+      z.string().trim().min(1).max(60),
+      z.array(z.string().trim().min(1).max(60)).min(1).max(3),
+    ])
+    .optional(),
   /** The title of each entry: « {position} — {company} »; else its title, name or first text. */
   title: z.string().trim().min(1).max(300).optional(),
 });
@@ -110,27 +115,37 @@ export async function receive(
       }
     }
     if (model) fit(model.fields, data);
-    const key = input.match ? data[input.match] : undefined;
-    if (input.match && (key === undefined || key === null || key === '')) {
+    // What tells this item from the others: one field, or several tried in order (the same offer
+    // by its fingerprint, else by its address).
+    const names = input.match === undefined ? [] : [input.match].flat();
+    const keys = names
+      .map((name) => [name, data[name]] as const)
+      .filter(([, value]) => value !== undefined && value !== null && value !== '');
+    if (names.length && !keys.length) {
       skipped += 1;
       continue;
     }
-    if (key !== undefined) {
+    if (keys.length) {
       // Twice in the same answer: once.
-      if (seen.has(String(key))) {
+      if (keys.some(([name, value]) => seen.has(`${name}:${String(value)}`))) {
         skipped += 1;
         continue;
       }
-      seen.add(String(key));
-      const { rows } = await tx.query<{ id: string }>(
-        `select id from entry
-          where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
-            and data->>$3 = $4
-          limit 1`,
-        [spaceId, input.kind, input.match, String(key)],
-      );
-      if (rows[0]) {
-        entries.push({ id: rows[0].id, data });
+      for (const [name, value] of keys) seen.add(`${name}:${String(value)}`);
+      let found: string | undefined;
+      for (const [name, value] of keys) {
+        const { rows } = await tx.query<{ id: string }>(
+          `select id from entry
+            where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
+              and data->>$3 = $4
+            limit 1`,
+          [spaceId, input.kind, name, String(value)],
+        );
+        found = rows[0]?.id;
+        if (found) break;
+      }
+      if (found) {
+        entries.push({ id: found, data });
         continue;
       }
     }

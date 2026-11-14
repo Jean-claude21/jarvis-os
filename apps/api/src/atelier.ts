@@ -114,7 +114,7 @@ export async function runCapability(
   request: {
     name: string;
     input: Record<string, unknown>;
-    save?: { kind: string; match?: string; title?: string; raw?: string };
+    save?: { kind: string; match?: string | string[]; title?: string; raw?: string };
     about?: string;
     agreed?: boolean;
   },

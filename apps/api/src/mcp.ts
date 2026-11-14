@@ -498,7 +498,9 @@ export async function mcpServerFor(
         save: z
           .object({
             kind: z.string().min(1).max(80),
-            match: z.string().min(1).max(60).optional(),
+            match: z
+              .union([z.string().min(1).max(60), z.array(z.string().min(1).max(60)).min(1).max(3)])
+              .optional(),
             title: z.string().min(1).max(300).optional(),
             raw: z.string().min(1).max(80).optional(),
           })
@@ -519,7 +521,7 @@ export async function mcpServerFor(
         save?:
           | {
               kind: string;
-              match?: string | undefined;
+              match?: string | string[] | undefined;
               title?: string | undefined;
               raw?: string | undefined;
             }

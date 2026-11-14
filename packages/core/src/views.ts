@@ -212,7 +212,17 @@ export interface ViewResult {
   calendar?: { date: string; items: { id: string; title: string; day: string }[] };
   map?: {
     field: string;
-    items: { id: string; title: string; lat: number; lng: number; address: string | null }[];
+    /** A choice that colours the pins (« type »: stage, alternance). */
+    by?: string;
+    items: {
+      id: string;
+      title: string;
+      lat: number;
+      lng: number;
+      address: string | null;
+      group?: string;
+      link?: string;
+    }[];
   };
   gallery?: { field: string; items: { id: string; title: string; file: string | null }[] };
   timeline?: {
@@ -223,6 +233,8 @@ export interface ViewResult {
   tree?: { parent: string; rows: (Record<string, unknown> & { depth: number })[] };
   /** Columns that are amounts or numbers, totalled. */
   totals: Record<string, number>;
+  /** The values each of its text fields holds (all entries of the kind): her filter picks one. */
+  values: Record<string, string[]>;
   truncated: boolean;
   view: z.infer<typeof viewDataSchema>;
 }
@@ -275,7 +287,21 @@ export async function runView(
     )?.path;
   const parent = view.parent ?? selfLink?.name;
   const where = view.filters.map((filter) => parse(filterFormula(filter)));
+  // On a map, each pin opens its web address when the kind has one (an offer's page), spec 068.
+  const webField = fields.find((field) => field.type === 'url' && !field.via)?.path;
   const rows = await reader.kindRows(view.kind, view.limit ?? 2000);
+  const values: Record<string, string[]> = {};
+  for (const field of fields) {
+    if (field.via || !['text', 'url', 'email', 'phone'].includes(field.type)) continue;
+    const found = new Set<string>();
+    for (const row of rows) {
+      const value = (row.data as Record<string, unknown>)[field.path];
+      if (typeof value === 'string' && value.trim()) found.add(value.trim());
+      if (found.size > 300) break;
+    }
+    if (found.size && found.size <= 300)
+      values[field.path] = [...found].sort((a, b) => a.localeCompare(b, 'fr'));
+  }
   await reader.around(rows.map((row) => row.id));
   const matching: EntryView[] = [];
   for (const row of rows) {
@@ -308,6 +334,8 @@ export async function runView(
         type === 'kanban' ? by : undefined,
         type === 'calendar' ? date : undefined,
         type === 'map' ? location : undefined,
+        type === 'map' ? view.by : undefined,
+        type === 'map' ? webField : undefined,
         type === 'gallery' ? image : undefined,
         type === 'timeline' ? start : undefined,
         type === 'timeline' ? end : undefined,
@@ -359,6 +387,7 @@ export async function runView(
     types,
     fields,
     columns: ['title', ...columns],
+    values,
     rows: lines.slice(0, 500),
     totals,
     truncated: lines.length > 500,
@@ -415,11 +444,13 @@ export async function runView(
               lat: place.lat,
               lng: place.lng,
               address: typeof place.address === 'string' ? place.address : null,
+              ...(view.by && line[view.by] != null ? { group: String(line[view.by]) } : {}),
+              ...(webField && typeof line[webField] === 'string' ? { link: line[webField] } : {}),
             },
           ]
         : [];
     });
-    result.map = { field: location, items };
+    result.map = { field: location, ...(view.by ? { by: view.by } : {}), items };
   }
   if (type === 'gallery' && image) {
     result.gallery = {

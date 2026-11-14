@@ -132,6 +132,46 @@ export const blockSchema = z.discriminatedUnion('block', [
   }),
   /** A view of a kind inside the page (spec 016): table, kanban, calendar, map, gallery, timeline, tree. */
   z.object({ block: z.literal('view'), title, view: viewDataSchema }),
+  /**
+   * A data table (spec 070): its entries with their columns and facets, searched, filtered, sorted
+   * and acted on in the page itself.
+   */
+  z.object({
+    block: z.literal('datatable'),
+    title,
+    kind,
+    where: formula.optional(),
+    columns: z.array(z.string().trim().min(1).max(60)).min(1).max(12),
+    facets: z.array(z.string().trim().min(1).max(60)).max(6).optional(),
+    link: z.string().trim().min(1).max(60).optional(),
+    sort: z.string().trim().min(1).max(61).optional(),
+    action: gesture.optional(),
+    more: z.array(gesture).max(3).optional(),
+  }),
+  /** A list and the record of the one picked (spec 070). */
+  z.object({
+    block: z.literal('review'),
+    title,
+    kind,
+    where: formula.optional(),
+    subtitle: z.array(z.string().trim().min(1).max(60)).max(3).optional(),
+    badge: z.string().trim().min(1).max(60).optional(),
+    fields: z.array(z.string().trim().min(1).max(60)).min(1).max(12),
+    facets: z.array(z.string().trim().min(1).max(60)).max(6).optional(),
+    link: z.string().trim().min(1).max(60).optional(),
+    sort: z.string().trim().min(1).max(61).optional(),
+    action: gesture.optional(),
+    more: z.array(gesture).max(3).optional(),
+  }),
+  /** How many entries stand at each step of a choice (spec 070): a funnel. */
+  z.object({
+    block: z.literal('funnel'),
+    title,
+    kind,
+    where: formula.optional(),
+    by: z.string().trim().min(1).max(60),
+    steps: z.array(z.string().trim().min(1).max(80)).min(2).max(8),
+  }),
 ]);
 export type Block = z.infer<typeof blockSchema>;
 
@@ -166,7 +206,7 @@ export function checkPage(data: unknown): PageData {
       .map((issue) => `${issue.path.join('.') || 'page'}: ${issue.message}`)
       .join('; ');
     throw new Error(
-      `A « ${PAGE_KIND} » is { app?, filters?: [{ name, type: month|choice|text|record, options?, default? }], blocks: [{ block: stat|stat_delta|gauge|bar|line|breakdown|heatmap|table|task_list|kanban|calendar|form|record|sql|view, … }] } — ${issues}.`,
+      `A « ${PAGE_KIND} » is { app?, filters?: [{ name, type: month|choice|text|record, options?, default? }], blocks: [{ block: stat|stat_delta|gauge|bar|line|breakdown|heatmap|table|datatable|review|funnel|task_list|kanban|calendar|form|record|sql|view, … }] } — ${issues}.`,
     );
   }
   for (const block of parsed.data.blocks) {
@@ -368,6 +408,75 @@ async function drawBlock(
         });
       }
       return { ...base, items, action: block.action, actions };
+    }
+    case 'datatable':
+    case 'review': {
+      // Each entry with what the page needs of it — the rest happens there (spec 070).
+      const views = await filtered(block.kind, block.where);
+      const names = [
+        ...new Set([
+          ...(block.block === 'datatable' ? block.columns : block.fields),
+          ...(block.block === 'review'
+            ? [...(block.subtitle ?? []), ...(block.badge ? [block.badge] : [])]
+            : []),
+          ...(block.facets ?? []),
+          ...(block.link ? [block.link] : []),
+        ]),
+      ];
+      const items: { id: string; title: string; values: Record<string, unknown> }[] = [];
+      for (const view of views.slice(0, 1000)) {
+        const values: Record<string, unknown> = {};
+        for (const name of names) values[name] = plain(await view.get(name));
+        items.push({ id: view.row.id, title: view.row.title, values });
+      }
+      if (block.sort) {
+        const desc = block.sort.startsWith('-');
+        const name = desc ? block.sort.slice(1) : block.sort;
+        const at = (item: (typeof items)[number]) =>
+          name === 'title' ? item.title : item.values[name];
+        items.sort((a, b) => {
+          const x = at(a);
+          const y = at(b);
+          if (x === y) return 0;
+          if (x === null || x === undefined) return 1;
+          if (y === null || y === undefined) return -1;
+          const order =
+            typeof x === 'number' && typeof y === 'number'
+              ? x - y
+              : String(x).localeCompare(String(y), 'fr');
+          return desc ? -order : order;
+        });
+      }
+      const model = reader.model(block.kind);
+      const types = Object.fromEntries(
+        names.map((name) => [name, model?.fields.find((one) => one.name === name)?.type ?? 'text']),
+      );
+      const actions = block.action ? [block.action, ...(block.more ?? [])] : [];
+      return {
+        ...base,
+        items,
+        types,
+        truncated: views.length > 1000,
+        ...(block.block === 'datatable'
+          ? { columns: block.columns }
+          : { fields: block.fields, subtitle: block.subtitle ?? [], badge: block.badge ?? null }),
+        facets: block.facets ?? [],
+        link: block.link ?? null,
+        actions,
+      };
+    }
+    case 'funnel': {
+      const views = await filtered(block.kind, block.where);
+      const count = new Map<string, number>();
+      for (const view of views) {
+        const value = String((await view.get(block.by)) ?? '');
+        count.set(value, (count.get(value) ?? 0) + 1);
+      }
+      return {
+        ...base,
+        by: block.by,
+        steps: block.steps.map((name) => ({ name, count: count.get(name) ?? 0 })),
+      };
     }
     case 'kanban': {
       const views = await filtered(block.kind, block.where);

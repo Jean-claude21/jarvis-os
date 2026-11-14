@@ -662,15 +662,64 @@
             }
           },
           {
-            "block": "task_list",
+            "block": "review",
             "title": {
-              "fr": "Nouvelles offres qui correspondent",
-              "en": "New offers that fit"
+              "fr": "Nouvelles offres, une à une",
+              "en": "New offers, one by one"
             },
             "kind": "JobOffer",
             "where": "status = 'new' and score >= 100 and ({type} = 'tous' or type = {type})",
-            "detail": "company",
+            "subtitle": ["company", "location"],
+            "badge": "score",
+            "fields": ["company", "location", "type", "contract", "published", "source", "reasons"],
+            "facets": ["type", "source"],
             "link": "url",
+            "sort": "-published",
+            "action": {
+              "label": "À creuser",
+              "set": {
+                "status": "interesting"
+              }
+            },
+            "more": [
+              {
+                "label": "Postulé",
+                "set": {
+                  "status": "applied"
+                }
+              },
+              {
+                "label": "Écarter",
+                "set": {
+                  "status": "dismissed"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "title": "Offers",
+      "data": {
+        "label": {
+          "fr": "Offres",
+          "en": "Offers"
+        },
+        "order": 2,
+        "blocks": [
+          {
+            "block": "datatable",
+            "title": {
+              "fr": "Toutes mes offres en IA",
+              "en": "All my AI offers"
+            },
+            "kind": "JobOffer",
+            "where": "score >= 100",
+            "columns": ["company", "location", "type", "status", "score", "published", "url"],
+            "facets": ["type", "status", "source", "location"],
+            "link": "url",
+            "sort": "-published",
             "action": {
               "label": "À creuser",
               "set": {
@@ -702,7 +751,7 @@
           "fr": "Suivi",
           "en": "Tracking"
         },
-        "order": 2,
+        "order": 3,
         "filters": [
           {
             "name": "type",
@@ -717,15 +766,26 @@
         ],
         "blocks": [
           {
-            "block": "bar",
+            "block": "funnel",
             "title": {
               "fr": "Où en sont mes offres",
               "en": "Where my offers stand"
             },
+            "kind": "JobOffer",
+            "where": "score >= 100 and ({type} = 'tous' or type = {type})",
+            "by": "status",
+            "steps": ["new", "interesting", "applied"]
+          },
+          {
+            "block": "breakdown",
+            "title": {
+              "fr": "Par type",
+              "en": "By type"
+            },
             "query": {
               "kind": "JobOffer",
-              "where": "score >= 100 and ({type} = 'tous' or type = {type})",
-              "groupBy": "status",
+              "where": "score >= 100 and status != 'dismissed'",
+              "groupBy": "type",
               "aggregate": {
                 "n": "count()"
               }
@@ -756,7 +816,7 @@
             },
             "kind": "JobOffer",
             "by": "status",
-            "where": "score >= 100 and ({type} = 'tous' or type = {type})",
+            "where": "score >= 100 and status != 'new' and ({type} = 'tous' or type = {type})",
             "detail": "company",
             "badge": "score",
             "link": "url",
@@ -789,18 +849,17 @@
           "fr": "CV",
           "en": "CVs"
         },
-        "order": 3,
+        "order": 4,
         "blocks": [
           {
-            "block": "table",
+            "block": "datatable",
             "title": {
               "fr": "Mes CV",
               "en": "My CVs"
             },
-            "query": {
-              "kind": "CV",
-              "fields": ["role", "offer", "state", "appreciation"]
-            }
+            "kind": "CV",
+            "columns": ["role", "offer", "state", "appreciation"],
+            "facets": ["role", "state"]
           },
           {
             "block": "table",
@@ -824,29 +883,28 @@
           "fr": "Réglages",
           "en": "Settings"
         },
-        "order": 4,
+        "order": 5,
         "blocks": [
           {
-            "block": "table",
+            "block": "datatable",
             "title": {
               "fr": "Ce que je cherche",
               "en": "What I am looking for"
             },
-            "query": {
-              "kind": "JobSearch",
-              "fields": ["poste", "lieu", "contrat"]
-            }
+            "kind": "JobSearch",
+            "columns": ["poste", "lieu", "contrat"]
           },
           {
-            "block": "table",
+            "block": "datatable",
             "title": {
               "fr": "Où je cherche",
               "en": "Where I search"
             },
-            "query": {
-              "kind": "Source",
-              "fields": ["lien", "active", "notes"]
-            }
+            "kind": "Source",
+            "where": "lien != null",
+            "columns": ["lien", "active", "notes"],
+            "facets": ["active"],
+            "link": "lien"
           },
           {
             "block": "form",

@@ -545,6 +545,175 @@ function bindConnexions(root) {
   }
 }
 
+// The data table and the list with its record (spec 070): every entry is in the page, and what she
+// searches, filters, sorts and picks happens here, without asking the server again. Its state lives
+// per page and block, so a gesture that redraws the page keeps her filters.
+const DT = {};
+const dtOps = ['eq', 'ne', 'contains', 'gte', 'lte'];
+function dtState(at) {
+  const key = (shownPage && shownPage.id) + ':' + at;
+  return DT[key] || (DT[key] = { q: '', facets: {}, adv: [], join: 'and', sort: null, page: 0, sel: [], pick: null, advOpen: false });
+}
+const dtText = (v) => v == null ? '' : Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? String(v.address || '') : String(v);
+function dtVal(it, f) { return f === 'title' ? it.title : it.values[f]; }
+function dtCond(it, c) {
+  const v = dtVal(it, c.field); const t = dtText(v).toLowerCase(); const w = String(c.value == null ? '' : c.value).toLowerCase();
+  if (c.op === 'eq') return t === w;
+  if (c.op === 'ne') return t !== w;
+  if (c.op === 'contains') return t.includes(w);
+  const a = Number(v), b = Number(c.value);
+  if (c.op === 'gte') return isFinite(a) && a >= b;
+  if (c.op === 'lte') return isFinite(a) && a <= b;
+  return true;
+}
+function dtRows(b, st, skip) {
+  const q = st.q.trim().toLowerCase();
+  return b.items.filter((it) => {
+    if (q && !(it.title + ' ' + Object.values(it.values).map(dtText).join(' ')).toLowerCase().includes(q)) return false;
+    for (const f of Object.keys(st.facets)) {
+      if (f === skip || !st.facets[f].length) continue;
+      if (!st.facets[f].includes(dtText(it.values[f]) || '—')) return false;
+    }
+    if (st.adv.length) {
+      const ok = st.adv.map((c) => dtCond(it, c));
+      if (st.join === 'and' ? ok.includes(false) : !ok.includes(true)) return false;
+    }
+    return true;
+  });
+}
+function dtSorted(rows, st) {
+  if (!st.sort) return rows;
+  const { field, desc } = st.sort;
+  return rows.slice().sort((a, b) => {
+    const x = dtVal(a, field), y = dtVal(b, field);
+    if (x === y) return 0; if (x == null || x === '') return 1; if (y == null || y === '') return -1;
+    const o = typeof x === 'number' && typeof y === 'number' ? x - y : dtText(x).localeCompare(dtText(y), 'fr');
+    return desc ? -o : o;
+  });
+}
+// The values a facet holds, with how many entries hold each, under her other filters.
+function dtFacet(b, st, f) {
+  const n = new Map();
+  for (const it of dtRows(b, st, f)) { const v = dtText(it.values[f]) || '—'; n.set(v, (n.get(v) || 0) + 1); }
+  for (const v of st.facets[f] || []) if (!n.has(v)) n.set(v, 0);
+  return [...n.entries()].sort((a, c) => c[1] - a[1] || a[0].localeCompare(c[0], 'fr'));
+}
+function dtToolbar(b, st, lab, olab, wide) {
+  const facets = (b.facets || []).map((f) => {
+    const on = st.facets[f] || [];
+    return '<details class="dt-facet"><summary class="btn small' + (on.length ? ' on' : '') + '">' + esc(lab(f)) + (on.length ? ' · ' + on.length : '') + ' ▾</summary><div class="dt-menu">' +
+      dtFacet(b, st, f).map(([v, n]) => '<label class="dt-opt"><input type="checkbox" data-dt-facet="' + esc(f) + '" value="' + esc(v) + '"' + (on.includes(v) ? ' checked' : '') + '> <span>' + esc(v === '—' ? '—' : olab(f, v)) + '</span><b>' + n + '</b></label>').join('') + '</div></details>';
+  }).join('');
+  const pills = [];
+  for (const f of Object.keys(st.facets)) for (const v of st.facets[f]) pills.push('<button class="dt-pill" data-dt-unfacet="' + esc(f) + '" data-v="' + esc(v) + '">' + esc(lab(f)) + ' : ' + esc(olab(f, v)) + ' ✕</button>');
+  st.adv.forEach((c, i) => pills.push('<button class="dt-pill" data-dt-unadv="' + i + '">' + esc(lab(c.field)) + ' ' + esc(W['dt_' + c.op]) + ' ' + esc(olab(c.field, c.value)) + ' ✕</button>'));
+  if (st.q) pills.push('<button class="dt-pill" data-dt-unq>« ' + esc(st.q) + ' » ✕</button>');
+  return '<div class="dt-bar"><input class="field dt-q" data-dt-q placeholder="' + esc(W.dt_search) + '" value="' + esc(st.q) + '">' + facets +
+    '<button class="btn small' + (st.advOpen || st.adv.length ? ' on' : '') + '" data-dt-adv>' + esc(W.dt_advanced) + (st.adv.length ? ' · ' + st.adv.length : '') + '</button></div>' +
+    (st.advOpen ? dtAdvanced(b, st, lab, olab) : '') +
+    (pills.length ? '<div class="dt-pills">' + pills.join('') + '<button class="link" data-dt-clear>' + esc(W.dt_clear) + '</button></div>' : '');
+}
+function dtAdvanced(b, st, lab, olab) {
+  const fields = ['title'].concat(Object.keys(b.types));
+  const values = (f) => [...new Set(b.items.map((it) => dtText(dtVal(it, f))).filter(Boolean))].sort((x, y) => x.localeCompare(y, 'fr')).slice(0, 300);
+  return '<div class="dt-adv">' + (st.adv.length > 1 ? '<label>' + esc(W.dt_join) + ' <select class="field" data-dt-join><option value="and"' + (st.join === 'and' ? ' selected' : '') + '>' + esc(W.dt_all) + '</option><option value="or"' + (st.join === 'or' ? ' selected' : '') + '>' + esc(W.dt_any) + '</option></select></label>' : '') +
+    st.adv.map((c, i) => { const vs = values(c.field); const listed = ['eq', 'ne'].includes(c.op) && vs.length;
+      return '<div class="dt-cond"><select class="field" data-dt-c="' + i + '" data-k="field">' + fields.map((f) => '<option value="' + esc(f) + '"' + (f === c.field ? ' selected' : '') + '>' + esc(lab(f)) + '</option>').join('') + '</select>' +
+        '<select class="field" data-dt-c="' + i + '" data-k="op">' + dtOps.map((o) => '<option value="' + o + '"' + (o === c.op ? ' selected' : '') + '>' + esc(W['dt_' + o]) + '</option>').join('') + '</select>' +
+        (listed ? '<select class="field" data-dt-c="' + i + '" data-k="value"><option value=""></option>' + vs.map((v) => '<option value="' + esc(v) + '"' + (v === String(c.value) ? ' selected' : '') + '>' + esc(olab(c.field, v)) + '</option>').join('') + '</select>'
+          : '<input class="field" data-dt-c="' + i + '" data-k="value" value="' + esc(c.value == null ? '' : c.value) + '" list="dt-l-' + i + '"><datalist id="dt-l-' + i + '">' + vs.map((v) => '<option value="' + esc(v) + '">').join('') + '</datalist>') +
+        '<button class="btn small" data-dt-unadv="' + i + '" aria-label="' + esc(W.remove) + '">✕</button></div>'; }).join('') +
+    '<button class="btn small" data-dt-addc>+ ' + esc(W.dt_condition) + '</button></div>';
+}
+function dtCell(b, it, f, lab, olab, webLink, fmt) {
+  const v = dtVal(it, f);
+  if (f === 'title') return '<span class="cell-title">' + esc(it.title) + '</span>';
+  const link = webLink(v); if (link) return link;
+  if (b.types[f] === 'choice' && v != null) return '<span class="dt-tag">' + esc(olab(f, v)) + '</span>';
+  if (b.types[f] === 'number' && typeof v === 'number') return '<span class="mono">' + esc(fmt(v)) + '</span>';
+  return esc(fmt(v));
+}
+function dtTableHtml(b, at, lab, olab, webLink, fmt) {
+  const st = dtState(at);
+  const rows = dtSorted(dtRows(b, st), st);
+  const pages = Math.max(1, Math.ceil(rows.length / 25)); st.page = Math.min(st.page, pages - 1);
+  const shown = rows.slice(st.page * 25, st.page * 25 + 25);
+  const cols = ['title'].concat(b.columns);
+  const sel = st.sel.filter((id) => rows.some((r) => r.id === id));
+  const acts = b.actions || [];
+  return dtToolbar(b, st, lab, olab) +
+    '<div class="dt-meta"><b>' + rows.length + '</b> ' + esc(W.dt_results) + (b.truncated ? ' · ' + esc(W.dt_more) : '') +
+    (sel.length && acts.length ? '<span class="dt-bulk">' + sel.length + ' ' + esc(W.dt_selected) + ' · ' + acts.map((a, n) => '<button class="btn small" data-dt-bulk="' + n + '">' + esc(a.label) + '</button>').join('') + '</span>' : '') + '</div>' +
+    (rows.length ? '<div class="scroll"><table class="dt"><thead><tr>' + (acts.length ? '<th class="dt-check"><input type="checkbox" data-dt-all' + (shown.length && shown.every((r) => sel.includes(r.id)) ? ' checked' : '') + ' aria-label="' + esc(W.dt_all) + '"></th>' : '') +
+      cols.map((f) => '<th class="dt-sort" data-dt-sort="' + esc(f) + '">' + esc(lab(f)) + (st.sort && st.sort.field === f ? (st.sort.desc ? ' ↓' : ' ↑') : '') + '</th>').join('') + (acts.length ? '<th></th>' : '') + '</tr></thead><tbody>' +
+      shown.map((it) => '<tr class="row-click" data-go="#/entree/' + esc(it.id) + '">' + (acts.length ? '<td class="dt-check"><input type="checkbox" data-dt-sel="' + esc(it.id) + '"' + (sel.includes(it.id) ? ' checked' : '') + '></td>' : '') +
+        cols.map((f) => '<td' + (b.types[f] === 'number' ? ' class="n"' : '') + '>' + dtCell(b, it, f, lab, olab, webLink, fmt) + '</td>').join('') +
+        (acts.length ? '<td class="dt-acts">' + acts.map((a, n) => '<button class="btn small" data-dt-act="' + esc(it.id) + ':' + n + '">' + esc(a.label) + '</button>').join('') + '</td>' : '') + '</tr>').join('') +
+      '</tbody></table></div>' : '<div class="pad muted">' + esc(W.dt_none) + '</div>') +
+    (pages > 1 ? '<div class="dt-pages"><button class="btn small" data-dt-page="-1"' + (st.page ? '' : ' disabled') + '>‹</button> ' + (st.page + 1) + ' / ' + pages + ' <button class="btn small" data-dt-page="1"' + (st.page < pages - 1 ? '' : ' disabled') + '>›</button></div>' : '');
+}
+function dtReviewHtml(b, at, lab, olab, webLink, fmt) {
+  const st = dtState(at);
+  const rows = dtSorted(dtRows(b, st), st);
+  const pick = rows.find((r) => r.id === st.pick) || rows[0];
+  const acts = b.actions || [];
+  const sub = (it) => (b.subtitle || []).map((f) => dtText(dtVal(it, f)) && olab(f, dtText(dtVal(it, f)))).filter(Boolean).join(' · ');
+  const badge = (it) => b.badge && dtVal(it, b.badge) != null ? '<span class="dt-badge">' + esc(fmt(dtVal(it, b.badge))) + '</span>' : '';
+  const detail = pick ? '<div class="rv-head"><h3>' + esc(pick.title) + '</h3><div class="muted">' + esc(sub(pick)) + '</div></div>' +
+    '<div class="rv-acts">' + (b.link && typeof pick.values[b.link] === 'string' && /^https?:/.test(pick.values[b.link]) ? '<a class="btn solid" data-web target="_blank" rel="noopener" href="' + esc(pick.values[b.link]) + '">' + esc(W.dt_open) + ' ↗</a>' : '') +
+    acts.map((a, n) => '<button class="btn" data-dt-act="' + esc(pick.id) + ':' + n + '" data-dt-next>' + esc(a.label) + '</button>').join('') + '<a class="btn" href="#/entree/' + esc(pick.id) + '">' + esc(W.dt_record) + '</a></div>' +
+    '<dl class="rv-fields">' + b.fields.map((f) => '<dt>' + esc(lab(f)) + '</dt><dd>' + dtCell(b, pick, f, lab, olab, webLink, fmt) + '</dd>').join('') + '</dl>'
+    : '<div class="pad muted">' + esc(W.dt_none) + '</div>';
+  return dtToolbar(b, st, lab, olab) + '<div class="dt-meta"><b>' + rows.length + '</b> ' + esc(W.dt_results) + '</div>' +
+    '<div class="rv"><div class="rv-list">' + rows.slice(0, 200).map((it) => '<button class="rv-item' + (pick && it.id === pick.id ? ' on' : '') + '" data-dt-pick="' + esc(it.id) + '"><span class="rv-t">' + esc(it.title) + '</span>' + badge(it) + '<span class="rv-s">' + esc(sub(it)) + '</span></button>').join('') +
+    (rows.length > 200 ? '<div class="muted pad">' + esc(W.dt_more) + '</div>' : '') + '</div><div class="rv-detail">' + detail + '</div></div>';
+}
+// Wires one block: its toolbar, its rows, its gestures; redraws only itself.
+function dtMount(el, at, draw) {
+  const b = shownPage.blocks[at];
+  const st = dtState(at);
+  const redraw = () => { el.innerHTML = draw(); };
+  const save = async (ids, n) => {
+    const set = b.actions[n].set;
+    await api(inSpace('/save'), { method: 'POST', body: { entries: ids.map((id) => ({ id, data: set })) } });
+    toast(W.v2filed, ids.length === 1 ? { id: ids[0], spaceId: space } : null);
+    st.sel = []; show();
+  };
+  el.addEventListener('input', (e) => {
+    if (e.target.matches('[data-dt-q]')) { st.q = e.target.value; st.page = 0; const pos = e.target.selectionStart; redraw(); const q = el.querySelector('[data-dt-q]'); q.focus(); q.setSelectionRange(pos, pos); }
+  });
+  el.addEventListener('change', (e) => {
+    const t = e.target;
+    if (t.matches('[data-dt-facet]')) { const f = t.dataset.dtFacet; const on = new Set(st.facets[f] || []); t.checked ? on.add(t.value) : on.delete(t.value); st.facets[f] = [...on]; st.page = 0; const open = f; redraw(); const d = [...el.querySelectorAll('details.dt-facet')].find((x) => x.querySelector('[data-dt-facet="' + CSS.escape(open) + '"]')); if (d) d.open = true; }
+    else if (t.matches('[data-dt-c]')) { const c = st.adv[Number(t.dataset.dtC)]; c[t.dataset.k] = t.value; if (t.dataset.k === 'field') c.value = ''; st.page = 0; redraw(); }
+    else if (t.matches('[data-dt-join]')) { st.join = t.value; redraw(); }
+    else if (t.matches('[data-dt-sel]')) { const s = new Set(st.sel); t.checked ? s.add(t.dataset.dtSel) : s.delete(t.dataset.dtSel); st.sel = [...s]; redraw(); }
+    else if (t.matches('[data-dt-all]')) { const ids = [...el.querySelectorAll('[data-dt-sel]')].map((x) => x.dataset.dtSel); const s = new Set(st.sel); ids.forEach((id) => t.checked ? s.add(id) : s.delete(id)); st.sel = [...s]; redraw(); }
+  });
+  el.addEventListener('click', async (e) => {
+    const t = e.target.closest('button, th, a, input, summary');
+    if (!t) return;
+    if (t.matches('[data-dt-unfacet]')) { st.facets[t.dataset.dtUnfacet] = (st.facets[t.dataset.dtUnfacet] || []).filter((v) => v !== t.dataset.v); redraw(); }
+    else if (t.matches('[data-dt-unadv]')) { st.adv.splice(Number(t.dataset.dtUnadv), 1); redraw(); }
+    else if (t.matches('[data-dt-unq]')) { st.q = ''; redraw(); }
+    else if (t.matches('[data-dt-clear]')) { st.q = ''; st.facets = {}; st.adv = []; st.page = 0; redraw(); }
+    else if (t.matches('[data-dt-adv]')) { st.advOpen = !st.advOpen; if (st.advOpen && !st.adv.length) st.adv.push({ field: (b.facets || [])[0] || 'title', op: 'eq', value: '' }); redraw(); }
+    else if (t.matches('[data-dt-addc]')) { st.adv.push({ field: 'title', op: 'contains', value: '' }); redraw(); }
+    else if (t.matches('[data-dt-sort]')) { const f = t.dataset.dtSort; st.sort = st.sort && st.sort.field === f ? { field: f, desc: !st.sort.desc } : { field: f, desc: false }; redraw(); }
+    else if (t.matches('[data-dt-page]')) { st.page += Number(t.dataset.dtPage); redraw(); }
+    else if (t.matches('[data-dt-pick]')) { st.pick = t.dataset.dtPick; redraw(); }
+    else if (t.matches('[data-dt-act]')) {
+      e.stopPropagation(); const [id, n] = t.dataset.dtAct.split(':'); t.disabled = true;
+      if (t.hasAttribute('data-dt-next')) { const ids = [...el.querySelectorAll('[data-dt-pick]')].map((x) => x.dataset.dtPick); st.pick = ids[ids.indexOf(id) + 1] || null; }
+      try { await save([id], Number(n)); } catch (error) { t.disabled = false; alert(error.message); }
+    } else if (t.matches('[data-dt-bulk]')) {
+      t.disabled = true; try { await save(st.sel.slice(), Number(t.dataset.dtBulk)); } catch (error) { t.disabled = false; alert(error.message); }
+    }
+  });
+}
+
+const DT_DRAW = {};
+
 // The blocks of a page (an app's page, a dashboard), drawn in the mockup's markup: figures, gauges,
 // bars, a line, shares, tables with their total, things to act on, a form, a kanban, her days.
 const SERIES2 = ['var(--primary)', 'var(--ochre)', 'var(--info)', 'var(--success)', 'var(--verify)', 'var(--ink)'];
@@ -560,12 +729,23 @@ function blocksHtml(drawn) {
   const table = (columns, rows, kind, extra) => rows.length ? '<div class="scroll"><table><thead><tr>' + columns.map((c) => '<th class="' + (rows.every((r) => r[c] == null || isNum(r[c])) ? 'n' : '') + '">' + esc(c === 'group' ? '' : fLabel(kind, c)) + '</th>').join('') + '</tr></thead><tbody>' +
     rows.map((r) => '<tr' + (r.id ? ' class="row-click" data-go="#/entree/' + esc(r.id) + '" style="cursor:pointer"' : '') + '>' + columns.map((c) => '<td class="' + (isNum(r[c]) ? 'n' : '') + '">' + (c === 'title' ? '<div class="cell-title">' + esc(fmt(r[c])) + '</div>' : webLink(r[c]) || esc(fmt(oLabel(kind, c, r[c])))) + '</td>').join('') + '</tr>').join('') + (extra || '') + '</tbody></table></div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>';
   const bars = (b) => { const max = Math.max(1, ...b.points.map((p) => Math.abs(p.value))); return b.points.length ? '<div class="pad" style="display:flex;flex-direction:column;gap:8px">' + b.points.map((p) => '<div class="hbar" style="grid-template-columns:minmax(80px,30%) 1fr 90px"><span>' + esc(fmt(b.groupField ? oLabel(b.kind, b.groupField, p.label) : p.label)) + '</span><div class="track"><div class="fill" style="width:' + Math.max(1, Math.abs(p.value) / max * 100) + '%"></div></div><span class="mono" style="text-align:right;font-size:12px">' + esc(fmt(p.value)) + '</span></div>').join('') + '</div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>'; };
+  const lab = (b) => (f) => f === 'title' ? W.title : fLabel(b.kind, f);
+  const olab = (b) => (f, v) => oLabel(b.kind, f, v);
   const draw = {
+    datatable: (b, at) => { DT_DRAW[at] = () => dtTableHtml(b, at, lab(b), olab(b), webLink, fmt); return v2panel(T(b), '<div class="dt-wrap" data-dt="' + at + '">' + DT_DRAW[at]() + '</div>', '', 'i-life'); },
+    review: (b, at) => { DT_DRAW[at] = () => dtReviewHtml(b, at, lab(b), olab(b), webLink, fmt); return v2panel(T(b), '<div class="dt-wrap" data-dt="' + at + '">' + DT_DRAW[at]() + '</div>', '', 'i-check'); },
+    funnel: (b) => { const top = Math.max(1, b.steps[0] ? b.steps[0].count : 1);
+      return v2panel(T(b), '<div class="pad fn">' + b.steps.map((s, i) => '<div class="fn-row"><span class="fn-l">' + esc(oLabel(b.kind, b.by, s.name)) + '</span><div class="fn-track"><div class="fn-bar" style="width:' + Math.max(2, s.count / top * 100) + '%;background:' + SERIES2[i % SERIES2.length] + '"></div></div><span class="mono">' + esc(fmt(s.count)) + (i ? ' <small class="muted">' + Math.round(s.count / top * 100) + ' %</small>' : '') + '</span></div>').join('') + '</div>', '', 'i-chart'); },
     stat: (b) => v2kpi(T(b), esc(fmt(b.value)) + (b.unit ? '<small>' + esc(b.unit) + '</small>' : ''), '', isNum(b.value) && b.value < 0 ? 'alert' : ''),
     stat_delta: (b) => v2kpi(T(b), esc(fmt(b.value)) + (b.unit ? '<small>' + esc(b.unit) + '</small>' : ''), b.delta == null ? esc(W.v2noCompare) : (b.delta > 0 ? '↑ ' : '↓ ') + esc(fmt(Math.abs(b.delta))) + ' % · ' + esc(say(W.v2vsBefore, { value: fmt(b.previous) }))),
     gauge: (b) => v2panel(T(b), b.items.length ? '<div class="pad" style="display:flex;flex-direction:column;gap:12px">' + b.items.map((g) => { const p = isNum(g.max) && g.max > 0 && isNum(g.value) ? g.value / g.max * 100 : 0; return '<div><div style="display:flex;justify-content:space-between;gap:8px"><span>' + esc(fmt(g.label)) + '</span><span class="mono" style="font-size:12px">' + esc(fmt(g.value)) + ' / ' + esc(fmt(g.max)) + '</span></div><div class="bar ' + (p > 100 ? 'warn' : p >= 80 ? 'info' : 'ok') + '" style="margin-top:6px"><i style="width:' + Math.min(100, Math.max(1, p)) + '%"></i></div></div>'; }).join('') + '</div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>', '', 'i-chart'),
     bar: (b) => v2panel(T(b), bars(b), '', 'i-chart'),
-    breakdown: (b) => { const total = b.points.reduce((t, p) => t + Math.max(0, p.value), 0) || 1; return v2panel(T(b), b.points.length ? '<div class="pad"><div style="display:flex;height:12px;border-radius:3px;overflow:hidden">' + b.points.map((p, i) => '<span style="flex:' + Math.max(0, p.value) + ';background:' + SERIES2[i % SERIES2.length] + '"></span>').join('') + '</div><div class="legend" style="margin-top:10px">' + b.points.map((p, i) => '<span><i style="background:' + SERIES2[i % SERIES2.length] + '"></i>' + esc(fmt(b.groupField ? oLabel(b.kind, b.groupField, p.label) : p.label)) + ' ' + Math.round(Math.max(0, p.value) / total * 100) + ' %</span>').join('') + '</div></div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>', '', 'i-chart'); },
+    breakdown: (b) => { const total = b.points.reduce((t, p) => t + Math.max(0, p.value), 0) || 1;
+      // A ring with its legend (spec 070).
+      if (b.points.length) { let a = -Math.PI / 2; const arcs = b.points.map((p, i) => { const sweep = Math.max(0, p.value) / total * Math.PI * 2; const a0 = a; a += sweep; const large = sweep > Math.PI ? 1 : 0; const pt = (r, x) => (60 + r * Math.cos(x)).toFixed(2) + ' ' + (60 + r * Math.sin(x)).toFixed(2);
+        return sweep >= Math.PI * 2 - 0.0001 ? '<circle cx="60" cy="60" r="44" fill="none" stroke="' + SERIES2[i % SERIES2.length] + '" stroke-width="20"/>' : '<path d="M ' + pt(44, a0) + ' A 44 44 0 ' + large + ' 1 ' + pt(44, a) + '" fill="none" stroke="' + SERIES2[i % SERIES2.length] + '" stroke-width="20"><title>' + esc(fmt(b.groupField ? oLabel(b.kind, b.groupField, p.label) : p.label)) + ' : ' + esc(fmt(p.value)) + '</title></path>'; }).join('');
+        return v2panel(T(b), '<div class="pad ring"><svg viewBox="0 0 120 120" width="150" height="150" role="img" aria-label="' + esc(T(b)) + '">' + arcs + '<text x="60" y="66" text-anchor="middle" class="ring-n">' + esc(fmt(total)) + '</text></svg><div class="legend" style="flex-direction:column;gap:6px">' + b.points.map((p, i) => '<span><i style="background:' + SERIES2[i % SERIES2.length] + '"></i>' + esc(fmt(b.groupField ? oLabel(b.kind, b.groupField, p.label) : p.label)) + ' · <b>' + esc(fmt(p.value)) + '</b> · ' + Math.round(Math.max(0, p.value) / total * 100) + ' %</span>').join('') + '</div></div>', '', 'i-chart'); }
+      return v2panel(T(b), b.points.length ? '<div class="pad"><div style="display:flex;height:12px;border-radius:3px;overflow:hidden">' + b.points.map((p, i) => '<span style="flex:' + Math.max(0, p.value) + ';background:' + SERIES2[i % SERIES2.length] + '"></span>').join('') + '</div><div class="legend" style="margin-top:10px">' + b.points.map((p, i) => '<span><i style="background:' + SERIES2[i % SERIES2.length] + '"></i>' + esc(fmt(b.groupField ? oLabel(b.kind, b.groupField, p.label) : p.label)) + ' ' + Math.round(Math.max(0, p.value) / total * 100) + ' %</span>').join('') + '</div></div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>', '', 'i-chart'); },
     line: (b) => {
       const series = b.series && b.series.length ? b.series : [{ name: '', points: b.points }];
       const labels = series[0].points.map((p) => p.label);
@@ -621,6 +801,7 @@ async function drawPageInto(id, params) {
   return shownPage;
 }
 function bindBlocks(root) {
+  root.querySelectorAll('[data-dt]').forEach((el) => { const at = Number(el.dataset.dt); if (DT_DRAW[at]) dtMount(el, at, DT_DRAW[at]); });
   root.querySelectorAll('[data-page-filter]').forEach((el) => el.addEventListener('change', () => {
     const h = location.hash.split('?'); const q = new URLSearchParams(h[1] || ''); q.set('f_' + el.dataset.pageFilter, el.value); location.hash = h[0] + '?' + q.toString();
   }));
@@ -684,8 +865,9 @@ v2Pages.app = async function (params, name) {
   const tabs = '<nav class="tabs">' +
     (isHabitApp(models, name) ? [['aujourdhui', W.rt_today], ['habitudes', W.rt_habits], ['regularite', W.rt_regularity]].map((t) => '<a href="' + appHref + '?t=' + t[0] + '"' + (habitTab === t[0] ? ' aria-current="page"' : '') + '>' + esc(t[1]) + '</a>').join('') : '') +
     appPages.map((p) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?page=' + esc(encodeURIComponent(p.id)) + '"' + (p.id === pageId ? ' aria-current="page"' : '') + '>' + esc(tr(p.label) || p.title) + '</a>').join('') +
-    models.map((k) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '"' + (params.get('kind') === k.kind ? ' aria-current="page"' : '') + '>' + esc(kindLabel(k)) + '<span class="n">' + num(k.count || 0) + '</span></a>').join('') +
     views.map((v) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?view=' + esc(encodeURIComponent(v.id)) + '"' + (params.get('view') === v.id ? ' aria-current="page"' : '') + '>' + esc(tr(v.label) || v.title) + '</a>').join('') +
+    // Its pages and views first; its kinds — the raw data — under one « Données » menu (spec 070).
+    ((links) => appPages.length ? '<details class="tabs-more"><summary' + (params.get('kind') ? ' aria-current="page"' : '') + '>' + esc(W.dataMenu) + ' ▾</summary><div class="tabs-menu">' + links + '</div></details>' : links)(models.map((k) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '"' + (params.get('kind') === k.kind ? ' aria-current="page"' : '') + '>' + esc(kindLabel(k)) + '<span class="n">' + num(k.count || 0) + '</span></a>').join('')) +
     '<a href="#/role/' + esc(encodeURIComponent(name)) + '">' + esc(W.v2appRoleTab) + '</a></nav>';
   const moves = models.some((k) => k.kind === 'Transaction');
   const head = v2head(esc(name) + ' <span class="built">' + esc(say(W.v2nKinds, { n: models.length })) + '</span>', esc(W.v2appSub), moves ? '<button class="btn solid" data-add-move>' + ic('i-plus') + esc(W.mv_title) + '</button>' : '', v2app(name));
@@ -701,6 +883,19 @@ v2Pages.app = async function (params, name) {
   const inner = await dayPages.app(params, name);
   return head + tabs + '<section class="panel"><div class="panel-body pad">' + inner.replace(/<nav class="tabs">[^]*?<[/]nav>/, '') + '</div></section>';
 };
+// The « Données » menu opens over the page (the tabs scroll sideways and would cut it), and closes
+// on a click elsewhere.
+document.addEventListener('toggle', (event) => {
+  const menu = event.target;
+  if (!(menu instanceof HTMLDetailsElement) || !menu.classList.contains('tabs-more') || !menu.open) return;
+  const at = menu.querySelector('summary').getBoundingClientRect();
+  const list = menu.querySelector('.tabs-menu');
+  list.style.top = Math.round(at.bottom + 2) + 'px';
+  list.style.left = Math.round(Math.min(at.left, window.innerWidth - 250)) + 'px';
+}, true);
+document.addEventListener('click', (event) => {
+  document.querySelectorAll('details.tabs-more[open]').forEach((menu) => { if (!menu.contains(event.target) || event.target.closest('.tabs-menu a')) menu.open = false; });
+});
 function bindBoards(root) {
   const ask = root.querySelector('[data-ask-board]');
   if (ask) ask.addEventListener('click', () => openDrawer(W.v2askBoard, '<p>' + esc(W.v2askBoardHow) + '</p>'));

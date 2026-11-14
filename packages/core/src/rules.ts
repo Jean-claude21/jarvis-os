@@ -70,7 +70,15 @@ export const actionSchema = z.union([
             z.string().trim().min(1).max(80),
             z.record(
               z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/),
-              z.string().trim().min(1).max(80),
+              z.union([
+                z.string().trim().min(1).max(80),
+                /** Only the entries a formula keeps, the newest first (spec 072). */
+                z.object({
+                  kind: z.string().trim().min(1).max(80),
+                  where: z.string().trim().min(1).max(1000).optional(),
+                  limit: z.number().int().min(1).max(200).default(100),
+                }),
+              ]),
             ),
           ])
           .optional(),
@@ -345,14 +353,32 @@ async function act(
         typeof action.call.include === 'string'
           ? { entries: action.call.include }
           : (action.call.include ?? {});
-      for (const [name, kind] of Object.entries(included)) {
-        const { rows } = await tx.query<{ title: string; data: Record<string, unknown> }>(
-          `select title, data - 'text' as data from entry
-            where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
-            order by updated_at desc limit 100`,
-          [spaceId, kind],
-        );
-        body[name] = rows.map((row) => ({ title: row.title, ...row.data }));
+      for (const [name, asked] of Object.entries(included)) {
+        const { kind, where, limit } =
+          typeof asked === 'string' ? { kind: asked, where: undefined, limit: 100 } : asked;
+        if (!where) {
+          const { rows } = await tx.query<{ title: string; data: Record<string, unknown> }>(
+            `select title, data - 'text' as data from entry
+              where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
+              order by updated_at desc limit $3`,
+            [spaceId, kind, limit],
+          );
+          body[name] = rows.map((row) => ({ title: row.title, ...row.data }));
+          continue;
+        }
+        // Only the entries her formula keeps (« score >= 100 and contenu = null »), spec 072.
+        const tree = parse(where);
+        const rows = await reader.kindRows(kind, 5000);
+        await reader.around(rows.map((row) => row.id));
+        const kept: Record<string, unknown>[] = [];
+        for (const row of rows) {
+          if (kept.length >= limit) break;
+          if (!(await evaluate(tree, reader.view(row), reader.clock))) continue;
+          const data = { ...(row.data as Record<string, unknown>) };
+          delete data.text;
+          kept.push({ title: row.title, ...data });
+        }
+        body[name] = kept;
       }
       if (entryId && scope) body.entry = { id: entryId, title: (await scope.get('title')) ?? null };
       // Every call leaves its execution (spec 057): long work gets a token to answer with.

@@ -25,6 +25,7 @@ async function explore(key, st, ctx) {
     const f = fieldAt(path) || {};
     if (f.type === 'button') return '<button class="quiet mini" data-press="' + esc(path) + '" data-id="' + esc(row.id) + '">' + esc(fl(path)) + '</button>';
     if (v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length)) return '<span class="muted">—</span>';
+    if (f.type !== 'url' && typeof v === 'string' && /^https?:\\/\\/[^\\s{}<>"]+$/.test(v)) return '<a class="link" target="_blank" rel="noopener" href="' + esc(v) + '">' + esc(v.replace(/^https?:\\/\\/(www\\.)?/, '').split('/')[0]) + ' ↗</a>';
     switch (f.type) {
       case 'url': return '<a class="link" target="_blank" rel="noopener" href="' + esc(v) + '">' + esc(String(v).replace(/^https?:\\/\\//, '').split('/')[0]) + ' ↗</a>';
       case 'email': return '<a class="link" href="mailto:' + esc(v) + '">' + esc(v) + '</a>';

@@ -163,7 +163,7 @@ const v2Pages = {
 
 // What the v2 screens do: one handler, by the data attributes the mockup's markup carries.
 function bindV2(root) {
-  root.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => { location.hash = b.dataset.go; }));
+  root.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', (event) => { if (event.target.closest('a[data-web]')) return; location.hash = b.dataset.go; }));
   const run = async (button, work, said) => {
     button.disabled = true;
     try { const done = await work(); toast(typeof said === 'function' ? said(done) : said, null); show(); counts(); } catch (error) { button.disabled = false; alert(error.message); }
@@ -555,8 +555,10 @@ function blocksHtml(drawn) {
   const isNum = (v) => typeof v === 'number' && isFinite(v);
   const fmt = (v) => v === null || v === undefined || v === '' ? '—' : isNum(v) ? num(Math.round(v * 100) / 100) : Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? JSON.stringify(v) : String(v);
   const T = (b) => tr(b.title) || '';
+  /** An address in a cell opens in a new tab; a click elsewhere on the row still opens the entry. */
+  const webLink = (v) => typeof v === 'string' && /^https?:\\/\\/[^\\s{}<>"]+$/.test(v) ? '<a class="link" data-web target="_blank" rel="noopener" href="' + esc(v) + '">' + esc(v.replace(/^https?:\\/\\/(www\\.)?/, '').split('/')[0]) + ' ↗</a>' : null;
   const table = (columns, rows, kind, extra) => rows.length ? '<div class="scroll"><table><thead><tr>' + columns.map((c) => '<th class="' + (rows.every((r) => r[c] == null || isNum(r[c])) ? 'n' : '') + '">' + esc(c === 'group' ? '' : fLabel(kind, c)) + '</th>').join('') + '</tr></thead><tbody>' +
-    rows.map((r) => '<tr' + (r.id ? ' class="row-click" data-go="#/entree/' + esc(r.id) + '" style="cursor:pointer"' : '') + '>' + columns.map((c) => '<td class="' + (isNum(r[c]) ? 'n' : '') + '">' + (c === 'title' ? '<div class="cell-title">' + esc(fmt(r[c])) + '</div>' : esc(fmt(oLabel(kind, c, r[c])))) + '</td>').join('') + '</tr>').join('') + (extra || '') + '</tbody></table></div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>';
+    rows.map((r) => '<tr' + (r.id ? ' class="row-click" data-go="#/entree/' + esc(r.id) + '" style="cursor:pointer"' : '') + '>' + columns.map((c) => '<td class="' + (isNum(r[c]) ? 'n' : '') + '">' + (c === 'title' ? '<div class="cell-title">' + esc(fmt(r[c])) + '</div>' : webLink(r[c]) || esc(fmt(oLabel(kind, c, r[c])))) + '</td>').join('') + '</tr>').join('') + (extra || '') + '</tbody></table></div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>';
   const bars = (b) => { const max = Math.max(1, ...b.points.map((p) => Math.abs(p.value))); return b.points.length ? '<div class="pad" style="display:flex;flex-direction:column;gap:8px">' + b.points.map((p) => '<div class="hbar" style="grid-template-columns:minmax(80px,30%) 1fr 90px"><span>' + esc(fmt(b.groupField ? oLabel(b.kind, b.groupField, p.label) : p.label)) + '</span><div class="track"><div class="fill" style="width:' + Math.max(1, Math.abs(p.value) / max * 100) + '%"></div></div><span class="mono" style="text-align:right;font-size:12px">' + esc(fmt(p.value)) + '</span></div>').join('') + '</div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>'; };
   const draw = {
     stat: (b) => v2kpi(T(b), esc(fmt(b.value)) + (b.unit ? '<small>' + esc(b.unit) + '</small>' : ''), '', isNum(b.value) && b.value < 0 ? 'alert' : ''),

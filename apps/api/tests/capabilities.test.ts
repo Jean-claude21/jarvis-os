@@ -238,15 +238,20 @@ describe('the Atelier, reached by Jarvis itself', () => {
           execution: work.execution,
           items: [
             { title: 'Stage NLP', url: 'https://ex.com/9', published: '2026-11-12T08:30:00Z' },
+            // LinkedIn gives seconds since 1970; a day it cannot read is left out.
+            { title: 'Stage LLM', url: 'https://ex.com/10', published: 1792540800 },
+            { title: 'Stage CV', url: 'https://ex.com/11', published: 'il y a 3 jours' },
           ],
         }),
       })
     ).json()) as { ids: string[] };
-    expect(fitted.ids).toHaveLength(1);
-    const kept = (await (await ama.call(`/api/entries/${fitted.ids[0]}`)).json()) as {
-      data: { published: string };
-    };
-    expect(kept.data.published).toBe('2026-11-12');
+    expect(fitted.ids).toHaveLength(3);
+    const day = async (id: string) =>
+      ((await (await ama.call(`/api/entries/${id}`)).json()) as { data: { published?: string } })
+        .data.published;
+    expect(await day(fitted.ids[0]!)).toBe('2026-11-12');
+    expect(await day(fitted.ids[1]!)).toBe('2026-10-21');
+    expect(await day(fitted.ids[2]!)).toBeUndefined();
     // What could not be structured is kept raw, with the same token.
     const raw = await withToken(work.token, '/api/receive', {
       method: 'POST',

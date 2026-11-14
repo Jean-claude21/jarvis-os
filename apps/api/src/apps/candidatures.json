@@ -175,8 +175,8 @@
           {
             "block": "task_list",
             "title": {
-              "fr": "Nouvelles offres, les meilleures d’abord",
-              "en": "New offers, best first"
+              "fr": "Nouvelles offres qui correspondent",
+              "en": "New offers that fit"
             },
             "kind": "JobOffer",
             "where": "status = 'new' and score >= 50",

@@ -2,8 +2,8 @@
   "app": "Candidatures",
   "version": 1,
   "description": {
-    "fr": "Chercher un stage, une alternance ou un emploi : ce que tu cherches et tes mots, les sites où chercher et leur recette, les offres ramenées chaque matin et notées, tes candidatures et leurs relances.",
-    "en": "Looking for an internship, a work-study place or a job: what you look for and your words, the sites to search and their recipe, the offers brought back each morning and scored, your applications and follow-ups."
+    "fr": "Chercher un stage, une alternance ou un emploi : les offres collectées chaque matin sur tes sites, appréciées par l’IA selon tes critères, les CV adaptés, tes candidatures et leurs relances.",
+    "en": "Looking for an internship, a work-study place or a job: offers collected each morning from your sites, appraised by the AI against your criteria, tailored CVs, your applications and follow-ups."
   },
   "models": [
     {
@@ -167,6 +167,64 @@
       }
     },
     {
+      "title": "Criterion",
+      "data": {
+        "label": {
+          "fr": "Critère de CV",
+          "en": "CV criterion"
+        },
+        "fields": [
+          {
+            "name": "pour",
+            "type": "choice",
+            "label": {
+              "fr": "Pour",
+              "en": "For"
+            },
+            "options": ["offre", "cv"],
+            "optionLabels": {
+              "offre": {
+                "fr": "apprécier une offre",
+                "en": "appraising an offer"
+              },
+              "cv": {
+                "fr": "noter un CV",
+                "en": "grading a CV"
+              }
+            },
+            "default": "cv"
+          },
+          {
+            "name": "poids",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "label": {
+              "fr": "Poids",
+              "en": "Weight"
+            }
+          },
+          {
+            "name": "instruction",
+            "type": "long_text",
+            "label": {
+              "fr": "Ce que l’IA vérifie",
+              "en": "What the AI checks"
+            }
+          },
+          {
+            "name": "ordre",
+            "type": "number",
+            "label": {
+              "fr": "Ordre",
+              "en": "Order"
+            }
+          }
+        ],
+        "columns": ["pour", "poids", "instruction"]
+      }
+    },
+    {
       "title": "JobOffer",
       "data": {
         "label": {
@@ -251,43 +309,55 @@
             }
           },
           {
-            "name": "score",
-            "type": "number",
-            "min": 0,
-            "max": 100,
-            "label": {
-              "fr": "Score",
-              "en": "Score"
-            }
-          },
-          {
-            "name": "reasons",
-            "type": "text",
-            "label": {
-              "fr": "Pourquoi",
-              "en": "Why"
-            }
-          },
-          {
             "name": "status",
             "type": "choice",
             "label": {
-              "fr": "Suite",
-              "en": "Next"
+              "fr": "Étape",
+              "en": "Step"
             },
-            "options": ["new", "interesting", "applied", "dismissed"],
+            "options": [
+              "new",
+              "rated",
+              "to_apply",
+              "cv_ready",
+              "applied",
+              "interview",
+              "refused",
+              "accepted",
+              "dismissed"
+            ],
             "optionLabels": {
               "new": {
                 "fr": "nouvelle",
                 "en": "new"
               },
-              "interesting": {
-                "fr": "à creuser",
-                "en": "interesting"
+              "rated": {
+                "fr": "appréciée",
+                "en": "appraised"
+              },
+              "to_apply": {
+                "fr": "à postuler",
+                "en": "to apply"
+              },
+              "cv_ready": {
+                "fr": "CV prêt",
+                "en": "CV ready"
               },
               "applied": {
                 "fr": "postulée",
                 "en": "applied"
+              },
+              "interview": {
+                "fr": "entretien",
+                "en": "interview"
+              },
+              "refused": {
+                "fr": "refusée",
+                "en": "refused"
+              },
+              "accepted": {
+                "fr": "acceptée",
+                "en": "accepted"
               },
               "dismissed": {
                 "fr": "écartée",
@@ -295,6 +365,53 @@
               }
             },
             "default": "new"
+          },
+          {
+            "name": "adequation",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "label": {
+              "fr": "Note (IA)",
+              "en": "Note (AI)"
+            },
+            "help": "L’IA lit le contenu, ton CV maître et tes critères d’offre : à quel point l’offre te correspond, sur 100."
+          },
+          {
+            "name": "avis_ia",
+            "type": "long_text",
+            "label": {
+              "fr": "Pourquoi (IA)",
+              "en": "Why (AI)"
+            }
+          },
+          {
+            "name": "score",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "label": {
+              "fr": "Pertinence (mots-clés)",
+              "en": "Relevance (keywords)"
+            },
+            "help": "Filtre sans IA : 100 = parle de ton domaine et de ton contrat. Décide ce qui est lu et apprécié, ne classe pas."
+          },
+          {
+            "name": "reasons",
+            "type": "text",
+            "label": {
+              "fr": "Mots trouvés",
+              "en": "Words found"
+            }
+          },
+          {
+            "name": "contenu",
+            "type": "long_text",
+            "label": {
+              "fr": "Contenu de l’offre",
+              "en": "Offer’s content"
+            },
+            "help": "Le texte complet de la page de l’offre, lu sans IA chaque matin, pour que l’IA le lise."
           },
           {
             "name": "position",
@@ -314,93 +431,6 @@
             "help": "Mots du titre + entreprise : la même offre vue sur plusieurs sites ou plusieurs jours."
           },
           {
-            "name": "contenu",
-            "type": "long_text",
-            "label": {
-              "fr": "Contenu de l’offre",
-              "en": "Offer’s content"
-            },
-            "help": "Le texte complet de la page de l’offre, lu sans IA chaque matin, pour que l’IA le lise."
-          },
-          {
-            "name": "adequation",
-            "type": "number",
-            "min": 0,
-            "max": 100,
-            "label": {
-              "fr": "Adéquation (IA)",
-              "en": "Fit (AI)"
-            },
-            "help": "L’IA lit le contenu et ton CV maître : à quel point l’offre te correspond, sur 100."
-          },
-          {
-            "name": "avis_ia",
-            "type": "long_text",
-            "label": {
-              "fr": "Avis de l’IA",
-              "en": "AI’s review"
-            }
-          }
-        ],
-        "columns": ["url", "company", "location", "type", "score", "status"]
-      }
-    },
-    {
-      "title": "Application",
-      "data": {
-        "label": {
-          "fr": "Candidature",
-          "en": "Application"
-        },
-        "activity": true,
-        "fields": [
-          {
-            "name": "offer",
-            "type": "link",
-            "target": "JobOffer",
-            "inverse": "applications",
-            "label": {
-              "fr": "Offre",
-              "en": "Offer"
-            }
-          },
-          {
-            "name": "company",
-            "type": "text",
-            "label": {
-              "fr": "Entreprise",
-              "en": "Company"
-            }
-          },
-          {
-            "name": "status",
-            "type": "choice",
-            "label": {
-              "fr": "Où j’en suis",
-              "en": "Where it stands"
-            },
-            "options": ["to_send", "waiting", "interview", "done"],
-            "optionLabels": {
-              "to_send": {
-                "fr": "à envoyer",
-                "en": "to send"
-              },
-              "waiting": {
-                "fr": "envoyée, en attente",
-                "en": "sent, waiting"
-              },
-              "interview": {
-                "fr": "entretien",
-                "en": "interview"
-              },
-              "done": {
-                "fr": "terminée",
-                "en": "over"
-              }
-            },
-            "default": "to_send"
-          },
-          {
             "name": "sent_on",
             "type": "date",
             "label": {
@@ -409,56 +439,24 @@
             }
           },
           {
-            "name": "due",
+            "name": "follow_up",
             "type": "date",
             "label": {
               "fr": "Relancer le",
               "en": "Follow up on"
             },
-            "aliases": ["relance", "next_step"]
+            "aliases": ["relance", "due"]
           },
           {
-            "name": "outcome",
-            "type": "choice",
-            "label": {
-              "fr": "Réponse",
-              "en": "Answer"
-            },
-            "options": ["none", "yes", "no"],
-            "optionLabels": {
-              "none": {
-                "fr": "pas encore",
-                "en": "not yet"
-              },
-              "yes": {
-                "fr": "acceptée",
-                "en": "accepted"
-              },
-              "no": {
-                "fr": "refusée",
-                "en": "declined"
-              }
-            },
-            "default": "none"
-          },
-          {
-            "name": "contact",
-            "type": "text",
-            "label": {
-              "fr": "Contact",
-              "en": "Contact"
-            }
-          },
-          {
-            "name": "notes",
+            "name": "answer",
             "type": "long_text",
             "label": {
-              "fr": "Notes",
-              "en": "Notes"
+              "fr": "Réponse, notes",
+              "en": "Answer, notes"
             }
           }
         ],
-        "columns": ["company", "status", "sent_on", "due", "outcome"]
+        "columns": ["company", "location", "type", "adequation", "status", "url"]
       }
     },
     {
@@ -559,51 +557,77 @@
       }
     },
     {
-      "title": "Criterion",
+      "title": "JobSettings",
       "data": {
         "label": {
-          "fr": "Critère de CV",
-          "en": "CV criterion"
+          "fr": "Réglages",
+          "en": "Settings"
         },
         "fields": [
           {
-            "name": "poids",
+            "name": "seuil_postuler",
             "type": "number",
             "min": 0,
             "max": 100,
+            "default": 75,
             "label": {
-              "fr": "Poids",
-              "en": "Weight"
+              "fr": "À postuler d’office à partir de (note IA)",
+              "en": "To apply automatically from (AI note)"
             }
           },
           {
-            "name": "instruction",
-            "type": "long_text",
-            "label": {
-              "fr": "Ce que l’IA vérifie",
-              "en": "What the AI checks"
-            }
-          },
-          {
-            "name": "ordre",
+            "name": "seuil_pdf",
             "type": "number",
+            "min": 0,
+            "max": 100,
+            "default": 80,
             "label": {
-              "fr": "Ordre",
-              "en": "Order"
+              "fr": "PDF du CV à partir de (note du CV)",
+              "en": "CV PDF from (CV grade)"
+            }
+          },
+          {
+            "name": "notes_par_jour",
+            "type": "number",
+            "min": 0,
+            "max": 200,
+            "default": 30,
+            "label": {
+              "fr": "Offres appréciées par jour, au plus",
+              "en": "Offers appraised per day, at most"
+            }
+          },
+          {
+            "name": "cv_par_jour",
+            "type": "number",
+            "min": 0,
+            "max": 20,
+            "default": 3,
+            "label": {
+              "fr": "CV écrits par jour, au plus",
+              "en": "CVs written per day, at most"
+            }
+          },
+          {
+            "name": "villes",
+            "type": "text",
+            "default": "Rouen, Paris (Île-de-France)",
+            "label": {
+              "fr": "Villes visées",
+              "en": "Target cities"
             }
           }
-        ],
-        "columns": ["poids", "instruction"]
+        ]
       }
     }
   ],
   "pages": [
     {
-      "title": "Applications",
+      "title": "Decide",
       "data": {
         "label": {
-          "fr": "Aujourd’hui",
-          "en": "Today"
+          "fr": "À décider",
+          "en": "To decide"
         },
         "order": 1,
         "filters": [
@@ -622,12 +646,12 @@
           {
             "block": "stat",
             "title": {
-              "fr": "Nouvelles en IA",
-              "en": "New on AI"
+              "fr": "À apprécier",
+              "en": "To appraise"
             },
             "query": {
               "kind": "JobOffer",
-              "where": "status = 'new' and score >= 100 and ({type} = 'tous' or type = {type})",
+              "where": "score >= 100 and status = 'new' and ({type} = 'tous' or type = {type})",
               "aggregate": {
                 "n": "count()"
               }
@@ -636,12 +660,12 @@
           {
             "block": "stat",
             "title": {
-              "fr": "À creuser",
-              "en": "To look into"
+              "fr": "Appréciées",
+              "en": "Appraised"
             },
             "query": {
               "kind": "JobOffer",
-              "where": "status = 'interesting' and ({type} = 'tous' or type = {type})",
+              "where": "status = 'rated' and ({type} = 'tous' or type = {type})",
               "aggregate": {
                 "n": "count()"
               }
@@ -650,12 +674,12 @@
           {
             "block": "stat",
             "title": {
-              "fr": "CV prêts",
-              "en": "CVs ready"
+              "fr": "À postuler",
+              "en": "To apply"
             },
             "query": {
-              "kind": "CV",
-              "where": "state = 'ready'",
+              "kind": "JobOffer",
+              "where": "(status = 'to_apply' or status = 'cv_ready') and ({type} = 'tous' or type = {type})",
               "aggregate": {
                 "n": "count()"
               }
@@ -664,12 +688,12 @@
           {
             "block": "stat",
             "title": {
-              "fr": "Candidatures en cours",
-              "en": "Applications under way"
+              "fr": "Postulées",
+              "en": "Applied"
             },
             "query": {
-              "kind": "Application",
-              "where": "status != 'done'",
+              "kind": "JobOffer",
+              "where": "(status = 'applied' or status = 'interview') and ({type} = 'tous' or type = {type})",
               "aggregate": {
                 "n": "count()"
               }
@@ -678,27 +702,27 @@
           {
             "block": "table",
             "title": {
-              "fr": "Dernière collecte",
-              "en": "Last collection"
+              "fr": "Dernières collectes",
+              "en": "Last collections"
             },
             "query": {
               "kind": "Execution",
               "where": "service = 'Atelier'",
-              "fields": ["status", "started", "error"],
+              "fields": ["action", "status", "started", "error"],
               "sort": "-started",
-              "limit": 1
+              "limit": 2
             }
           },
           {
             "block": "review",
             "title": {
-              "fr": "Nouvelles offres, une à une",
-              "en": "New offers, one by one"
+              "fr": "Offres à décider, les mieux notées d’abord",
+              "en": "Offers to decide, best noted first"
             },
             "kind": "JobOffer",
-            "where": "status = 'new' and score >= 100 and ({type} = 'tous' or type = {type})",
+            "where": "score >= 100 and (status = 'new' or status = 'rated') and ({type} = 'tous' or type = {type})",
             "subtitle": ["company", "location"],
-            "badge": "score",
+            "badge": "adequation",
             "fields": [
               "adequation",
               "avis_ia",
@@ -708,25 +732,18 @@
               "contract",
               "published",
               "source",
-              "reasons",
-              "contenu"
+              "status"
             ],
-            "facets": ["type", "source"],
+            "facets": ["type", "status", "source"],
             "link": "url",
-            "sort": "-published",
+            "sort": "-adequation",
             "action": {
-              "label": "À creuser",
+              "label": "À postuler",
               "set": {
-                "status": "interesting"
+                "status": "to_apply"
               }
             },
             "more": [
-              {
-                "label": "Postulé",
-                "set": {
-                  "status": "applied"
-                }
-              },
               {
                 "label": "Écarter",
                 "set": {
@@ -739,48 +756,137 @@
       }
     },
     {
-      "title": "Offers",
+      "title": "ToApply",
       "data": {
         "label": {
-          "fr": "Offres",
-          "en": "Offers"
+          "fr": "À postuler",
+          "en": "To apply"
         },
         "order": 2,
         "blocks": [
           {
             "block": "datatable",
             "title": {
-              "fr": "Toutes mes offres en IA",
-              "en": "All my AI offers"
+              "fr": "Offres à postuler",
+              "en": "Offers to apply to"
             },
             "kind": "JobOffer",
-            "where": "score >= 100",
-            "columns": [
-              "company",
-              "location",
-              "type",
-              "status",
-              "score",
-              "adequation",
-              "published",
-              "url"
-            ],
-            "facets": ["type", "status", "source", "location"],
+            "where": "status = 'to_apply' or status = 'cv_ready'",
+            "columns": ["company", "location", "adequation", "status", "url"],
+            "facets": ["status", "type"],
             "link": "url",
-            "sort": "-published",
+            "sort": "-adequation",
             "action": {
-              "label": "À creuser",
+              "label": "Postulée",
               "set": {
-                "status": "interesting"
+                "status": "applied"
               }
             },
             "more": [
               {
-                "label": "Postulé",
+                "label": "Écarter",
                 "set": {
-                  "status": "applied"
+                  "status": "dismissed"
+                }
+              }
+            ]
+          },
+          {
+            "block": "datatable",
+            "title": {
+              "fr": "Mes CV adaptés",
+              "en": "My tailored CVs"
+            },
+            "kind": "CV",
+            "where": "role = 'tailored'",
+            "columns": ["offer", "appreciation", "state"],
+            "facets": ["state"],
+            "sort": "-appreciation"
+          }
+        ]
+      }
+    },
+    {
+      "title": "Applied",
+      "data": {
+        "label": {
+          "fr": "Postulées",
+          "en": "Applied"
+        },
+        "order": 3,
+        "blocks": [
+          {
+            "block": "datatable",
+            "title": {
+              "fr": "Mes candidatures",
+              "en": "My applications"
+            },
+            "kind": "JobOffer",
+            "where": "status = 'applied' or status = 'interview' or status = 'refused' or status = 'accepted'",
+            "columns": ["company", "sent_on", "follow_up", "status", "url"],
+            "facets": ["status"],
+            "link": "url",
+            "sort": "-sent_on",
+            "action": {
+              "label": "Entretien",
+              "set": {
+                "status": "interview"
+              }
+            },
+            "more": [
+              {
+                "label": "Refusée",
+                "set": {
+                  "status": "refused"
                 }
               },
+              {
+                "label": "Acceptée",
+                "set": {
+                  "status": "accepted"
+                }
+              }
+            ]
+          },
+          {
+            "block": "calendar",
+            "title": {
+              "fr": "Les jours qui viennent",
+              "en": "Days ahead"
+            },
+            "days": 14
+          }
+        ]
+      }
+    },
+    {
+      "title": "All",
+      "data": {
+        "label": {
+          "fr": "Toutes les offres",
+          "en": "All offers"
+        },
+        "order": 4,
+        "blocks": [
+          {
+            "block": "datatable",
+            "title": {
+              "fr": "Toutes les offres de mon domaine",
+              "en": "Every offer in my field"
+            },
+            "kind": "JobOffer",
+            "where": "score >= 100",
+            "columns": ["company", "location", "type", "adequation", "status", "published", "url"],
+            "facets": ["status", "type", "source", "location"],
+            "link": "url",
+            "sort": "-adequation",
+            "action": {
+              "label": "À postuler",
+              "set": {
+                "status": "to_apply"
+              }
+            },
+            "more": [
               {
                 "label": "Écarter",
                 "set": {
@@ -799,7 +905,7 @@
           "fr": "Suivi",
           "en": "Tracking"
         },
-        "order": 3,
+        "order": 5,
         "filters": [
           {
             "name": "type",
@@ -822,7 +928,21 @@
             "kind": "JobOffer",
             "where": "score >= 100 and ({type} = 'tous' or type = {type})",
             "by": "status",
-            "steps": ["new", "interesting", "applied"]
+            "steps": ["new", "rated", "to_apply", "cv_ready", "applied", "interview"]
+          },
+          {
+            "block": "live",
+            "title": {
+              "fr": "Offres publiées par jour, par type",
+              "en": "Offers published per day, by type"
+            },
+            "data": {
+              "kind": "JobOffer",
+              "where": "score >= 100 and ({type} = 'tous' or type = {type})",
+              "fields": ["published", "type"]
+            },
+            "height": 320,
+            "code": "<div id=\"c\" style=\"padding:8px 12px 0\"></div><div id=\"l\" style=\"display:flex;gap:16px;flex-wrap:wrap;font-size:12px;padding:6px 12px\"></div><script>\nconst J = JARVIS, T = J.theme, rows = J.rows;\nconst days = []; const today = new Date();\nfor (let i = 20; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); days.push(d.toISOString().slice(0, 10)); }\nconst types = ['stage', 'alternance', 'cdi', 'autre', 'none'];\nconst col = { stage: T.primary, alternance: T.ochre, cdi: T.info, autre: T.bark, none: T['rule-strong'] };\nconst lab = (t) => { const o = J.labels.type && J.labels.type.options; const v = o && o[t]; return v ? (v[J.lang] || v.fr) : (t === 'none' ? (J.lang === 'en' ? 'not set' : 'non défini') : t); };\nconst count = {}; days.forEach((d) => { count[d] = {}; });\nrows.forEach((r) => { const d = String(r.values.published || '').slice(0, 10); if (!count[d]) return; const t = r.values.type || 'none'; count[d][t] = (count[d][t] || 0) + 1; });\nconst total = (d) => Object.values(count[d]).reduce((a, b) => a + b, 0);\nconst max = Math.max(1, ...days.map(total));\nconst W = 720, H = 250, L = 34, B = 26, bw = (W - L - 8) / days.length;\nlet s = '<svg viewBox=\"0 0 ' + W + ' ' + H + '\" width=\"100%\" role=\"img\" aria-label=\"' + J.title + '\">';\nfor (let g = 0; g <= 4; g++) { const v = Math.round(max * g / 4), y = H - B - (H - B - 12) * g / 4; s += '<line x1=\"' + L + '\" x2=\"' + W + '\" y1=\"' + y + '\" y2=\"' + y + '\" stroke=\"' + T.rule + '\"/><text x=\"' + (L - 6) + '\" y=\"' + (y + 4) + '\" text-anchor=\"end\" font-size=\"10\" fill=\"' + T.bark + '\">' + v + '</text>'; }\ndays.forEach((d, i) => {\n  let y = H - B;\n  types.forEach((t) => { const n = count[d][t] || 0; if (!n) return; const h = (H - B - 12) * n / max; y -= h; s += '<rect x=\"' + (L + i * bw + 2) + '\" y=\"' + y + '\" width=\"' + (bw - 4) + '\" height=\"' + h + '\" rx=\"2\" fill=\"' + col[t] + '\"><title>' + d + ' · ' + lab(t) + ' : ' + n + '</title></rect>'; });\n  if (total(d)) s += '<text x=\"' + (L + i * bw + bw / 2) + '\" y=\"' + (y - 4) + '\" text-anchor=\"middle\" font-size=\"10\" fill=\"' + T.ink + '\">' + total(d) + '</text>';\n  if (i % 3 === 0) s += '<text x=\"' + (L + i * bw + bw / 2) + '\" y=\"' + (H - 8) + '\" text-anchor=\"middle\" font-size=\"10\" fill=\"' + T.bark + '\">' + d.slice(8, 10) + '/' + d.slice(5, 7) + '</text>';\n});\ns += '</svg>';\ndocument.getElementById('c').innerHTML = s;\ndocument.getElementById('l').innerHTML = types.filter((t) => days.some((d) => count[d][t])).map((t) => '<span><i style=\"display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;background:' + col[t] + '\"></i>' + lab(t) + '</span>').join('');\n</script>"
           },
           {
             "block": "breakdown",
@@ -855,72 +975,6 @@
               "sort": "-n",
               "limit": 12
             }
-          },
-          {
-            "block": "kanban",
-            "title": {
-              "fr": "Mes offres en IA",
-              "en": "My AI offers"
-            },
-            "kind": "JobOffer",
-            "by": "status",
-            "where": "score >= 100 and ({type} = 'tous' or type = {type})",
-            "detail": "company",
-            "badge": "score",
-            "link": "url",
-            "muted": ["dismissed"],
-            "show": ["interesting", "applied", "dismissed"]
-          },
-          {
-            "block": "kanban",
-            "title": {
-              "fr": "Candidatures",
-              "en": "Applications"
-            },
-            "kind": "Application",
-            "by": "status"
-          },
-          {
-            "block": "calendar",
-            "title": {
-              "fr": "Les jours qui viennent",
-              "en": "Days ahead"
-            },
-            "days": 14
-          }
-        ]
-      }
-    },
-    {
-      "title": "CVs",
-      "data": {
-        "label": {
-          "fr": "CV",
-          "en": "CVs"
-        },
-        "order": 4,
-        "blocks": [
-          {
-            "block": "datatable",
-            "title": {
-              "fr": "Mes CV",
-              "en": "My CVs"
-            },
-            "kind": "CV",
-            "columns": ["role", "offer", "state", "appreciation"],
-            "facets": ["role", "state"]
-          },
-          {
-            "block": "table",
-            "title": {
-              "fr": "Ma grille d’appréciation des CV",
-              "en": "My CV grid"
-            },
-            "query": {
-              "kind": "Criterion",
-              "fields": ["poids", "instruction"],
-              "sort": "ordre"
-            }
           }
         ]
       }
@@ -932,8 +986,28 @@
           "fr": "Réglages",
           "en": "Settings"
         },
-        "order": 5,
+        "order": 6,
         "blocks": [
+          {
+            "block": "datatable",
+            "title": {
+              "fr": "Mes seuils",
+              "en": "My thresholds"
+            },
+            "kind": "JobSettings",
+            "columns": ["seuil_postuler", "seuil_pdf", "notes_par_jour", "cv_par_jour", "villes"]
+          },
+          {
+            "block": "datatable",
+            "title": {
+              "fr": "Mes critères",
+              "en": "My criteria"
+            },
+            "kind": "Criterion",
+            "columns": ["pour", "poids", "instruction"],
+            "facets": ["pour"],
+            "sort": "ordre"
+          },
           {
             "block": "datatable",
             "title": {
@@ -1000,26 +1074,6 @@
       }
     },
     {
-      "title": "Relance d’une candidature",
-      "data": {
-        "when": {
-          "before": {
-            "kind": "Application",
-            "field": "due",
-            "days": 0
-          }
-        },
-        "if": "status = 'waiting'",
-        "then": [
-          {
-            "remind": {
-              "text": "Relancer : {title}"
-            }
-          }
-        ]
-      }
-    },
-    {
       "title": "Lire les offres",
       "data": {
         "when": {
@@ -1047,13 +1101,33 @@
           }
         ]
       }
+    },
+    {
+      "title": "Relance d’une candidature",
+      "data": {
+        "when": {
+          "before": {
+            "kind": "JobOffer",
+            "field": "follow_up",
+            "days": 0
+          }
+        },
+        "if": "status = 'applied'",
+        "then": [
+          {
+            "remind": {
+              "text": "Relancer : {title} ({company})"
+            }
+          }
+        ]
+      }
     }
   ],
   "scripts": [],
   "role": {
     "covers": {
-      "fr": "Ta recherche de stage, d’alternance ou d’emploi : tes critères, les offres trouvées et notées chaque matin, tes candidatures et leurs relances.",
-      "en": "Your search for an internship, work-study or job: your criteria, the offers found and scored each morning, your applications and follow-ups."
+      "fr": "Chercher un stage, une alternance ou un emploi : les offres collectées chaque matin sur tes sites, appréciées par l’IA selon tes critères, les CV adaptés, tes candidatures et leurs relances.",
+      "en": "Looking for an internship, a work-study place or a job: offers collected each morning from your sites, appraised by the AI against your criteria, tailored CVs, your applications and follow-ups."
     },
     "intents": [
       "stage",
@@ -1079,35 +1153,26 @@
       "site d’emploi",
       "sites d’offres"
     ],
-    "watches": [
-      "JobSearch",
-      "Source",
-      "JobOffer",
-      "Capture",
-      "Application",
-      "Fichier",
-      "CV",
-      "Criterion"
-    ],
-    "reads": ["JobSearch", "Source", "JobOffer", "Capture", "Application", "CV", "Criterion"],
-    "writes": ["JobSearch", "Source", "JobOffer", "Application", "CV", "Criterion"],
+    "watches": ["JobSearch", "Source", "JobOffer", "Fichier", "CV", "Criterion", "JobSettings"],
+    "reads": ["JobSearch", "Source", "JobOffer", "CV", "Criterion", "JobSettings"],
+    "writes": ["JobSearch", "Source", "JobOffer", "CV", "Criterion", "JobSettings"],
     "ask": [
       {
         "fr": "Quel poste, où, et quel contrat ?",
         "en": "Which role, where, and which contract?"
       },
       {
-        "fr": "Je te propose des sites où chercher ?",
-        "en": "Shall I propose sites to search?"
+        "fr": "On fixe tes critères pour apprécier les offres ?",
+        "en": "Shall we set your criteria for appraising offers?"
       },
       {
-        "fr": "On fixe ta grille d’appréciation des CV ?",
-        "en": "Shall we set your CV grid?"
+        "fr": "À partir de quelle note je prépare le CV ?",
+        "en": "From which note do I prepare the CV?"
       }
     ],
     "instructions": {
-      "fr": "Sa recherche : « JobSearch » (poste, lieu, contrat ; « mots » : une idée par ligne, formes séparées par |). Ses sites : « Source » (recette ; essaie avec parcourir ; « lien » prêt à ouvrir). À 7 h les offres arrivent notées en « JobOffer ». CV : un « CV » maître (Markdown) et un modèle (HTML avec {{contenu}}). À 7 h 30, le texte complet des offres retenues est rangé dans « contenu ». Pour une offre : lis son « contenu », note « adequation » (0-100) et « avis_ia », renseigne-toi sur l’entreprise (chercher), écris un « CV » adapté relié à l’offre, sans rien inventer ; note-le sur 100 avec ses « Criterion » (poids, instruction) : appreciation + avis critère par critère. À 80 ou plus : pdf du modèle rempli, fichier relié, état prêt. Elle postule : une « Application », « due » = relance. Rien n’est envoyé sans son oui.",
-      "en": "Her search: « JobSearch » (role, place, contract; « mots »: one idea per line, forms separated by |). Her sites: « Source » (recipe; try with parcourir; « lien » ready to open). At 7 offers arrive scored as « JobOffer ». CVs: a master « CV » (Markdown) and a template (HTML with {{contenu}}). At 7:30 the full text of kept offers is filed in « contenu ». For an offer: read its « contenu », set « adequation » (0-100) and « avis_ia », learn about the company (chercher), write a tailored « CV » linked to the offer, inventing nothing; score it out of 100 with her « Criterion » entries (weight, instruction): appreciation + review per criterion. At 80 or more: pdf of the filled template, file linked, state ready. She applies: an « Application », « due » = follow-up. Nothing is sent without her yes."
+      "fr": "Trois étapes. 1) Collecte sans IA : à 7 h les offres arrivent en « JobOffer » (étape new), à 7 h 30 leur texte complet dans « contenu ». 2) Appréciation : lis « contenu », son « CV » maître et ses « Criterion » pour offre ; écris « adequation » (0-100) et « avis_ia » ; étape rated, ou to_apply si la note atteint « seuil_postuler » (« JobSettings »). 3) Préparation, pour chaque offre to_apply : un « CV » adapté relié à l’offre, sans rien inventer, noté avec ses « Criterion » pour cv ; à « seuil_pdf » ou plus, pdf du modèle rempli, fichier relié, étape cv_ready. Elle postule : étape applied, « sent_on », « follow_up ». Rien n’est envoyé sans son oui.",
+      "en": "Three steps. 1) Collect without AI: at 7 offers arrive as « JobOffer » (step new), at 7:30 their full text in « contenu ». 2) Appraise: read « contenu », her master « CV » and her offer « Criterion » entries; write « adequation » (0-100) and « avis_ia »; step rated, or to_apply when the note reaches « seuil_postuler » (« JobSettings »). 3) Prepare, for each to_apply offer: a tailored « CV » linked to the offer, inventing nothing, graded with her cv « Criterion » entries; at « seuil_pdf » or more, pdf of the filled template, file linked, step cv_ready. She applies: step applied, « sent_on », « follow_up ». Nothing is sent without her yes."
     },
     "capabilities": ["chercher", "lire", "parcourir", "pdf", "situer"],
     "bridges": []

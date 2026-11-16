@@ -555,7 +555,7 @@ function dtState(at) {
   if (DT[key]) return DT[key];
   let kept = {};
   try { kept = JSON.parse(localStorage.getItem('jos.dt.' + key) || '{}') || {}; } catch (e) { kept = {}; }
-  return (DT[key] = Object.assign({ q: '', facets: {}, adv: [], join: 'and', sort: null, page: 0, sel: [], pick: null, advOpen: false }, kept, { page: 0, sel: [] }));
+  return (DT[key] = Object.assign({ q: '', facets: {}, adv: [], join: 'and', sort: null, page: 0, sel: [], pick: null, advOpen: false, view: null, group: null, fold: [] }, kept, { page: 0, sel: [] }));
 }
 const dtText = (v) => v == null ? '' : Array.isArray(v) ? v.join(', ') : typeof v === 'object' ? String(v.address || '') : String(v);
 function dtVal(it, f) { return f === 'title' ? it.title : it.values[f]; }
@@ -601,20 +601,103 @@ function dtFacet(b, st, f) {
   for (const v of st.facets[f] || []) if (!n.has(v)) n.set(v, 0);
   return [...n.entries()].sort((a, c) => c[1] - a[1] || a[0].localeCompare(c[0], 'fr'));
 }
-function dtToolbar(b, st, lab, olab, wide) {
-  const facets = (b.facets || []).map((f) => {
+// Spec 077: one toolbar (search, Filtre, Tri, Grouper, the views), and the same entries as a table,
+// a list or a board. A row, a line or a card opens the side card (spec 076) by its data-peek.
+const dtChoices = (b) => Object.keys(b.types).filter((f) => b.types[f] === 'choice');
+// On a phone, a list until she chooses another view.
+const dtView = (b, st) => { const v = st.view || (window.innerWidth < 760 ? 'list' : 'table'); return v === 'board' && !dtChoices(b).length ? 'table' : v; };
+const dtGroupOf = (b, st) => st.group && b.types[st.group] === 'choice' ? st.group : null;
+// The groups of a field: the model's options in their order, then what else the entries hold.
+function dtGroups(b, rows, f) {
+  const map = new Map();
+  for (const v of (b.order && b.order[f]) || []) map.set(v, []);
+  for (const it of rows) { const v = dtText(it.values[f]) || '—'; if (!map.has(v)) map.set(v, []); map.get(v).push(it); }
+  return [...map.entries()];
+}
+const dtMenu = (label, on, body, cls) => '<details class="dt-dd' + (cls ? ' ' + cls : '') + '"><summary class="btn small' + (on ? ' on' : '') + '">' + label + ' ▾</summary><div class="dt-pop">' + body + '</div></details>';
+function dtToolbar(b, st, lab, olab, views) {
+  const nf = Object.values(st.facets).reduce((n, v) => n + v.length, 0) + st.adv.length;
+  const filter = (b.facets || []).map((f) => {
     const on = st.facets[f] || [];
-    return '<details class="dt-facet"><summary class="btn small' + (on.length ? ' on' : '') + '">' + esc(lab(f)) + (on.length ? ' · ' + on.length : '') + ' ▾</summary><div class="dt-menu">' +
-      dtFacet(b, st, f).map(([v, n]) => '<label class="dt-opt"><input type="checkbox" data-dt-facet="' + esc(f) + '" value="' + esc(v) + '"' + (on.includes(v) ? ' checked' : '') + '> <span>' + esc(v === '—' ? '—' : olab(f, v)) + '</span><b>' + n + '</b></label>').join('') + '</div></details>';
-  }).join('');
+    return '<div class="dt-sec"><div class="dt-sec-h">' + esc(lab(f)) + '</div>' + dtFacet(b, st, f).map(([v, n]) => '<label class="dt-opt"><input type="checkbox" data-dt-facet="' + esc(f) + '" value="' + esc(v) + '"' + (on.includes(v) ? ' checked' : '') + '> <span>' + esc(v === '—' ? '—' : olab(f, v)) + '</span><b>' + n + '</b></label>').join('') + '</div>';
+  }).join('') + '<button class="dt-item dt-advl" data-dt-adv>' + esc(W.dt_advanced) + (st.adv.length ? ' · ' + st.adv.length : '') + '</button>';
+  const sorts = ['title'].concat(b.columns.filter((f) => f !== 'title'));
+  const sort = sorts.map((f) => '<button class="dt-item' + (st.sort && st.sort.field === f ? ' on' : '') + '" data-dt-sortf="' + esc(f) + '">' + esc(lab(f)) + (st.sort && st.sort.field === f ? (st.sort.desc ? ' ↓' : ' ↑') : '') + '</button>').join('') +
+    (st.sort ? '<button class="dt-item muted" data-dt-sortf="">' + esc(W.dt_unsorted) + '</button>' : '');
+  const choices = dtChoices(b);
+  const group = views && choices.length ? dtMenu(esc(W.dt_group) + (dtGroupOf(b, st) ? ' : ' + esc(lab(st.group)) : ''), Boolean(dtGroupOf(b, st)),
+    '<button class="dt-item' + (dtGroupOf(b, st) ? '' : ' on') + '" data-dt-group="">' + esc(W.dt_noGroup) + '</button>' + choices.map((f) => '<button class="dt-item' + (st.group === f ? ' on' : '') + '" data-dt-group="' + esc(f) + '">' + esc(lab(f)) + '</button>').join('')) : '';
+  const view = dtView(b, st);
+  const switcher = views ? '<div class="segmented dt-views">' + [['list', W.dt_viewList], ['board', W.dt_viewBoard], ['table', W.dt_viewTable]].filter((x) => x[0] !== 'board' || choices.length).map((x) => '<button data-dt-view="' + x[0] + '" aria-pressed="' + (view === x[0]) + '">' + esc(x[1]) + '</button>').join('') + '</div>' : '';
   const pills = [];
   for (const f of Object.keys(st.facets)) for (const v of st.facets[f]) pills.push('<button class="dt-pill" data-dt-unfacet="' + esc(f) + '" data-v="' + esc(v) + '">' + esc(lab(f)) + ' : ' + esc(olab(f, v)) + ' ✕</button>');
   st.adv.forEach((c, i) => pills.push('<button class="dt-pill" data-dt-unadv="' + i + '">' + esc(lab(c.field)) + ' ' + esc(W['dt_' + c.op]) + ' ' + esc(olab(c.field, c.value)) + ' ✕</button>'));
   if (st.q) pills.push('<button class="dt-pill" data-dt-unq>« ' + esc(st.q) + ' » ✕</button>');
-  return '<div class="dt-bar"><input class="field dt-q" data-dt-q placeholder="' + esc(W.dt_search) + '" value="' + esc(st.q) + '">' + facets +
-    '<button class="btn small' + (st.advOpen || st.adv.length ? ' on' : '') + '" data-dt-adv>' + esc(W.dt_advanced) + (st.adv.length ? ' · ' + st.adv.length : '') + '</button></div>' +
+  return '<div class="dt-bar"><input class="field dt-q" data-dt-q placeholder="' + esc(W.dt_search) + '" value="' + esc(st.q) + '">' +
+    dtMenu(esc(W.dt_filter) + (nf ? ' · ' + nf : ''), nf > 0, filter, 'dt-filter') +
+    dtMenu(esc(W.dt_sort) + (st.sort ? ' : ' + esc(lab(st.sort.field)) : ''), Boolean(st.sort), sort) + group +
+    '<span class="dt-sp"></span>' + switcher + '</div>' +
     (st.advOpen ? dtAdvanced(b, st, lab, olab) : '') +
     (pills.length ? '<div class="dt-pills">' + pills.join('') + '<button class="link" data-dt-clear>' + esc(W.dt_clear) + '</button></div>' : '');
+}
+// A row's gestures, behind « ⋯ ».
+const dtMore = (it, acts) => '<details class="dt-dd dt-more"><summary class="icon-btn" aria-label="' + esc(W.dt_actions) + '" title="' + esc(W.dt_actions) + '">⋯</summary><div class="dt-pop right">' +
+  acts.map((a, n) => '<button class="dt-item" data-dt-act="' + esc(it.id) + ':' + n + '">' + esc(a.label) + '</button>').join('') +
+  '<a data-full class="dt-item" href="#/entree/' + esc(it.id) + '">' + esc(W.dt_record) + '</a></div></details>';
+function dtTableHtml(b, at, lab, olab, webLink, fmt) {
+  const st = dtState(at);
+  const view = dtView(b, st);
+  const rows = dtSorted(dtRows(b, st), st);
+  const acts = b.actions || [];
+  const sel = st.sel.filter((id) => rows.some((r) => r.id === id));
+  const meta = '<div class="dt-meta"><b>' + rows.length + '</b> ' + esc(W.dt_results) + (b.truncated ? ' · ' + esc(W.dt_more) : '') +
+    (sel.length && acts.length ? '<span class="dt-bulk">' + sel.length + ' ' + esc(W.dt_selected) + ' · ' + acts.map((a, n) => '<button class="btn small" data-dt-bulk="' + n + '">' + esc(a.label) + '</button>').join('') + '</span>' : '') + '</div>';
+  const head = dtToolbar(b, st, lab, olab, true) + meta;
+  if (!rows.length) return head + '<div class="pad muted">' + esc(W.dt_none) + '</div>';
+  if (view === 'board') return head + dtBoardHtml(b, st, rows, dtGroupOf(b, st) || dtChoices(b)[0], olab, webLink, fmt);
+  const g = dtGroupOf(b, st);
+  const check = (it) => acts.length ? '<input type="checkbox" class="dt-check-in" data-dt-sel="' + esc(it.id) + '"' + (sel.includes(it.id) ? ' checked' : '') + ' aria-label="' + esc(it.title) + '">' : '';
+  const figure = b.columns.find((f) => b.types[f] === 'number');
+  const linkOf = (it) => b.link && webLink(it.values[b.link]);
+  let line;
+  let wrap;
+  if (view === 'list') {
+    const subs = b.columns.filter((f) => f !== g && f !== figure && f !== b.link && b.types[f] !== 'number').slice(0, 4);
+    line = (it) => '<div class="dt-li" data-peek="' + esc(it.id) + '" tabindex="0">' + check(it) + '<div class="dt-li-main"><span class="cell-title">' + esc(it.title) + '</span><span class="dt-li-sub">' + subs.map((f) => dtText(dtVal(it, f)) ? esc(olab(f, dtText(dtVal(it, f)))) : '').filter(Boolean).join(' · ') + '</span></div>' +
+      (figure && dtVal(it, figure) != null ? '<span class="dt-badge">' + esc(fmt(dtVal(it, figure))) + '</span>' : '') + (linkOf(it) || '') + dtMore(it, acts) + '</div>';
+    wrap = (inner) => '<div class="dt-list">' + inner + '</div>';
+  } else {
+    const cols = ['title'].concat(b.columns);
+    line = (it) => '<tr class="row-click" data-peek="' + esc(it.id) + '">' + (acts.length ? '<td class="dt-check">' + check(it) + '</td>' : '') +
+      cols.map((f) => f === 'title' ? '<td><div class="dt-tcell">' + dtCell(b, it, f, lab, olab, webLink, fmt) + dtMore(it, acts) + '</div></td>' : '<td' + (b.types[f] === 'number' ? ' class="n"' : '') + '>' + dtCell(b, it, f, lab, olab, webLink, fmt) + '</td>').join('') + '</tr>';
+    const width = cols.length + (acts.length ? 1 : 0);
+    wrap = (inner) => '<div class="scroll"><table class="dt"><thead><tr>' + (acts.length ? '<th class="dt-check"><input type="checkbox" data-dt-all aria-label="' + esc(W.dt_all) + '"></th>' : '') +
+      cols.map((f) => '<th class="dt-sort" data-dt-sort="' + esc(f) + '">' + esc(lab(f)) + (st.sort && st.sort.field === f ? (st.sort.desc ? ' ↓' : ' ↑') : '') + '</th>').join('') + '</tr></thead><tbody>' + inner + '</tbody></table></div>';
+    wrap.width = width;
+  }
+  if (g) {
+    const groups = dtGroups(b, rows, g).filter(([, items]) => items.length);
+    const header = (v, n) => { const key = g + ':' + v; const folded = st.fold.includes(key); const h = '<button class="dt-gh-b" data-dt-fold="' + esc(key) + '" aria-expanded="' + !folded + '"><span class="dt-caret">' + (folded ? '▸' : '▾') + '</span>' + esc(v === '—' ? '—' : olab(g, v)) + '<b>' + n + '</b></button>';
+      return view === 'list' ? '<div class="dt-gh">' + h + '</div>' : '<tr class="dt-gh"><td colspan="' + wrap.width + '">' + h + '</td></tr>'; };
+    return head + wrap(groups.map(([v, items]) => header(v, items.length) + (st.fold.includes(g + ':' + v) ? '' : items.slice(0, 200).map(line).join(''))).join(''));
+  }
+  const pages = Math.max(1, Math.ceil(rows.length / 25)); st.page = Math.min(st.page, pages - 1);
+  return head + wrap(rows.slice(st.page * 25, st.page * 25 + 25).map(line).join('')) +
+    (pages > 1 ? '<div class="dt-pages"><button class="btn small" data-dt-page="-1"' + (st.page ? '' : ' disabled') + '>‹</button> ' + (st.page + 1) + ' / ' + pages + ' <button class="btn small" data-dt-page="1"' + (st.page < pages - 1 ? '' : ' disabled') + '>›</button></div>' : '');
+}
+// The board: one column per option of the field, cards that move from one to another.
+function dtBoardHtml(b, st, rows, g, olab, webLink, fmt) {
+  const figure = b.columns.find((f) => b.types[f] === 'number');
+  const metas = b.columns.filter((f) => f !== g && f !== b.link && b.types[f] !== 'number').slice(0, 2);
+  const acts = b.actions || [];
+  const card = (it) => '<div class="dt-card" draggable="true" data-dt-card="' + esc(it.id) + '" data-peek="' + esc(it.id) + '" tabindex="0"><span class="dt-card-t">' + esc(it.title) + '</span>' +
+    (metas.some((f) => dtText(dtVal(it, f))) ? '<span class="dt-card-m">' + metas.map((f) => dtText(dtVal(it, f)) ? esc(olab(f, dtText(dtVal(it, f)))) : '').filter(Boolean).join(' · ') + '</span>' : '') +
+    '<span class="dt-card-f">' + (figure && dtVal(it, figure) != null ? '<span class="dt-badge">' + esc(fmt(dtVal(it, figure))) + '</span>' : '') + '<span class="dt-sp"></span>' + ((b.link && webLink(it.values[b.link])) || '') + dtMore(it, acts) + '</span></div>';
+  return '<div class="dt-board">' + dtGroups(b, rows, g).map(([v, items]) => {
+    const key = g + ':' + v; const folded = st.fold.includes(key);
+    return '<section class="dt-col' + (folded ? ' folded' : '') + '" data-dt-col="' + esc(v) + '"><button class="dt-col-h" data-dt-fold="' + esc(key) + '" aria-expanded="' + !folded + '"><span>' + esc(v === '—' ? '—' : olab(g, v)) + '</span><b>' + items.length + '</b></button>' +
+      (folded ? '' : '<div class="dt-col-b">' + (items.length ? items.slice(0, 100).map(card).join('') : '<span class="dt-col-none">' + esc(W.dt_dropHere) + '</span>') + (items.length > 100 ? '<span class="dt-col-none">+' + (items.length - 100) + '</span>' : '') + '</div>') + '</section>';
+  }).join('') + '</div>';
 }
 function dtAdvanced(b, st, lab, olab) {
   const fields = ['title'].concat(Object.keys(b.types));
@@ -635,25 +718,6 @@ function dtCell(b, it, f, lab, olab, webLink, fmt) {
   if (b.types[f] === 'choice' && v != null) return '<span class="dt-tag">' + esc(olab(f, v)) + '</span>';
   if (b.types[f] === 'number' && typeof v === 'number') return '<span class="mono">' + esc(fmt(v)) + '</span>';
   return esc(fmt(v));
-}
-function dtTableHtml(b, at, lab, olab, webLink, fmt) {
-  const st = dtState(at);
-  const rows = dtSorted(dtRows(b, st), st);
-  const pages = Math.max(1, Math.ceil(rows.length / 25)); st.page = Math.min(st.page, pages - 1);
-  const shown = rows.slice(st.page * 25, st.page * 25 + 25);
-  const cols = ['title'].concat(b.columns);
-  const sel = st.sel.filter((id) => rows.some((r) => r.id === id));
-  const acts = b.actions || [];
-  return dtToolbar(b, st, lab, olab) +
-    '<div class="dt-meta"><b>' + rows.length + '</b> ' + esc(W.dt_results) + (b.truncated ? ' · ' + esc(W.dt_more) : '') +
-    (sel.length && acts.length ? '<span class="dt-bulk">' + sel.length + ' ' + esc(W.dt_selected) + ' · ' + acts.map((a, n) => '<button class="btn small" data-dt-bulk="' + n + '">' + esc(a.label) + '</button>').join('') + '</span>' : '') + '</div>' +
-    (rows.length ? '<div class="scroll"><table class="dt"><thead><tr>' + (acts.length ? '<th class="dt-check"><input type="checkbox" data-dt-all' + (shown.length && shown.every((r) => sel.includes(r.id)) ? ' checked' : '') + ' aria-label="' + esc(W.dt_all) + '"></th>' : '') +
-      cols.map((f) => '<th class="dt-sort" data-dt-sort="' + esc(f) + '">' + esc(lab(f)) + (st.sort && st.sort.field === f ? (st.sort.desc ? ' ↓' : ' ↑') : '') + '</th>').join('') + (acts.length ? '<th></th>' : '') + '</tr></thead><tbody>' +
-      shown.map((it) => '<tr class="row-click" data-go="#/entree/' + esc(it.id) + '">' + (acts.length ? '<td class="dt-check"><input type="checkbox" data-dt-sel="' + esc(it.id) + '"' + (sel.includes(it.id) ? ' checked' : '') + '></td>' : '') +
-        cols.map((f) => '<td' + (b.types[f] === 'number' ? ' class="n"' : '') + '>' + dtCell(b, it, f, lab, olab, webLink, fmt) + '</td>').join('') +
-        (acts.length ? '<td class="dt-acts">' + acts.map((a, n) => '<button class="btn small" data-dt-act="' + esc(it.id) + ':' + n + '">' + esc(a.label) + '</button>').join('') + '</td>' : '') + '</tr>').join('') +
-      '</tbody></table></div>' : '<div class="pad muted">' + esc(W.dt_none) + '</div>') +
-    (pages > 1 ? '<div class="dt-pages"><button class="btn small" data-dt-page="-1"' + (st.page ? '' : ' disabled') + '>‹</button> ' + (st.page + 1) + ' / ' + pages + ' <button class="btn small" data-dt-page="1"' + (st.page < pages - 1 ? '' : ' disabled') + '>›</button></div>' : '');
 }
 function dtReviewHtml(b, at, lab, olab, webLink, fmt) {
   const st = dtState(at);
@@ -676,7 +740,7 @@ function dtMount(el, at, draw) {
   const b = shownPage.blocks[at];
   const st = dtState(at);
   const redraw = () => {
-    try { localStorage.setItem('jos.dt.' + (shownPage && shownPage.id) + ':' + at, JSON.stringify({ q: st.q, facets: st.facets, adv: st.adv, join: st.join, sort: st.sort })); } catch (e) { /* a private window keeps nothing */ }
+    try { localStorage.setItem('jos.dt.' + (shownPage && shownPage.id) + ':' + at, JSON.stringify({ q: st.q, facets: st.facets, adv: st.adv, join: st.join, sort: st.sort, view: st.view, group: st.group, fold: st.fold })); } catch (e) { /* a private window keeps nothing */ }
     el.innerHTML = draw();
   };
   const save = async (ids, n) => {
@@ -690,15 +754,20 @@ function dtMount(el, at, draw) {
   });
   el.addEventListener('change', (e) => {
     const t = e.target;
-    if (t.matches('[data-dt-facet]')) { const f = t.dataset.dtFacet; const on = new Set(st.facets[f] || []); t.checked ? on.add(t.value) : on.delete(t.value); st.facets[f] = [...on]; st.page = 0; const open = f; redraw(); const d = [...el.querySelectorAll('details.dt-facet')].find((x) => x.querySelector('[data-dt-facet="' + CSS.escape(open) + '"]')); if (d) d.open = true; }
+    if (t.matches('[data-dt-facet]')) { const f = t.dataset.dtFacet; const on = new Set(st.facets[f] || []); t.checked ? on.add(t.value) : on.delete(t.value); st.facets[f] = [...on]; st.page = 0; const open = f; redraw(); const d = el.querySelector('details.dt-filter'); if (d) { d.open = true; const box = d.querySelector('[data-dt-facet="' + CSS.escape(open) + '"]'); if (box) box.focus(); } }
     else if (t.matches('[data-dt-c]')) { const c = st.adv[Number(t.dataset.dtC)]; c[t.dataset.k] = t.value; if (t.dataset.k === 'field') c.value = ''; st.page = 0; redraw(); }
     else if (t.matches('[data-dt-join]')) { st.join = t.value; redraw(); }
     else if (t.matches('[data-dt-sel]')) { const s = new Set(st.sel); t.checked ? s.add(t.dataset.dtSel) : s.delete(t.dataset.dtSel); st.sel = [...s]; redraw(); }
     else if (t.matches('[data-dt-all]')) { const ids = [...el.querySelectorAll('[data-dt-sel]')].map((x) => x.dataset.dtSel); const s = new Set(st.sel); ids.forEach((id) => t.checked ? s.add(id) : s.delete(id)); st.sel = [...s]; redraw(); }
   });
   el.addEventListener('click', async (e) => {
+    el.querySelectorAll('details.dt-dd[open]').forEach((d) => { if (!d.contains(e.target)) d.open = false; });
     const t = e.target.closest('button, th, a, input, summary');
     if (!t) return;
+    if (t.matches('[data-dt-sortf]')) { const f = t.dataset.dtSortf; st.sort = !f ? null : st.sort && st.sort.field === f ? { field: f, desc: !st.sort.desc } : { field: f, desc: false }; redraw(); return; }
+    if (t.matches('[data-dt-group]')) { st.group = t.dataset.dtGroup || null; st.fold = []; redraw(); return; }
+    if (t.matches('[data-dt-view]')) { st.view = t.dataset.dtView; redraw(); return; }
+    if (t.matches('[data-dt-fold]')) { const k = t.dataset.dtFold; st.fold = st.fold.includes(k) ? st.fold.filter((x) => x !== k) : st.fold.concat([k]); redraw(); return; }
     if (t.matches('[data-dt-unfacet]')) { st.facets[t.dataset.dtUnfacet] = (st.facets[t.dataset.dtUnfacet] || []).filter((v) => v !== t.dataset.v); redraw(); }
     else if (t.matches('[data-dt-unadv]')) { st.adv.splice(Number(t.dataset.dtUnadv), 1); redraw(); }
     else if (t.matches('[data-dt-unq]')) { st.q = ''; redraw(); }
@@ -715,6 +784,24 @@ function dtMount(el, at, draw) {
     } else if (t.matches('[data-dt-bulk]')) {
       t.disabled = true; try { await save(st.sel.slice(), Number(t.dataset.dtBulk)); } catch (error) { t.disabled = false; alert(error.message); }
     }
+  });
+  el.addEventListener('dragstart', (e) => { const c = e.target.closest && e.target.closest('[data-dt-card]'); if (!c) return; e.dataTransfer.setData('text/plain', c.dataset.dtCard); e.dataTransfer.effectAllowed = 'move'; c.classList.add('dragging'); });
+  el.addEventListener('dragend', (e) => { const c = e.target.closest && e.target.closest('[data-dt-card]'); if (c) c.classList.remove('dragging'); el.querySelectorAll('.dt-col.over').forEach((x) => x.classList.remove('over')); });
+  el.addEventListener('dragover', (e) => { const col = e.target.closest && e.target.closest('[data-dt-col]'); if (!col) return; e.preventDefault(); el.querySelectorAll('.dt-col.over').forEach((x) => { if (x !== col) x.classList.remove('over'); }); col.classList.add('over'); });
+  el.addEventListener('drop', async (e) => {
+    const col = e.target.closest && e.target.closest('[data-dt-col]');
+    if (!col) return;
+    e.preventDefault(); col.classList.remove('over');
+    const id = e.dataTransfer.getData('text/plain');
+    const g = dtGroupOf(b, st) || dtChoices(b)[0];
+    const v = col.dataset.dtCol;
+    const it = b.items.find((x) => x.id === id);
+    if (!it || !g || v === '—' || dtText(it.values[g]) === v) return;
+    it.values[g] = v; redraw();
+    try {
+      await api(inSpace('/save'), { method: 'POST', body: { entries: [{ id, data: { [g]: v }, origin: 'said' }] } });
+      toast(say(W.dt_moved, { title: it.title, v: b.olab ? b.olab(g, v) : v }), { id, spaceId: space });
+    } catch (error) { alert(error.message); show(); }
   });
 }
 
@@ -752,7 +839,7 @@ function blocksHtml(drawn) {
   const lab = (b) => (f) => f === 'title' ? W.title : fLabel(b.kind, f);
   const olab = (b) => (f, v) => oLabel(b.kind, f, v);
   const draw = {
-    datatable: (b, at) => { DT_DRAW[at] = () => dtTableHtml(b, at, lab(b), olab(b), webLink, fmt); return v2panel(T(b), '<div class="dt-wrap" data-dt="' + at + '">' + DT_DRAW[at]() + '</div>', '', 'i-life'); },
+    datatable: (b, at) => { b.olab = olab(b); b.order = Object.fromEntries(Object.keys(b.types || {}).map((f) => { const v = vocab[b.kind] && vocab[b.kind].fields[f]; return [f, v && v.order ? v.order : v && v.options ? Object.keys(v.options) : []]; })); DT_DRAW[at] = () => dtTableHtml(b, at, lab(b), olab(b), webLink, fmt); return v2panel(T(b), '<div class="dt-wrap" data-dt="' + at + '">' + DT_DRAW[at]() + '</div>', '', 'i-life'); },
     review: (b, at) => { DT_DRAW[at] = () => dtReviewHtml(b, at, lab(b), olab(b), webLink, fmt); return v2panel(T(b), '<div class="dt-wrap" data-dt="' + at + '">' + DT_DRAW[at]() + '</div>', '', 'i-check'); },
     live: (b, at) => v2panel(T(b), '<iframe class="live-frame" data-live="' + at + '" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" title="' + esc(T(b)) + '" style="height:' + Number(b.height || 360) + 'px"></iframe>', '<span class="caps faint">' + esc(W.liveBlock) + '</span>', 'i-chart'),
     funnel: (b) => { const top = Math.max(1, b.steps[0] ? b.steps[0].count : 1);

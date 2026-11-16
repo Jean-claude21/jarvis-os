@@ -272,7 +272,10 @@ export interface DrawnPage {
     string,
     {
       label: Label | null;
-      fields: Record<string, { label: Label | null; options: Record<string, Label> }>;
+      fields: Record<
+        string,
+        { label: Label | null; options: Record<string, Label>; order?: string[] }
+      >;
     }
   >;
   computedAt: string;
@@ -692,7 +695,12 @@ export async function renderPage(
           fields: Object.fromEntries(
             model.fields.map((field) => [
               field.name,
-              { label: field.label ?? null, options: field.optionLabels ?? {} },
+              // The options in the model's order: an object's keys lose it in the database.
+              {
+                label: field.label ?? null,
+                options: field.optionLabels ?? {},
+                ...(Array.isArray(field.options) ? { order: field.options } : {}),
+              },
             ]),
           ),
         },

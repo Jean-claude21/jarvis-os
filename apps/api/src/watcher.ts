@@ -174,11 +174,19 @@ export async function watcherPass(
   try {
     // Who pressed « Start » with her code (spec 015), before telling anyone.
     if (delivery.telegramToken) {
-      await readTelegramLinks(db, delivery.telegramToken, wordsOf('fr').channelLinked, {
-        kept: wordsOf('fr').captureKept,
-        filed: wordsOf('fr').captureFiled,
-        unheard: wordsOf('fr').voiceUnheard,
-      }).catch((error) => console.warn('[watcher] telegram', (error as Error).message));
+      await readTelegramLinks(
+        db,
+        delivery.telegramToken,
+        wordsOf('fr').channelLinked,
+        {
+          kept: wordsOf('fr').captureKept,
+          filed: wordsOf('fr').captureFiled,
+          unheard: wordsOf('fr').voiceUnheard,
+          unkept: wordsOf('fr').fileUnkept,
+        },
+        undefined,
+        delivery.blobs,
+      ).catch((error) => console.warn('[watcher] telegram', (error as Error).message));
     }
     report = await watchOnce(db, now, tellerFor(db, delivery));
     done.reminders = report;

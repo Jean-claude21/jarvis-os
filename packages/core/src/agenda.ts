@@ -2,7 +2,16 @@ import { createHash, randomBytes } from 'node:crypto';
 import type pg from 'pg';
 import type { Actor, Tx } from './db';
 import { find, get, save } from './entries';
-import { DEFAULT_ZONE, inZone, minutesOf, nextTime, TIME_FIELDS, timeOf } from './time';
+import {
+  anchorOf,
+  DEFAULT_ZONE,
+  inZone,
+  minutesOf,
+  nextTime,
+  repetitionFromWords,
+  TIME_FIELDS,
+  timeOf,
+} from './time';
 import { zoneOf } from './zone';
 
 export { minutesOf, TIME_FIELDS } from './time';
@@ -116,8 +125,26 @@ export function occurrencesOf(
     end ? at < to && end > from : at >= from && at < to;
   const out: Occurrence[] = [];
 
-  if (typeof data.repeat === 'string' && data.repeat.trim()) {
-    const minutes = minutesOf(data.duration);
+  // A repetition kept as fields, or still in her words (« tous les mercredis »): read here too, on
+  // the event's own hour and day (spec 075).
+  // Words are read only with a start to take the day and hour from.
+  const said = typeof data.repeat === 'string' ? data.repeat.trim() : '';
+  const anchor = anchorOf(timeOf(data.start ?? data.at, zone), zone);
+  const repeat = !said
+    ? null
+    : /^[\d*,/#L-]+(\s+[\d*,/#L-]+){4}$/i.test(said) || !anchor
+      ? said
+      : (repetitionFromWords(said, anchor) ?? said);
+  let unreadable = false;
+  if (repeat) {
+    // How long: its `duration`, else from its start to its end (spec 075).
+    const startAt = timeOf(data.start, zone);
+    const endAt = timeOf(data.end, zone);
+    const minutes =
+      minutesOf(data.duration) ??
+      (startAt && endAt && endAt > startAt && endAt.getTime() - startAt.getTime() < 24 * 60 * MINUTE
+        ? Math.round((endAt.getTime() - startAt.getTime()) / MINUTE)
+        : null);
     const skipped = new Set(
       (Array.isArray(data.except)
         ? data.except
@@ -140,7 +167,7 @@ export function occurrencesOf(
     if (begins && Number.isInteger(count) && count > 0) {
       let at = new Date(begins.getTime() - 1);
       try {
-        for (let n = 0; n < Math.min(count, 1000); n += 1) at = nextTime(data.repeat, at, zone);
+        for (let n = 0; n < Math.min(count, 1000); n += 1) at = nextTime(repeat, at, zone);
         if (!ends || at < ends) ends = at;
       } catch {
         // Said below, as any repetition she must correct.
@@ -167,7 +194,7 @@ export function occurrencesOf(
     );
     try {
       for (let n = 0; n < AGENDA_MAX_REPEATS; n += 1) {
-        const at = nextTime(data.repeat, cursor, zone);
+        const at = nextTime(repeat, cursor, zone);
         if (at >= to || (ends && at > ends)) break;
         cursor = at;
         const day = localDay(at);
@@ -179,14 +206,16 @@ export function occurrencesOf(
         push(at, day, false);
       }
     } catch {
-      // A repetition she must correct (the watcher says so); it has no place in time yet.
+      // A repetition she must correct (the watcher says so): the event is still shown once, at its
+      // start, below (spec 075).
+      unreadable = true;
     }
     for (const [day, one] of changed) {
       if (!one.at || one.status === 'cancelled' || skipped.has(day)) continue;
       const moved = timeOf(one.at, zone);
       if (moved) push(moved, day, true);
     }
-    return out.sort((a, b) => a.start.localeCompare(b.start));
+    if (!unreadable) return out.sort((a, b) => a.start.localeCompare(b.start));
   }
 
   const span = placed(data.start, zone);

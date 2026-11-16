@@ -78,7 +78,15 @@ export {
   type Member,
   type Space,
 } from './spaces';
-export { DEFAULT_ZONE, inZone, nextTime, repetitionFromWords, repetitionOf, timeOf } from './time';
+export {
+  anchorOf,
+  DEFAULT_ZONE,
+  inZone,
+  nextTime,
+  repetitionFromWords,
+  repetitionOf,
+  timeOf,
+} from './time';
 export { watchOnce, type Due, type PassReport } from './watcher';
 export { defaultsFor, offsetOf, syncReminders } from './reminders';
 export { comment, COMMENT_KIND, commentsOf } from './comments';

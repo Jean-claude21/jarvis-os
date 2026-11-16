@@ -1,4 +1,4 @@
-import { repetitionFromWords } from '@jarvis-os/core';
+import { anchorOf, repetitionFromWords, timeOf } from '@jarvis-os/core';
 import * as chrono from 'chrono-node';
 
 // Dates in her words (spec 030): « demain 9h », « vendredi prochain à 14h30 », « dans 2 semaines »
@@ -76,7 +76,11 @@ export function momentsOf<
     }
     // A repetition in her words (spec 036): « tous les lundis à 7h » → « 0 7 * * 1 ».
     if (typeof data.repeat === 'string') {
-      const fields = repetitionFromWords(data.repeat);
+      const start = [data.start, data.at, data.due].find((one) => typeof one === 'string');
+      const fields = repetitionFromWords(
+        data.repeat,
+        anchorOf(typeof start === 'string' ? timeOf(start, zone) : null, zone),
+      );
       if (fields) {
         understood.push({
           entry: entry.title ?? '',

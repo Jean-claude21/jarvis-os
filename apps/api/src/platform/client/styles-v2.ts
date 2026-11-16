@@ -2380,6 +2380,128 @@ to {
 .v2 .x-month .ev {
   font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 2px solid var(--c, var(--ink)); padding-left: 4px;
 }
+.v2 .x-month .md .d {
+  color: inherit; text-decoration: none; align-self: flex-start; border-radius: 5px; padding: 0 4px;
+}
+.v2 .x-month .md .d:hover {
+  background: var(--sand);
+}
+.v2 .ag-chip {
+  display: flex; gap: 5px; align-items: baseline; min-width: 0; font-size: 11.5px; line-height: 1.35; color: var(--ink); text-decoration: none; padding: 2px 6px; border-radius: 5px; background: color-mix(in srgb, var(--c, var(--ink)) 9%, var(--paper)); border-left: 3px solid var(--c, var(--ink));
+}
+.v2 .ag-chip span {
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.v2 .ag-chip time {
+  font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--bark); flex: none;
+}
+.v2 .ag-chip.proposed {
+  border-left-style: dashed;
+}
+.v2 .ag-chip:hover, .v2 .ag-card:hover {
+  background: color-mix(in srgb, var(--c, var(--ink)) 16%, var(--paper));
+}
+.v2 .ag-more {
+  font-size: 11px; color: var(--bark); text-decoration: none; padding: 0 6px;
+}
+.v2 .ag-more:hover {
+  color: var(--ink); text-decoration: underline;
+}
+.v2 .ag-bar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 4px 0 14px;
+}
+.v2 .ag-step {
+  display: inline-flex;
+}
+.v2 .ag-period {
+  font-size: 16px; font-weight: 700; margin: 0 6px;
+}
+.v2 .ag-period::first-letter {
+  text-transform: uppercase;
+}
+.v2 .ag-sp {
+  flex: 1;
+}
+.v2 .ag-spaces {
+  display: inline-flex; flex-wrap: wrap; gap: 6px;
+}
+.v2 .ag-week {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--rule); border-radius: 10px; background: var(--paper); overflow-x: auto; min-height: 420px;
+}
+.v2 .ag-col {
+  border-right: 1px solid var(--rule); display: flex; flex-direction: column; min-width: 0;
+}
+.v2 .ag-col:last-child {
+  border-right: 0;
+}
+.v2 .ag-col.weekend {
+  background: var(--sand);
+}
+.v2 .ag-col header {
+  display: flex; align-items: baseline; gap: 6px; padding: 10px 10px 8px; border-bottom: 1px solid var(--rule); position: sticky; top: 0;
+}
+.v2 .ag-col header .n {
+  font-size: 18px; font-weight: 700; color: var(--ink); text-decoration: none; line-height: 1;
+}
+.v2 .ag-col header .w {
+  font-size: 12px; color: var(--bark);
+}
+.v2 .ag-col.today header .n {
+  background: var(--primary); color: var(--on-primary); border-radius: 6px; padding: 2px 6px;
+}
+.v2 .ag-add {
+  margin-left: auto; border: 0; background: none; color: var(--faint); cursor: pointer; padding: 2px; border-radius: 5px; display: inline-flex;
+}
+.v2 .ag-add:hover {
+  color: var(--ink); background: var(--sand);
+}
+.v2 .ag-body {
+  display: flex; flex-direction: column; gap: 6px; padding: 8px;
+}
+.v2 .ag-none {
+  font-size: 12px; color: var(--faint); padding: 2px 4px;
+}
+.v2 .ag-card {
+  display: grid; gap: 3px; padding: 7px 9px; border-radius: 7px; text-decoration: none; color: var(--ink); background: color-mix(in srgb, var(--c, var(--ink)) 8%, var(--paper)); border: 1px solid color-mix(in srgb, var(--c, var(--ink)) 22%, var(--paper)); border-left: 3px solid var(--c, var(--ink));
+}
+.v2 .ag-card .t {
+  font-size: 13px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere;
+}
+.v2 .ag-card .m {
+  display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 11.5px; color: var(--bark);
+}
+.v2 .ag-card .m time {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+}
+.v2 .ag-card.due .m {
+  color: var(--error);
+}
+.v2 .ag-card.proposed {
+  border-style: dashed;
+}
+.v2 .ag-card.kept .t {
+  text-decoration: line-through; color: var(--bark);
+}
+.v2 .ag-mark {
+  font-size: 12px; color: var(--bark);
+}
+.v2 .ag-card .m .end {
+  margin-left: -4px;
+}
+@media (max-width: 1180px) {
+  .v2 .ag-card .m .end {
+    display: none;
+  }
+  .v2 .ag-col header {
+    padding: 8px 6px 6px;
+  }
+  .v2 .ag-body {
+    padding: 6px 5px;
+  }
+}
+.v2 .ag-space {
+  margin-left: auto; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
 .v2 .x-steps {
   display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; font-weight: 600; color: var(--faint);
 }
@@ -2459,6 +2581,33 @@ to {
   min-height: 58px; padding: 4px;
 }
 .v2 .x-month .ev {
+  display: none;
+}
+.v2 .x-month .ag-chip {
+  padding: 0; height: 4px; border-left-width: 0; background: var(--c, var(--ink));
+}
+.v2 .x-month .ag-chip time, .v2 .x-month .ag-chip span {
+  display: none;
+}
+.v2 .ag-week {
+  grid-template-columns: 1fr; min-height: 0;
+}
+.v2 .ag-col {
+  border-right: 0; border-bottom: 1px solid var(--rule);
+}
+.v2 .ag-col:last-child {
+  border-bottom: 0;
+}
+.v2 .ag-col header {
+  position: static;
+}
+.v2 .ag-body {
+  flex-direction: row; flex-wrap: wrap;
+}
+.v2 .ag-card {
+  flex: 1 1 220px;
+}
+.v2 .ag-more .w {
   display: none;
 }
 .v2 .x-days {

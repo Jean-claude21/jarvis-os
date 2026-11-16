@@ -108,6 +108,7 @@ function frame(src) {
 const drawer = () => document.getElementById('drawer');
 // The drawer of the mockup: its title and a line under it, what it holds, its gestures at the foot.
 function openDrawer(title, body, foot, sub) {
+  if (drawer().classList.contains('pk')) drawer().classList.remove('pk');
   drawer().innerHTML = '<div class="drawer-head"><div><h2>' + esc(title) + '</h2>' + (sub ? '<span class="muted" style="font-size:12px">' + esc(sub) + '</span>' : '') + '</div><button class="icon-btn" data-close aria-label="' + esc(W.close || '×') + '"><svg class="i"><use href="#i-x"/></svg></button></div>' +
     '<div class="pad" style="display:flex;flex-direction:column;gap:14px;overflow-y:auto;flex:1;min-height:0">' + body + '</div>' + (foot ? '<div class="drawer-foot">' + foot + '</div>' : '');
   drawer().classList.add('open');

@@ -15,6 +15,7 @@ import { router } from './client/router';
 import { v2Pages } from './client/pages-v2';
 import { v2Agenda } from './client/pages-v2-agenda';
 import { v2Entry } from './client/pages-v2-entry';
+import { v2Peek } from './client/pages-v2-peek';
 import { v2Apps } from './client/pages-v2-apps';
 import { v2Life } from './client/pages-v2-life';
 import { v2Routines } from './client/pages-v2-routines';
@@ -39,6 +40,7 @@ const script = [
   v2Pages,
   v2Agenda,
   v2Entry,
+  v2Peek,
   v2Apps,
   v2Life,
   v2Routines,

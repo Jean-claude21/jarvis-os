@@ -36,7 +36,7 @@ const dayPages = {
         (typeof e.data.text === 'string' ? '<p style="margin:0 0 10px">' + esc(e.data.text.slice(0, 400)) + (e.data.text.length > 400 ? '…' : '') + '</p>' : '') +
         fields.map((f) => '<div class="field-row"><span class="caps">' + esc(f) + '</span><span>' + esc(value(e.data[f])) + '</span>' + originBadge(e.origin[f] || 'said') + '</div>').join('') +
         (links.length ? '<div class="chips" style="margin-top:12px">' + links.map((l) => '<a class="chip" href="#/entree/' + esc(l.entry.id) + '">' + esc(l.entry.title) + '<small>' + esc(l.role) + '</small></a>').join('') + '</div>' : '') +
-        '<div class="actions" style="margin-top:12px"><a class="link" href="#/entree/' + esc(e.id) + '">' + esc(W.fullEntry) + ' →</a></div></div></section>' +
+        '<div class="actions" style="margin-top:12px"><a data-full class="link" href="#/entree/' + esc(e.id) + '">' + esc(W.fullEntry) + ' →</a></div></div></section>' +
         dayBand(now.day, sel.id) +
         '<div class="choices">' + acts.map((a) => '<div class="choice' + (a[3] ? ' main' : '') + '"><b>' + esc(a[1]) + '</b><p>' + esc(a[2]) + '</p><button class="' + (a[3] ? '' : 'quiet') + '" data-act="' + a[0] + '" data-id="' + esc(sel.id) + '" data-space="' + esc(sel.spaceId) + '">' + esc(a[1]) + '</button></div>').join('') + '</div>';
     }

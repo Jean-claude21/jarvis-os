@@ -152,7 +152,7 @@ const v2Pages = {
     if (chosen) {
       const c = await api(inSpace('/people/' + encodeURIComponent(chosen)));
       const owed = c.promises.length;
-      detail = '<section class="panel"><div class="panel-body pad" style="display:flex;flex-direction:column;gap:16px"><div class="x-person"><span class="x-avatar">' + esc(ini(c.title)) + '</span><div style="flex:1;min-width:200px"><h2 style="margin:0">' + esc(c.title) + '</h2><div class="muted">' + esc([c.data.relation, typeof c.data.circle === 'string' && !/^[0-9]+$/.test(c.data.circle) ? c.data.circle : null, spaceName()].filter(Boolean).join(' · ')) + '</div></div><a class="btn" href="#/entree/' + esc(c.id) + '">' + ic('i-life') + esc(W.fullEntry) + '</a></div>' +
+      detail = '<section class="panel"><div class="panel-body pad" style="display:flex;flex-direction:column;gap:16px"><div class="x-person"><span class="x-avatar">' + esc(ini(c.title)) + '</span><div style="flex:1;min-width:200px"><h2 style="margin:0">' + esc(c.title) + '</h2><div class="muted">' + esc([c.data.relation, typeof c.data.circle === 'string' && !/^[0-9]+$/.test(c.data.circle) ? c.data.circle : null, spaceName()].filter(Boolean).join(' · ')) + '</div></div><a data-full class="btn" href="#/entree/' + esc(c.id) + '">' + ic('i-life') + esc(W.fullEntry) + '</a></div>' +
         '<div class="grid g3" style="gap:10px">' + v2kpi(W.v2lastTime, c.last ? esc(agoShort(c.last.on)) : '—', c.last ? esc(c.last.title) : esc(W.v2never)) + v2kpi(W.v2promises, String(owed), owed ? esc(c.promises[0].title) : esc(W.v2none), owed ? 'alert' : '') + v2kpi(W.v2nextTime, c.next ? esc(day(c.next.on)) : '—', c.next ? esc(c.next.title) : esc(W.v2nothingPlanned)) + '</div></div></section>' +
         v2panel(W.v2promises, owed ? '<div class="pad x-rel">' + c.promises.map((p) => '<a href="#/entree/' + esc(p.id) + '">' + ic('i-hand', p.kind === 'Intention' ? 'color:var(--verify)' : '') + '<span><b>' + esc(p.title) + '</b> <em>· ' + esc(kindName(p.kind)) + (p.due ? ' · ' + esc(day(p.due)) : '') + '</em></span></a>').join('') + '</div>' : '<div class="pad muted">' + esc(W.v2none) + '</div>', '', 'i-hand') +
         v2panel(W.v2acrossApps, c.around.length ? '<div class="pad"><div class="x-across">' + c.around.map((g) => '<div class="x-app"><div class="top">' + v2app(kindName(g.kind)) + esc(kindName(g.kind)) + '<span class="muted" style="margin-left:auto;font-size:12px">' + g.n + '</span></div><p>' + g.latest.map((x) => '<a href="#/entree/' + esc(x.id) + '" style="color:inherit">' + esc(x.title) + '</a>').join(' · ') + '</p></div>').join('') + '</div></div>' : '<div class="pad muted">' + esc(W.v2nothingYet) + '</div>', '', 'i-link');
@@ -320,7 +320,7 @@ v2Pages[''] = async function () {
     const context = typeof e.data.text === 'string' ? e.data.text.slice(0, 360) + (e.data.text.length > 360 ? '…' : '') : sel.said ? say(W.v2intentContext, { n: sel.said.times, since: day(sel.said.since) }) : '';
     det = '<button class="back" data-back>' + ic('i-left') + esc(W.v2backToList) + '</button>' +
       '<section class="panel"><div class="panel-head"><span class="left caps">' + ic(NOW_ICONS[sel.group]) + esc(kindName(sel.kind) + ' · ' + W['g_' + sel.group]) + '</span><span class="tag ' + NOW_TAGS[sel.group] + '">' + esc(W['r_' + sel.reason] || sel.reason) + '</span></div>' +
-      '<div class="panel-body subject"><div class="subject-top"><div><h2>' + esc(e.title) + '</h2><div class="muted" style="font-size:13px">' + esc(sub(sel)) + '</div></div><a class="btn small" href="#/entree/' + esc(e.id) + '">' + ic('i-life') + esc(W.fullEntry) + '</a></div>' +
+      '<div class="panel-body subject"><div class="subject-top"><div><h2>' + esc(e.title) + '</h2><div class="muted" style="font-size:13px">' + esc(sub(sel)) + '</div></div><a data-full class="btn small" href="#/entree/' + esc(e.id) + '">' + ic('i-life') + esc(W.fullEntry) + '</a></div>' +
       (context ? '<p class="context">' + esc(context) + '</p>' : '') +
       (links.length ? '<div class="chips">' + links.map((l) => '<a class="chip" href="#/entree/' + esc(l.entry.id) + '">' + ic(l.entry.kind === 'Person' ? 'i-person' : l.entry.kind === 'Fichier' ? 'i-file' : 'i-link') + esc(l.entry.title) + '<small>' + esc(kindName(l.entry.kind)) + '</small></a>').join('') + '</div>' : '') + '</div></section>' +
       dayBandV2(now.day, sel.id) +
@@ -664,7 +664,7 @@ function dtReviewHtml(b, at, lab, olab, webLink, fmt) {
   const badge = (it) => b.badge && dtVal(it, b.badge) != null ? '<span class="dt-badge">' + esc(fmt(dtVal(it, b.badge))) + '</span>' : '';
   const detail = pick ? '<div class="rv-head"><h3>' + esc(pick.title) + '</h3><div class="muted">' + esc(sub(pick)) + '</div></div>' +
     '<div class="rv-acts">' + (b.link && typeof pick.values[b.link] === 'string' && /^https?:/.test(pick.values[b.link]) ? '<a class="btn solid" data-web target="_blank" rel="noopener" href="' + esc(pick.values[b.link]) + '">' + esc(W.dt_open) + ' ↗</a>' : '') +
-    acts.map((a, n) => '<button class="btn" data-dt-act="' + esc(pick.id) + ':' + n + '" data-dt-next>' + esc(a.label) + '</button>').join('') + '<a class="btn" href="#/entree/' + esc(pick.id) + '">' + esc(W.dt_record) + '</a></div>' +
+    acts.map((a, n) => '<button class="btn" data-dt-act="' + esc(pick.id) + ':' + n + '" data-dt-next>' + esc(a.label) + '</button>').join('') + '<a data-full class="btn" href="#/entree/' + esc(pick.id) + '">' + esc(W.dt_record) + '</a></div>' +
     '<dl class="rv-fields">' + b.fields.map((f) => '<dt>' + esc(lab(f)) + '</dt><dd>' + dtCell(b, pick, f, lab, olab, webLink, fmt) + '</dd>').join('') + '</dl>'
     : '<div class="pad muted">' + esc(W.dt_none) + '</div>';
   return dtToolbar(b, st, lab, olab) + '<div class="dt-meta"><b>' + rows.length + '</b> ' + esc(W.dt_results) + '</div>' +
@@ -855,7 +855,7 @@ v2Pages.tableaux = async function (params) {
   if (id) {
     const d = await api(inSpace('/dashboard'), { method: 'POST', body: { id } });
     crumbs([W.navDashboards, d.title]);
-    return v2head(esc(d.title), esc(say(W.v2computedAt, { when: time(d.computedAt) })), '<a class="btn" href="#/tableaux">' + ic('i-left') + esc(W.navDashboards) + '</a><a class="btn" href="#/entree/' + esc(id) + '">' + ic('i-shape') + esc(W.fullEntry) + '</a>') + blocksHtml(widgetsAsBlocks(d));
+    return v2head(esc(d.title), esc(say(W.v2computedAt, { when: time(d.computedAt) })), '<a data-full class="btn" href="#/tableaux">' + ic('i-left') + esc(W.navDashboards) + '</a><a data-full class="btn" href="#/entree/' + esc(id) + '">' + ic('i-shape') + esc(W.fullEntry) + '</a>') + blocksHtml(widgetsAsBlocks(d));
   }
   const list = await api(inSpace('/entries?kind=Dashboard&limit=50'));
   const drawn = await Promise.all(list.slice(0, 8).map((d) => api(inSpace('/dashboard'), { method: 'POST', body: { id: d.id } }).catch(() => null)));
@@ -938,7 +938,7 @@ v2Pages.fichiers = async function () { setTimeout(() => { location.replace('#/do
 v2Pages.document = async function (params, id) {
   const e = await api(inSpace('/entries/' + encodeURIComponent(id)));
   crumbs([W.navDocuments, e.title]);
-  return v2head(esc(e.title), esc(kindName(e.kind) + ' · ' + say(W.chars, { n: num(String(e.data.text || '').length) })), '<a class="btn" href="#/documents">' + ic('i-left') + esc(W.navDocuments) + '</a><a class="btn" href="#/entree/' + esc(id) + '">' + ic('i-life') + esc(W.fullEntry) + '</a>') +
+  return v2head(esc(e.title), esc(kindName(e.kind) + ' · ' + say(W.chars, { n: num(String(e.data.text || '').length) })), '<a data-full class="btn" href="#/documents">' + ic('i-left') + esc(W.navDocuments) + '</a><a data-full class="btn" href="#/entree/' + esc(id) + '">' + ic('i-life') + esc(W.fullEntry) + '</a>') +
     '<section class="panel"><div class="panel-body">' + frame('/app/frame/document/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(space)) + '</div></section>';
 };
 `;

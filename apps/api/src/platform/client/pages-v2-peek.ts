@@ -103,18 +103,20 @@ function bindPeek(root, e, model) {
 // Every link to an entry opens the side card; Ctrl, ⌘, Shift or a middle click keep the page.
 document.addEventListener('click', (ev) => {
   if (ev.defaultPrevented || ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
-  const a = ev.target.closest && ev.target.closest('a[href^="#/entree/"], [data-go^="#/entree/"]');
+  const a = ev.target.closest && ev.target.closest('a[href^="#/entree/"], [data-go^="#/entree/"], [data-peek]');
   if (!a || a.hasAttribute('data-full') || a.closest('#side')) return;
   // A row that opens an entry: its own buttons, boxes and other links keep their gesture.
   if (a.tagName !== 'A') {
-    const own = ev.target.closest('a[href], button, input, select, textarea, label, [contenteditable="true"]');
+    const own = ev.target.closest('a[href], button, input, select, textarea, label, summary, details, [contenteditable="true"]');
     if (own && a.contains(own)) return;
   }
   ev.preventDefault();
   ev.stopPropagation();
+  if (a.dataset.peek) { peek(a.dataset.peek, a.dataset.space || null); return; }
   const target = a.getAttribute('href') || a.dataset.go;
   peek(decodeURIComponent(target.slice(9).split('?')[0]), a.dataset.space || null);
 }, true);
+document.addEventListener('keydown', (ev) => { if (ev.key !== 'Enter' || !ev.target.matches || !ev.target.matches('[data-peek]')) return; ev.preventDefault(); peek(ev.target.dataset.peek, ev.target.dataset.space || null); });
 // The drawer closes as a side card too: its width comes back.
 const closePeekWidth = new MutationObserver(() => { const d = drawer(); if (!d.classList.contains('open') && d.classList.contains('pk')) d.classList.remove('pk'); });
 closePeekWidth.observe(drawer(), { attributes: true, attributeFilter: ['class'] });

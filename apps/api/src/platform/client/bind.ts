@@ -277,7 +277,7 @@ function bindActions(root) {
     openDrawer(f.name, view + '<div class="field-row"><span class="caps">' + esc(W.added) + '</span><span>' + esc(time(f.createdAt)) + '</span><span></span></div>' +
       '<div class="field-row"><span class="caps">' + esc(W.kind) + '</span><span>' + esc(f.mediaType) + '</span><span></span></div>' +
       (f.links.length ? '<div class="chips">' + f.links.map((l) => '<a class="chip" href="#/entree/' + esc(l.id) + '">' + esc(l.title) + '<small>' + esc(l.role) + '</small></a>').join('') + '</div>' : ''),
-      '<a class="badge" href="#/entree/' + esc(id) + '">' + esc(W.fullEntry) + '</a><a class="badge primary" href="' + esc(src) + '&download=1">' + esc(W.download) + '</a>');
+      '<a data-full class="badge" href="#/entree/' + esc(id) + '">' + esc(W.fullEntry) + '</a><a data-full class="badge primary" href="' + esc(src) + '&download=1">' + esc(W.download) + '</a>');
   }));
   root.querySelectorAll('[data-area]').forEach((b) => b.addEventListener('click', async () => {
     const area = prompt(say(W.fileInAsk, { app: b.dataset.area }));
@@ -366,7 +366,7 @@ function bindActions(root) {
       '<div class="field-row"><span class="caps">' + esc(fieldLabelOf(k.model, c.name)) + '</span><span>' + esc((W['ty_' + c.type] || c.type) + (c.options ? ' : ' + c.options.map((o) => optionLabelOf(k.model, c.name, o)).join(', ') : '') + (c.target ? ' → ' + c.target : '') + (c.formula ? ' = ' + c.formula : '') + (c.unit ? ' (' + c.unit + ')' : '')) + '</span><span class="badge">' + esc(c.type === 'formula' ? W.computedBadge : c.required ? W.required : W.optional) + '</span></div>').join('') +
       (k.model.workflow ? '<p><span class="caps">' + esc(W.workflow) + '</span><br>' + k.model.workflow.transitions.map((t) => esc([t.from].flat().join(' | ') + ' → ' + t.to + (t.if ? ' (' + t.if + ')' : ''))).join('<br>') + '</p>' : '') +
       (k.model.path ? '<p><span class="caps">' + esc(W.rangement) + '</span><br><code class="url">' + esc(k.model.path) + '</code></p>' : ''),
-      '<a class="badge" href="#/entree/' + esc(k.model.id) + '">' + esc(W.fullEntry) + '</a>');
+      '<a data-full class="badge" href="#/entree/' + esc(k.model.id) + '">' + esc(W.fullEntry) + '</a>');
   }));
   root.querySelectorAll('[data-add]').forEach((b) => b.addEventListener('click', async () => {
     const k = (await api(inSpace('/kinds'))).find((one) => one.kind === b.dataset.add);

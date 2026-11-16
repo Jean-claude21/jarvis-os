@@ -93,7 +93,7 @@ const css = `
 .doc h1 { font-size: 22px; } .doc h2 { font-size: 18px; } .doc h3 { font-size: 15px; }
 .doc p, .doc ul, .doc ol, .doc blockquote, .doc pre { margin: 0 0 0.9em; }
 .doc p, .doc li { font-size: 15px; line-height: 1.65; }
-.doc blockquote { border-left: 3px solid var(--primary); padding: 2px 0 2px 14px; color: var(--bark); }
+.doc blockquote { background: #f6f0e9; border-radius: 8px; padding: 8px 14px; color: var(--bark); }
 .doc pre { background: var(--sand); border: 1px solid var(--rule); border-radius: 2px; padding: 10px; overflow-x: auto; }
 .doc code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 13px; }
 .doc hr { border: 0; border-top: 1px solid var(--rule); margin: 1.4em 0; }

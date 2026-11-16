@@ -68,7 +68,7 @@ pre.brief { white-space: pre-wrap; font-family: inherit; font-size: 14px; line-h
 .spark span { flex: 1; background: var(--primary); opacity: 0.85; min-height: 2px; border-radius: 1px; }
 .field-row { display: grid; grid-template-columns: minmax(110px, 30%) 1fr auto; gap: 10px; padding: 7px 0; border-bottom: 1px dotted var(--rule); align-items: baseline; }
 .doc { max-width: 760px; } .doc p, .doc li { font-size: 15px; line-height: 1.65; }
-.doc h1, .doc h2, .doc h3 { margin: 1.2em 0 0.5em; } .doc blockquote { border-left: 3px solid var(--primary); margin: 0 0 0.9em; padding: 2px 0 2px 14px; color: var(--bark); }
+.doc h1, .doc h2, .doc h3 { margin: 1.2em 0 0.5em; } .doc blockquote { background: var(--sand); border-radius: 8px; margin: 0 0 0.9em; padding: 8px 14px; color: var(--bark); }
 .doc pre { background: var(--sand); border: 1px solid var(--rule); padding: 10px; overflow-x: auto; } .doc .ref { color: var(--primary); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .stack { display: grid; gap: 14px; }

@@ -83,7 +83,7 @@ Object.assign(v2Pages, {
         const done = evs.filter((o) => o.repeated && !o.end && o.status === 'done').length;
         const planned = evs.filter((o) => o.repeated && !o.end).length;
         cells.push('<div class="md' + (d.getMonth() === month ? '' : ' out') + (k === todayKey ? ' today' : '') + '"><a class="d" href="' + go('jour', d) + '" aria-label="' + esc(d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })) + '">' + d.getDate() + '</a>' +
-          shown.slice(0, 3).map((o) => '<a class="ag-chip' + (o.type === 'deadline' ? ' due' : '') + (o.proposed ? ' proposed' : '') + '" href="#/entree/' + esc(o.id) + '" style="--c:' + (o.type === 'deadline' ? 'var(--error)' : spaceColor(o.spaceId)) + '" title="' + esc(o.title) + '">' + (o.allDay ? '' : '<time>' + esc(hhmm(o.start)) + '</time>') + '<span>' + esc(o.title) + '</span></a>').join('') +
+          shown.slice(0, 3).map((o) => '<a class="ag-chip' + (o.type === 'deadline' ? ' due' : '') + (o.proposed ? ' proposed' : '') + '" href="#/entree/' + esc(o.id) + '" data-space="' + esc(o.spaceId) + '" style="--c:' + (o.type === 'deadline' ? 'var(--error)' : spaceColor(o.spaceId)) + '" title="' + esc(o.title) + '">' + (o.allDay ? '' : '<time>' + esc(hhmm(o.start)) + '</time>') + '<span>' + esc(o.title) + '</span></a>').join('') +
           (shown.length > 3 ? '<a class="ag-more" href="' + go('jour', d) + '">' + '+' + (shown.length - 3) + '<span class="w">' + esc(W.agMoreWord) + '</span>' + '</a>' : '') +
           (planned ? '<span class="dots" title="' + esc(say(W.v2keptOf, { n: done, of: planned })) + '">' + Array.from({ length: Math.min(planned, 6) }, (_, j) => '<i style="background:' + (j < done ? 'var(--success)' : 'var(--rule)') + '"></i>').join('') + '</span>' : '') + '</div>');
       }
@@ -99,7 +99,7 @@ Object.assign(v2Pages, {
       const when = o.allDay ? W.allDay : hhmm(o.start);
       const until = o.end && !due && !o.allDay ? '<time class="end">– ' + esc(hhmm(o.end)) + '</time>' : '';
       const marks = (o.repeated ? '<span class="ag-mark" title="' + esc(W.legendRepeated) + '">↻</span>' : '') + (o.proposed ? '<span class="ag-mark" title="' + esc(W.legendProposed) + '">?</span>' : '');
-      return '<a class="ag-card' + (due ? ' due' : '') + (o.proposed ? ' proposed' : '') + (o.repeated && o.status === 'done' ? ' kept' : '') + '" href="#/entree/' + esc(o.id) + '" style="--c:' + (due ? 'var(--error)' : spaceColor(o.spaceId)) + '">' +
+      return '<a class="ag-card' + (due ? ' due' : '') + (o.proposed ? ' proposed' : '') + (o.repeated && o.status === 'done' ? ' kept' : '') + '" href="#/entree/' + esc(o.id) + '" data-space="' + esc(o.spaceId) + '" style="--c:' + (due ? 'var(--error)' : spaceColor(o.spaceId)) + '">' +
         '<span class="t">' + esc(o.title) + '</span>' +
         '<span class="m">' + (due ? '⚑ ' : '') + '<time>' + esc(when) + '</time>' + until + marks + (me.spaces.length > 1 ? '<span class="ag-space">' + esc(o.space) + '</span>' : '') + '</span></a>';
     };

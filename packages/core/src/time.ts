@@ -214,17 +214,43 @@ const ORDINALS: Record<string, string> = {
   last: 'L',
 };
 
+/** A moment's hour, minute and weekday on her clock (0 = Sunday), for a repetition (spec 075). */
+export function anchorOf(
+  at: Date | null,
+  zone = DEFAULT_ZONE,
+): { hour: number; minute: number; weekday: number } | undefined {
+  if (!at || Number.isNaN(at.getTime())) return undefined;
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      hour: '2-digit',
+      minute: '2-digit',
+      weekday: 'short',
+      hourCycle: 'h23',
+    })
+      .formatToParts(at)
+      .map((part) => [part.type, part.value]),
+  ) as Record<string, string>;
+  const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday ?? '');
+  return { hour: Number(parts.hour), minute: Number(parts.minute), weekday: Math.max(0, weekday) };
+}
+
 /**
  * A repetition said in her words, as the five fields Jarvis keeps (spec 036): « tous les jours à
  * 20h45 », « chaque lundi et jeudi à 7h », « le 2e lundi du mois à 18h », « le dernier vendredi »,
  * « tous les mois le 5 », « en semaine à 6h30 ». Null when it is already fields, or says none.
  */
-export function repetitionFromWords(text: string): string | null {
+export function repetitionFromWords(
+  text: string,
+  /** The event's own start, on her clock (spec 075): its hour when none is said, its day for
+   * « chaque semaine ». */
+  anchor?: { hour: number; minute: number; weekday: number },
+): string | null {
   const said = text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’']/g, ' ').trim();
   if (!said || /^[\d*,/#L-]+(\s+[\d*,/#L-]+){4}$/i.test(text.trim())) return null;
   const clock = /(\d{1,2})\s*(?:h|:)\s*(\d{2})?|(\d{1,2})\s*(am|pm)/.exec(said);
-  let hour = 9;
-  let minute = 0;
+  let hour = anchor?.hour ?? 9;
+  let minute = anchor?.minute ?? 0;
   if (clock) {
     hour = Number(clock[1] ?? clock[3]);
     minute = Number(clock[2] ?? 0);
@@ -263,6 +289,15 @@ export function repetitionFromWords(text: string): string | null {
   }
   if (days.length && /\b(tous|toutes|chaque|les|every|each|on)\b|s\b/.test(said)) {
     return `${at} * * ${days.sort((a, b) => a - b).join(',')}`;
+  }
+  // « chaque semaine »: the day of the event's own start (spec 075).
+  if (
+    anchor &&
+    /\b(chaque semaine|toutes les semaines|tous les semaines|hebdomadaire(ment)?|every week|weekly)\b/.test(
+      said,
+    )
+  ) {
+    return `${at} * * ${anchor.weekday}`;
   }
   return null;
 }

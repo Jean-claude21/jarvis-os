@@ -32,19 +32,24 @@ Object.assign(v2Pages, {
     const all = data ? data.occurrences.filter((o) => !agendaHidden.has(o.spaceId)) : [];
     const step = (n) => view === 'jour' ? new Date(anchor.getTime() + n * 86400000) : view === 'mois' ? new Date(anchor.getFullYear(), anchor.getMonth() + n, 15) : new Date(anchor.getTime() + n * 7 * 86400000);
     const segmented = '<div class="segmented">' + [['jour', W.v2day], ['semaine', W.v2weekV], ['mois', W.v2monthV], ['rappels', W.navReminders]].map((x) => '<button data-go="' + go(x[0], anchor) + '" aria-pressed="' + (view === x[0]) + '">' + esc(x[1]) + '</button>').join('') + '</div>';
-    const nav = view === 'rappels' ? '' : '<div class="segmented"><button data-go="' + go(view, step(-1)) + '" aria-label="' + esc(W.prevWeek) + '">‹</button><button data-go="' + go(view, new Date()) + '">' + esc(W.today) + '</button><button data-go="' + go(view, step(1)) + '" aria-label="' + esc(W.nextWeek) + '">›</button></div>';
+    const nav = view === 'rappels' ? '' : '<button class="btn small" data-go="' + go(view, new Date()) + '">' + esc(W.today) + '</button><span class="ag-step"><button class="btn small ghost" data-go="' + go(view, step(-1)) + '" aria-label="' + esc(W.prevWeek) + '">‹</button><button class="btn small ghost" data-go="' + go(view, step(1)) + '" aria-label="' + esc(W.nextWeek) + '">›</button></span>';
     const sub = view === 'jour' ? say(W.v2daySub, { day: anchor.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' }) })
       : view === 'mois' ? say(W.v2monthSub, { month: anchor.toLocaleDateString(locale, { month: 'long', year: 'numeric' }) })
       : view === 'rappels' ? W.v2remindersSub
       : say(W.v2weekSub, { from: from.toLocaleDateString(locale, { day: 'numeric', month: 'long' }), to: new Date(to.getTime() - 86400000).toLocaleDateString(locale, { day: 'numeric', month: 'long' }) });
-    const head = v2head(esc(W.navAgenda), esc(sub), segmented + nav + '<button class="btn" data-ical>' + ic('i-link') + esc(W.v2ical) + '</button>');
-    const chips = me.spaces.length > 1 ? '<span class="muted" style="margin-left:auto">' + esc(W.navSpacesTitle) + ' :</span>' + me.spaces.map((s) => '<button class="chip" data-sp="' + esc(s.id) + '" aria-pressed="' + !agendaHidden.has(s.id) + '" style="' + (agendaHidden.has(s.id) ? 'opacity:.45;text-decoration:line-through' : '') + '"><span class="space-dot" style="background:' + spaceColor(s.id) + '"></span>' + esc(s.name) + '</button>').join('') : '';
+    const head = v2head(esc(W.navAgenda), esc(sub), '<button class="btn" data-ical>' + ic('i-link') + esc(W.v2ical) + '</button><button class="btn solid" data-new="' + localDay(view === 'jour' ? anchor : new Date()) + '">' + ic('i-plus') + esc(W.agAdd) + '</button>');
+    // The period on the left, her spaces in the middle, the views on the right (spec 075).
+    const period = view === 'jour' ? anchor.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
+      : view === 'mois' ? anchor.toLocaleDateString(locale, { month: 'long', year: 'numeric' })
+      : from.toLocaleDateString(locale, { day: 'numeric', month: 'short' }) + ' – ' + new Date(to.getTime() - 86400000).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+    const chips = me.spaces.length > 1 ? me.spaces.map((s) => '<button class="chip" data-sp="' + esc(s.id) + '" aria-pressed="' + !agendaHidden.has(s.id) + '" style="' + (agendaHidden.has(s.id) ? 'opacity:.45;text-decoration:line-through' : '') + '"><span class="space-dot" style="background:' + spaceColor(s.id) + '"></span>' + esc(s.name) + '</button>').join('') : '';
+    const bar = '<div class="ag-bar">' + nav + (view === 'rappels' ? '' : '<h2 class="ag-period" aria-live="polite">' + esc(period) + '</h2>') + '<span class="ag-sp"></span>' + (chips ? '<span class="ag-spaces">' + chips + '</span>' : '') + segmented + '</div>';
 
     if (view === 'rappels') {
       const list = await api(inSpace('/entries?limit=200&kind=Reminder'));
       const rows = list.filter((r) => !['cancelled'].includes(r.data.status)).sort((a, b) => String(a.data.next || a.data.at || '').localeCompare(String(b.data.next || b.data.at || '')));
       const chain = (r) => { const st = r.data.status || 'planned'; return ['planned', 'sent', 'done'].map((s) => '<span class="tag ' + (s === st ? (s === 'done' ? 'ok' : 'info') : 'plain') + '">' + esc(W['st_' + s] || s) + '</span>').join(' ') + (['failed', 'to_fix'].includes(st) ? ' <span class="tag error">' + esc(W['st_' + st] || st) + '</span>' : ''); };
-      return head + (chips ? '<div class="legend">' + chips + '</div>' : '') + v2panel(W.v2whatRings, rows.length ? '<div class="scroll"><table><thead><tr><th>' + esc(W.v2reminder) + '</th><th>' + esc(W.v2comesFrom) + '</th><th>' + esc(W.when) + '</th><th>' + esc(W.v2whereItIs) + '</th></tr></thead><tbody>' +
+      return head + bar + v2panel(W.v2whatRings, rows.length ? '<div class="scroll"><table><thead><tr><th>' + esc(W.v2reminder) + '</th><th>' + esc(W.v2comesFrom) + '</th><th>' + esc(W.when) + '</th><th>' + esc(W.v2whereItIs) + '</th></tr></thead><tbody>' +
         rows.map((r) => '<tr><td><div class="cell-title"><a href="#/entree/' + esc(r.id) + '" style="color:inherit">' + esc(r.title) + '</a></div>' + (r.data.message ? '<div class="cell-sub">' + esc(r.data.message) + '</div>' : '') + '</td><td><div class="cell-sub">' + esc(r.data.before ? say(W.v2attached, { before: r.data.before }) : r.data.repeat ? W.v2repeats : W.v2alone) + '</div></td><td class="mono" style="font-size:12.5px">' + esc(r.data.next || r.data.at ? time(r.data.next || r.data.at) : '—') + '</td><td>' + chain(r) + '</td></tr>').join('') + '</tbody></table></div>' : '<div class="pad muted">' + esc(W.v2noReminder) + '</div>', '<span class="muted" style="font-size:12px">' + rows.length + '</span>', 'i-bell') +
         '<div class="hint">' + ic('i-bell') + '<span>' + W.v2remindersHint + '</span></div>';
     }
@@ -63,8 +68,7 @@ Object.assign(v2Pages, {
         slots.push('<div class="slot' + (o.repeated ? ' tpl' : '') + '"><time>' + esc(o.allDay ? W.allDay : hhmm(o.start)) + '</time><div><b>' + esc(o.title) + '</b><div class="meta"><span class="cell-sub">' + esc(meta) + '</span></div></div>' + occ + '</div>');
       }
       if (!nowPlaced) slots.push('<div class="slot now"><time style="color:var(--error)">' + esc(hhmm(nowAt.toISOString())) + '</time><span class="muted" style="font-size:12px">' + esc(W.v2now) + '</span><span></span></div>');
-      return head + (chips ? '<div class="legend">' + chips + '</div>' : '') + v2panel(anchor.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' }), items.length ? '<div class="x-day">' + slots.join('') + '</div>' : '<div class="pad muted">' + esc(W.noEvents) + '</div>', '<span class="muted" style="font-size:12px">' + esc(W.v2eachOcc) + '</span>', 'i-cal') +
-        '<div class="hint">' + ic('i-plus') + '<span>' + esc(W.v2clickToAdd) + '</span></div>';
+      return head + bar + v2panel(anchor.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' }), items.length ? '<div class="x-day">' + slots.join('') + '</div>' : '<div class="pad muted">' + esc(W.noEvents) + '</div>', '<span class="muted" style="font-size:12px">' + esc(W.v2eachOcc) + '</span>', 'i-cal');
     }
 
     if (view === 'mois') {
@@ -74,45 +78,39 @@ Object.assign(v2Pages, {
       for (let i = 0; i < 42; i++) {
         const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
         const k = localDay(d);
-        const evs = all.filter((o) => localDay(new Date(o.start)) === k);
-        const shown = evs.filter((o) => !o.repeated || o.type === 'deadline').slice(0, 3);
-        const done = evs.filter((o) => o.repeated && o.status === 'done').length;
-        const planned = evs.filter((o) => o.repeated).length;
-        cells.push('<div class="md' + (d.getMonth() === month ? '' : ' out') + (k === todayKey ? ' today' : '') + '" data-go="' + go('jour', d) + '" style="cursor:pointer"><span class="d">' + d.getDate() + '</span>' +
-          shown.map((o) => '<span class="ev" style="--c:' + (o.type === 'deadline' ? 'var(--error)' : spaceColor(o.spaceId)) + '">' + esc(o.title) + '</span>').join('') +
+        const evs = all.filter((o) => localDay(new Date(o.start)) === k).sort((a, b) => a.start.localeCompare(b.start));
+        const shown = evs.filter((o) => !o.repeated || o.type === 'deadline' || Boolean(o.end));
+        const done = evs.filter((o) => o.repeated && !o.end && o.status === 'done').length;
+        const planned = evs.filter((o) => o.repeated && !o.end).length;
+        cells.push('<div class="md' + (d.getMonth() === month ? '' : ' out') + (k === todayKey ? ' today' : '') + '"><a class="d" href="' + go('jour', d) + '" aria-label="' + esc(d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })) + '">' + d.getDate() + '</a>' +
+          shown.slice(0, 3).map((o) => '<a class="ag-chip' + (o.type === 'deadline' ? ' due' : '') + (o.proposed ? ' proposed' : '') + '" href="#/entree/' + esc(o.id) + '" style="--c:' + (o.type === 'deadline' ? 'var(--error)' : spaceColor(o.spaceId)) + '" title="' + esc(o.title) + '">' + (o.allDay ? '' : '<time>' + esc(hhmm(o.start)) + '</time>') + '<span>' + esc(o.title) + '</span></a>').join('') +
+          (shown.length > 3 ? '<a class="ag-more" href="' + go('jour', d) + '">' + '+' + (shown.length - 3) + '<span class="w">' + esc(W.agMoreWord) + '</span>' + '</a>' : '') +
           (planned ? '<span class="dots" title="' + esc(say(W.v2keptOf, { n: done, of: planned })) + '">' + Array.from({ length: Math.min(planned, 6) }, (_, j) => '<i style="background:' + (j < done ? 'var(--success)' : 'var(--rule)') + '"></i>').join('') + '</span>' : '') + '</div>');
       }
       const names = Array.from({ length: 7 }, (_, i) => new Date(2026, 10, 9 + i).toLocaleDateString(locale, { weekday: 'short' }));
-      return head + (chips ? '<div class="legend">' + chips + '</div>' : '') + v2panel(anchor.toLocaleDateString(locale, { month: 'long', year: 'numeric' }), '<div class="x-month">' + names.map((d) => '<div class="mh">' + esc(d) + '</div>').join('') + cells.join('') + '</div>', '<span class="muted" style="font-size:12px">' + esc(W.v2greenDots) + '</span>', 'i-cal');
+      return head + bar + v2panel(anchor.toLocaleDateString(locale, { month: 'long', year: 'numeric' }), '<div class="x-month">' + names.map((d) => '<div class="mh">' + esc(d) + '</div>').join('') + cells.join('') + '</div>', '<span class="muted" style="font-size:12px">' + esc(W.v2greenDots) + '</span>', 'i-cal');
     }
 
-    // The week: 4:00 to 23:00, wider when something falls outside.
+    // The week: one column per day, its things as cards sorted by hour; « + » adds one that day.
     const days = Array.from({ length: 7 }, (_, i) => new Date(from.getFullYear(), from.getMonth(), from.getDate() + i));
-    const timed = all.filter((o) => !o.allDay);
-    const lo = Math.max(0, Math.min(4, ...timed.map((o) => Math.floor(hourOf(o.start)))));
-    const hi = Math.min(24, Math.max(23, ...timed.map((o) => Math.ceil(o.end ? (hourOf(o.end) || 24) : hourOf(o.start) + 1))));
-    const hh = 40;
-    const H = (hi - lo) * hh;
     const todayKey = localDay(new Date());
-    const onDay = (d) => all.filter((o) => localDay(new Date(o.start)) === localDay(d));
+    const card = (o) => {
+      const due = o.type === 'deadline';
+      const when = o.allDay ? W.allDay : hhmm(o.start);
+      const until = o.end && !due && !o.allDay ? '<time class="end">– ' + esc(hhmm(o.end)) + '</time>' : '';
+      const marks = (o.repeated ? '<span class="ag-mark" title="' + esc(W.legendRepeated) + '">↻</span>' : '') + (o.proposed ? '<span class="ag-mark" title="' + esc(W.legendProposed) + '">?</span>' : '');
+      return '<a class="ag-card' + (due ? ' due' : '') + (o.proposed ? ' proposed' : '') + (o.repeated && o.status === 'done' ? ' kept' : '') + '" href="#/entree/' + esc(o.id) + '" style="--c:' + (due ? 'var(--error)' : spaceColor(o.spaceId)) + '">' +
+        '<span class="t">' + esc(o.title) + '</span>' +
+        '<span class="m">' + (due ? '⚑ ' : '') + '<time>' + esc(when) + '</time>' + until + marks + (me.spaces.length > 1 ? '<span class="ag-space">' + esc(o.space) + '</span>' : '') + '</span></a>';
+    };
     const cols = days.map((d) => {
       const k = localDay(d);
-      const evs = onDay(d).map((o) => {
-        if (o.allDay || o.type === 'deadline') return '<a class="ev due" href="#/entree/' + esc(o.id) + '" style="top:2px;height:22px"><b>⚑ ' + esc(o.title) + '</b></a>';
-        const a = hourOf(o.start);
-        const b = o.end ? (localDay(new Date(o.end)) === k ? hourOf(o.end) || 24 : hi) : a + 0.5;
-        return '<a class="ev ' + kindClass(o) + '" href="#/entree/' + esc(o.id) + '" title="' + esc(kindName(o.kind) + ' · ' + o.space) + '" style="top:' + ((a - lo) * hh + 1) + 'px;height:' + Math.max((Math.min(b, hi) - a) * hh - 2, 18) + 'px;box-shadow:inset 3px 0 0 ' + spaceColor(o.spaceId) + '"><b>' + esc(o.title) + '</b><small>' + esc(hhmm(o.start) + (o.end ? '–' + hhmm(o.end) : '')) + '</small></a>';
-      }).join('');
-      const n = hourOf(new Date().toISOString());
-      const now = k === todayKey && n >= lo && n <= hi ? '<div class="nowline" style="top:' + (n - lo) * hh + 'px"></div>' : '';
-      return '<div class="col' + (k === todayKey ? ' today' : '') + '" data-day="' + k + '" data-lo="' + lo + '" style="height:' + H + 'px">' + evs + now + '</div>';
+      const items = all.filter((o) => localDay(new Date(o.start)) === k).sort((a, b) => (a.allDay === b.allDay ? a.start.localeCompare(b.start) : a.allDay ? -1 : 1));
+      return '<section class="ag-col' + (k === todayKey ? ' today' : '') + (d.getDay() === 0 || d.getDay() === 6 ? ' weekend' : '') + '" aria-label="' + esc(d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })) + '">' +
+        '<header><a class="n" href="' + go('jour', d) + '">' + d.getDate() + '</a><span class="w">' + esc(d.toLocaleDateString(locale, { weekday: 'short' })) + '</span><button class="ag-add" data-new="' + k + '" aria-label="' + esc(say(W.agAddOn, { day: d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric' }) })) + '">' + ic('i-plus') + '</button></header>' +
+        '<div class="ag-body">' + (items.length ? items.map(card).join('') : '<span class="ag-none">' + esc(W.agNone) + '</span>') + '</div></section>';
     }).join('');
-    const legend = '<div class="legend"><span><i style="background:var(--paper);border:1px solid var(--ink)"></i>' + esc(W.legendEvent) + '</span><span><i style="background:var(--clay)"></i>' + esc(W.legendRepeated) + '</span><span><i style="border:1px solid var(--primary)"></i>' + esc(W.legendDeadline) + '</span><span><i style="background:var(--info-surface);border:1px dashed var(--info)"></i>' + esc(W.legendProposed) + '</span>' + chips + '</div>';
-    return head + legend + v2panel(say(W.v2weekOf, { day: from.toLocaleDateString(locale, { day: 'numeric', month: 'long' }) }),
-      '<div class="scroll"><div class="week"><div></div>' + days.map((d) => '<div class="wh' + (localDay(d) === todayKey ? ' today' : '') + '">' + esc(d.toLocaleDateString(locale, { weekday: 'short' }).toUpperCase()) + '<b>' + d.getDate() + '</b></div>').join('') +
-      '<div class="gutter" style="height:' + H + 'px">' + Array.from({ length: hi - lo }, (_, i) => i % 2 === 0 ? '<span style="top:' + i * hh + 'px">' + String(lo + i).padStart(2, '0') + '</span>' : '').join('') + '</div>' + cols + '</div></div>',
-      '<span class="muted" style="font-size:12px">' + String(lo).padStart(2, '0') + ':00 – ' + String(hi).padStart(2, '0') + ':00</span>', 'i-cal') +
-      '<div class="hint">' + ic('i-plus') + '<span>' + esc(W.v2clickToAdd) + '</span></div>';
+    return head + bar + '<div class="ag-week">' + cols + '</div>';
   },
 });
 
@@ -133,13 +131,12 @@ function bindAgenda(root) {
       toast(again ? W.v2occBack : W.v2occKept, null); show();
     } catch (error) { b.disabled = false; alert(error.message); }
   }));
-  // A click on a free time of the week: something new at that hour, an hour long.
-  root.querySelectorAll('.week .col[data-day]').forEach((col) => col.addEventListener('click', (event) => {
-    if (event.target.closest('a')) return;
-    const box = col.getBoundingClientRect();
-    const hour = Number(col.dataset.lo) + Math.floor((event.clientY - box.top) / 40);
-    const start = col.dataset.day + 'T' + String(Math.min(hour, 23)).padStart(2, '0') + ':00';
-    newEvent(start);
+  // « + » on a day (or « Ajouter »): something new that day, at 9:00, or the next hour when it is today.
+  root.querySelectorAll('[data-new]').forEach((b) => b.addEventListener('click', () => {
+    const day = b.dataset.new;
+    const now = new Date();
+    const hour = day === localDay(now) ? Math.min(now.getHours() + 1, 23) : 9;
+    newEvent(day + 'T' + String(hour).padStart(2, '0') + ':00');
   }));
   const ical = root.querySelector('[data-ical]');
   if (ical) ical.addEventListener('click', async () => {

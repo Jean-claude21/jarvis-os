@@ -76,6 +76,8 @@ const words = {
     captureKept: 'Gardé ✓ — à ranger.',
     voiceUnheard: 'Je n’ai pas pu écrire ton vocal. Peux-tu me l’écrire ?',
     captureFiled: 'Gardé et rangé ✓',
+    fileUnkept:
+      'Je n’ai pas pu garder ce fichier (plus de 20 Mo, ou stockage indisponible). Réessaie plus petit ?',
     briefEnd: 'Dis à Claude ce que tu veux en faire.',
   },
   en: {
@@ -150,6 +152,8 @@ const words = {
     captureKept: 'Kept ✓ — to file.',
     voiceUnheard: 'I could not write down your voice note. Could you type it?',
     captureFiled: 'Kept and filed ✓',
+    fileUnkept:
+      'I could not keep this file (over 20 MB, or storage unavailable). Try a smaller one?',
     briefEnd: 'Tell Claude what you want to do with it.',
   },
 } as const;

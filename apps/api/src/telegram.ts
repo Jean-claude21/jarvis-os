@@ -1,4 +1,5 @@
 import {
+  addFile,
   asPerson,
   fingerprintOf,
   find,
@@ -6,6 +7,7 @@ import {
   save,
   spacesOf,
   type Actor,
+  type Blobs,
 } from '@jarvis-os/core';
 import { captureAs } from './capture';
 import { randomBytes } from 'node:crypto';
@@ -69,11 +71,16 @@ export async function readTelegramLinks(
   db: pg.Pool,
   token: string,
   linked: string,
-  replies: { kept: string; filed: string; unheard?: string } = { kept: 'OK', filed: 'OK' },
+  replies: { kept: string; filed: string; unheard?: string; unkept?: string } = {
+    kept: 'OK',
+    filed: 'OK',
+  },
   /** Her voice notes are written down with this key (OpenAI); without it, she is told. */
   transcribe: ((audio: Blob, name: string) => Promise<string>) | null = openaiTranscriber(
     process.env.OPENAI_API_KEY,
   ),
+  /** Where the photos and documents she sends are kept (spec 074); none, she is told. */
+  blobs?: Blobs,
 ): Promise<number> {
   const response = await fetch(
     `${API}/bot${token}/getUpdates?timeout=0&offset=${offset}&allowed_updates=%5B%22message%22%5D`,
@@ -87,8 +94,11 @@ export async function readTelegramLinks(
         text?: string;
         date?: number;
         chat?: { id: number };
+        caption?: string;
         voice?: { file_id: string; duration?: number };
         audio?: { file_id: string; file_name?: string };
+        photo?: { file_id: string; file_size?: number; width?: number; height?: number }[];
+        document?: { file_id: string; file_name?: string; mime_type?: string; file_size?: number };
       };
     }[];
   };
@@ -101,10 +111,48 @@ export async function readTelegramLinks(
     // Anything else from a linked chat is kept in her inbox (spec 035), without any AI.
     if (!match) {
       const sound = update.message?.voice ?? update.message?.audio;
+      const sent = sentFile(update.message ?? {});
       let text = update.message?.text?.trim();
       const owner =
-        (text && !text.startsWith('/')) || sound ? await personByChat(db, String(chat)) : null;
+        (text && !text.startsWith('/')) || sound || sent
+          ? await personByChat(db, String(chat))
+          : null;
       if (!owner) continue;
+      // A photo or a document (spec 074): kept as her file, with a capture that carries it.
+      if (sent) {
+        const at = new Date((update.message?.date ?? Date.now() / 1000) * 1000).toISOString();
+        const bytes = blobs ? await fetched(token, sent.fileId).catch(() => null) : null;
+        if (!blobs || !bytes) {
+          await reply(token, chat, replies.unkept ?? replies.kept);
+          continue;
+        }
+        const words = update.message?.caption?.trim() || sent.label;
+        const done = await asPerson(db, owner.person, async (tx) => {
+          const kept = await captureAs(
+            tx,
+            { person: owner.person, door: 'telegram' },
+            owner.spaceId,
+            { text: words, source: 'telegram', at },
+          );
+          await addFile(tx, { person: owner.person, door: 'telegram' }, blobs, {
+            spaceId: owner.spaceId,
+            name: sent.name,
+            mediaType: sent.mediaType,
+            bytes,
+            data: { source: 'telegram' },
+            origin: 'said',
+            links: [{ to: kept.capture.id, role: 'pièce de' }],
+          });
+          return kept;
+        }).catch(() => null);
+        await reply(
+          token,
+          chat,
+          done ? (done.filed ? replies.filed : replies.kept) : (replies.unkept ?? replies.kept),
+        );
+        if (done) count += 1;
+        continue;
+      }
       // A voice note: written down, then kept like a written message (her words, said).
       if (!text && sound) {
         text = transcribe ? await heard(token, sound.file_id, transcribe).catch(() => '') : '';
@@ -158,6 +206,49 @@ async function reply(token: string, chat: number, text: string): Promise<void> {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ chat_id: chat, text }),
   });
+}
+
+/** The photo (its largest size) or the document of a message, as a file to keep (spec 074). */
+export function sentFile(message: {
+  photo?: { file_id: string; file_size?: number; width?: number; height?: number }[];
+  document?: { file_id: string; file_name?: string; mime_type?: string };
+  date?: number;
+}): { fileId: string; name: string; mediaType: string; label: string } | null {
+  const sizes = message.photo ?? [];
+  if (sizes.length) {
+    const largest = [...sizes].sort(
+      (a, b) =>
+        (b.file_size ?? (b.width ?? 0) * (b.height ?? 0)) -
+        (a.file_size ?? (a.width ?? 0) * (a.height ?? 0)),
+    )[0]!;
+    const day = new Date((message.date ?? Date.now() / 1000) * 1000).toISOString().slice(0, 10);
+    return {
+      fileId: largest.file_id,
+      name: `photo-${day}.jpg`,
+      mediaType: 'image/jpeg',
+      label: 'Photo',
+    };
+  }
+  const document = message.document;
+  if (!document) return null;
+  const name = document.file_name?.trim() || 'document';
+  return {
+    fileId: document.file_id,
+    name,
+    mediaType: document.mime_type || 'application/octet-stream',
+    label: `Document : ${name}`,
+  };
+}
+
+/** A file's bytes, fetched from Telegram (its bots reach files up to 20 MB); null when refused. */
+async function fetched(token: string, fileId: string): Promise<Uint8Array | null> {
+  const info = await fetch(`${API}/bot${token}/getFile?file_id=${encodeURIComponent(fileId)}`);
+  if (!info.ok) return null;
+  const path = ((await info.json()) as { result?: { file_path?: string } }).result?.file_path;
+  if (!path) return null;
+  const file = await fetch(`${API}/file/bot${token}/${path}`);
+  if (!file.ok) return null;
+  return new Uint8Array(await file.arrayBuffer());
 }
 
 /** A voice note's words: the file fetched from Telegram, written down by the transcriber. */

@@ -102,6 +102,33 @@ const css = `
 .doc li.task { list-style: none; margin-left: -1.2em; }
 .toc a { color: var(--ink); text-decoration: none; } .toc a:hover { color: var(--primary); }
 .toc li { padding: 4px 0; border: 0; }
+.doc .callout { border-radius: 10px; padding: 10px 14px; margin: 0 0 1em; background: #f4efe8; }
+.doc .callout > :last-child { margin-bottom: 0; }
+.doc .callout-t { font-weight: 700; margin: 0 0 4px; font-size: 14px; }
+.doc .callout.note { background: #eef3f9; } .doc .callout.note .callout-t { color: #2f5f8f; }
+.doc .callout.tip { background: #edf6f0; } .doc .callout.tip .callout-t { color: #2f7d55; }
+.doc .callout.important { background: #f3eefa; } .doc .callout.important .callout-t { color: #6a4fa0; }
+.doc .callout.warning { background: #fbf3e4; } .doc .callout.warning .callout-t { color: #8a5a0b; }
+.doc .callout.caution { background: #fbecec; } .doc .callout.caution .callout-t { color: #9b1c3c; }
+.doc pre.mermaid { background: #fff; text-align: center; border: 1px solid var(--rule); border-radius: 10px; padding: 14px; white-space: pre; }
+.doc pre.mermaid svg { max-width: 100%; height: auto; }
+.doc pre code[data-lang]::before { content: attr(data-lang); display: block; font-size: 11px; color: var(--bark); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+.doc table { border-collapse: collapse; width: 100%; margin: 0 0 1em; font-size: 14px; }
+.doc th, .doc td { border-bottom: 1px solid var(--rule); padding: 7px 10px; text-align: left; }
+.doc th { background: var(--sand); font-weight: 600; }
+.doc img { max-width: 100%; border-radius: 8px; }
+.doc del { color: var(--bark); }
+.doc ul ul, .doc ol ol, .doc ul ol, .doc ol ul { margin: 4px 0 4px; }
+.doc sup.fn a { text-decoration: none; font-size: 11px; }
+.doc .footnotes { border-top: 1px solid var(--rule); margin-top: 2em; padding-top: 10px; font-size: 13px; color: var(--bark); }
+.reader { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+.toc-side { display: none; }
+@media (min-width: 1000px) {
+  .reader.with-toc { grid-template-columns: minmax(0, 760px) 220px; }
+  .reader.with-toc .toc-side { display: block; position: sticky; top: 12px; align-self: start; max-height: calc(100vh - 24px); overflow-y: auto; font-size: 13px; }
+  .reader.with-toc + .toc-fold, .toc-fold.wide-hide { display: none; }
+}
+.toc-side .caps { margin-bottom: 6px; } .toc-side ul { list-style: none; padding: 0; margin: 0; } .toc-side li { padding: 3px 0; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .actions a { text-decoration: none; }
 @media print { .noprint { display: none !important; } body { padding: 0; } .doc { max-width: none; } }
@@ -110,6 +137,28 @@ const css = `
 const script = `
 document.head.insertAdjacentHTML('beforeend', '<style>${css.replace(/\n/g, ' ')}</style>');
 let shown = null;
+// Her diagrams (spec 083): Mermaid, loaded from Jarvis only when a document holds one; where it cannot
+// load, the diagram stays as its text.
+let mermaidLoading = null;
+function drawDiagrams(root) {
+  const nodes = Array.from(root.querySelectorAll('pre.mermaid'));
+  if (!nodes.length) return;
+  mermaidLoading = mermaidLoading || new Promise((done, fail) => {
+    if (window.mermaid) { done(); return; }
+    const tag = document.createElement('script');
+    tag.src = '/vendor/mermaid.js'; tag.onload = done; tag.onerror = fail;
+    document.head.appendChild(tag);
+  });
+  mermaidLoading.then(() => {
+    const css = getComputedStyle(document.documentElement);
+    const v = (n, d) => (css.getPropertyValue(n) || '').trim() || d;
+    const pal = ['#b0451f', '#c08a2c', '#3c6e9e', '#2f7d55', '#6a4fa0', '#c0447a', '#1e8580', '#8a867e'];
+    const vars = { fontFamily: 'Inter, system-ui, sans-serif', fontSize: '14px', primaryColor: '#f6ede4', primaryTextColor: v('--ink', '#2a1610'), primaryBorderColor: '#c9b3a4', lineColor: '#9a8276', secondaryColor: '#eef3f9', tertiaryColor: '#edf6f0', pieStrokeColor: '#fff', pieOuterStrokeColor: '#fff', pieTitleTextSize: '16px', pieSectionTextColor: '#fff' };
+    pal.forEach((c, i) => { vars['pie' + (i + 1)] = c; vars['cScale' + i] = c; vars['cScaleLabel' + i] = '#fff'; });
+    window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'base', themeVariables: vars });
+    return window.mermaid.run({ nodes });
+  }).catch(() => {});
+}
 function render(data) {
   const root = document.getElementById('root');
   if (!data || !data.id) { root.innerHTML = '<p class="empty">' + esc(words.nothing) + '</p>'; return; }
@@ -123,13 +172,15 @@ function render(data) {
       '<a href="' + esc(data.link) + '" target="_blank" rel="noopener"><button>' + esc(words.print) + '</button></a>' : '<button onclick="print()">' + esc(words.print) + '</button>') +
     '</div></header>' +
     (data.partial ? '<p class="badge read noprint" style="white-space:normal;margin-bottom:12px">' + esc(words.partial) + '</p>' : '') +
-    (toc.length > 2 ? '<details class="card noprint" style="margin-bottom:14px"><summary class="caps">' + esc(words.contents) + '</summary><ul class="list toc">' +
+    (toc.length > 2 ? '<details class="card noprint toc-fold wide-hide" style="margin-bottom:14px"><summary class="caps">' + esc(words.contents) + '</summary><ul class="list toc">' +
       toc.map((one) => '<li style="padding-left:' + (one.level - 1) * 14 + 'px"><a href="#' + esc(one.anchor) + '">' + esc(one.title) + '</a></li>').join('') + '</ul></details>' : '') +
-    '<article class="doc">' + (data.html || '<p class="empty">' + esc(words.empty) + '</p>') + '</article>' +
+    '<div class="reader' + (toc.length > 2 ? ' with-toc' : '') + '"><article class="doc">' + (data.html || '<p class="empty">' + esc(words.empty) + '</p>') + '</article>' +
+    (toc.length > 2 ? '<aside class="toc-side noprint"><div class="caps">' + esc(words.contents) + '</div><ul class="toc">' + toc.map((one) => '<li style="padding-left:' + (one.level - 1) * 12 + 'px"><a href="#' + esc(one.anchor) + '">' + esc(one.title) + '</a></li>').join('') + '</ul></aside>' : '') + '</div>' +
     (data.versions.length ? '<details class="card noprint" style="margin-top:16px"><summary class="caps">' + esc(words.versions) + ' (' + data.versions.length + ')</summary><ul class="list">' +
       data.versions.map((v) => '<li><span>' + esc(when(v.at)) + ' <span class="muted">' + esc(say(words.by, { door: v.client || v.door })) + (v.size ? ' · <span class="num">' + v.size + '</span>' : '') + '</span></span>' +
         (v.undone ? '<span class="badge">' + esc(words.restored) + '</span>' : (host.inside ? '<button class="quiet" data-undo="' + v.journalId + '">' + esc(words.restore) + '</button>' : '')) + '</li>').join('') +
       '</ul><p class="error-text" id="undo-error"></p></details>' : '');
+  drawDiagrams(root);
   root.querySelectorAll('[data-undo]').forEach((button) => button.addEventListener('click', async () => {
     button.disabled = true;
     try {

@@ -4,6 +4,8 @@
 FROM node:22-slim
 ENV NODE_ENV=production PNPM_HOME=/pnpm PATH=/pnpm:$PATH
 RUN corepack enable
+# curl: Coolify checks the container's health with it before switching to a new release.
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc* ./

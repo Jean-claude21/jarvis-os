@@ -15,6 +15,7 @@ import { router } from './client/router';
 import { v2Pages } from './client/pages-v2';
 import { v2Agenda } from './client/pages-v2-agenda';
 import { v2Entry } from './client/pages-v2-entry';
+import { v2Settings } from './client/pages-v2-settings';
 import { v2Peek } from './client/pages-v2-peek';
 import { v2Apps } from './client/pages-v2-apps';
 import { v2Life } from './client/pages-v2-life';
@@ -38,6 +39,7 @@ const script = [
   lifePages,
   settingsPages,
   v2Pages,
+  v2Settings,
   v2Agenda,
   v2Entry,
   v2Peek,
@@ -73,6 +75,7 @@ export function appPage(lang: Lang): string {
     <nav id="nav"></nav>
     <div class="grow"></div>
     <div class="menu" id="me-menu" role="menu">
+      <button data-go="#/reglages">${use('i-gear')}${escape(words.navSettings)}</button>
       <button data-go="#/collections">${use('i-shape')}${escape(words.navModels)}</button>
       <button data-go="#/connexions">${use('i-plug')}${escape(words.navConnections)}</button>
       <button data-go="#/donnees">${use('i-box')}${escape(words.navData)}</button>

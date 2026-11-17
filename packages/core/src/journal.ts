@@ -20,6 +20,7 @@ export type Command =
   // Who belongs to a space (spec 004): journaled, never undone through `undo`.
   | 'space.create'
   | 'space.rename'
+  | 'space.update'
   | 'space.invite'
   | 'space.withdraw'
   | 'space.join'

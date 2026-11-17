@@ -59,7 +59,7 @@ import {
   membersOf,
   query,
   querySchema,
-  renameSpace,
+  updateSpace,
   save,
   modelsOf,
   spacesOf,
@@ -315,10 +315,17 @@ export function apiRoutes(deps: {
     return c.json(await as(c, (tx, actor) => createSharedSpace(tx, actor, { name })), 201);
   });
 
+  // Its name, and (spec 081) its colour and its line.
   api.patch('/spaces/:id', async (c) => {
-    const { name } = z.object({ name: z.string().min(1).max(120) }).parse(await c.req.json());
-    await as(c, (tx, actor) => renameSpace(tx, actor, { spaceId: c.req.param('id'), name }));
-    return c.json({ renamed: c.req.param('id'), name });
+    const input = z
+      .object({
+        name: z.string().min(1).max(120).optional(),
+        color: z.string().max(7).nullable().optional(),
+        description: z.string().max(280).nullable().optional(),
+      })
+      .parse(await c.req.json());
+    await as(c, (tx, actor) => updateSpace(tx, actor, { spaceId: c.req.param('id'), ...input }));
+    return c.json({ renamed: c.req.param('id'), ...input });
   });
 
   api.post('/spaces/:id/invitations', async (c) => {

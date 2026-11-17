@@ -10,6 +10,10 @@ export interface Space {
   role: 'owner' | 'member' | 'viewer';
   /** Her own space: private for good, no one is ever invited into it. */
   personal: boolean;
+  /** Its colour, « #rrggbb » (spec 081); none, the order of her spaces gives one. */
+  color?: string | null;
+  /** A line that says what it is for. */
+  description?: string | null;
 }
 
 export interface Member {
@@ -51,7 +55,7 @@ export async function createSpace(
 }
 
 /** The spaces the acting person belongs to: her own first, then the shared ones, oldest first. */
-const SPACES_SQL = `select s.id, s.name, m.role, s.personal from space s join member m on m.space_id = s.id
+const SPACES_SQL = `select s.id, s.name, m.role, s.personal, s.color, s.description from space s join member m on m.space_id = s.id
       where m.person_id = jarvis_person()
       order by (s.personal and s.created_by = jarvis_person()) desc, s.created_at`;
 
@@ -114,6 +118,55 @@ export async function createSharedSpace(
     after: { name },
   });
   return { id, name, role: 'owner', personal: false };
+}
+
+/** A space's identity changed by an owner (spec 081): its name, its colour, its line. */
+export async function updateSpace(
+  tx: Tx,
+  actor: Actor,
+  input: {
+    spaceId: string;
+    name?: string | undefined;
+    color?: string | null | undefined;
+    description?: string | null | undefined;
+  },
+): Promise<void> {
+  const space = await spaceOf(tx, input.spaceId);
+  if (space.role !== 'owner') throw new Error('Only an owner changes a space.');
+  const { rows } = await tx.query<{ color: string | null; description: string | null }>(
+    'select color, description from space where id = $1',
+    [input.spaceId],
+  );
+  const was = rows[0] ?? { color: null, description: null };
+  const name = input.name === undefined ? space.name : input.name.trim().slice(0, 120);
+  if (!name) throw new Error('A space needs a name.');
+  const color =
+    input.color === undefined
+      ? was.color
+      : input.color === null
+        ? null
+        : input.color.trim().toLowerCase();
+  if (color !== null && !/^#[0-9a-f]{6}$/.test(color))
+    throw new Error('A colour is written « #rrggbb ».');
+  const description =
+    input.description === undefined
+      ? was.description
+      : input.description === null
+        ? null
+        : input.description.trim().slice(0, 280) || null;
+  await tx.query('update space set name = $2, color = $3, description = $4 where id = $1', [
+    input.spaceId,
+    name,
+    color,
+    description,
+  ]);
+  await record(tx, actor, {
+    spaceId: input.spaceId,
+    command: 'space.update',
+    target: input.spaceId,
+    before: { name: space.name, color: was.color, description: was.description },
+    after: { name, color, description },
+  });
 }
 
 /** Renames a space she owns. */

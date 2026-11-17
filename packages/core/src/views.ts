@@ -346,8 +346,15 @@ export async function runView(
   const lines: Record<string, unknown>[] = [];
   for (const one of matching) {
     const line: Record<string, unknown> = { id: one.row.id, title: one.row.title };
-    for (const [column, tree] of trees)
-      line[column] = plain(await evaluate(tree, one, reader.clock));
+    for (const [column, tree] of trees) {
+      const value = await evaluate(tree, one, reader.clock);
+      line[column] = plain(value);
+      // A link's entries by id too (« offer#ids »): a timeline draws its arrows from them.
+      if (known.get(column)?.type === 'link')
+        line[`${column}#ids`] = (Array.isArray(value) ? value : [value])
+          .filter(isScope)
+          .map((scope) => (scope as unknown as EntryView).row.id);
+    }
     lines.push(line);
   }
 

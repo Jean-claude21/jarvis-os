@@ -14,7 +14,15 @@ interface ModelField {
 }
 type KindWithModel = Omit<Kind, 'model' | 'facets'> & {
   model?: Kind['model'] & { fields?: ModelField[] };
-  facets?: { facet: string; start?: string; end?: string; field?: string }[];
+  facets?: {
+    facet: string;
+    start?: string;
+    end?: string;
+    after?: string;
+    field?: string;
+    target?: string;
+    current?: string;
+  }[];
 };
 interface ViewField {
   path: string;
@@ -69,6 +77,10 @@ export function useKindRows(kinds: string[]): Source {
     const facets = known.get(kind)?.facets ?? [];
     const dated = facets.find((one) => one.facet === 'dated');
     const stages = facets.find((one) => one.facet === 'stages');
+    const measurable = facets.find((one) => one.facet === 'measurable');
+    const progressField = (known.get(kind)?.model?.fields ?? []).find(
+      (field) => field.type === 'progress',
+    )?.name;
     for (const field of result.data?.fields ?? []) {
       if (field.via || field.path === 'title' || fields.has(field.path)) continue;
       fields.set(field.path, {
@@ -92,6 +104,15 @@ export function useKindRows(kinds: string[]): Source {
       const { id, title, ...values } = line as { id: string; title: string };
       const start = dated ? (values as Record<string, unknown>)[dated.start ?? ''] : null;
       const end = dated?.end ? (values as Record<string, unknown>)[dated.end] : null;
+      const read = values as Record<string, unknown>;
+      const number = (key?: string) =>
+        key && typeof read[key] === 'number' ? (read[key] as number) : null;
+      const progress = progressField
+        ? number(progressField)
+        : measurable?.target && number(measurable.target)
+          ? (number(measurable.current) ?? 0) / number(measurable.target)!
+          : null;
+      const ids = dated?.after ? read[`${dated.after}#ids`] : null;
       rows.push({
         id,
         kind,
@@ -101,6 +122,15 @@ export function useKindRows(kinds: string[]): Source {
         end: typeof end === 'string' ? end : null,
         allDay: typeof start === 'string' && start.length <= 10,
         stageField: stages?.field ?? null,
+        startField: dated?.start ?? null,
+        endField: dated?.end ?? null,
+        after: Array.isArray(ids)
+          ? ids.filter((one): one is string => typeof one === 'string')
+          : [],
+        progress:
+          progress === null
+            ? null
+            : Math.max(0, Math.min(1, progressField ? progress / 100 : progress)),
       });
     }
   });

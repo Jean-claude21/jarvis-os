@@ -27,9 +27,12 @@ export const asDate = (value: string) =>
 export const hhmm = (value: string) =>
   new Date(value).toLocaleTimeString('fr', { hour: '2-digit', minute: '2-digit' });
 
-/** The window of a timeline: weeks (9 weeks, from the week before) or months (30 weeks). */
+/** The window of a timeline: in weeks, 13 weeks from two weeks before; in months, 34 weeks. */
 export function timelineRange(m: string | undefined, zoom: 'week' | 'month' | undefined) {
   const anchor = monthOf(m);
-  const weeks = zoom === 'month';
-  return { start: mondayOf(addDays(anchor, weeks ? -14 : -7)), days: weeks ? 7 * 30 : 7 * 9 };
+  const months = zoom === 'month';
+  return {
+    start: mondayOf(addDays(anchor, months ? -56 : -14)),
+    days: months ? 7 * 34 : 7 * 13,
+  };
 }

@@ -21,6 +21,13 @@ export interface Row {
   allDay?: boolean;
   /** From the « stages » facet: the field that holds its step. */
   stageField?: string | null;
+  /** The fields its dates are written in, when they can be moved (a timeline's drag). */
+  startField?: string | null;
+  endField?: string | null;
+  /** The entries that come before it (the « dated » facet's `after` link): the arrows. */
+  after?: string[];
+  /** How far along, from 0 to 1 (a progress field, or the « measurable » facet). */
+  progress?: number | null;
 }
 
 export type RenderKey = 'list' | 'table' | 'board' | 'calendar' | 'timeline' | 'files';

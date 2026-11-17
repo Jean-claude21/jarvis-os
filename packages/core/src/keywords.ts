@@ -128,8 +128,26 @@ export function modelInNewWords(data: Record<string, unknown>, notes: string[] =
         notes.push(`${one.type} → ${TYPE_RENAMES[one.type]}`);
         one.type = TYPE_RENAMES[one.type];
       }
+      // A field named with an old keyword (« debut ») holds its values under the new one
+      // (« start »): the model says so too, and keeps her word as the field's label.
+      const name = typeof one.name === 'string' ? one.name : '';
+      const engine = FIELD_RENAMES[name];
+      if (engine) {
+        one.name = engine;
+        if (!one.label) one.label = { fr: name.charAt(0).toUpperCase() + name.slice(1) };
+      }
       return one;
     });
+    // What names a field follows it: its workflow, its total, its columns, its groups.
+    const to = (name: unknown) =>
+      typeof name === 'string' && FIELD_RENAMES[name] ? FIELD_RENAMES[name] : name;
+    if (model.workflow && typeof model.workflow === 'object') {
+      const workflow = model.workflow as Record<string, unknown>;
+      model.workflow = { ...workflow, field: to(workflow.field) };
+    }
+    if (model.total !== undefined) model.total = to(model.total);
+    if (model.groupBy !== undefined) model.groupBy = to(model.groupBy);
+    if (Array.isArray(model.columns)) model.columns = model.columns.map(to);
   }
   return model;
 }

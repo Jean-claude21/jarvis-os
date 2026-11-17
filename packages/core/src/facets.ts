@@ -15,6 +15,8 @@ export const facetSchema = z.discriminatedUnion('facet', [
     facet: z.literal('dated'),
     start: name,
     end: name.optional(),
+    /** A link to entries of the same kind that come first (« dépend de »): the timeline's arrows. */
+    after: name.optional(),
   }),
   /** Something to do: done or not, late or not, on the day's list. */
   z.object({
@@ -110,10 +112,18 @@ export function facetsOf(model: ModelData, parent?: ModelData | null): Facet[] {
   const start = named(START, ['date', 'datetime']) ?? dates[0] ?? null;
   if (start) {
     const end = named(END, ['date', 'datetime']);
+    // What comes first: a link to its own kind named so (« dépend de », « après », « bloqué par »).
+    const after = fields.find(
+      (field) =>
+        field.type === 'link' &&
+        !!field.target &&
+        /depend|apres|after|bloqu|block|preced/.test(fold(field.name)),
+    );
     out.push({
       facet: 'dated',
       start: start.name,
       ...(end && end.name !== start.name ? { end: end.name } : {}),
+      ...(after ? { after: after.name } : {}),
     });
   }
   if (model.activity) {

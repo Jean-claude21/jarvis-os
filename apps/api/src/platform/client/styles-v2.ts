@@ -2899,4 +2899,16 @@ html, body { overflow-x: clip; }
 .v2 .st-avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--sand); display: grid; place-items: center; font-weight: 700; font-size: 12px; color: var(--bark); }
 .v2 .st-main > .page-head { display: none; }
 @media (max-width: 860px) { .v2 .st { grid-template-columns: 1fr; } .v2 .st-nav { position: static; max-height: none; border-right: 0; border-bottom: 1px solid var(--rule); flex-direction: row; overflow-x: auto; gap: 18px; } .v2 .st-group { flex: none; } .v2 .st-main { padding: 18px 16px 30px; } .v2 .st-row { flex-wrap: wrap; } }
+.v2 .sk-panel { border-radius: 12px; overflow: hidden; }
+.v2 .sk-hint { font-size: 12.5px; }
+.v2 .sk-list { display: flex; flex-direction: column; }
+.v2 .sk-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border: 0; border-bottom: 1px solid var(--rule); background: none; text-align: left; font: inherit; color: var(--ink); text-decoration: none; cursor: pointer; width: 100%; }
+.v2 .sk-row:last-child { border-bottom: 0; } .v2 .sk-row:hover { background: var(--sand); }
+.v2 .sk-ic { width: 32px; height: 32px; border-radius: 8px; background: var(--sand); display: grid; place-items: center; color: var(--bark); flex: none; }
+.v2 .sk-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .sk-main .t { font-weight: 600; font-size: 14px; } .v2 .sk-main .s { font-size: 12.5px; color: var(--bark); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v2 .sk-meta { display: flex; align-items: center; gap: 10px; flex: none; max-width: 45%; flex-wrap: wrap; justify-content: flex-end; }
+.v2 .sk-when { font-size: 12.5px; color: var(--bark); } .v2 .sk-space { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--bark); }
+.v2 .sk-empty { padding: 26px 18px; text-align: center; } .v2 .sk-empty p { color: var(--bark); max-width: 520px; margin: 6px auto 14px; }
+@media (max-width: 760px) { .v2 .sk-row { flex-wrap: wrap; } .v2 .sk-meta { max-width: none; width: 100%; justify-content: flex-start; padding-left: 44px; } }
 `;

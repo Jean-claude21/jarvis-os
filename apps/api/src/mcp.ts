@@ -115,7 +115,7 @@ interface Routine {
 }
 
 /** Jarvis's base routines, read once from `routines/*.md` (front matter: name, when). */
-const baseRoutines: Routine[] = (() => {
+export const baseRoutines: Routine[] = (() => {
   const folder = fileURLToPath(new URL('./routines/', import.meta.url));
   return readdirSync(folder)
     .filter((file) => file.endsWith('.md'))

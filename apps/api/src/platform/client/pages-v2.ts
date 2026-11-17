@@ -291,52 +291,76 @@ function dayBandV2(occ, focus) {
     '<div class="legend pad" style="padding-top:10px;padding-bottom:12px"><span><i style="background:var(--sand);border:1px solid var(--rule-strong)"></i>' + esc(W.legendRepeated) + '</span><span><i style="background:var(--paper);border:1px solid var(--ink)"></i>' + esc(W.legendEvent) + '</span><span><i style="background:var(--info-surface);border:1px dashed var(--info)"></i>' + esc(W.legendProposed) + '</span></div>',
     '<a class="btn small" href="#/agenda?v=jour">' + esc(W.navAgenda) + '</a>', 'i-cal');
 }
+// Spec 078: « Maintenant » as a home, after Gr8r Studio's: four figures, what waits in three tabs,
+// deadlines by day, her day, recent activity. A line opens the side card (spec 076).
+let nowTab = 'next';
+const NOW_TABS = { next: ['today', 'week'], late: ['fix', 'late'], proposed: ['proposed', 'intent'] };
+const nwKey = (d) => d.toLocaleDateString('en-CA');
+function nwWhen(i) {
+  if (!i.when) return '';
+  const d = new Date(i.when);
+  const k = nwKey(d); const t = new Date();
+  const dayWord = k === nwKey(t) ? W.today : k === nwKey(new Date(t.getTime() + 86400000)) ? W.nwTomorrow : d.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' });
+  return i.allDay ? dayWord : dayWord + ' · ' + d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+}
+function nwAgo(iso) {
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (m < 1) return W.nwJust;
+  if (m < 60) return say(W.nwMin, { n: m });
+  if (m < 1440) return say(W.nwHour, { n: Math.round(m / 60) });
+  return say(W.nwDays, { n: Math.round(m / 1440) });
+}
 v2Pages[''] = async function () {
-  const now = await api('/now');
+  const [now, hist] = await Promise.all([api('/now'), api(inSpace('/history?limit=8')).catch(() => [])]);
   const items = now.items;
   const n = (g) => items.filter((i) => i.group === g).length;
-  const vis = items.filter((i) => nowFilter === 'all' || i.group === nowFilter);
-  const sel = vis.find((i) => i.id === pick) || vis[0];
-  const when = (i) => (i.when ? (i.allDay ? day(i.when) : time(i.when)) : '');
-  const sub = (i) => [kindName(i.kind), i.space, i.said ? say(W.v2saidTimes, { n: i.said.times, since: day(i.said.since) }) : when(i)].filter(Boolean).join(' · ');
-  const list = vis.length ? NOW_GROUPS.map((g) => {
-    const rows = vis.filter((i) => i.group === g);
-    return rows.length ? '<div class="group-title caps">' + esc(W['g_' + g]) + ' <span class="n">' + rows.length + '</span></div>' + rows.map((i) =>
-      '<button class="row" data-pick="' + esc(i.id) + '" aria-selected="' + (sel && i.id === sel.id) + '"><span class="kind' + (g === 'proposed' ? ' proposed' : '') + '">' + ic(NOW_ICONS[g]) + '</span><div><div class="t">' + esc(i.title) + '</div><div class="s">' + esc(sub(i)) + '</div></div><span class="tag ' + NOW_TAGS[g] + '">' + esc(W['r_' + i.reason] || i.reason) + '</span></button>').join('') : '';
-  }).join('') : '<div class="empty">' + esc(W.allClear) + '</div>';
-  let det = '<div class="panel"><div class="panel-body empty">' + esc(W.v2nothingToDecide) + '</div></div>';
-  if (sel) {
-    const e = await api('/entries/' + encodeURIComponent(sel.id) + '?space=' + encodeURIComponent(sel.spaceId));
-    const links = e.links.out.concat(e.links.in).filter((l) => l.entry.kind !== 'Comment').slice(0, 6);
-    const acts = [];
-    if (sel.group === 'proposed') acts.push(['accept', W.a_accept, W.a_acceptWhy, true], ['refuse', W.a_refuse, W.a_refuseWhy]);
-    else if (sel.group === 'fix') acts.push(['retry', W.a_retry, W.a_retryWhy, true], ['done', W.a_done, W.a_doneWhy]);
-    else if (sel.group === 'intent') acts.push(['plan', W.v2planIt, W.v2planItWhy, true], ['done', W.a_done, W.v2intentDoneWhy], ['drop', W.v2dropIt, W.v2dropItWhy]);
-    else {
-      acts.push(['done', W.a_done, W.a_doneWhy, sel.group === 'late']);
-      if (e.data.at || e.data.due || e.data.start) acts.push(['later', W.a_later, W.a_laterWhy, sel.group !== 'late']);
-      acts.push(['cancel', W.a_cancel, W.a_cancelWhy]);
-    }
-    const context = typeof e.data.text === 'string' ? e.data.text.slice(0, 360) + (e.data.text.length > 360 ? '…' : '') : sel.said ? say(W.v2intentContext, { n: sel.said.times, since: day(sel.said.since) }) : '';
-    det = '<button class="back" data-back>' + ic('i-left') + esc(W.v2backToList) + '</button>' +
-      '<section class="panel"><div class="panel-head"><span class="left caps">' + ic(NOW_ICONS[sel.group]) + esc(kindName(sel.kind) + ' · ' + W['g_' + sel.group]) + '</span><span class="tag ' + NOW_TAGS[sel.group] + '">' + esc(W['r_' + sel.reason] || sel.reason) + '</span></div>' +
-      '<div class="panel-body subject"><div class="subject-top"><div><h2>' + esc(e.title) + '</h2><div class="muted" style="font-size:13px">' + esc(sub(sel)) + '</div></div><a data-full class="btn small" href="#/entree/' + esc(e.id) + '">' + ic('i-life') + esc(W.fullEntry) + '</a></div>' +
-      (context ? '<p class="context">' + esc(context) + '</p>' : '') +
-      (links.length ? '<div class="chips">' + links.map((l) => '<a class="chip" href="#/entree/' + esc(l.entry.id) + '">' + ic(l.entry.kind === 'Person' ? 'i-person' : l.entry.kind === 'Fichier' ? 'i-file' : 'i-link') + esc(l.entry.title) + '<small>' + esc(kindName(l.entry.kind)) + '</small></a>').join('') + '</div>' : '') + '</div></section>' +
-      dayBandV2(now.day, sel.id) +
-      '<div class="choices">' + acts.map((a) => '<article class="choice' + (a[3] ? ' recommended' : '') + '"><div class="choice-head"><h3>' + esc(a[1]) + '</h3>' + (a[3] ? '<span class="why">' + esc(W.v2recommended) + '</span>' : '') + '</div><p>' + esc(a[2]) + '</p><div class="choice-foot"><button class="btn' + (a[3] ? ' solid' : '') + '" ' + (a[0] === 'plan' || a[0] === 'drop' ? 'data-intent' : 'data-act') + '="' + a[0] + '" data-id="' + esc(sel.id) + '" data-space="' + esc(sel.spaceId) + '">' + (a[3] ? ic('i-check') : '') + esc(a[1]) + '</button></div></article>').join('') + '</div>';
-  }
-  const filters = [['all', W.v2all, items.length], ['fix', W.g_fix, n('fix')], ['late', W.g_late, n('late')], ['today', W.g_today, n('today')], ['proposed', W.g_proposed, n('proposed')]];
+  const hour = new Date().getHours();
+  const first = String((me.person && me.person.name) || '').trim().split(' ')[0];
+  const hello = (hour < 12 ? W.nwMorning : hour < 18 ? W.nwAfternoon : W.nwEvening) + (first ? ', ' + first : '');
   const today = new Date().toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
-  return v2head(esc(W.navNow), esc(today.charAt(0).toUpperCase() + today.slice(1) + ' · ' + say(W.nowLead, { fix: n('fix'), late: n('late'), proposed: n('proposed'), today: n('today') })),
-    '<div class="segmented">' + filters.map((f) => '<button data-now-filter="' + f[0] + '" aria-pressed="' + (nowFilter === f[0]) + '">' + esc(f[1]) + '<span class="n">' + f[2] + '</span></button>').join('') + '</div><a class="btn hide-s" href="#/agenda">' + ic('i-cal') + esc(W.v2openAgenda) + '</a>') +
-    '<div class="board' + (reading ? ' reading' : '') + '"><section class="panel list-panel"><div class="panel-head"><span class="left caps">' + ic('i-now') + esc(W.navNow) + ' · ' + esc(new Date().toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })) + '</span><span class="pill"><span class="live"></span>' + esc(W.v2live) + '</span></div><div class="panel-body list">' + list + '</div></section><section class="detail">' + det + '</section></div>';
+  const stat = (tab, icon, label, value, sub, tone) => '<button class="nw-stat" data-now-tab="' + tab + '"><span class="nw-stat-l">' + ic(icon) + esc(label) + '</span><b class="' + tone + '">' + value + '</b><span class="nw-stat-s ' + tone + '">' + esc(sub) + '</span></button>';
+  const stats = '<div class="nw-stats">' +
+    stat('late', 'i-alert', W.g_fix, n('fix'), n('fix') ? W.nwToFix : W.nwNothing, n('fix') ? 'bad' : '') +
+    stat('late', 'i-bell', W.g_late, n('late'), n('late') ? W.nwNeedYou : W.nwNothing, n('late') ? 'bad' : '') +
+    stat('next', 'i-cal', W.g_today, n('today'), say(W.nwThisWeek, { n: n('week') }), '') +
+    stat('proposed', 'i-spark', W.g_proposed, n('proposed') + n('intent'), say(W.nwSaid, { n: n('intent') }), n('proposed') ? 'ok' : '') + '</div>';
+  // A line: the box that settles it, what it is, its gestures, when.
+  const gestures = (i) => i.group === 'proposed' ? [['accept', W.a_accept], ['refuse', W.a_refuse]]
+    : i.group === 'fix' ? [['retry', W.a_retry]]
+    : i.group === 'intent' ? [['plan', W.v2planIt], ['drop', W.v2dropIt]]
+    : (i.when ? [['later', W.a_later]] : []).concat([['cancel', W.a_cancel]]);
+  const attr = (a, i) => (a === 'plan' || a === 'drop' ? 'data-intent' : 'data-act') + '="' + a + '" data-id="' + esc(i.id) + '" data-space="' + esc(i.spaceId) + '"';
+  const line = (i) => '<div class="nw-row">' +
+    '<button class="nw-box" ' + attr(i.group === 'proposed' ? 'accept' : 'done', i) + ' title="' + esc(i.group === 'proposed' ? W.a_accept : W.a_done) + '" aria-label="' + esc((i.group === 'proposed' ? W.a_accept : W.a_done) + ' : ' + i.title) + '"></button>' +
+    '<a class="nw-main" href="#/entree/' + esc(i.id) + '" data-space="' + esc(i.spaceId) + '"><span class="t">' + esc(i.title) + '</span><span class="s">' + esc([kindName(i.kind), i.space, i.said ? say(W.v2saidTimes, { n: i.said.times, since: day(i.said.since) }) : ''].filter(Boolean).join(' · ')) + '</span></a>' +
+    '<span class="nw-acts">' + gestures(i).map((g) => '<button class="btn small ghost" ' + attr(g[0], i) + '>' + esc(g[1]) + '</button>').join('') + '</span>' +
+    '<span class="nw-when' + (['late', 'fix'].includes(i.group) ? ' bad' : '') + '">' + esc(nwWhen(i)) + '</span></div>';
+  const tabs = [['next', W.nwNext], ['late', W.g_late], ['proposed', W.g_proposed]];
+  const count = (t) => items.filter((i) => NOW_TABS[t].includes(i.group)).length;
+  const shown = items.filter((i) => NOW_TABS[nowTab].includes(i.group));
+  const waits = '<section class="panel nw-panel"><div class="nw-head"><h2>' + esc(W.nwWaits) + '</h2><div class="segmented">' + tabs.map((t) => '<button data-now-tab="' + t[0] + '" aria-pressed="' + (nowTab === t[0]) + '">' + esc(t[1]) + '<span class="n">' + count(t[0]) + '</span></button>').join('') + '</div></div>' +
+    (shown.length ? '<div class="nw-list">' + shown.map(line).join('') + '</div>' : '<p class="nw-empty">' + esc(W.nwEmpty) + '</p>') + '</section>';
+  // Deadlines by day: today, tomorrow, the rest of the week.
+  const t0 = new Date(); const kToday = nwKey(t0); const kTomorrow = nwKey(new Date(t0.getTime() + 86400000));
+  const dated = items.filter((i) => i.when && ['today', 'week'].includes(i.group)).sort((a, b) => String(a.when).localeCompare(String(b.when)));
+  const buckets = [[W.today, dated.filter((i) => nwKey(new Date(i.when)) === kToday)], [W.nwTomorrow, dated.filter((i) => nwKey(new Date(i.when)) === kTomorrow)], [W.nwWeek, dated.filter((i) => ![kToday, kTomorrow].includes(nwKey(new Date(i.when))))]].filter((b) => b[1].length);
+  const deadlines = '<section class="panel nw-panel"><div class="nw-head"><h2>' + esc(W.nwDeadlines) + '</h2><a class="btn small ghost" href="#/agenda">' + ic('i-cal') + esc(W.navAgenda) + '</a></div>' +
+    (buckets.length ? buckets.map((b) => '<div class="nw-bucket"><div class="nw-bucket-h">' + esc(b[0]) + ' <span class="n">' + b[1].length + '</span></div>' + b[1].slice(0, 5).map((i) => '<a class="nw-dl" href="#/entree/' + esc(i.id) + '" data-space="' + esc(i.spaceId) + '"><span class="space-dot" style="background:' + spaceColor(i.spaceId) + '"></span><span class="t">' + esc(i.title) + '</span><time>' + esc(i.allDay ? '' : new Date(i.when).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })) + '</time></a>').join('') + (b[1].length > 5 ? '<span class="nw-more">' + esc(say(W.nwMore, { n: b[1].length - 5 })) + '</span>' : '') + '</div>').join('') : '<p class="nw-empty">' + esc(W.nwNoDeadline) + '</p>') + '</section>';
+  // Her day: what is timed today, in hour order.
+  const timed = (now.day || []).filter((o) => !o.allDay).sort((a, b) => a.start.localeCompare(b.start));
+  const dayPanel = timed.length ? '<section class="panel nw-panel"><div class="nw-head"><h2>' + esc(W.nwDay) + '</h2></div>' + timed.map((o) => '<a class="nw-slot" href="#/entree/' + esc(o.id) + '" data-space="' + esc(o.spaceId) + '"><time>' + esc(new Date(o.start).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })) + '</time><span class="t">' + esc(o.title) + '</span>' + (o.end ? '<span class="s">' + esc(say(W.nwUntil, { at: new Date(o.end).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) })) + '</span>' : '') + '</a>').join('') + '</section>' : '';
+  // Recent activity of her space.
+  const titleOf = (h) => (h.after && h.after.title) || (h.before && h.before.title) || '';
+  const activity = '<section class="panel nw-panel"><div class="nw-head"><h2>' + esc(W.nwActivity) + '</h2><a class="btn small ghost" href="#/activites">' + esc(W.nwAll) + '</a></div>' +
+    (hist.length ? '<ul class="nw-feed">' + hist.map((h) => '<li><span class="nw-av">' + esc(String(h.client || h.door || 'J').slice(0, 1).toUpperCase()) + '</span><span class="nw-what">' + esc(said(h.command)) + (titleOf(h) ? ' ' + (String(h.target || '').slice(0, 4) === 'ent_' ? '<a href="#/entree/' + esc(h.target) + '">' + esc(titleOf(h)) + '</a>' : '<b>' + esc(titleOf(h)) + '</b>') : '') + '</span><time>' + esc(nwAgo(h.at)) + '</time></li>').join('') + '</ul>' : '<p class="nw-empty">' + esc(W.v2nothingYet) + '</p>') + '</section>';
+  return v2head(esc(hello), esc(today.charAt(0).toUpperCase() + today.slice(1) + ' · ' + say(W.nowLead, { fix: n('fix'), late: n('late'), proposed: n('proposed'), today: n('today') })), '<a class="btn" href="#/agenda">' + ic('i-cal') + esc(W.v2openAgenda) + '</a>') +
+    stats + '<div class="nw-grid"><div class="nw-col">' + waits + dayPanel + '</div><div class="nw-col">' + deadlines + activity + '</div></div>';
 };
 v2Pages.accueil = v2Pages[''];
 
 // What « Maintenant » does beyond the usual gestures: its filter, an intention planned or dropped.
 function bindNow(root) {
-  root.querySelectorAll('[data-now-filter]').forEach((b) => b.addEventListener('click', () => { nowFilter = b.dataset.nowFilter; pick = null; show(); }));
+  root.querySelectorAll('[data-now-tab]').forEach((b) => b.addEventListener('click', () => { nowTab = b.dataset.nowTab; show(); }));
   root.querySelectorAll('[data-intent]').forEach((b) => b.addEventListener('click', async () => {
     const id = b.dataset.id; const where = b.dataset.space;
     if (b.dataset.intent === 'plan') {

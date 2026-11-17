@@ -7,9 +7,9 @@ export const router = `
 const pages = Object.assign({}, dayPages, lifePages, settingsPages, v2Pages, tasksPages);
 
 // The title of each page, as the breadcrumb says it; the sidebar item it lights.
-const titles = { '': 'navNow', accueil: 'navNow', collections: 'navModels', modeles: 'navModels', fichiers: 'navDocuments', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
+const titles = { reglages: 'navSettings', '': 'navNow', accueil: 'navNow', collections: 'navModels', modeles: 'navModels', fichiers: 'navDocuments', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
   rappels: 'navAgenda', taches: 'navActivities', activites: 'navActivities', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', espace: 'navSpaces', bienvenue: 'v2welcome', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
-const navOf = { '': '', accueil: '', agenda: 'agenda', taches: 'activites', activites: 'activites', rappels: 'agenda', ranger: 'ranger', revue: 'revue', personnes: 'personnes', vie: 'vie', entree: 'vie', documents: 'documents', document: 'documents', fichiers: 'documents', tableaux: 'tableaux', apps: 'apps' };
+const navOf = { reglages: 'reglages', '': '', accueil: '', agenda: 'agenda', taches: 'activites', activites: 'activites', rappels: 'agenda', ranger: 'ranger', revue: 'revue', personnes: 'personnes', vie: 'vie', entree: 'vie', documents: 'documents', document: 'documents', fichiers: 'documents', tableaux: 'tableaux', apps: 'apps' };
 
 // The breadcrumb: « Jarvis › … › the page ». A page may say more (its kind, its entry).
 let crumbParts = null;
@@ -57,7 +57,7 @@ function paint(entry, route, first) {
   const y = window.scrollY;
   page().innerHTML = entry.html; dress(page());
   crumbParts = entry.crumbs; drawCrumbs(route.key, route.id);
-  bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page()); bindConnexions(page()); bindBlocks(page()); bindBoards(page()); bindRoutines(page()); bindTasks(page());
+  bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page()); bindConnexions(page()); bindBlocks(page()); bindBoards(page()); bindRoutines(page()); bindTasks(page()); bindSettings(page());
   if (first) { page().scrollTop = 0; window.scrollTo(0, 0); } else window.scrollTo(0, y);
 }
 const typing = () => { const a = document.activeElement; return Boolean(a && page().contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)); };
@@ -144,7 +144,7 @@ function drawNav(key, id) {
       item('#/tableaux', W.navDashboards, ic('i-chart'), on === 'tableaux', navCounts.boards),
     ]) +
     group(W.navApps, navApps.map((a) => item('#/app/' + encodeURIComponent(a), a, appIcon(a), (key === 'app' || key === 'role') && id === a)).concat(['<a class="nav-item ghost" href="#/apps"' + (on === 'apps' ? ' aria-current="page"' : '') + '>' + ic('i-plus') + esc(W.navAllApps) + '</a>'])) +
-    group(W.navSpacesTitle, me ? me.spaces.map((s, i) => '<a class="nav-item" href="#/espace/' + esc(s.id) + '"' + (key === 'espace' && id === s.id ? ' aria-current="page"' : '') + '><span class="space-dot" style="background:' + SPACE_COLORS2[i % SPACE_COLORS2.length] + '"></span>' + esc(s.name) + '</a>') : []);
+    group(W.navSpacesTitle, me ? me.spaces.map((s) => '<a class="nav-item" href="#/espace/' + esc(s.id) + '"' + (key === 'espace' && id === s.id ? ' aria-current="page"' : '') + '><span class="space-dot" style="background:' + spaceColorOf(s.id) + '"></span>' + esc(s.name) + '</a>').concat([item('#/reglages', W.navSettings, ic('i-gear'), on === 'reglages')]) : []);
 }
 
 // Her space: the switcher on top filters the whole app.
@@ -157,7 +157,7 @@ function choose(id, again) {
 function drawSwitcher() {
   const s = me.spaces.find((x) => x.id === space) || me.space;
   document.getElementById('space-name').textContent = s.name + ' · ' + (s.personal ? W.own : W.shared);
-  document.getElementById('space-menu').innerHTML = me.spaces.map((x, i) => '<button data-space="' + esc(x.id) + '"' + (x.id === space ? ' aria-current="true" style="font-weight:600"' : '') + '><span class="space-dot" style="background:' + SPACE_COLORS2[i % SPACE_COLORS2.length] + '"></span>' + esc(x.name) + '<span class="muted" style="margin-left:auto;font-size:12px">' + esc(x.personal ? W.own : W.shared) + '</span></button>').join('') +
+  document.getElementById('space-menu').innerHTML = me.spaces.map((x, i) => '<button data-space="' + esc(x.id) + '"' + (x.id === space ? ' aria-current="true" style="font-weight:600"' : '') + '><span class="space-dot" style="background:' + spaceColorOf(x.id) + '"></span>' + esc(x.name) + '<span class="muted" style="margin-left:auto;font-size:12px">' + esc(x.personal ? W.own : W.shared) + '</span></button>').join('') +
     '<button data-go="#/espaces">' + ic('i-plus') + esc(W.newSpace) + '</button>';
   document.querySelectorAll('#space-menu [data-space]').forEach((b) => b.addEventListener('click', () => choose(b.dataset.space)));
   document.querySelectorAll('#space-menu [data-go]').forEach((b) => b.addEventListener('click', () => { location.hash = b.dataset.go; }));

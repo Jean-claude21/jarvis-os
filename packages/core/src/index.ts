@@ -430,3 +430,4 @@ export {
   type ActivityGroup,
   type CloseInput,
 } from './activities';
+export * from './facets';

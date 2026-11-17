@@ -111,6 +111,8 @@ import {
   type ViewData,
 } from '@jarvis-os/core';
 import { Hono, type Context } from 'hono';
+import { streamSSE } from 'hono/streaming';
+import type { LiveEvent, LiveHub } from './live';
 import { bodyLimit } from 'hono/body-limit';
 import type pg from 'pg';
 import { z } from 'zod';
@@ -195,6 +197,8 @@ export function apiRoutes(deps: {
   secret: string;
   /** The whole server, for a batch of reads each answered as if asked alone. */
   self?: (request: Request) => Promise<Response> | Response;
+  /** The journal, live (v3 D9). */
+  live?: LiveHub;
 }) {
   const api = new Hono<Env>();
   const keyUsed = new Map<string, number>();
@@ -928,6 +932,51 @@ export function apiRoutes(deps: {
   api.get('/outbox', async (c) => {
     const days = Math.min(30, Math.max(1, Number(c.req.query('days') ?? 7)));
     return c.json(await as(c, (tx) => recentMessages(tx, days)));
+  });
+
+  // The journal, live (v3 D9): Server-Sent Events of the changes in the spaces she reaches (or the
+  // one asked). Ids and the command only; the screen reads the rest as usual.
+  api.get('/live', (c) => {
+    const hub = deps.live;
+    if (!hub) return c.json({ error: 'No live journal on this server.' }, 503);
+    const asked = c.req.query('space');
+    const spaces = c
+      .get('spaces')
+      .filter((one) => !asked || one.id === asked)
+      .map((one) => one.id);
+    return streamSSE(c, async (stream) => {
+      const queue: LiveEvent[] = [];
+      let wake: (() => void) | null = null;
+      const stop = hub.subscribe(spaces, (event) => {
+        queue.push(event);
+        wake?.();
+      });
+      stream.onAbort(() => {
+        stop();
+        wake?.();
+      });
+      await stream.writeSSE({ event: 'ready', data: JSON.stringify({ spaces }) });
+      while (!stream.aborted) {
+        if (!queue.length)
+          await new Promise<void>((resolve) => {
+            wake = resolve;
+            setTimeout(resolve, 25_000);
+          });
+        wake = null;
+        if (stream.aborted) break;
+        if (!queue.length) {
+          await stream.writeSSE({ event: 'ping', data: '' });
+          continue;
+        }
+        for (const event of queue.splice(0))
+          await stream.writeSSE({
+            event: 'change',
+            id: String(event.id),
+            data: JSON.stringify(event),
+          });
+      }
+      stop();
+    });
   });
 
   api.get('/history', async (c) => {

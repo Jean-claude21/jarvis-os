@@ -1,3 +1,4 @@
+import { facetsOf, type Facet } from './facets';
 import type { Actor, Tx } from './db';
 import { NEAR, SAID, wordsMatch, wordsOf } from './search';
 import { prefixedId } from './ids';
@@ -719,6 +720,10 @@ export interface Kind {
   system: boolean;
   /** A common type's name in her languages (spec 032). */
   common?: { fr: string; en: string };
+  /** What it is (v3 D5), said by its model or read from it. */
+  facets?: Facet[];
+  /** The kind its model extends (v3 D4). */
+  parent?: string;
 }
 
 /** Jarvis's own kinds: the engine and her method, grouped apart from her life. */
@@ -776,15 +781,31 @@ export async function kinds(tx: Tx, spaceId: string): Promise<Kind[]> {
     const one = COMMON_KINDS.find((common) => common.kind === kind);
     return one ? { common: one.label } : {};
   };
+  const all = new Map(models);
+  // Its facets and its parent (v3 D4–D5): a child reads its parent's fields.
+  const shaped = (model: Model) => {
+    const parent = model.extends ? (all.get(fold(model.extends)) ?? null) : null;
+    return {
+      facets: facetsOf(model, parent),
+      ...(model.extends ? { parent: model.extends } : {}),
+    };
+  };
   const out: Kind[] = rows.map((row) => {
     const model = models.get(fold(row.kind));
     models.delete(fold(row.kind));
     return model
-      ? { ...row, model, ...placed(row.kind, model), ...commonOf(row.kind) }
+      ? { ...row, model, ...shaped(model), ...placed(row.kind, model), ...commonOf(row.kind) }
       : { ...row, ...placed(row.kind), ...commonOf(row.kind) };
   });
   for (const model of models.values())
-    out.push({ kind: model.kind, count: 0, fields: [], model, ...placed(model.kind, model) });
+    out.push({
+      kind: model.kind,
+      count: 0,
+      fields: [],
+      model,
+      ...shaped(model),
+      ...placed(model.kind, model),
+    });
   return out;
 }
 

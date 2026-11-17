@@ -1,3 +1,4 @@
+import { facetSchema, fieldsOfFacet } from './facets';
 import { z } from 'zod';
 import type { Tx } from './db';
 import { parse } from './formula';
@@ -176,6 +177,12 @@ export const modelDataSchema = z
     workflow: workflowSchema.optional(),
     /** Spec 057: an entry of this kind is something to do — shown on « Tâches » by its status and due. */
     activity: z.boolean().optional(),
+    /** What it is (v3 D5): dated, todo, stages… Read from its fields when not said. */
+    facets: z.array(facetSchema).max(12).optional(),
+    /** The kind it extends (v3 D4): « Recruiter » extends « Person », and has its fields. */
+    extends: z.string().trim().min(1).max(80).optional(),
+    /** Each field's name in her languages (v3 D4): `sent_on` reads « Envoyée le ». */
+    fieldLabels: z.record(z.string(), labelSchema).optional(),
   })
   .superRefine((model, context) => {
     const names = new Map<string, ModelField>();
@@ -222,6 +229,16 @@ export const modelDataSchema = z
         context.addIssue({ code: 'custom', message: `« ${shown} » is not a field of the model.` });
       }
     }
+    // A facet points to fields the model has (or every kind may carry); a child's may be its parent's.
+    if (!model.extends)
+      for (const facet of model.facets ?? [])
+        for (const name of fieldsOfFacet(facet))
+          if (!names.has(fold(name)) && !COMMON_FIELDS.has(name) && fold(name) !== 'title')
+            context.addIssue({
+              code: 'custom',
+              path: ['facets'],
+              message: `« ${name} » (facet ${facet.facet}) is not a field of the model.`,
+            });
     if (model.workflow) {
       const field = names.get(fold(model.workflow.field));
       if (!field || field.type !== 'choice') {
@@ -303,8 +320,8 @@ function modelFrom(row: { id: string; title: string; data: unknown }): Model | n
   return parsed.success ? { ...parsed.data, id: row.id, kind: row.title } : null;
 }
 
-/** The model of a kind in a space, or null. */
-export async function modelOf(tx: Tx, spaceId: string, kind: string): Promise<Model | null> {
+/** The model of a kind in a space as stored, or null. */
+async function storedModel(tx: Tx, spaceId: string, kind: string): Promise<Model | null> {
   const { rows } = await tx.query<{ id: string; title: string; data: unknown }>(
     `select id, title, data from entry
       where space_id = $1 and archived_at is null
@@ -315,6 +332,37 @@ export async function modelOf(tx: Tx, spaceId: string, kind: string): Promise<Mo
   return rows[0] ? modelFrom(rows[0]) : null;
 }
 
+/**
+ * A model with what it inherits (v3 D4): a kind that `extends` another has its parent's fields
+ * (its own win on a name), up to three levels, never in a loop.
+ */
+function inherited(model: Model, find: (kind: string) => Model | null | undefined): Model {
+  const seen = new Set([fold(model.kind)]);
+  let fields = model.fields;
+  let parent = model.extends ? find(model.extends) : null;
+  for (let depth = 0; parent && depth < 3 && !seen.has(fold(parent.kind)); depth += 1) {
+    seen.add(fold(parent.kind));
+    const own = new Set(fields.map((field) => fold(field.name)));
+    fields = [...parent.fields.filter((field) => !own.has(fold(field.name))), ...fields];
+    parent = parent.extends ? find(parent.extends) : null;
+  }
+  return fields === model.fields ? model : { ...model, fields };
+}
+
+/** The model of a kind in a space, with what it inherits, or null. */
+export async function modelOf(tx: Tx, spaceId: string, kind: string): Promise<Model | null> {
+  const model = await storedModel(tx, spaceId, kind);
+  if (!model?.extends) return model;
+  const chain = new Map<string, Model | null>();
+  let next: string | undefined = model.extends;
+  for (let depth = 0; next && depth < 3 && !chain.has(fold(next)); depth += 1) {
+    const parent = await storedModel(tx, spaceId, next);
+    chain.set(fold(next), parent);
+    next = parent?.extends;
+  }
+  return inherited(model, (one) => chain.get(fold(one)));
+}
+
 /** Every model of a space. */
 export async function modelsOf(tx: Tx, spaceId: string): Promise<Model[]> {
   const { rows } = await tx.query<{ id: string; title: string; data: unknown }>(
@@ -323,7 +371,11 @@ export async function modelsOf(tx: Tx, spaceId: string): Promise<Model[]> {
       order by title`,
     [spaceId, MODEL_KIND],
   );
-  return rows.flatMap((row) => modelFrom(row) ?? []);
+  const models = rows.flatMap((row) => modelFrom(row) ?? []);
+  const byKind = new Map(models.map((model) => [fold(model.kind), model]));
+  return models.map((model) =>
+    model.extends ? inherited(model, (one) => byKind.get(fold(one))) : model,
+  );
 }
 
 /** A model's field by name, case and accents aside. */

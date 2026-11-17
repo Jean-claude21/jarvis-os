@@ -1,3 +1,4 @@
+import { liveHub } from './live';
 import { requireMcpAuth } from '@better-auth/mcp';
 import { verifyOAuthQueryParams } from '@better-auth/oauth-provider';
 import {
@@ -112,6 +113,7 @@ export function makeApp(settings: Settings) {
       publicUrl: settings.publicUrl,
       secret: settings.authSecret,
       self: (request: Request) => app.fetch(request),
+      live: liveHub(settings.appUrl),
     }),
   );
 

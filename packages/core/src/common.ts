@@ -1,4 +1,5 @@
 import type { Actor, Tx } from './db';
+import type { Facet } from './facets';
 import { archive } from './entries';
 import { renameKind } from './lists';
 import { migrateKind, type MigrationReport } from './migrations';
@@ -15,6 +16,38 @@ export interface CommonKind {
   /** Its usual fields, in the engine's words. */
   fields: string[];
 }
+
+/** What each common type is (v3 D5, D8), for a kind she keeps without a model of her own. */
+export const COMMON_FACETS: Record<string, Facet[]> = {
+  Person: [{ facet: 'who', kind: 'person', email: 'email', phone: 'phone' }],
+  Organization: [{ facet: 'who', kind: 'organization', phone: 'phone', domain: 'website' }],
+  Account: [{ facet: 'amount', amount: 'opening_balance', currency: 'currency' }],
+  Transaction: [
+    { facet: 'dated', start: 'date' },
+    { facet: 'amount', amount: 'amount', currency: 'currency' },
+  ],
+  Event: [{ facet: 'dated', start: 'start', end: 'end' }],
+  Task: [
+    { facet: 'todo', status: 'status', due: 'due' },
+    { facet: 'dated', start: 'due' },
+  ],
+  Place: [{ facet: 'place', location: 'address' }],
+  Goal: [
+    { facet: 'measurable', target: 'target', current: 'measure' },
+    { facet: 'dated', start: 'deadline' },
+  ],
+  Note: [{ facet: 'document', text: 'text' }],
+  Project: [
+    { facet: 'stages', field: 'status' },
+    { facet: 'dated', start: 'deadline' },
+  ],
+  Habit: [{ facet: 'recurring', repeat: 'repeat' }],
+  Treatment: [
+    { facet: 'dated', start: 'start', end: 'end' },
+    { facet: 'recurring', repeat: 'repeat' },
+  ],
+  Fichier: [{ facet: 'document' }],
+};
 
 export const COMMON_KINDS: CommonKind[] = [
   {

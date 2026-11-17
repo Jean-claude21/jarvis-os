@@ -15,7 +15,7 @@ import { checkScript } from './scripts';
 import { checkView } from './views';
 import { checkShare } from './shares';
 import { checkArea } from './areas';
-import { asCommon, COMMON_KINDS } from './common';
+import { asCommon, COMMON_FACETS, COMMON_KINDS } from './common';
 import { dataInNewWords, KIND_RENAMES, modelInNewWords, ROLE_RENAMES } from './keywords';
 import {
   checkAgainst,
@@ -781,6 +781,9 @@ export async function kinds(tx: Tx, spaceId: string): Promise<Kind[]> {
     const one = COMMON_KINDS.find((common) => common.kind === kind);
     return one ? { common: one.label } : {};
   };
+  // A common type kept without a model still says what it is (v3 D8).
+  const commonFacets = (kind: string) =>
+    COMMON_FACETS[kind] ? { facets: COMMON_FACETS[kind] } : {};
   const all = new Map(models);
   // Its facets and its parent (v3 D4–D5): a child reads its parent's fields.
   const shaped = (model: Model) => {
@@ -795,7 +798,7 @@ export async function kinds(tx: Tx, spaceId: string): Promise<Kind[]> {
     models.delete(fold(row.kind));
     return model
       ? { ...row, model, ...shaped(model), ...placed(row.kind, model), ...commonOf(row.kind) }
-      : { ...row, ...placed(row.kind), ...commonOf(row.kind) };
+      : { ...row, ...commonFacets(row.kind), ...placed(row.kind), ...commonOf(row.kind) };
   });
   for (const model of models.values())
     out.push({

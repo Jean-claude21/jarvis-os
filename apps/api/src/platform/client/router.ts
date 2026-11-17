@@ -57,7 +57,7 @@ function paint(entry, route, first) {
   const y = window.scrollY;
   page().innerHTML = entry.html; dress(page());
   crumbParts = entry.crumbs; drawCrumbs(route.key, route.id);
-  bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page()); bindConnexions(page()); bindBlocks(page()); bindBoards(page()); bindRoutines(page()); bindTasks(page()); bindSettings(page()); bindSkills(page()); bindBilans(page());
+  bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page()); bindConnexions(page()); bindBlocks(page()); bindBoards(page()); bindRoutines(page()); bindTasks(page()); bindSettings(page()); bindSkills(page()); bindBilans(page()); bindAppViews(page());
   if (first) { page().scrollTop = 0; window.scrollTo(0, 0); } else window.scrollTo(0, y);
 }
 const typing = () => { const a = document.activeElement; return Boolean(a && page().contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)); };

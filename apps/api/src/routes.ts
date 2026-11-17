@@ -933,8 +933,20 @@ export function apiRoutes(deps: {
   api.get('/history', async (c) => {
     const target = c.req.query('target');
     const limit = Number(c.req.query('limit') ?? 50);
+    // Only the changes of entries of these kinds (an app's activity, spec 084).
+    const kinds = (c.req.query('kinds') ?? '')
+      .split(',')
+      .map((one) => one.trim())
+      .filter(Boolean)
+      .slice(0, 40);
     return c.json(
-      await act(c, (tx, _a, space) => history(tx, space, { ...(target ? { target } : {}), limit })),
+      await act(c, (tx, _a, space) =>
+        history(tx, space, {
+          ...(target ? { target } : {}),
+          ...(kinds.length ? { kinds } : {}),
+          limit,
+        }),
+      ),
     );
   });
 

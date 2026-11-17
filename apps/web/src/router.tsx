@@ -5,6 +5,7 @@ import { AgendaPage, DocumentsPage, PeoplePage, TasksPage } from './routes/Acros
 import { viewSearch, type ViewSearch } from './engine/types';
 import { EntryPage } from './routes/Entry';
 import { Soon } from './routes/Soon';
+import { SettingsPage, settingsSearch } from './routes/Settings';
 import { Today } from './routes/Today';
 import { Shell, type Crumb } from './shell/Shell';
 
@@ -89,9 +90,13 @@ const routes = [
       step="les agents (V8)"
     />
   )),
-  page('/reglages', 'Réglages', () => (
-    <Soon title="Réglages" lead="Ton compte, tes espaces, leurs membres." step="V7" />
-  )),
+  createRoute({
+    getParentRoute: () => root,
+    path: '/reglages',
+    component: SettingsPage,
+    validateSearch: settingsSearch,
+    staticData: { crumbs: () => [{ label: 'Réglages', to: '/reglages' }] },
+  }),
 ];
 
 export const router = createRouter({

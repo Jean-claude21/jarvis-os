@@ -1,4 +1,6 @@
 import { withWho } from './who';
+import { readAndUnderstand } from './reading';
+import { logoFor } from './logo';
 import { answerOf, appLines, appsOf, bridgesOf, proposeStructure } from '@jarvis-os/core';
 import {
   comment,
@@ -284,6 +286,9 @@ export function apiRoutes(deps: {
     };
   };
   /** The work of a route, in the space it names (else her own). */
+  /** Where she comes back after a sign-in: her connections, in the client she uses. */
+  const connectionsPage = () =>
+    process.env.JARVIS_HOME === '/v3' ? '/v3/reglages?t=connexions' : '/app#/connexions';
   const act = <T>(c: Context<Env>, work: (tx: Tx, actor: Actor, spaceId: string) => Promise<T>) => {
     const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
     return asPerson(deps.db, c.get('person'), (tx) => work(tx, actorOf(c), space.id));
@@ -1102,9 +1107,37 @@ export function apiRoutes(deps: {
           links,
         }),
       );
+      // Read and understood right away (v3 V7), out of the request: its answer does not wait.
+      const space = spaceFor(
+        c.get('spaces'),
+        c.req.query('space') ?? c.req.header('x-jarvis-space'),
+      );
+      void readAndUnderstand(deps.db, deps.blobs, c.get('person'), space.id, stored.entryId).catch(
+        (error) => console.warn('[reading]', (error as Error).message),
+      );
       return c.json(stored, 201);
     },
   );
+
+  // A file read again (v3 V7): one dropped before Jarvis understood documents, or read wrongly.
+  api.post('/files/:id/understand', async (c) => {
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    await act(c, (tx, actor, spaceId) =>
+      save(tx, actor, spaceId, { entries: [{ id: c.req.param('id'), data: { genre: null } }] }),
+    );
+    await readAndUnderstand(deps.db, deps.blobs, c.get('person'), space.id, c.req.param('id'));
+    return c.json({ read: c.req.param('id') });
+  });
+
+  // A company's logo (v3 V7), from its own site, fetched by Jarvis: her browser never calls it.
+  api.get('/logo/:domain', async (c) => {
+    const logo = await logoFor(c.req.param('domain'));
+    if (!logo) return c.body(null, 404, { 'cache-control': 'public, max-age=86400' });
+    return c.body(logo.bytes as Uint8Array<ArrayBuffer>, 200, {
+      'content-type': logo.type,
+      'cache-control': 'public, max-age=604800',
+    });
+  });
 
   // Her files, listed (spec 013): what each is, when, what it is linked to.
   api.get('/files', async (c) => c.json(await act(c, (tx, _a, space) => filesOf(tx, space))));
@@ -1192,9 +1225,9 @@ export function apiRoutes(deps: {
   api.get('/connections/oauth/callback', async (c) => {
     const code = c.req.query('code');
     const state = c.req.query('state') ?? '';
-    if (!code) return c.redirect('/app#/connexions');
+    if (!code) return c.redirect(connectionsPage());
     await deps.connectors.relay.finish(c.get('person'), code, state);
-    return c.redirect('/app#/connexions');
+    return c.redirect(connectionsPage());
   });
   api.post('/connections/:id/sync', async (c) =>
     c.json(await deps.connectors.relay.syncIcs(c.get('person'), c.req.param('id'))),
@@ -1222,9 +1255,9 @@ export function apiRoutes(deps: {
   api.get('/connectors/callback', async (c) => {
     const state = c.req.query('state') ?? '';
     const code = c.req.query('code');
-    if (!code) return c.redirect('/app#/connexions');
+    if (!code) return c.redirect(connectionsPage());
     await deps.connectors.finishSignIn(c.get('person'), state, code);
-    return c.redirect('/app#/connexions');
+    return c.redirect(connectionsPage());
   });
   api.get('/connectors/:id/resources/read', async (c) =>
     c.json(

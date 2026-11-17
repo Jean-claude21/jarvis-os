@@ -35,7 +35,12 @@ export function shape(
   const filters = filtersOf(state.f);
   let out = rows.filter((row) => {
     if (state.kind && row.kind !== state.kind) return false;
-    for (const [path, value] of filters) if (keyValue(valueOf(row, path)) !== value) return false;
+    for (const [path, value] of filters) {
+      const held = valueOf(row, path);
+      // A multiple choice (her circles) matches when it holds the value.
+      if (Array.isArray(held) ? !held.map(keyValue).includes(value) : keyValue(held) !== value)
+        return false;
+    }
     if (!words) return true;
     const text = [row.title, ...Object.values(row.values).map((one) => showValue(one))]
       .join(' ')

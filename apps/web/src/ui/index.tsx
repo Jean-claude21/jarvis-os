@@ -449,3 +449,40 @@ export function Segmented<T extends string>({
     </div>
   );
 }
+
+/** A page's tabs (an app's views, the settings): underlined, the current one in clay. */
+export function Tabs<T extends string>({
+  tabs,
+  value,
+  onChange,
+  label,
+}: {
+  tabs: { key: T; label: string }[];
+  value: T;
+  onChange: (key: T) => void;
+  label: string;
+}) {
+  return (
+    <nav className="-mt-1 flex gap-0.5 overflow-x-auto border-b border-rule" aria-label={label}>
+      {tabs.map(({ key, label: words }) => (
+        <button
+          key={key}
+          onClick={() => onChange(key)}
+          aria-current={value === key ? 'page' : undefined}
+          className={cn(
+            '-mb-px cursor-pointer border-b-2 px-3 py-2 text-[13.5px] whitespace-nowrap',
+            value === key
+              ? 'border-primary font-semibold text-ink'
+              : 'border-transparent text-bark hover:text-ink',
+          )}
+        >
+          {words}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+/** A text field, a select: the v2 input — ruled, 2px, clay when focused. */
+export const inputClass =
+  'h-9 w-full min-w-0 rounded-[2px] border border-rule bg-paper px-3 text-[13.5px] outline-none focus:border-primary disabled:opacity-60';

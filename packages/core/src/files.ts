@@ -175,6 +175,10 @@ export interface FileRow {
   links: { id: string; title: string; kind: string; role: string }[];
   /** Whether its words were kept (text files), so `find` reaches them. */
   read: boolean;
+  /** Where its reading stands (pending, read, none, failed). */
+  readState: string;
+  /** What it is, once understood (v3 V7): invoice, contract… */
+  genre: string | null;
 }
 
 /** Every file of a space, the latest first. */
@@ -182,7 +186,7 @@ export async function filesOf(tx: Tx, spaceId: string, limit = 500): Promise<Fil
   const { rows } = await tx.query<FileRow & { size: string }>(
     `select f.entry_id as "entryId", f.name, f.media_type as "mediaType", f.size, e.title,
             to_char(f.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
-            f.text is not null as read,
+            f.text is not null as read, f.read_state as "readState", e.data->>'genre' as genre,
             coalesce((
               select json_agg(json_build_object('id', o.id, 'title', o.title, 'kind', o.kind, 'role', l.role))
                 from link l join entry o on o.id = case when l.from_id = f.entry_id then l.to_id else l.from_id end

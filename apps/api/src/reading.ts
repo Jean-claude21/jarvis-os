@@ -1,4 +1,11 @@
-import { asPerson, filesToRead, setFileWords, type Blobs } from '@jarvis-os/core';
+import {
+  asPerson,
+  filesToRead,
+  setFileWords,
+  understandFile,
+  type Actor,
+  type Blobs,
+} from '@jarvis-os/core';
 import { tmpdir } from 'node:os';
 import type pg from 'pg';
 
@@ -74,6 +81,10 @@ export async function readOnce(
       const text = await within(readWords(bytes, file.mediaType), READ_TIMEOUT_MS);
       await asPerson(db, file.person, (tx) => setFileWords(tx, file.entryId, { text }));
       report.read += 1;
+      if (text)
+        await asPerson(db, file.person, (tx) =>
+          understandFile(tx, readerOf(file.person), file.spaceId, file.entryId, text),
+        ).catch((error) => console.warn('[reading] understand', (error as Error).message));
     } catch (error) {
       const reason = (error as Error).message;
       await asPerson(db, file.person, (tx) =>
@@ -84,4 +95,49 @@ export async function readOnce(
     }
   }
   return report;
+}
+
+/** Who reads: her, through Jarvis's reading — so the journal says where the facts come from. */
+const readerOf = (person: string): Actor => ({ person, door: 'app', client: 'lecture' });
+
+/**
+ * A file she just gave, read now and understood (v3 V7): its words (at once for a text, within
+ * the minute for a PDF or a photo), its genre and facts, and what it makes waiting in « À valider ».
+ * The watcher's pass stays the way back for what this one could not finish.
+ */
+export async function readAndUnderstand(
+  db: pg.Pool,
+  blobs: Blobs,
+  person: string,
+  spaceId: string,
+  entryId: string,
+): Promise<void> {
+  const row = await asPerson(db, person, async (tx) => {
+    const { rows } = await tx.query<{
+      text: string | null;
+      read_state: string;
+      media_type: string;
+      storage_key: string;
+    }>(
+      'select text, read_state, media_type, storage_key from file where entry_id = $1 and space_id = $2',
+      [entryId, spaceId],
+    );
+    return rows[0];
+  });
+  if (!row) return;
+  let text = row.text;
+  if (!text && row.read_state === 'pending') {
+    try {
+      const bytes = await blobs.get(row.storage_key);
+      text = await within(readWords(bytes, row.media_type), READ_TIMEOUT_MS);
+      await asPerson(db, person, (tx) => setFileWords(tx, entryId, { text }));
+    } catch (error) {
+      console.warn('[reading] now', entryId, (error as Error).message);
+      return;
+    }
+  }
+  if (text)
+    await asPerson(db, person, (tx) =>
+      understandFile(tx, readerOf(person), spaceId, entryId, text),
+    );
 }

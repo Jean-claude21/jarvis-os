@@ -2,6 +2,7 @@ import { Link, Outlet, useMatches, useNavigate } from '@tanstack/react-router';
 import { ChevronRight, History, Menu as MenuIcon, Search } from 'lucide-react';
 import { Fragment, useEffect, useState } from 'react';
 import { useLive } from '../lib/live';
+import { DropLayer } from '../lib/upload';
 import { IconButton, Sheet, cn } from '../ui';
 import { Palette } from './Palette';
 import { Sidebar } from './Sidebar';
@@ -130,6 +131,7 @@ export function Shell() {
         </div>
       </main>
       <Palette open={search} setOpen={setSearch} />
+      <DropLayer />
     </div>
   );
 }

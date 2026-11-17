@@ -5,6 +5,7 @@ import {
   FileText,
   GanttChart,
   Layers,
+  LayoutGrid,
   List,
   ListFilter,
   Search,
@@ -23,6 +24,7 @@ import type { Field, RenderKey, Row, ViewSearch, ViewChange } from './types';
 
 export const RENDER_WORDS: Record<RenderKey, { label: string; icon: LucideIcon }> = {
   list: { label: 'Liste', icon: List },
+  cards: { label: 'Cartes', icon: LayoutGrid },
   table: { label: 'Tableau', icon: Table2 },
   board: { label: 'Kanban', icon: Columns3 },
   calendar: { label: 'Calendrier', icon: CalendarDays },

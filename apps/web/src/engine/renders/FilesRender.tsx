@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
   Archive,
@@ -11,7 +10,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { spaceNow } from '../../lib/api';
+import { useUpload } from '../../lib/upload';
+import { GENRE_WORDS } from '../../lib/words';
 import { useKindName } from '../../lib/kinds';
 import { Button, Empty, Segmented, Tag, ago, cn } from '../../ui';
 import type { FileRow } from '../sources';
@@ -85,10 +85,8 @@ export function FilesRender({
   set: (change: ViewChange) => void;
 }) {
   const kindName = useKindName();
-  const client = useQueryClient();
   const input = useRef<HTMLInputElement>(null);
   const [layout, setLayout] = useState<'grid' | 'list'>('list');
-  const [busy, setBusy] = useState(false);
   const [hover, setHover] = useState(false);
   const genre = state.f?.startsWith('genre=') ? state.f.slice(6) : 'all';
   const words = (state.q ?? '').toLowerCase();
@@ -100,22 +98,8 @@ export function FilesRender({
         ? a.title.localeCompare(b.title, 'fr') * (state.desc ? -1 : 1)
         : b.createdAt.localeCompare(a.createdAt) * (state.desc ? -1 : 1),
     );
-  const upload = async (list: FileList | null) => {
-    if (!list?.length) return;
-    setBusy(true);
-    try {
-      for (const file of [...list]) {
-        const form = new FormData();
-        form.append('file', file);
-        const url = new URL('/api/files', location.origin);
-        if (spaceNow()) url.searchParams.set('space', spaceNow()!);
-        await fetch(url, { method: 'POST', body: form, credentials: 'same-origin' });
-      }
-    } finally {
-      setBusy(false);
-      void client.invalidateQueries({ queryKey: ['entries'] });
-    }
-  };
+  const { send, busy } = useUpload();
+  const upload = (list: FileList | null) => void send([...(list ?? [])]);
   const present = GENRES.filter((one) => files.some((file) => one.test(file)));
   return (
     <div>
@@ -159,7 +143,7 @@ export function FilesRender({
             type="file"
             multiple
             hidden
-            onChange={(event) => void upload(event.target.files)}
+            onChange={(event) => upload(event.target.files)}
           />
         </span>
       </div>
@@ -171,8 +155,9 @@ export function FilesRender({
         onDragLeave={() => setHover(false)}
         onDrop={(event) => {
           event.preventDefault();
+          event.stopPropagation();
           setHover(false);
-          void upload(event.dataTransfer.files);
+          upload(event.dataTransfer.files);
         }}
         className={cn(
           'm-3 grid place-items-center rounded-[10px] border border-dashed border-rule-strong px-4 py-4 text-center text-[13px] text-bark',
@@ -252,7 +237,17 @@ export function FilesRender({
                         <span className="truncate font-semibold">{file.title || file.name}</span>
                       </Link>
                     </td>
-                    <td className="px-3 py-2 text-bark">{one.label}</td>
+                    <td className="px-3 py-2 whitespace-nowrap text-bark">
+                      {file.genre && GENRE_WORDS[file.genre] ? (
+                        <Tag tone="info" dot={false}>
+                          {GENRE_WORDS[file.genre]}
+                        </Tag>
+                      ) : file.readState === 'pending' ? (
+                        <span className="text-faint">lecture…</span>
+                      ) : (
+                        one.label
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-right font-mono text-bark">{size(file.size)}</td>
                     <td className="max-w-[220px] px-3 py-2">
                       <span className="flex flex-wrap gap-1">

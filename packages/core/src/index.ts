@@ -355,6 +355,13 @@ export {
 } from './connectors';
 export { filesToRead, READ_LATER, setFileWords, type FileToRead } from './files';
 export {
+  readFacts,
+  understandFile,
+  genreLabel,
+  GENRES as DOCUMENT_GENRES,
+  type DocumentFacts,
+} from './read-documents';
+export {
   entriesToEmbed,
   keepVector,
   nearEntries,

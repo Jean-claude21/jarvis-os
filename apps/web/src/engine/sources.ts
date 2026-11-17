@@ -1,6 +1,7 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { useKinds, type Kind } from '../lib/kinds';
+import { fieldWord } from './format';
 import type { Field, Row } from './types';
 
 // The sources of the engine (v3 D10): entries of some kinds (through the server's own view, its
@@ -22,6 +23,10 @@ type KindWithModel = Omit<Kind, 'model' | 'facets'> & {
     field?: string;
     target?: string;
     current?: string;
+    kind?: 'person' | 'organization';
+    email?: string;
+    phone?: string;
+    domain?: string;
   }[];
 };
 interface ViewField {
@@ -52,10 +57,17 @@ export function useKindRows(kinds: string[]): Source {
   const known = new Map((all as KindWithModel[]).map((one) => [one.kind, one]));
   const results = useQueries({
     queries: kinds.map((kind) => {
-      const own = (known.get(kind)?.model?.fields ?? [])
-        .filter((field) => field.type !== 'lines' && field.type !== 'button')
-        .map((field) => field.name)
-        .slice(0, 20);
+      const modelFields = known.get(kind)?.model?.fields;
+      // Her model's fields; for a kind kept without one (a common Person), the fields it uses.
+      const own = (
+        modelFields?.length
+          ? modelFields
+              .filter((field) => field.type !== 'lines' && field.type !== 'button')
+              .map((field) => field.name)
+          : (known.get(kind)?.fields ?? []).filter(
+              (name) => !['text', 'source_connection', 'genre', 'facts'].includes(name),
+            )
+      ).slice(0, 20);
       return {
         queryKey: ['entries', 'view', kind, own.join(',')],
         queryFn: () =>
@@ -78,6 +90,7 @@ export function useKindRows(kinds: string[]): Source {
     const dated = facets.find((one) => one.facet === 'dated');
     const stages = facets.find((one) => one.facet === 'stages');
     const measurable = facets.find((one) => one.facet === 'measurable');
+    const who = facets.find((one) => one.facet === 'who');
     const progressField = (known.get(kind)?.model?.fields ?? []).find(
       (field) => field.type === 'progress',
     )?.name;
@@ -86,7 +99,7 @@ export function useKindRows(kinds: string[]): Source {
       fields.set(field.path, {
         path: field.path,
         type: field.type,
-        label: label(field.label, field.path),
+        label: label(field.label, fieldWord(field.path)),
         ...(field.options ? { options: field.options } : {}),
         ...(field.optionLabels
           ? {
@@ -100,6 +113,22 @@ export function useKindRows(kinds: string[]): Source {
           : {}),
       });
     }
+    for (const line of result.data?.rows ?? [])
+      for (const [path, value] of Object.entries(line as Record<string, unknown>)) {
+        if (path === 'id' || path === 'title' || path.includes('#') || fields.has(path)) continue;
+        if (value === null || value === undefined || value === '') continue;
+        fields.set(path, {
+          path,
+          type: Array.isArray(value)
+            ? 'multi_choice'
+            : typeof value === 'number'
+              ? 'number'
+              : typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+                ? 'date'
+                : 'text',
+          label: fieldWord(path),
+        });
+      }
     for (const line of result.data?.rows ?? []) {
       const { id, title, ...values } = line as { id: string; title: string };
       const start = dated ? (values as Record<string, unknown>)[dated.start ?? ''] : null;
@@ -113,11 +142,21 @@ export function useKindRows(kinds: string[]): Source {
           ? (number(measurable.current) ?? 0) / number(measurable.target)!
           : null;
       const ids = dated?.after ? read[`${dated.after}#ids`] : null;
+      const text = (key?: string) =>
+        key && typeof read[key] === 'string' ? (read[key] as string) : null;
       rows.push({
         id,
         kind,
         title,
         values,
+        who: who
+          ? {
+              kind: who.kind ?? 'person',
+              email: text(who.email),
+              phone: text(who.phone),
+              domain: text(who.domain),
+            }
+          : null,
         start: typeof start === 'string' ? start : null,
         end: typeof end === 'string' ? end : null,
         allDay: typeof start === 'string' && start.length <= 10,
@@ -245,6 +284,8 @@ export interface FileRow {
   title: string;
   createdAt: string;
   links: { id: string; title: string; kind: string; role: string }[];
+  readState?: string;
+  genre?: string | null;
 }
 
 /** Her files, or those linked to entries of these kinds. */

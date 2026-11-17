@@ -67,3 +67,31 @@ export function keyValue(value: unknown): string {
   }
   return String(value);
 }
+
+/** The common types' fields (v3 D8), in her words, when no model names them. */
+const COMMON_WORDS: Record<string, string> = {
+  email: 'E-mail',
+  phone: 'Téléphone',
+  circle: 'Cercle',
+  relation: 'Relation',
+  birthday: 'Anniversaire',
+  last_contact: 'Dernier contact',
+  website: 'Site',
+  type: 'Genre',
+  address: 'Adresse',
+  city: 'Ville',
+  country: 'Pays',
+  amount: 'Montant',
+  date: 'Date',
+  due: 'Échéance',
+  status: 'Statut',
+  priority: 'Priorité',
+  start: 'Début',
+  end: 'Fin',
+  place: 'Lieu',
+  with: 'Avec',
+  note: 'Note',
+  tags: 'Étiquettes',
+  organization: 'Organisation',
+};
+export const fieldWord = (path: string) => COMMON_WORDS[path] ?? path.replace(/_/g, ' ');

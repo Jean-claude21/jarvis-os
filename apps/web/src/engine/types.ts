@@ -1,3 +1,4 @@
+import type { Who } from '../ui/identity';
 // The view engine (v3 D10): a source gives rows and their fields; a state (search, filters, sort,
 // groups, render) kept in the URL shapes them; a render draws them. One engine, every scope.
 
@@ -28,9 +29,11 @@ export interface Row {
   after?: string[];
   /** How far along, from 0 to 1 (a progress field, or the « measurable » facet). */
   progress?: number | null;
+  /** From the « who » facet: a person or an organisation, and how to reach them. */
+  who?: Who | null;
 }
 
-export type RenderKey = 'list' | 'table' | 'board' | 'calendar' | 'timeline' | 'files';
+export type RenderKey = 'list' | 'cards' | 'table' | 'board' | 'calendar' | 'timeline' | 'files';
 
 /** The state of a view, in the URL. */
 export interface ViewSearch {
@@ -53,7 +56,7 @@ export interface ViewSearch {
 /** A change of the state: a key set to undefined is taken away. */
 export type ViewChange = { [K in keyof ViewSearch]?: ViewSearch[K] | undefined };
 
-const RENDERS: RenderKey[] = ['list', 'table', 'board', 'calendar', 'timeline', 'files'];
+const RENDERS: RenderKey[] = ['list', 'cards', 'table', 'board', 'calendar', 'timeline', 'files'];
 /** Reads a view's state from the URL, keeping only what it understands. */
 export function viewSearch(search: Record<string, unknown>): ViewSearch {
   const text = (value: unknown, max = 200) =>

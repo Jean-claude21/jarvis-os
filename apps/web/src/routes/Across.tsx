@@ -2,7 +2,7 @@ import { useKinds } from '../lib/kinds';
 import { useAgendaRows, useFiles, useKindRows, useTaskRows } from '../engine/sources';
 import { addDays, mondayOf, monthOf, timelineRange } from '../engine/renders/time';
 import { useViewState, View } from '../engine/View';
-import { PageHead } from '../ui';
+import { PageHead, Segmented } from '../ui';
 
 // The views across her whole life (v3 D2, D10): one per facet, every app at once — the agenda
 // (what is dated), the tasks (what is to do), the documents (her files), the people (who). The
@@ -99,13 +99,49 @@ export function DocumentsPage() {
   );
 }
 
+/** Her circles (v3 D8, gr8r's Teams for a life): the values of the people's « circle » field. */
+const CIRCLE_FIELDS = ['circle', 'circles', 'cercle', 'cercles'];
+
 export function PeoplePage() {
   const kinds = useKindsWith('who');
   const source = useKindRows(kinds);
+  const [state, set] = useViewState();
+  const circleField = source.fields.find((one) => CIRCLE_FIELDS.includes(one.path));
+  const counts = new Map<string, number>();
+  if (circleField)
+    for (const row of source.rows) {
+      const held = row.values[circleField.path];
+      for (const one of Array.isArray(held) ? held : held ? [held] : [])
+        if (typeof one === 'string' && one) counts.set(one, (counts.get(one) ?? 0) + 1);
+    }
+  const filter = circleField ? `${circleField.path}=` : null;
+  const chosen = filter && state.f?.startsWith(filter) ? state.f.slice(filter.length) : 'all';
   return (
     <>
-      <PageHead title="Personnes" lead="Toutes les personnes et organisations de ta vie." />
-      <View source={source} renders={['list', 'table']} />
+      <PageHead
+        title="Personnes"
+        lead="Toutes les personnes et organisations de ta vie : qui, où ils travaillent, comment les joindre."
+      />
+      {counts.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Segmented
+            label="Cercle"
+            value={chosen}
+            onChange={(value) => set({ f: value === 'all' ? undefined : `${filter}${value}` })}
+            options={[
+              { value: 'all', label: 'Tous', n: source.rows.length },
+              ...[...counts.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .map(([value, n]) => ({
+                  value,
+                  label: circleField!.optionLabels?.[value] ?? value,
+                  n,
+                })),
+            ]}
+          />
+        </div>
+      )}
+      <View source={source} renders={['cards', 'list', 'table']} />
     </>
   );
 }

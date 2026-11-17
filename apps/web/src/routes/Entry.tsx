@@ -1,96 +1,473 @@
-import { useQuery } from '@tanstack/react-query';
-import { useParams } from '@tanstack/react-router';
-import { History, ListTree } from 'lucide-react';
-import { api, type Entry as EntryRow, type JournalLine } from '../lib/api';
-import { useKindName } from '../lib/kinds';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link, useParams } from '@tanstack/react-router';
+import {
+  Download,
+  ExternalLink,
+  FileSearch,
+  History,
+  Link2,
+  ListTree,
+  Paperclip,
+  RotateCw,
+  Upload,
+  UserRound,
+} from 'lucide-react';
+import { useRef } from 'react';
+import { api, type JournalLine } from '../lib/api';
+import { useKinds, useKindName } from '../lib/kinds';
 import { useSession } from '../lib/session';
-import { said, whoOf } from '../lib/words';
-import { Avatar, PageHead, Panel, Skeleton, Tag, ago } from '../ui';
+import { useDropTarget, useUpload } from '../lib/upload';
+import { GENRE_WORDS, said, whoOf } from '../lib/words';
+import { fieldWord, showValue } from '../engine/format';
+import type { Field } from '../engine/types';
+import { Avatar, Button, PageHead, Panel, Skeleton, Tag, ago, rowClass } from '../ui';
+import { Identity, WhoActions, type Who } from '../ui/identity';
 
-// La fiche (v3 D10, first form): an entry, its values, and its history. Editing in place, its
-// links both ways and its files come with the view engine (V5).
+// La fiche (v3 D10): one entry, drawn from its kind's facets — who it is (avatar, logo, the
+// gestures that reach them, the last contact), what a document is (its preview, what Jarvis read
+// in it, each fact with its words), its values in her words (« lu » when read, not said), its
+// links both ways, the files joined to it (drop one anywhere on the page), and its history.
 
-const show = (value: unknown): string => {
-  if (value === null || value === undefined || value === '') return '—';
-  if (Array.isArray(value)) return value.map(show).join(', ');
-  if (typeof value === 'object') return JSON.stringify(value);
-  const text = String(value);
-  if (/^\d{4}-\d{2}-\d{2}T/.test(text))
-    return new Date(text).toLocaleString('fr', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  if (/^\d{4}-\d{2}-\d{2}$/.test(text))
-    return new Date(`${text}T12:00:00`).toLocaleDateString('fr', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  return text;
+interface ModelField {
+  name: string;
+  type: string;
+  label?: Record<string, string>;
+  options?: string[];
+  optionLabels?: Record<string, Record<string, string>>;
+}
+interface KindShape {
+  kind: string;
+  facets?: {
+    facet: string;
+    kind?: string;
+    email?: string;
+    phone?: string;
+    domain?: string;
+    text?: string;
+  }[];
+  model?: { fields?: ModelField[] };
+}
+interface LinkView {
+  id: string;
+  role: string;
+  entry: { id: string; kind: string; title: string };
+}
+interface FullEntry {
+  id: string;
+  kind: string;
+  title: string;
+  data: Record<string, unknown>;
+  origin: Record<string, string>;
+  createdAt: string;
+  updatedAt: string;
+  links: { out: LinkView[]; in: LinkView[] };
+}
+interface PersonCard {
+  last: { id: string; kind: string; title: string; on: string } | null;
+  promises: { id: string; kind: string; title: string; due: string | null }[];
+  next: { id: string; kind: string; title: string; on: string } | null;
+}
+interface ReadFact {
+  value: string | number;
+  quote: string;
+}
+
+/** Keys Jarvis keeps for itself on an entry: never shown as her values. */
+const OWN = new Set(['text', 'source_connection', 'genre', 'facts', 'nom', 'type', 'taille']);
+const FACT_WORDS: Record<string, string> = {
+  amount: 'Montant',
+  date: 'Date',
+  due: 'Échéance',
+  supplier: 'De',
+  warranty: 'Garantie',
 };
+const factText = (key: string, fact: ReadFact) =>
+  key === 'amount'
+    ? `${Number(fact.value).toLocaleString('fr', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+    : key === 'warranty'
+      ? `${fact.value} mois`
+      : showValue(fact.value);
+const label = (one: Record<string, string> | undefined, fallback: string) =>
+  one?.fr ?? one?.en ?? fallback;
 
 export function EntryPage() {
   const { id } = useParams({ from: '/entree/$id' });
   const { me } = useSession();
+  const client = useQueryClient();
   const kindName = useKindName();
+  const { data: kinds = [] } = useKinds();
   const entry = useQuery({
     queryKey: ['entry', id],
-    queryFn: () => api<EntryRow>(`/entries/${id}`),
+    queryFn: () => api<FullEntry>(`/entries/${id}`),
   });
   const history = useQuery({
     queryKey: ['history', 'entry', id],
     queryFn: () => api<JournalLine[]>(`/history?limit=30&target=${encodeURIComponent(id)}`),
   });
+  const isPerson = !!entry.data && /^person$/i.test(entry.data.kind);
+  const card = useQuery({
+    queryKey: ['entry', id, 'card'],
+    queryFn: () => api<PersonCard>(`/people/${id}`),
+    enabled: isPerson,
+  });
+  const reread = useMutation({
+    mutationFn: () => api(`/files/${id}/understand`, { method: 'POST' }),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['entry', id] });
+      void client.invalidateQueries({ queryKey: ['now'] });
+    },
+  });
+  const { send, busy } = useUpload();
+  const input = useRef<HTMLInputElement>(null);
+  useDropTarget(entry.data ? { id: entry.data.id, title: entry.data.title } : null);
+
   if (entry.isLoading) return <Skeleton className="h-40" />;
   if (!entry.data)
     return <PageHead title="Introuvable" lead="Cette entrée n’existe pas dans cet espace." />;
-  const fields = Object.entries(entry.data.data).filter(
-    ([key]) => !['text', 'source_connection'].includes(key),
+  const one = entry.data;
+  const shape = (kinds as KindShape[]).find((k) => k.kind === one.kind);
+  const facet = (name: string) => shape?.facets?.find((f) => f.facet === name);
+  const whoFacet = facet('who');
+  const text = (key?: string) =>
+    key && typeof one.data[key] === 'string' ? (one.data[key] as string) : null;
+  const who: Who | null = whoFacet
+    ? {
+        kind: whoFacet.kind === 'organization' ? 'organization' : 'person',
+        email: text(whoFacet.email),
+        phone: text(whoFacet.phone),
+        domain: text(whoFacet.domain),
+      }
+    : null;
+  const mediaType = text('type') ?? '';
+  const isFile = /^fichier$/i.test(one.kind) && !!text('nom');
+  const genre = text('genre');
+  const facts = (one.data.facts ?? {}) as Record<string, ReadFact>;
+
+  // Her values, in her model's order and words; then any other she gave.
+  const modelFields = shape?.model?.fields ?? [];
+  const fieldOf = (name: string): Field => {
+    const own = modelFields.find((f) => f.name === name);
+    return {
+      path: name,
+      type: own?.type ?? 'text',
+      label: label(own?.label, fieldWord(name)),
+      ...(own?.options ? { options: own.options } : {}),
+      ...(own?.optionLabels
+        ? {
+            optionLabels: Object.fromEntries(
+              Object.entries(own.optionLabels).map(([code, words]) => [code, label(words, code)]),
+            ),
+          }
+        : {}),
+    };
+  };
+  const names = [
+    ...modelFields.map((f) => f.name).filter((name) => name in one.data),
+    ...Object.keys(one.data).filter((name) => !modelFields.some((f) => f.name === name)),
+  ].filter((name) => !OWN.has(name) && (one.data[name] ?? '') !== '');
+  const linkedBy = (role: string) => one.links.out.filter((l) => l.role === role);
+
+  // Its links, both ways, by kind (« Altereo → ses offres (4) »); its files apart.
+  const files = [...one.links.in, ...one.links.out].filter((l) => /^fichier$/i.test(l.entry.kind));
+  const others = [
+    ...one.links.out.map((l) => ({ ...l, way: 'out' as const })),
+    ...one.links.in.map((l) => ({ ...l, way: 'in' as const })),
+  ].filter(
+    (l) =>
+      !/^fichier$/i.test(l.entry.kind) &&
+      l.role !== 'from_proposal' &&
+      !modelFields.some((f) => f.type === 'link' && f.name === l.role && l.way === 'out'),
   );
-  const text = typeof entry.data.data.text === 'string' ? entry.data.data.text : null;
+  const byKind = new Map<string, typeof others>();
+  for (const l of others) byKind.set(l.entry.kind, [...(byKind.get(l.entry.kind) ?? []), l]);
+
   return (
     <>
       <PageHead
-        title={entry.data.title}
-        lead={<Tag tone="neutral">{kindName(entry.data.kind)}</Tag>}
+        icon={who ? <Identity name={one.title} who={who} size={40} /> : undefined}
+        title={one.title}
+        lead={
+          <span className="flex flex-wrap items-center gap-1.5">
+            <Tag tone="neutral">{kindName(one.kind)}</Tag>
+            {genre && GENRE_WORDS[genre] && (
+              <Tag tone="info" dot={false}>
+                {GENRE_WORDS[genre]}
+              </Tag>
+            )}
+            <span className="text-faint">modifié {ago(one.updatedAt)}</span>
+          </span>
+        }
+        actions={who ? <WhoActions who={who} /> : undefined}
       />
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Panel title="Propriétés" icon={<ListTree size={16} />}>
-          <dl>
-            {fields.map(([key, value]) => (
-              <div
-                key={key}
-                className="grid grid-cols-[minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-rule px-4 py-2.5 last:border-0"
-              >
-                <dt className="truncate font-mono text-[12px] text-bark">{key}</dt>
-                <dd className="min-w-0 break-words">{show(value)}</dd>
+        <div className="flex min-w-0 flex-col gap-4">
+          {isFile && (
+            <Panel
+              title="Le document"
+              icon={<FileSearch size={16} />}
+              action={
+                <span className="flex flex-wrap gap-2">
+                  <a
+                    href={`/api/files/${one.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex h-8 items-center gap-1.5 rounded-[2px] border border-rule bg-paper px-2.5 text-[13px] font-semibold hover:border-rule-strong"
+                  >
+                    <ExternalLink size={14} />
+                    Ouvrir
+                  </a>
+                  <a
+                    href={`/api/files/${one.id}?download=1`}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-[2px] border border-rule bg-paper px-2.5 text-[13px] font-semibold hover:border-rule-strong"
+                  >
+                    <Download size={14} />
+                    Télécharger
+                  </a>
+                </span>
+              }
+            >
+              <div className="border-b border-rule px-4 py-3">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <b className="text-[13px] font-semibold">Ce que Jarvis y a lu</b>
+                  <Button size="sm" disabled={reread.isPending} onClick={() => reread.mutate()}>
+                    <RotateCw size={14} />
+                    Relire
+                  </Button>
+                </div>
+                {Object.keys(facts).length === 0 ? (
+                  <p className="text-[13px] text-bark">
+                    {genre
+                      ? 'Rien de chiffré ici.'
+                      : 'Pas encore lu : la lecture se fait juste après le dépôt.'}
+                  </p>
+                ) : (
+                  <dl className="grid gap-2">
+                    {Object.entries(facts).map(([key, fact]) => (
+                      <div
+                        key={key}
+                        className="grid grid-cols-[minmax(0,110px)_minmax(0,1fr)] gap-3"
+                      >
+                        <dt className="text-[13px] text-bark">{FACT_WORDS[key] ?? key}</dt>
+                        <dd className="min-w-0">
+                          <span className="font-semibold">{factText(key, fact)}</span>
+                          <span
+                            className="block truncate font-mono text-[11.5px] text-faint"
+                            title={fact.quote}
+                          >
+                            « {fact.quote} »
+                          </span>
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+                <p className="mt-2 text-xs text-faint">
+                  Lu par Jarvis, à vérifier. Ce qu’il en tire t’attend dans « À valider ».
+                </p>
               </div>
-            ))}
-          </dl>
-          {text && <p className="border-t border-rule px-4 py-3 whitespace-pre-wrap">{text}</p>}
-        </Panel>
-        <Panel title="Son histoire" icon={<History size={16} />}>
-          <ul className="max-h-[60vh] overflow-y-auto">
-            {(history.data ?? []).map((line) => {
-              const who = whoOf(line, me.person.id);
-              return (
-                <li
-                  key={line.id}
-                  className="flex items-start gap-2.5 border-b border-rule px-4 py-2.5 last:border-0"
-                >
-                  <Avatar name={who.name} size={26} />
-                  <span className="min-w-0 flex-1 text-[13px]">
-                    <b className="font-semibold">{who.name}</b> {said(line.command)}
-                  </span>
-                  <time className="flex-none font-mono text-[11px] text-faint">{ago(line.at)}</time>
-                </li>
-              );
-            })}
-          </ul>
-        </Panel>
+              {/pdf/.test(mediaType) ? (
+                <iframe
+                  src={`/api/files/${one.id}#view=FitH`}
+                  title={one.title}
+                  className="block h-[min(62vh,620px)] w-full border-0 bg-sand"
+                />
+              ) : /^image\//.test(mediaType) ? (
+                <img
+                  src={`/api/files/${one.id}`}
+                  alt={one.title}
+                  className="mx-auto block max-h-[70vh] max-w-full object-contain p-3"
+                />
+              ) : (
+                <p className="px-4 py-5 text-[13px] text-bark">
+                  {text('nom')} · aperçu indisponible pour ce format, ouvre-le ou télécharge-le.
+                </p>
+              )}
+            </Panel>
+          )}
+          <Panel title="Propriétés" icon={<ListTree size={16} />}>
+            {names.length === 0 ? (
+              <p className="px-4 py-5 text-[13px] text-bark">Aucune valeur.</p>
+            ) : (
+              <dl>
+                {names.map((name) => {
+                  const field = fieldOf(name);
+                  const links = field.type === 'link' ? linkedBy(name) : [];
+                  return (
+                    <div
+                      key={name}
+                      className="grid grid-cols-[minmax(0,150px)_minmax(0,1fr)] items-baseline gap-3 border-b border-rule px-4 py-2.5 last:border-0"
+                    >
+                      <dt className="truncate text-[13px] text-bark">{field.label}</dt>
+                      <dd className="flex min-w-0 flex-wrap items-baseline gap-2 break-words">
+                        {links.length ? (
+                          links.map((l) => (
+                            <Link
+                              key={l.id}
+                              to="/entree/$id"
+                              params={{ id: l.entry.id }}
+                              className="font-semibold hover:underline"
+                            >
+                              {l.entry.title}
+                            </Link>
+                          ))
+                        ) : field.type === 'url' && typeof one.data[name] === 'string' ? (
+                          <a
+                            href={String(one.data[name])}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-primary hover:underline"
+                          >
+                            {String(one.data[name])}
+                          </a>
+                        ) : (
+                          <span>{showValue(one.data[name], field) || '—'}</span>
+                        )}
+                        {one.origin[name] === 'read' && (
+                          <Tag tone="late" dot={false}>
+                            lu, à vérifier
+                          </Tag>
+                        )}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            )}
+            {text('text') && !isFile && (
+              <p className="border-t border-rule px-4 py-3 whitespace-pre-wrap">{text('text')}</p>
+            )}
+          </Panel>
+          {byKind.size > 0 && (
+            <Panel title="Ses liens" icon={<Link2 size={16} />}>
+              {[...byKind.entries()].map(([kind, links]) => (
+                <div key={kind}>
+                  <div className="flex items-center gap-2 border-b border-rule bg-sand px-4 py-1.5">
+                    <b className="text-[13px] font-semibold">{kindName(kind)}</b>
+                    <span className="font-mono text-[11px] text-faint">{links.length}</span>
+                  </div>
+                  {links.map((l) => (
+                    <Link
+                      key={l.id + l.way}
+                      to="/entree/$id"
+                      params={{ id: l.entry.id }}
+                      className={rowClass}
+                    >
+                      <span className="min-w-0 flex-1 truncate font-semibold">{l.entry.title}</span>
+                      <span className="flex-none text-[12.5px] text-bark">
+                        {l.way === 'out' ? l.role : `← ${l.role}`}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
+              ))}
+            </Panel>
+          )}
+        </div>
+        <div className="flex min-w-0 flex-col gap-4">
+          {isPerson && card.data && (
+            <Panel title="Avec cette personne" icon={<UserRound size={16} />}>
+              <dl className="grid gap-2.5 px-4 py-3 text-[13px]">
+                <div>
+                  <dt className="text-bark">Dernier contact</dt>
+                  <dd className="font-semibold">
+                    {card.data.last ? (
+                      <Link
+                        to="/entree/$id"
+                        params={{ id: card.data.last.id }}
+                        className="hover:underline"
+                      >
+                        {card.data.last.title} · {showValue(card.data.last.on)}
+                      </Link>
+                    ) : (
+                      '—'
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-bark">Prochain</dt>
+                  <dd className="font-semibold">
+                    {card.data.next ? (
+                      <Link
+                        to="/entree/$id"
+                        params={{ id: card.data.next.id }}
+                        className="hover:underline"
+                      >
+                        {card.data.next.title} · {showValue(card.data.next.on)}
+                      </Link>
+                    ) : (
+                      'rien de prévu'
+                    )}
+                  </dd>
+                </div>
+                {card.data.promises.length > 0 && (
+                  <div>
+                    <dt className="text-bark">Ce que tu lui as promis</dt>
+                    {card.data.promises.slice(0, 4).map((p) => (
+                      <dd key={p.id}>
+                        <Link to="/entree/$id" params={{ id: p.id }} className="hover:underline">
+                          {p.title}
+                        </Link>
+                        {p.due ? <span className="text-faint"> · {showValue(p.due)}</span> : null}
+                      </dd>
+                    ))}
+                  </div>
+                )}
+              </dl>
+            </Panel>
+          )}
+          {!isFile && (
+            <Panel
+              title="Fichiers joints"
+              icon={<Paperclip size={16} />}
+              action={
+                <Button size="sm" disabled={busy} onClick={() => input.current?.click()}>
+                  <Upload size={14} />
+                  Joindre
+                </Button>
+              }
+            >
+              <input
+                ref={input}
+                type="file"
+                multiple
+                hidden
+                onChange={(event) => void send([...(event.target.files ?? [])], one.id)}
+              />
+              {files.map((l) => (
+                <Link key={l.id} to="/entree/$id" params={{ id: l.entry.id }} className={rowClass}>
+                  <Paperclip size={14} className="flex-none text-bark" />
+                  <span className="min-w-0 flex-1 truncate">{l.entry.title}</span>
+                </Link>
+              ))}
+              <p className="px-4 py-3 text-[12.5px] text-faint">
+                {busy
+                  ? 'Dépôt en cours…'
+                  : 'Glisse un fichier n’importe où sur la page pour le joindre ici.'}
+              </p>
+            </Panel>
+          )}
+          <Panel title="Son histoire" icon={<History size={16} />}>
+            <ul className="max-h-[60vh] overflow-y-auto">
+              {(history.data ?? []).map((line) => {
+                const by = whoOf(line, me.person.id);
+                return (
+                  <li
+                    key={line.id}
+                    className="flex items-start gap-2.5 border-b border-rule px-4 py-2.5 last:border-0"
+                  >
+                    <Avatar name={by.name} size={26} />
+                    <span className="min-w-0 flex-1 text-[13px]">
+                      <b className="font-semibold">{by.name}</b> {said(line.command)}
+                    </span>
+                    <time className="flex-none font-mono text-[11px] text-faint">
+                      {ago(line.at)}
+                    </time>
+                  </li>
+                );
+              })}
+            </ul>
+          </Panel>
+        </div>
       </div>
     </>
   );

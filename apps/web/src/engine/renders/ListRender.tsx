@@ -1,6 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { useKindName } from '../../lib/kinds';
 import { Empty, Tag, colorOf, rowClass } from '../../ui';
+import { Identity, WhoActions } from '../../ui/identity';
 import type { Shaped } from '../apply';
 import { showValue } from '../format';
 import type { Field, Row } from '../types';
@@ -32,21 +33,36 @@ export function RowLine({
     .filter(Boolean)
     .slice(0, 2);
   return (
-    <Link to="/entree/$id" params={{ id: row.id }} className={rowClass}>
-      <span className="h-2 w-2 flex-none rounded-full" style={{ background: colorOf(row.kind) }} />
+    // The row opens the entry; its links (write, call, the site) stay links of their own.
+    <div className={rowClass + ' relative'}>
+      {row.who ? (
+        <Identity name={row.title} who={row.who} size={30} />
+      ) : (
+        <span
+          className="h-2 w-2 flex-none rounded-full"
+          style={{ background: colorOf(row.kind) }}
+        />
+      )}
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-semibold">{row.title}</span>
+        <Link
+          to="/entree/$id"
+          params={{ id: row.id }}
+          className="block truncate font-semibold after:absolute after:inset-0"
+        >
+          {row.title}
+        </Link>
         <span className="block truncate text-[12.5px] text-bark">
           {[kindName(row.kind), ...extra].join(' · ')}
         </span>
       </span>
       {stage ? <Tag tone="neutral">{showValue(stage, stageField)}</Tag> : null}
+      {row.who && <WhoActions who={row.who} className="relative z-[1] hidden sm:flex" />}
       {row.start && (
         <time className="hidden flex-none font-mono text-xs text-bark sm:block">
           {showValue(row.start)}
         </time>
       )}
-    </Link>
+    </div>
   );
 }
 

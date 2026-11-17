@@ -14,6 +14,7 @@ import {
   Segmented,
   Sheet,
   Skeleton,
+  Tabs,
   Tag,
   type TagTone,
 } from '../ui';
@@ -293,6 +294,7 @@ export function AppPage() {
     mine.some((one) => (one.facets ?? []).some((f) => f.facet === facet));
   const renders: RenderKey[] = [
     'list',
+    ...(has('who') ? (['cards'] as const) : []),
     'table',
     ...(has('stages') ? (['board'] as const) : []),
     ...(has('dated') ? (['calendar', 'timeline'] as const) : []),
@@ -324,26 +326,7 @@ export function AppPage() {
         badge={`${mine.length} type(s)`}
         lead={mine.map((one) => nameOf(one)).join(' · ')}
       />
-      <nav
-        className="-mt-1 flex gap-0.5 overflow-x-auto border-b border-rule"
-        aria-label="Vues de l’app"
-      >
-        {tabs.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => go(key)}
-            aria-current={tab === key ? 'page' : undefined}
-            className={
-              '-mb-px cursor-pointer border-b-2 px-3 py-2 text-[13.5px] whitespace-nowrap ' +
-              (tab === key
-                ? 'border-primary font-semibold text-ink'
-                : 'border-transparent text-bark hover:text-ink')
-            }
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
+      <Tabs tabs={tabs} value={tab} onChange={go} label="Vues de l’app" />
       {tab === 'overview' ? (
         isLoading ? (
           <Skeleton className="h-40" />

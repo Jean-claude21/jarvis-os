@@ -53,8 +53,8 @@ export async function personCard(
   const today = now.toISOString().slice(0, 16);
   const open = (status: string | null) => !status || !CLOSED.has(status.toLowerCase());
   const doing = (kind: string) => /^(task|intention)$/i.test(kind);
-  // Another person linked to them is not a time they met.
-  const event = (kind: string) => !/^(person|capture)$/i.test(kind);
+  // Another person, a file or a company linked to them is not a time they met.
+  const event = (kind: string) => !/^(person|capture|fichier|organization)$/i.test(kind);
   // What happened with them: a dated thing (a capture is what she said, not a meeting).
   const past = rows.filter((one) => one.on <= today && !doing(one.kind) && event(one.kind));
   const ahead = rows

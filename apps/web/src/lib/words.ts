@@ -31,6 +31,7 @@ export function whoOf(line: { actor: string; door: string; client: string | null
   if (client.startsWith('source:'))
     return { name: `Source « ${client.slice(7)} »`, kind: 'source' as const };
   if (client === 'health') return { name: 'Vérification', kind: 'rule' as const };
+  if (client === 'lecture') return { name: 'Lecture de Jarvis', kind: 'rule' as const };
   if (line.door === 'telegram') return { name: 'Telegram', kind: 'door' as const };
   if (line.door === 'mcp' || /claude|chatgpt|codex|gemini/i.test(client))
     return {
@@ -81,3 +82,16 @@ export const titleOf = (line: {
       (line.before && (line.before.title ?? line.before.name)) ??
       '',
   );
+
+/** What a document is, once Jarvis has read it (v3 V7): the core's genres in her words. */
+export const GENRE_WORDS: Record<string, string> = {
+  invoice: 'facture',
+  quote: 'devis',
+  notice: 'avis d’échéance',
+  contract: 'contrat',
+  prescription: 'ordonnance',
+  statement: 'relevé',
+  certificate: 'attestation',
+  ticket: 'billet',
+  payslip: 'bulletin de paie',
+};

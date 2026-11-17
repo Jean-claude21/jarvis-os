@@ -105,11 +105,34 @@ export async function recordMany(
   return rows.map((row) => Number(row.id));
 }
 
-/** The latest changes of a space, or of one entry, newest first. */
+/**
+ * Who made a change, in four families (v3 D9): her own hand (the web, a form, a file she dropped),
+ * an assistant (MCP, or a program's key), what runs by itself (the watcher, a rule, a script, a
+ * source, a check), and Telegram.
+ */
+export type Author = 'me' | 'assistant' | 'auto' | 'telegram';
+const AUTHOR_SQL = `case
+  when door = 'telegram' then 'telegram'
+  when door in ('watcher', 'rule', 'script') or client like 'rule:%' or client like 'script:%'
+    or client like 'source:%' or client = 'health' then 'auto'
+  when door = 'mcp' or client is not null then 'assistant'
+  else 'me' end`;
+
+/** The latest changes of a space, or of one entry, newest first — filtered when asked. */
 export async function history(
   tx: Tx,
   spaceId: string,
-  options: { target?: string; limit?: number; kinds?: string[] } = {},
+  options: {
+    target?: string;
+    limit?: number;
+    kinds?: string[];
+    /** Only those of this family of authors. */
+    author?: Author;
+    /** Only these commands, or those starting so (« entry. »). */
+    commands?: string[];
+    /** Only since this instant. */
+    since?: string;
+  } = {},
 ): Promise<JournalLine[]> {
   const { rows } = await tx.query<JournalLine & { id: string; undoneBy: string | null }>(
     `select id, to_char(at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as at, command,
@@ -118,12 +141,19 @@ export async function history(
         and ($4::text[] is null or exists (
           select 1 from entry e where e.id = journal.target and e.space_id = journal.space_id
              and jarvis_fold(e.kind) = any (select jarvis_fold(k) from unnest($4::text[]) k)))
+        and ($5::text is null or (${AUTHOR_SQL}) = $5)
+        and ($6::text[] is null or exists (
+          select 1 from unnest($6::text[]) c where journal.command = c or journal.command like c || '%'))
+        and ($7::timestamptz is null or at >= $7)
       order by id desc limit $3`,
     [
       spaceId,
       options.target ?? null,
       Math.min(options.limit ?? 50, 500),
       options.kinds?.length ? options.kinds : null,
+      options.author ?? null,
+      options.commands?.length ? options.commands : null,
+      options.since ?? null,
     ],
   );
   return rows.map((row) => ({

@@ -1,5 +1,5 @@
 import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
-import { Activity } from './routes/Activity';
+import { Activity, type ActivitySearch } from './routes/Activity';
 import { AppPage, Apps } from './routes/Apps';
 import { EntryPage } from './routes/Entry';
 import { Soon } from './routes/Soon';
@@ -28,7 +28,25 @@ const page = <P extends string>(path: P, label: string, component: () => React.R
 
 const routes = [
   page('/', 'Aujourd’hui', Today),
-  page('/activite', 'Activité', Activity),
+  createRoute({
+    getParentRoute: () => root,
+    path: '/activite',
+    component: Activity,
+    // Who, what, when: kept in the URL, so a filtered view can be opened again or shared.
+    validateSearch: (search: Record<string, unknown>): ActivitySearch => {
+      const pick = <T extends string>(value: unknown, allowed: readonly T[]) =>
+        allowed.includes(value as T) ? (value as T) : undefined;
+      const author = pick(search.author, ['all', 'me', 'assistant', 'auto', 'telegram'] as const);
+      const action = pick(search.action, ['all', 'create', 'update', 'archive', 'link'] as const);
+      const period = pick(search.period, ['today', '7', '30', 'all'] as const);
+      return {
+        ...(author ? { author } : {}),
+        ...(action ? { action } : {}),
+        ...(period ? { period } : {}),
+      };
+    },
+    staticData: { crumbs: () => [{ label: 'Activité', to: '/activite' }] },
+  }),
   page('/apps', 'Mes apps', Apps),
   createRoute({
     getParentRoute: () => root,

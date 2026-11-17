@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, Clock, Inbox } from 'lucide-react';
 import { api, type JournalLine } from '../lib/api';
 import { useKindName } from '../lib/kinds';
 import { useSession } from '../lib/session';
-import { said, titleOf, whoOf } from '../lib/words';
+import { stateOf, whoOf } from '../lib/words';
 import {
   Avatar,
   Empty,
@@ -14,13 +14,14 @@ import {
   Stat,
   Stats,
   Tag,
-  ago,
   rowClass,
   type TagTone,
 } from '../ui';
+import { QueuePanel, useQueue } from './Queue';
 
-// « Aujourd'hui » (v3 D11), drawn like the v2 « Maintenant »: the figures in one panel ruled
-// between them, what waits for her by group (« À valider » first), her day, and what was done.
+// « Aujourd'hui » (v3 D11), the one door of the present, drawn like the v2 « Maintenant »: the
+// figures; « À valider » first (the one queue, v3 D13); what else waits for her; her day; and the
+// receipt — what Jarvis, her assistants and her sources did for her today (v3 D9).
 
 interface AttentionItem {
   id: string;
@@ -45,8 +46,8 @@ interface Now {
   day: Occurrence[];
 }
 
+// « À valider » has its own panel: the attention groups show the rest.
 const GROUPS: { group: AttentionItem['group']; label: string; tone: TagTone }[] = [
-  { group: 'proposed', label: 'À valider', tone: 'late' },
   { group: 'fix', label: 'À régler', tone: 'error' },
   { group: 'late', label: 'En retard', tone: 'error' },
   { group: 'today', label: 'Aujourd’hui', tone: 'info' },
@@ -63,27 +64,101 @@ const when = (one: AttentionItem) =>
       )
     : null;
 
+const VERBS: Record<string, [string, string]> = {
+  'entry.create': ['a créé', 'entrée'],
+  'entry.update': ['a modifié', 'entrée'],
+  'entry.archive': ['a mis de côté', 'entrée'],
+  'link.add': ['a relié', 'lien'],
+  'connector.call': ['a appelé', 'service'],
+};
+
+/** What was done for her today, by whom: « Source « Jours fériés » a créé 13 entrées ». */
+function Receipt() {
+  const { me } = useSession();
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const { data = [], isLoading } = useQuery({
+    queryKey: ['history', 'receipt', start.toISOString().slice(0, 10)],
+    queryFn: () =>
+      api<JournalLine[]>(`/history?limit=500&since=${encodeURIComponent(start.toISOString())}`),
+  });
+  const byWho = new Map<string, { name: string; counts: Map<string, number> }>();
+  for (const line of data) {
+    const who = whoOf(line, me.person.id);
+    if (who.kind === 'person' || line.undoneBy !== null) continue;
+    const one = byWho.get(who.name) ?? { name: who.name, counts: new Map() };
+    one.counts.set(line.command, (one.counts.get(line.command) ?? 0) + 1);
+    byWho.set(who.name, one);
+  }
+  const rows = [...byWho.values()];
+  const sentence = (counts: Map<string, number>) =>
+    [...counts.entries()]
+      .map(([command, n]) => {
+        const [verb, noun] = VERBS[command] ?? [command, 'fois'];
+        return `${verb} ${n} ${noun}${n > 1 && noun !== 'fois' ? 's' : ''}`;
+      })
+      .join(' · ');
+  return (
+    <Panel
+      title="Ce que Jarvis a fait pour toi"
+      action={
+        <Link
+          to="/activite"
+          search={{ period: 'today' }}
+          className="text-[12.5px] text-bark hover:text-ink"
+        >
+          Tout voir
+        </Link>
+      }
+    >
+      {isLoading ? (
+        <Skeleton className="m-4 h-10" />
+      ) : rows.length === 0 ? (
+        <p className="px-4 py-5 text-[13px] text-bark">
+          Rien encore aujourd’hui : ni règle, ni source, ni assistant n’a agi.
+        </p>
+      ) : (
+        rows.map((one) => (
+          <div
+            key={one.name}
+            className="flex items-start gap-2.5 border-b border-rule px-4 py-2.5 last:border-0"
+          >
+            <Avatar name={one.name} size={26} />
+            <span className="min-w-0 flex-1 text-[13px]">
+              <b className="font-semibold">{one.name}</b>
+              <span className="block text-bark">{sentence(one.counts)}</span>
+            </span>
+          </div>
+        ))
+      )}
+    </Panel>
+  );
+}
+
 export function Today() {
   const { me } = useSession();
   const kindName = useKindName();
   const now = useQuery({ queryKey: ['now'], queryFn: () => api<Now>('/now') });
-  const history = useQuery({
-    queryKey: ['history', 'today'],
-    queryFn: () => api<JournalLine[]>('/history?limit=12'),
-  });
-  const items = now.data?.items ?? [];
+  const queue = useQueue();
+  // What waits in the queue shows there only, never twice.
+  const queued = new Set((queue.data ?? []).map((one) => one.id));
+  const items = (now.data?.items ?? []).filter(
+    (one) => one.group !== 'proposed' && !queued.has(one.id),
+  );
+  const day = (now.data?.day ?? []).filter((one) => !queued.has(one.id));
   const count = (group: AttentionItem['group']) =>
     items.filter((one) => one.group === group).length;
+  const waiting = queue.data?.length ?? 0;
   const hour = new Date().getHours();
   const hello = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
   const first = (me.person.name || '').split(' ')[0];
   const stats = [
     {
       label: 'À valider',
-      value: count('proposed'),
+      value: waiting,
       icon: Inbox,
       bad: false,
-      sub: count('proposed') ? 'attendent ton oui' : 'rien',
+      sub: waiting ? 'attendent ton oui' : 'rien',
     },
     {
       label: 'Aujourd’hui',
@@ -130,53 +205,56 @@ export function Today() {
         ))}
       </Stats>
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Panel title="Ce qui t’attend">
-          {now.isLoading ? (
-            <div className="space-y-2 p-4">
-              <Skeleton className="h-5" />
-              <Skeleton className="h-5" />
-            </div>
-          ) : items.length === 0 ? (
-            <Empty title="Rien ne t’attend" lead="Tout est à jour." />
-          ) : (
-            <div className="max-h-[min(62vh,640px)] overflow-y-auto">
-              {GROUPS.filter(({ group }) => count(group) > 0).map(({ group, label, tone }) => (
-                <div key={group}>
-                  <div className="flex items-center gap-2 border-b border-rule bg-sand px-4 py-1.5">
-                    <Tag tone={tone}>{label}</Tag>
-                    <span className="font-mono text-[11px] text-faint">{count(group)}</span>
-                  </div>
-                  {items
-                    .filter((one) => one.group === group)
-                    .map((one) => (
-                      <Link
-                        key={one.id + group}
-                        to="/entree/$id"
-                        params={{ id: one.id }}
-                        className={rowClass}
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-semibold">{one.title}</span>
-                          <span className="block truncate text-[12.5px] text-bark">
-                            {kindName(one.kind)} · {one.space}
-                            {when(one) ? ` · ${when(one)}` : ''}
+        <div className="flex min-w-0 flex-col gap-4">
+          <QueuePanel />
+          <Panel title="Ce qui t’attend">
+            {now.isLoading ? (
+              <div className="space-y-2 p-4">
+                <Skeleton className="h-5" />
+                <Skeleton className="h-5" />
+              </div>
+            ) : items.length === 0 ? (
+              <Empty title="Rien ne t’attend" lead="Tout est à jour." />
+            ) : (
+              <div className="max-h-[min(62vh,640px)] overflow-y-auto">
+                {GROUPS.filter(({ group }) => count(group) > 0).map(({ group, label, tone }) => (
+                  <div key={group}>
+                    <div className="flex items-center gap-2 border-b border-rule bg-sand px-4 py-1.5">
+                      <Tag tone={tone}>{label}</Tag>
+                      <span className="font-mono text-[11px] text-faint">{count(group)}</span>
+                    </div>
+                    {items
+                      .filter((one) => one.group === group)
+                      .map((one) => (
+                        <Link
+                          key={one.id + group}
+                          to="/entree/$id"
+                          params={{ id: one.id }}
+                          className={rowClass}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-semibold">{one.title}</span>
+                            <span className="block truncate text-[12.5px] text-bark">
+                              {kindName(one.kind)} · {one.space}
+                              {when(one) ? ` · ${when(one)}` : ''}
+                            </span>
                           </span>
-                        </span>
-                        {one.status && <Tag tone="plain">{one.status}</Tag>}
-                      </Link>
-                    ))}
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
+                          {one.status && <Tag tone="plain">{stateOf(one.status)}</Tag>}
+                        </Link>
+                      ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
         <div className="flex min-w-0 flex-col gap-4">
           <Panel title="Ta journée">
-            {(now.data?.day ?? []).length === 0 ? (
+            {day.length === 0 ? (
               <p className="px-4 py-5 text-[13px] text-bark">Rien de prévu aujourd’hui.</p>
             ) : (
               <ul className="max-h-[40vh] overflow-y-auto">
-                {now.data!.day.map((one) => (
+                {day.map((one) => (
                   <li key={one.id + one.start} className={rowClass}>
                     <time className="w-12 flex-none font-mono text-xs text-bark">
                       {one.allDay
@@ -192,35 +270,7 @@ export function Today() {
               </ul>
             )}
           </Panel>
-          <Panel
-            title="Ce qui a été fait"
-            action={
-              <Link to="/activite" className="text-[12.5px] text-bark hover:text-ink">
-                Tout voir
-              </Link>
-            }
-          >
-            <ul className="max-h-[40vh] overflow-y-auto">
-              {(history.data ?? []).map((line) => {
-                const who = whoOf(line, me.person.id);
-                return (
-                  <li
-                    key={line.id}
-                    className="flex items-start gap-2.5 border-b border-rule px-4 py-2.5 last:border-0"
-                  >
-                    <Avatar name={who.name} size={26} />
-                    <span className="min-w-0 flex-1 text-[13px]">
-                      <b className="font-semibold">{who.name}</b> {said(line.command)}{' '}
-                      <span className="text-bark">{titleOf(line)}</span>
-                    </span>
-                    <time className="flex-none font-mono text-[11px] text-faint">
-                      {ago(line.at)}
-                    </time>
-                  </li>
-                );
-              })}
-            </ul>
-          </Panel>
+          <Receipt />
         </div>
       </div>
     </>

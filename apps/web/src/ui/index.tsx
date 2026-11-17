@@ -409,3 +409,43 @@ export function Sheet({
     </Dialog.Root>
   );
 }
+
+/** Choices side by side (the v2 segmented): the chosen one lifted on paper. */
+export function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+  label,
+}: {
+  value: T;
+  options: { value: T; label: string; n?: number }[];
+  onChange: (value: T) => void;
+  label: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label={label}
+      className="inline-flex max-w-full gap-0.5 overflow-x-auto rounded-[2px] border border-rule bg-sand p-[3px]"
+    >
+      {options.map((one) => (
+        <button
+          key={one.value}
+          aria-pressed={one.value === value}
+          onClick={() => onChange(one.value)}
+          className={cn(
+            'cursor-pointer rounded-[2px] px-2.5 py-[5px] text-[13px] whitespace-nowrap',
+            one.value === value
+              ? 'bg-paper font-semibold text-ink shadow-card'
+              : 'text-bark hover:text-ink',
+          )}
+        >
+          {one.label}
+          {one.n !== undefined && (
+            <span className="ml-1 font-mono text-xs text-faint">{one.n}</span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}

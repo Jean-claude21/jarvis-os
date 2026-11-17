@@ -113,3 +113,36 @@ describe('the changes of some kinds', () => {
     expect(lines.some((line) => line.after?.title === 'Dune')).toBe(false);
   });
 });
+
+// v3 D9: the journal filtered by author, action and period.
+describe('the changes of an author, an action, a period', () => {
+  it('keeps her own hand apart from a rule and an assistant', async () => {
+    await ama.as((tx) =>
+      save(tx, { ...ama.actor, door: 'api' }, ama.space, {
+        entries: [{ kind: 'Note', title: 'De sa main', data: {} }],
+      }),
+    );
+    await ama.as((tx) =>
+      save(tx, { ...ama.actor, door: 'rule', client: 'rule:Ranger' }, ama.space, {
+        entries: [{ kind: 'Note', title: 'Par une règle', data: {} }],
+      }),
+    );
+    await ama.as((tx) =>
+      save(tx, { ...ama.actor, door: 'mcp', client: 'claude' }, ama.space, {
+        entries: [{ kind: 'Note', title: 'Par Claude', data: {} }],
+      }),
+    );
+    const titles = async (author: 'me' | 'auto' | 'assistant') =>
+      (await ama.as((tx) => history(tx, ama.space, { author, commands: ['entry.'], limit: 100 })))
+        .map((line) => line.after?.title)
+        .filter(Boolean);
+    expect(await titles('me')).toContain('De sa main');
+    expect(await titles('me')).not.toContain('Par une règle');
+    expect(await titles('auto')).toContain('Par une règle');
+    expect(await titles('assistant')).toContain('Par Claude');
+    const future = await ama.as((tx) =>
+      history(tx, ama.space, { since: new Date(Date.now() + 60_000).toISOString() }),
+    );
+    expect(future).toEqual([]);
+  });
+});

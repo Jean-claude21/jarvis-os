@@ -989,11 +989,27 @@ export function apiRoutes(deps: {
       .map((one) => one.trim())
       .filter(Boolean)
       .slice(0, 40);
+    // Who, which actions, since when (v3 D9).
+    const author = z
+      .enum(['me', 'assistant', 'auto', 'telegram'])
+      .optional()
+      .parse(c.req.query('author') || undefined);
+    const commands = (c.req.query('commands') ?? '')
+      .split(',')
+      .map((one) => one.trim())
+      .filter((one) => /^[a-z.]+$/.test(one))
+      .slice(0, 20);
+    const since = c.req.query('since');
+    const sinceAt =
+      since && !Number.isNaN(Date.parse(since)) ? new Date(since).toISOString() : null;
     return c.json(
       await act(c, (tx, _a, space) =>
         history(tx, space, {
           ...(target ? { target } : {}),
           ...(kinds.length ? { kinds } : {}),
+          ...(author ? { author } : {}),
+          ...(commands.length ? { commands } : {}),
+          ...(sinceAt ? { since: sinceAt } : {}),
           limit,
         }),
       ),

@@ -54,6 +54,24 @@ const DOORS: Record<string, string> = {
 };
 export const doorOf = (door: string) => DOORS[door] ?? door;
 
+/** The engine's own states, in her words; a state of her own model shows as she wrote it. */
+const STATES: Record<string, string> = {
+  todo: 'à faire',
+  planned: 'prévu',
+  done: 'fait',
+  to_file: 'à ranger',
+  proposed: 'proposé',
+  accepted: 'accepté',
+  declined: 'refusé',
+  to_write: 'à rédiger',
+  written: 'rédigé',
+  to_fix: 'à corriger',
+  failed: 'en échec',
+  in_progress: 'en cours',
+  cancelled: 'annulé',
+};
+export const stateOf = (status: string) => STATES[status] ?? status.replace(/_/g, ' ');
+
 export const titleOf = (line: {
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;

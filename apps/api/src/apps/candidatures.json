@@ -1088,7 +1088,7 @@
                 "pages": {
                   "kind": "JobOffer",
                   "where": "score >= 100 and status != 'dismissed' and contenu = null",
-                  "limit": 80
+                  "limit": 40
                 }
               },
               "save": {
@@ -1096,7 +1096,7 @@
                 "match": "url"
               },
               "long": true,
-              "minutes": 30
+              "minutes": 120
             }
           }
         ]

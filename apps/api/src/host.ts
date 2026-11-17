@@ -3,6 +3,8 @@ import { pool } from '@jarvis-os/core';
 import { makeApp } from './app';
 import { deliveryFor } from './channels';
 import { quiet, settingsFor, type Branch } from './settings';
+import { connectorService } from './connector-service';
+import { secretsKey } from './secrets';
 import { watch } from './watcher';
 
 // Jarvis OS on a server of its own (Coolify, Docker): the app and its watcher in one process —
@@ -20,6 +22,36 @@ const db = pool(settings.appUrl);
 const stop = new AbortController();
 // A quiet copy (next) never runs the watcher: its reminders, messages and collecting are the real
 // ones' copies, and would reach real people twice.
+// The daily check of her connections (v3 D16): what stopped answering shows in « À régler ».
+const connections = connectorService({
+  db,
+  key: secretsKey(settings.authSecret),
+  publicUrl: settings.publicUrl,
+});
+const checkConnections = async () => {
+  const { rows } = await db.query<{ id: string; person: string }>(
+    "select id, person from jarvis_connections_due(interval '1 day')",
+  );
+  let failed = 0;
+  for (const row of rows)
+    await connections.check(row.person, row.id).catch(() => {
+      failed += 1;
+    });
+  if (rows.length) console.info('[health]', JSON.stringify({ checked: rows.length, failed }));
+  // The calendars she follows, read again (v3 D16).
+  const { rows: sources } = await db.query<{ id: string; person: string }>(
+    'select id, person from jarvis_ics_sources()',
+  );
+  for (const row of sources)
+    await connections.relay
+      .syncIcs(row.person, row.id)
+      .catch((error) => console.warn('[sources]', row.id, (error as Error).message));
+};
+if (!quiet()) {
+  const hourly = setInterval(() => void checkConnections().catch(() => undefined), 3_600_000);
+  setTimeout(() => void checkConnections().catch(() => undefined), 60_000);
+  stop.signal.addEventListener('abort', () => clearInterval(hourly));
+}
 if (quiet()) console.info('[watcher] side effects off: the watcher does not run');
 else
   watch(

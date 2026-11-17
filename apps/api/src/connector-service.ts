@@ -19,6 +19,7 @@ import type pg from 'pg';
 import { z } from 'zod';
 import { callTool, headersOf, needsAgreement, probe, readResource, type Reach } from './connectors';
 import { presetClientFor } from './catalog';
+import { relay } from './relay';
 import { signInProvider, type SignIn } from './oauth-client';
 import { open, seal } from './secrets';
 import { ATELIER, atelier as atelierOf, atelierFromEnv, type Atelier } from './atelier';
@@ -127,7 +128,11 @@ export function connectorService(deps: {
     return { connector: found.connector, headers: way, oauth: found.oauth };
   };
 
+  // A provider's API (v3 D16) is reached through the relay, which checks it its own way.
+  const theRelay = relay({ db: deps.db, key: deps.key, publicUrl: deps.publicUrl });
   const check = async (person: string, id: string): Promise<Connector> => {
+    const kind = await as(person, (tx) => connectorWithSecret(tx, id));
+    if (kind?.connector.protocol === 'api') return theRelay.check(person, id);
     const { connector, headers, oauth } = await reach(person, id);
     const read =
       connector.protocol === 'http'
@@ -228,6 +233,8 @@ export function connectorService(deps: {
   return {
     /** Jarvis's own Atelier, when this server reaches one (spec 060). */
     atelier: builtIn,
+    /** Providers' APIs, through one relay (v3 D16). */
+    relay: theRelay,
     callOut,
     list: (person: string, spaceIds: string[]) => as(person, (tx) => connectorsOf(tx, spaceIds)),
 

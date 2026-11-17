@@ -126,6 +126,7 @@ import type { Auth } from './auth';
 import { codeOf, failure } from './errors';
 import { captureAs } from './capture';
 import { catalogFor } from './catalog';
+import { PROVIDERS, providerOf } from './relay';
 import { searchByMeaning } from './embeddings';
 import { connectorChange, connectorInput, type ConnectorService } from './connector-service';
 import { invitationLink, namesOf, spaceFor } from './spaces';
@@ -1093,6 +1094,65 @@ export function apiRoutes(deps: {
   });
   // « Discover »: the servers their makers host, ready to connect.
   api.get('/connectors/catalog', (c) => c.json(catalogFor()));
+
+  // Providers' APIs through the relay (v3 D16): what Jarvis knows, a new connection, Google's
+  // sign-in and its way back, and a call (for a door, an agent, or to try one).
+  api.get('/connections/providers', (c) =>
+    c.json(
+      PROVIDERS.map(({ id, name, family, auth, description }) => ({
+        id,
+        name,
+        family,
+        auth,
+        description,
+        needsAddress: !providerOf(id)?.base,
+      })),
+    ),
+  );
+  api.post('/connections', async (c) => {
+    const body = z
+      .object({
+        provider: z.string().min(1).max(60),
+        name: z.string().trim().min(1).max(80).optional(),
+        url: z.string().trim().max(2000).optional(),
+      })
+      .parse(await c.req.json());
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    const made = await deps.connectors.relay.connect(actorOf(c), space.id, body.provider, {
+      ...(body.name ? { name: body.name } : {}),
+      ...(body.url ? { url: body.url } : {}),
+    });
+    return c.json(made, 201);
+  });
+  api.post('/connections/:id/sign-in', async (c) =>
+    c.json({ url: await deps.connectors.relay.signInAgain(c.get('person'), c.req.param('id')) }),
+  );
+  api.get('/connections/oauth/callback', async (c) => {
+    const code = c.req.query('code');
+    const state = c.req.query('state') ?? '';
+    if (!code) return c.redirect('/app#/connexions');
+    await deps.connectors.relay.finish(c.get('person'), code, state);
+    return c.redirect('/app#/connexions');
+  });
+  api.post('/connections/:id/sync', async (c) =>
+    c.json(await deps.connectors.relay.syncIcs(c.get('person'), c.req.param('id'))),
+  );
+  api.post('/connections/:id/request', async (c) => {
+    const body = z
+      .object({
+        method: z.enum(['GET', 'POST', 'PATCH', 'PUT', 'DELETE']).optional(),
+        path: z.string().max(2000).default(''),
+        body: z.unknown().optional(),
+      })
+      .parse(await c.req.json());
+    return c.json(
+      await deps.connectors.relay.call(actorOf(c), c.req.param('id'), {
+        path: body.path,
+        ...(body.method ? { method: body.method } : {}),
+        ...(body.body !== undefined ? { body: body.body } : {}),
+      }),
+    );
+  });
   // Her sign-in to a server that asks for it (spec 025, US4): its page, then back here.
   api.post('/connectors/:id/sign-in', async (c) =>
     c.json({ url: await deps.connectors.signIn(c.get('person'), c.req.param('id')) }),

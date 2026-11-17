@@ -106,6 +106,35 @@ export async function attention(
     });
   }
 
+  // A connection that stopped answering or waits for her sign-in (v3 D16).
+  const { rows: cut } = await tx.query<{
+    id: string;
+    name: string;
+    state: string;
+    space: string;
+    space_id: string;
+  }>(
+    `select c.id, c.name, c.state, s.name as space, c.space_id
+       from connector c join space s on s.id = c.space_id
+      where c.space_id = any($1) and c.state in ('refused', 'unreachable', 'needs_sign_in')
+      order by c.name limit 20`,
+    [spaceIds],
+  );
+  for (const row of cut)
+    add({
+      id: row.id,
+      kind: 'Connection',
+      title: row.name,
+      space: row.space,
+      spaceId: row.space_id,
+      group: 'fix',
+      when: null,
+      allDay: false,
+      status: row.state,
+      reason: 'connection',
+      who: null,
+    });
+
   const open = (one: Occurrence) => !one.status || !DONE.has(one.status.toLowerCase());
   const item = (one: Occurrence, group: AttentionGroup, reason: string): AttentionItem => ({
     id: one.id,

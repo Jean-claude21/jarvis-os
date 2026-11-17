@@ -25,8 +25,13 @@ export interface Connector {
   url: string;
   auth: ConnectorAuth;
   headerName: string | null;
-  /** MCP, or plain HTTP: an agent's own address (spec 050). */
-  protocol: 'mcp' | 'http';
+  /** MCP, plain HTTP (an agent's own address, spec 050), or a provider's API through the relay (v3 D16). */
+  protocol: 'mcp' | 'http' | 'api';
+  /** The provider an `api` connection reaches (« google-calendar », « ics »…). */
+  provider: string | null;
+  /** Checks failed in a row, and the last time it answered (v3 D16). */
+  failures: number;
+  lastOkAt: string | null;
   /** Whether a secret is kept: never the secret itself. */
   hasSecret: boolean;
   state: ConnectorState;
@@ -48,7 +53,7 @@ export interface Probe {
 }
 
 const columns = `id, space_id, name, url, auth, header_name, protocol, secret_sealed is not null as has_secret,
-  state, reason, server_name, tools, resources, checked_at, created_at`;
+  state, reason, server_name, tools, resources, checked_at, created_at, provider, failures, last_ok_at`;
 
 const connectorOf = (row: Record<string, unknown>): Connector => ({
   id: String(row.id),
@@ -57,7 +62,10 @@ const connectorOf = (row: Record<string, unknown>): Connector => ({
   url: String(row.url),
   auth: row.auth as ConnectorAuth,
   headerName: (row.header_name as string | null) ?? null,
-  protocol: row.protocol === 'http' ? 'http' : 'mcp',
+  protocol: row.protocol === 'http' ? 'http' : row.protocol === 'api' ? 'api' : 'mcp',
+  provider: (row.provider as string | null) ?? null,
+  failures: Number(row.failures ?? 0),
+  lastOkAt: row.last_ok_at ? new Date(row.last_ok_at as string).toISOString() : null,
   hasSecret: row.has_secret === true,
   state: row.state as ConnectorState,
   reason: (row.reason as string | null) ?? null,
@@ -87,12 +95,13 @@ export async function addConnector(
     auth: ConnectorAuth;
     headerName?: string | null;
     sealed?: string | null;
-    protocol?: 'mcp' | 'http';
+    protocol?: 'mcp' | 'http' | 'api';
+    provider?: string | null;
   },
 ): Promise<Connector> {
   const { rows } = await tx.query(
-    `insert into connector (id, space_id, name, url, auth, header_name, secret_sealed, created_by, protocol)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning ${columns}`,
+    `insert into connector (id, space_id, name, url, auth, header_name, secret_sealed, created_by, protocol, provider)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning ${columns}`,
     [
       prefixedId('con'),
       input.spaceId,
@@ -103,6 +112,7 @@ export async function addConnector(
       input.sealed ?? null,
       actor.person,
       input.protocol ?? 'mcp',
+      input.provider ?? null,
     ],
   );
   const made = connectorOf(rows[0]!);
@@ -153,7 +163,10 @@ export async function setOAuth(tx: Tx, id: string, sealed: string | null): Promi
 export async function setProbe(tx: Tx, id: string, probe: Probe, at = new Date()): Promise<void> {
   await tx.query(
     `update connector set state = $2, reason = $3, server_name = $4, tools = $5, resources = $6,
-       checked_at = $7 where id = $1`,
+       checked_at = $7,
+       failures = case when $2 = 'connected' then 0 else failures + 1 end,
+       last_ok_at = case when $2 = 'connected' then $7::timestamptz else last_ok_at end
+     where id = $1`,
     [
       id,
       probe.state,
@@ -229,7 +242,7 @@ export async function recordCall(
   tx: Tx,
   actor: Actor,
   connector: Connector,
-  call: { tool: string; ok: boolean; agreed: boolean },
+  call: { tool: string; ok: boolean; agreed: boolean; ms?: number; status?: number },
 ): Promise<void> {
   await record(tx, actor, {
     spaceId: connector.spaceId,

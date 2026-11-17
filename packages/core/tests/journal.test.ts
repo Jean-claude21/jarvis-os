@@ -93,3 +93,23 @@ describe('undoing a change (story 3)', () => {
     ).rejects.toThrow(/cannot be undone/);
   });
 });
+
+// Spec 084: an app's activity is the journal of the entries of its kinds only.
+describe('the changes of some kinds', () => {
+  it('keeps only the lines of entries of those kinds, whatever their case', async () => {
+    await ama.as((tx) =>
+      save(tx, ama.actor, ama.space, {
+        entries: [
+          { kind: 'JobOffer', title: 'Data scientist', data: {} },
+          { kind: 'Livre', title: 'Dune', data: {} },
+        ],
+      }),
+    );
+    const lines = await ama.as((tx) => history(tx, ama.space, { kinds: ['joboffer'], limit: 50 }));
+    expect(lines.length).toBeGreaterThan(0);
+    expect(
+      lines.every((line) => line.after?.kind === 'JobOffer' || line.before?.kind === 'JobOffer'),
+    ).toBe(true);
+    expect(lines.some((line) => line.after?.title === 'Dune')).toBe(false);
+  });
+});

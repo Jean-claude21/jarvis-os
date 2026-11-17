@@ -9,11 +9,15 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc* ./
 COPY apps/api/package.json apps/api/
 COPY packages/core/package.json packages/core/
+COPY apps/web/package.json apps/web/
 RUN pnpm install --frozen-lockfile --prod=false
 
 COPY tsconfig.base.json ./
 COPY packages/core packages/core
 COPY apps/api apps/api
+# The v3 client (React), built once into apps/web/dist and served by the API at /v3.
+COPY apps/web apps/web
+RUN pnpm --filter @jarvis-os/web build
 
 ARG JARVIS_RELEASE=local
 ENV JARVIS_RELEASE=$JARVIS_RELEASE PORT=3000

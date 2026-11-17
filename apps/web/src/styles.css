@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+
+/* The tokens of J-C's mockup (docs/design/jarvis.html), light and dark — the same as the v2 client. */
+:root {
+  --canvas: #efe6dc;
+  --paper: #fffdf9;
+  --sand: #fbf6f0;
+  --clay: #f4e6da;
+  --rule: #e6d6c8;
+  --rule-strong: #c9b3a4;
+  --ink: #2a1610;
+  --bark: #6b4e43;
+  --faint: #9a8276;
+  --primary: #b83a1b;
+  --primary-strong: #962e14;
+  --ochre: #c98a2b;
+  --on-primary: #fffdf9;
+  --success: #2f7d4f;
+  --success-surface: #e3f1e8;
+  --verify: #7a4a0b;
+  --verify-surface: #fbebd0;
+  --error: #9b1c3c;
+  --error-surface: #f7e1e7;
+  --info: #2b5c8a;
+  --info-surface: #e2ecf5;
+  --shadow: 0 1px 2px rgba(42, 22, 16, 0.06), 0 4px 16px rgba(42, 22, 16, 0.05);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --canvas: #0f0a07;
+    --paper: #17100c;
+    --sand: #1d140f;
+    --clay: #2c2019;
+    --rule: #3a2b23;
+    --rule-strong: #5e4a3e;
+    --ink: #f4e6da;
+    --bark: #bfa799;
+    --faint: #8c7568;
+    --primary: #f08a63;
+    --primary-strong: #e2572d;
+    --ochre: #d9a04a;
+    --on-primary: #17100c;
+    --success: #4fa873;
+    --success-surface: #1c3025;
+    --verify: #f2cc8a;
+    --verify-surface: #3a2a12;
+    --error: #d0546f;
+    --error-surface: #3e1620;
+    --info: #5c8fc2;
+    --info-surface: #172a3d;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-paper: var(--paper);
+  --color-sand: var(--sand);
+  --color-clay: var(--clay);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-ink: var(--ink);
+  --color-bark: var(--bark);
+  --color-faint: var(--faint);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-ochre: var(--ochre);
+  --color-on-primary: var(--on-primary);
+  --color-success: var(--success);
+  --color-success-surface: var(--success-surface);
+  --color-verify: var(--verify);
+  --color-verify-surface: var(--verify-surface);
+  --color-error: var(--error);
+  --color-error-surface: var(--error-surface);
+  --color-info: var(--info);
+  --color-info-surface: var(--info-surface);
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-display: Archivo, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --shadow-card: var(--shadow);
+}
+
+html,
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+  overflow-wrap: anywhere;
+}
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}

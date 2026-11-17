@@ -1,0 +1,94 @@
+import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
+import { Activity } from './routes/Activity';
+import { AppPage, Apps } from './routes/Apps';
+import { EntryPage } from './routes/Entry';
+import { Soon } from './routes/Soon';
+import { Today } from './routes/Today';
+import { Shell, type Crumb } from './shell/Shell';
+
+// The screens (v3 D17): the URL holds where she is, so back and forth and the breadcrumb work.
+
+declare module '@tanstack/react-router' {
+  interface StaticDataRouteOption {
+    crumbs?: (params: Record<string, string>) => Crumb[];
+  }
+  interface Register {
+    router: typeof router;
+  }
+}
+
+const root = createRootRoute({ component: Shell });
+const page = <P extends string>(path: P, label: string, component: () => React.ReactNode) =>
+  createRoute({
+    getParentRoute: () => root,
+    path,
+    component,
+    staticData: { crumbs: () => [{ label, to: path }] },
+  });
+
+const routes = [
+  page('/', 'Aujourd’hui', Today),
+  page('/activite', 'Activité', Activity),
+  page('/apps', 'Mes apps', Apps),
+  createRoute({
+    getParentRoute: () => root,
+    path: '/apps/$name',
+    component: AppPage,
+    staticData: {
+      crumbs: (params) => [{ label: 'Mes apps', to: '/apps' }, { label: params.name ?? '' }],
+    },
+  }),
+  createRoute({
+    getParentRoute: () => root,
+    path: '/entree/$id',
+    component: EntryPage,
+    staticData: { crumbs: () => [{ label: 'Entrée' }] },
+  }),
+  page('/agenda', 'Agenda', () => (
+    <Soon
+      title="Agenda"
+      lead="Ta semaine et ton mois, tout ce qui est daté dans ta vie."
+      step="le moteur de vues (V5)"
+    />
+  )),
+  page('/documents', 'Documents', () => (
+    <Soon
+      title="Documents"
+      lead="Tes papiers et tes fichiers, lus, rangés et reliés."
+      step="les Documents vivants (V7)"
+    />
+  )),
+  page('/personnes', 'Personnes', () => (
+    <Soon
+      title="Personnes"
+      lead="Tes proches, tes contacts et tes cercles."
+      step="les Personnes (V7)"
+    />
+  )),
+  page('/argent', 'Argent', () => (
+    <Soon title="Argent" lead="Tes comptes, tes dépenses, ton budget." step="les gabarits (V6)" />
+  )),
+  page('/attente', 'À valider', () => (
+    <Soon
+      title="À valider"
+      lead="Tout ce qui attend ton oui, au même endroit."
+      step="la boîte en verre (V4)"
+    />
+  )),
+  page('/atelier', 'Atelier', () => (
+    <Soon
+      title="Atelier"
+      lead="Types, skills, agents et connexions : pour construire."
+      step="les agents (V8)"
+    />
+  )),
+  page('/reglages', 'Réglages', () => (
+    <Soon title="Réglages" lead="Ton compte, tes espaces, leurs membres." step="V7" />
+  )),
+];
+
+export const router = createRouter({
+  routeTree: root.addChildren(routes),
+  basepath: '/v3',
+  defaultPreload: 'intent',
+});

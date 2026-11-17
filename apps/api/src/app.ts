@@ -25,9 +25,10 @@ import {
   submitShare,
 } from '@jarvis-os/core';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
 import { CONSENT_PAGE, makeAuth, mcpResource, SIGN_IN_PAGE } from './auth';
@@ -208,7 +209,33 @@ export function makeApp(settings: Settings) {
   // Her web account (spec 009): the app with her session, else the sign-in page; its frames
   // reuse the clients' views for a dashboard and a document.
   const sessionOf = (request: Request) => auth.api.getSession({ headers: request.headers });
-  app.get('/', (c) => c.redirect('/app'));
+  // Home: the v2 client, or the v3 where it is the one shown (next: JARVIS_HOME=/v3).
+  app.get('/', (c) => c.redirect(process.env.JARVIS_HOME === '/v3' ? '/v3' : '/app'));
+
+  // The v3 client (v3 D17): built by Vite into apps/web/dist, served here behind her session.
+  const web = fileURLToPath(new URL('../../web/dist/', import.meta.url));
+  const TYPES: Record<string, string> = {
+    js: 'text/javascript; charset=utf-8',
+    css: 'text/css; charset=utf-8',
+    svg: 'image/svg+xml',
+    png: 'image/png',
+    woff2: 'font/woff2',
+  };
+  app.get('/v3/assets/:file', (c) => {
+    const file = c.req.param('file');
+    if (!/^[\w.-]+$/.test(file) || !existsSync(`${web}assets/${file}`)) return c.notFound();
+    c.header('cache-control', 'public, max-age=31536000, immutable');
+    c.header('content-type', TYPES[file.split('.').pop() ?? ''] ?? 'application/octet-stream');
+    return c.body(readFileSync(`${web}assets/${file}`));
+  });
+  const v3 = async (c: Context) => {
+    if (!(await sessionOf(c.req.raw))) return c.redirect(SIGN_IN_PAGE);
+    if (!existsSync(`${web}index.html`)) return c.text('The v3 client is not built here.', 503);
+    c.header('cache-control', 'no-store');
+    return c.html(readFileSync(`${web}index.html`, 'utf8'));
+  };
+  app.get('/v3', v3);
+  app.get('/v3/*', v3);
   // The script, style and words of her web account, named after their content: kept for good by the
   // browser (on Netlify, the CDN serves them from the site before this is ever reached).
   app.get('/assets/:file', (c) => {
@@ -236,6 +263,9 @@ export function makeApp(settings: Settings) {
   });
   app.get('/app', async (c) => {
     if (!(await sessionOf(c.req.raw))) return c.redirect(SIGN_IN_PAGE);
+    // Where the v3 is the one shown (next), the v2 stays reachable with « ?v2 ».
+    if (process.env.JARVIS_HOME === '/v3' && c.req.query('v2') === undefined)
+      return c.redirect('/v3');
     // Never kept by the browser: a new version reaches her at the next open.
     c.header('cache-control', 'no-store');
     return c.html(appPage(langOf(c.req.header('accept-language'))));

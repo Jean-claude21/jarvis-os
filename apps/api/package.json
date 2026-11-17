@@ -25,6 +25,7 @@
     "hono": "^4.13.14",
     "jose": "^6.2.13",
     "mammoth": "1.13.0",
+    "mermaid": "11.4.1",
     "nodemailer": "10.1.7",
     "pg": "^8.23.1",
     "quickjs-emscripten": "0.31.0",

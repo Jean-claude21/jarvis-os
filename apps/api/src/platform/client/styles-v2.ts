@@ -2911,4 +2911,12 @@ html, body { overflow-x: clip; }
 .v2 .sk-when { font-size: 12.5px; color: var(--bark); } .v2 .sk-space { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--bark); }
 .v2 .sk-empty { padding: 26px 18px; text-align: center; } .v2 .sk-empty p { color: var(--bark); max-width: 520px; margin: 6px auto 14px; }
 @media (max-width: 760px) { .v2 .sk-row { flex-wrap: wrap; } .v2 .sk-meta { max-width: none; width: 100%; justify-content: flex-start; padding-left: 44px; } }
+.v2 .bl-chips { display: flex; flex-wrap: wrap; gap: 6px; } .v2 .bl-chips .n { color: var(--faint); }
+.v2 .bl-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--rule); color: var(--ink); text-decoration: none; }
+.v2 .bl-row:last-child { border-bottom: 0; } .v2 .bl-row:hover { background: var(--sand); }
+.v2 .bl-ic { width: 32px; height: 32px; border-radius: 8px; background: var(--sand); display: grid; place-items: center; color: var(--bark); flex: none; }
+.v2 .bl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.v2 .bl-main .t { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .v2 .bl-main .s { font-size: 12.5px; color: var(--bark); }
+.v2 .bl-meta { display: flex; gap: 8px; align-items: center; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 760px) { .v2 .bl-row { flex-wrap: wrap; } .v2 .bl-meta { width: 100%; justify-content: flex-start; padding-left: 44px; } }
 `;

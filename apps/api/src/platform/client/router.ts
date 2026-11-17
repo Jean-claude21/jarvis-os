@@ -7,9 +7,9 @@ export const router = `
 const pages = Object.assign({}, dayPages, lifePages, settingsPages, v2Pages, tasksPages);
 
 // The title of each page, as the breadcrumb says it; the sidebar item it lights.
-const titles = { skills: 'navSkills', reglages: 'navSettings', '': 'navNow', accueil: 'navNow', collections: 'navModels', modeles: 'navModels', fichiers: 'navDocuments', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
+const titles = { bilans: 'navBilans', skills: 'navSkills', reglages: 'navSettings', '': 'navNow', accueil: 'navNow', collections: 'navModels', modeles: 'navModels', fichiers: 'navDocuments', app: 'navApps', agenda: 'navAgenda', vie: 'navEntries', entree: 'navEntries', documents: 'navDocuments', document: 'navDocuments', tableaux: 'navDashboards',
   rappels: 'navAgenda', taches: 'navActivities', activites: 'navActivities', ranger: 'navToSort', revue: 'navReview', personnes: 'navPeople', apps: 'navAllApps', role: 'navApps', espace: 'navSpaces', bienvenue: 'v2welcome', journal: 'navJournal', espaces: 'navSpaces', connexions: 'navConnections', donnees: 'navData', compte: 'navAccount' };
-const navOf = { skills: 'skills', reglages: 'reglages', '': '', accueil: '', agenda: 'agenda', taches: 'activites', activites: 'activites', rappels: 'agenda', ranger: 'ranger', revue: 'revue', personnes: 'personnes', vie: 'vie', entree: 'vie', documents: 'documents', document: 'documents', fichiers: 'documents', tableaux: 'tableaux', apps: 'apps' };
+const navOf = { bilans: 'bilans', skills: 'skills', reglages: 'reglages', '': '', accueil: '', agenda: 'agenda', taches: 'activites', activites: 'activites', rappels: 'agenda', ranger: 'ranger', revue: 'revue', personnes: 'personnes', vie: 'vie', entree: 'vie', documents: 'documents', document: 'documents', fichiers: 'documents', tableaux: 'tableaux', apps: 'apps' };
 
 // The breadcrumb: « Jarvis › … › the page ». A page may say more (its kind, its entry).
 let crumbParts = null;
@@ -57,7 +57,7 @@ function paint(entry, route, first) {
   const y = window.scrollY;
   page().innerHTML = entry.html; dress(page());
   crumbParts = entry.crumbs; drawCrumbs(route.key, route.id);
-  bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page()); bindConnexions(page()); bindBlocks(page()); bindBoards(page()); bindRoutines(page()); bindTasks(page()); bindSettings(page()); bindSkills(page());
+  bind(); bindV2(page()); bindAgenda(page()); bindEntry(page()); bindApps(page()); bindLife(page()); bindNow(page()); bindEntries2(page()); bindModels(page()); bindConnexions(page()); bindBlocks(page()); bindBoards(page()); bindRoutines(page()); bindTasks(page()); bindSettings(page()); bindSkills(page()); bindBilans(page());
   if (first) { page().scrollTop = 0; window.scrollTo(0, 0); } else window.scrollTo(0, y);
 }
 const typing = () => { const a = document.activeElement; return Boolean(a && page().contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)); };
@@ -136,6 +136,7 @@ function drawNav(key, id) {
       item('#/activites', W.navActivities, ic('i-check'), on === 'activites', navCounts.tasks, true),
       item('#/ranger', W.navToSort, ic('i-box'), on === 'ranger', navCounts.ranger, true),
       item('#/revue', W.navReview, ic('i-eye'), on === 'revue'),
+      item('#/bilans', W.navBilans, ic('i-doc'), on === 'bilans'),
     ]) +
     group(W.navLife, [
       item('#/personnes', W.navPeople, ic('i-person'), on === 'personnes', navCounts.people),

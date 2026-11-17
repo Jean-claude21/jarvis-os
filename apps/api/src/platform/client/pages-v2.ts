@@ -1048,8 +1048,8 @@ v2Pages.rappels = async function () { setTimeout(() => { location.replace('#/age
 v2Pages.fichiers = async function () { setTimeout(() => { location.replace('#/documents?s=deposes'); }, 0); return '<div class="empty">' + esc(W.loading) + '</div>'; };
 v2Pages.document = async function (params, id) {
   const e = await api(inSpace('/entries/' + encodeURIComponent(id)));
-  crumbs([W.navDocuments, e.title]);
-  return v2head(esc(e.title), esc(kindName(e.kind) + ' · ' + say(W.chars, { n: num(String(e.data.text || '').length) })), '<a data-full class="btn" href="#/documents">' + ic('i-left') + esc(W.navDocuments) + '</a><a data-full class="btn" href="#/entree/' + esc(id) + '">' + ic('i-life') + esc(W.fullEntry) + '</a>') +
+  crumbs([e.kind === 'Bilan' ? W.navBilans : W.navDocuments, e.title]);
+  return v2head(esc(e.title), esc(kindName(e.kind) + ' · ' + say(W.chars, { n: num(String(e.data.text || '').length) })), (e.kind === 'Bilan' ? '<a data-full class="btn" href="#/bilans">' + ic('i-left') + esc(W.navBilans) + '</a>' : '<a data-full class="btn" href="#/documents">' + ic('i-left') + esc(W.navDocuments) + '</a>') + '<a data-full class="btn" href="#/entree/' + esc(id) + '">' + ic('i-life') + esc(W.fullEntry) + '</a>') +
     '<section class="panel"><div class="panel-body">' + frame('/app/frame/document/' + encodeURIComponent(id) + '?space=' + encodeURIComponent(space)) + '</div></section>';
 };
 `;

@@ -16,6 +16,7 @@ import { v2Pages } from './client/pages-v2';
 import { v2Agenda } from './client/pages-v2-agenda';
 import { v2Entry } from './client/pages-v2-entry';
 import { v2Settings } from './client/pages-v2-settings';
+import { v2Skills } from './client/pages-v2-skills';
 import { v2Peek } from './client/pages-v2-peek';
 import { v2Apps } from './client/pages-v2-apps';
 import { v2Life } from './client/pages-v2-life';
@@ -40,6 +41,7 @@ const script = [
   settingsPages,
   v2Pages,
   v2Settings,
+  v2Skills,
   v2Agenda,
   v2Entry,
   v2Peek,

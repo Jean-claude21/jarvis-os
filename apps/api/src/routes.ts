@@ -115,6 +115,8 @@ import { bodyLimit } from 'hono/body-limit';
 import type pg from 'pg';
 import { z } from 'zod';
 import { shippedApp, shippedApps, shippedRoles } from './apps';
+import { baseRoutines } from './mcp';
+import { markdownHtml } from './views/markdown-html';
 import { usedBy } from './atelier';
 import { telegramLink } from './telegram';
 import { briefText, channelOf, sendTelegram } from './watcher';
@@ -1298,6 +1300,69 @@ export function apiRoutes(deps: {
       ),
     );
   });
+
+  // Her skills (spec 082): the routines of her spaces, Jarvis's own, and what her apps tell the
+  // assistant — how the AI works for each thing she asks.
+  api.get('/skills', async (c) =>
+    c.json(
+      await as(c, async (tx) => {
+        const mine = [];
+        for (const one of c.get('spaces')) {
+          for (const entry of await find(tx, one.id, { kind: 'Routine', limit: 100 })) {
+            const data = entry.data as Record<string, unknown>;
+            const trigger = (data.trigger ?? {}) as {
+              phrases?: unknown;
+              repeat?: unknown;
+              saved?: unknown;
+            };
+            const text = [data.instructions, data.instruction, data.text, data.description].find(
+              (v) => typeof v === 'string' && v,
+            ) as string | undefined;
+            mine.push({
+              id: entry.id,
+              title: entry.title,
+              spaceId: one.id,
+              space: one.name,
+              when: String(data.when ?? data.quand ?? ''),
+              phrases: Array.isArray(trigger.phrases) ? trigger.phrases : [],
+              repeat:
+                typeof trigger.repeat === 'string'
+                  ? trigger.repeat
+                  : typeof data.repeat === 'string'
+                    ? data.repeat
+                    : null,
+              saved: typeof trigger.saved === 'string' ? trigger.saved : null,
+              result: (data.result as { kind?: unknown } | undefined)?.kind ?? null,
+              structured: Boolean(data.instructions || data.trigger),
+              excerpt: (text ?? '')
+                .replace(/[#>*_`]+/g, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 220),
+              updatedAt: entry.updatedAt,
+            });
+          }
+        }
+        const apps: { app: string; covers: unknown; instructions: unknown; space: string }[] = [];
+        for (const one of c.get('spaces')) {
+          for (const app of await appsOf(tx, one.id, shippedRoles)) {
+            if (apps.some((x) => x.app === app.app)) continue;
+            apps.push({
+              app: app.app,
+              covers: app.role.covers,
+              instructions: app.role.instructions,
+              space: one.name,
+            });
+          }
+        }
+        return {
+          mine,
+          jarvis: baseRoutines.map((one) => ({ ...one, html: markdownHtml(one.text) })),
+          apps,
+        };
+      }),
+    ),
+  );
 
   // A routine kept as text, proposed in its five parts (spec 047): for her yes, in « À ranger ».
   api.post('/routines/:id/structure', async (c) =>

@@ -2840,4 +2840,35 @@ to {
 .v2 .ring { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
 .v2 .ring svg { width: 150px; height: 150px; flex: 0 0 150px; } .v2 .ring-n { font: 600 16px "JetBrains Mono", monospace; fill: var(--ink); }
 @media (max-width: 760px) { .v2 .rv { grid-template-columns: 1fr; } .v2 .rv-list { max-height: 320px; } .v2 .dt-cond { grid-template-columns: 1fr 1fr; } }
+/* Spec 080: nothing overflows; what scrolls is framed. */
+html, body { overflow-x: clip; }
+.v2, .v2 * { scrollbar-width: thin; scrollbar-color: var(--rule-strong) transparent; }
+.v2 *::-webkit-scrollbar { width: 8px; height: 8px; }
+.v2 *::-webkit-scrollbar-thumb { background: var(--rule-strong); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+.v2 *::-webkit-scrollbar-track { background: transparent; }
+.v2 .cell-title, .v2 .cell-sub, .v2 .t, .v2 .s, .v2 p, .v2 dd, .v2 li, .v2 .context { overflow-wrap: anywhere; }
+/* A scrolling area: a frame, and a soft shadow on the side where more is hidden. */
+.v2 .frame-scroll, .v2 .panel-body:has(> .task-row:nth-child(6)), .v2 .panel-body:has(> .x-rel > :nth-child(8)), .v2 .rv-list, .v2 .pk-scroll, .v2 .drawer > .pad, .v2 .dt-pop, .v2 .nw-list:has(> :nth-child(9)), .v2 .nw-feed {
+  background:
+    linear-gradient(var(--paper) 30%, transparent) center top,
+    linear-gradient(transparent, var(--paper) 70%) center bottom,
+    radial-gradient(farthest-side at 50% 0, rgba(42, 22, 16, 0.14), transparent) center top,
+    radial-gradient(farthest-side at 50% 100%, rgba(42, 22, 16, 0.14), transparent) center bottom;
+  background-color: var(--paper);
+  background-repeat: no-repeat;
+  background-size: 100% 28px, 100% 28px, 100% 10px, 100% 10px;
+  background-attachment: local, local, scroll, scroll;
+  overscroll-behavior: contain;
+}
+.v2 .panel-body:has(> .task-row:nth-child(6)) { max-height: min(62vh, 640px); overflow-y: auto; }
+.v2 .panel-body:has(> .x-rel > :nth-child(8)) { max-height: min(62vh, 640px); overflow-y: auto; }
+.v2 .nw-list:has(> :nth-child(9)) { max-height: min(56vh, 560px); overflow-y: auto; }
+.v2 .nw-feed { max-height: 360px; overflow-y: auto; }
+/* A long message stays two lines in a list; the whole of it is in its card. */
+.v2 .task-row .cell-sub { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* The add-a-task form is a row, its field a line high. */
+.v2 .panel.task-add { flex-direction: row; }
+.v2 .task-add input[name='title'] { height: 40px; flex: 1 1 240px; }
+.v2 .task-add input[type='date'] { width: auto; flex: 0 0 170px; } .v2 .task-add .btn { flex: none; }
+@media (max-width: 760px) { .v2 .task-add input[type='date'] { flex: 1 1 140px; } }
 `;

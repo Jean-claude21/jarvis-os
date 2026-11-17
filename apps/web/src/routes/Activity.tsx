@@ -1,15 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { Undo2 } from 'lucide-react';
+import { History, Undo2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, type JournalLine } from '../lib/api';
 import { onChange } from '../lib/live';
 import { useSession } from '../lib/session';
 import { doorOf, said, titleOf, whoOf } from '../lib/words';
-import { Avatar, Button, Empty, PageHead, Panel, Skeleton, cn } from '../ui';
+import { Avatar, Button, Caps, Empty, PageHead, Panel, Skeleton, Tag, cn } from '../ui';
 
-// Activité (v3 D9): everything that changed in the space, by day, who did it and why, undoable —
-// new lines arrive live. Filters by author and action come in V4.
+// Activité (v3 D9): everything that changed, by day, who did it and how, undoable — new lines lit
+// as they arrive. Filters by author, action and period come with V4.
 
 export function Activity() {
   const { me } = useSession();
@@ -54,9 +54,13 @@ export function Activity() {
     <>
       <PageHead
         title="Activité"
-        lead="Tout ce qui a changé, qui l’a fait et pourquoi. Chaque changement peut être annulé."
+        lead="Tout ce qui a changé, qui l’a fait et comment. Chaque changement peut être annulé."
       />
-      <Panel>
+      <Panel
+        title="Journal"
+        icon={<History size={16} />}
+        bodyClassName="max-h-[calc(100dvh-230px)] overflow-y-auto"
+      >
         {isLoading ? (
           <div className="space-y-2 p-4">
             <Skeleton className="h-5" />
@@ -68,9 +72,9 @@ export function Activity() {
         ) : (
           days.map(({ day, lines }) => (
             <div key={day}>
-              <p className="sticky top-0 bg-sand px-4 py-1.5 text-xs font-semibold text-bark first-letter:uppercase">
-                {day}
-              </p>
+              <div className="sticky top-0 z-[1] border-b border-rule bg-sand px-4 py-1.5">
+                <Caps>{day}</Caps>
+              </div>
               {lines.map((line) => {
                 const who = whoOf(line, me.person.id);
                 const undone = line.undoneBy !== null || line.command === 'journal.undo';
@@ -79,18 +83,18 @@ export function Activity() {
                   <div
                     key={line.id}
                     className={cn(
-                      'group flex items-center gap-3 border-b border-rule px-4 py-2.5 transition-colors last:border-0',
+                      'group flex min-w-0 items-center gap-3 border-b border-rule px-4 py-2.5 transition-colors last:border-0 hover:bg-sand',
                       fresh.has(line.id) && 'bg-success-surface',
                     )}
                   >
-                    <Avatar name={who.name} size={28} />
+                    <Avatar name={who.name} />
                     <span
                       className={cn(
-                        'min-w-0 flex-1 text-sm',
+                        'min-w-0 flex-1',
                         line.undoneBy !== null && 'text-faint line-through',
                       )}
                     >
-                      <b className="font-medium">{who.name}</b> {said(line.command)}{' '}
+                      <b className="font-semibold">{who.name}</b> {said(line.command)}{' '}
                       {isEntry ? (
                         <Link
                           to="/entree/$id"
@@ -102,9 +106,11 @@ export function Activity() {
                       ) : (
                         <span className="text-bark">{titleOf(line)}</span>
                       )}
-                      <span className="block text-xs text-faint">{doorOf(line.door)}</span>
+                      <span className="mt-0.5 block">
+                        <Tag tone="plain">{doorOf(line.door)}</Tag>
+                      </span>
                     </span>
-                    <time className="flex-none font-mono text-xs text-faint">
+                    <time className="flex-none font-mono text-[11.5px] text-faint">
                       {new Date(line.at).toLocaleTimeString('fr', {
                         hour: '2-digit',
                         minute: '2-digit',
@@ -113,13 +119,12 @@ export function Activity() {
                     {!undone && line.command.startsWith('entry.') && (
                       <Button
                         size="sm"
-                        tone="quiet"
-                        className="opacity-60 group-hover:opacity-100"
+                        className="opacity-70 group-hover:opacity-100"
                         onClick={() => undo.mutate(line.id)}
-                        aria-label="Annuler"
-                        title="Annuler"
+                        title="Annuler ce changement"
                       >
-                        <Undo2 size={15} />
+                        <Undo2 size={14} />
+                        <span className="hidden sm:inline">Annuler</span>
                       </Button>
                     )}
                   </div>

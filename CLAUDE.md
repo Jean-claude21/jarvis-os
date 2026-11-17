@@ -14,11 +14,23 @@ then work on her life: they save what she says, link it, compute from it, remind
 2. `docs/product/vision.md` (French) — what we build and why.
 3. `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/decisions/`.
 
+## Step back first (the author's standing rule, 2026-11-17)
+
+1. **Before developing any module**: step back. Say what it really is in the v3 model (eight
+   modules, facets, common kinds, one view engine at every scope, the Agent node, apps as
+   services) and build it as generically as possible within those decisions — no life domain
+   hard-coded, no copy of something that exists.
+2. **Before proposing any interface**: step back. Each element has one clear reason to be; never
+   mix natures (moments, views across a life, apps), never duplicate, never impose what only some
+   lives have; as few entries as possible; the journal (who did what) always in sight. Write that
+   reasoning in a few lines before showing the screen.
+
 ## Layout
 
 ```
 packages/core/     the domain: entries, links, journal, files, schedules — no HTTP, no MCP
 apps/api/          Hono: REST API (/api), MCP server (/mcp), accounts and OAuth (/auth)
+apps/web/          the v3 client (React, TanStack), served by the API at /v3
 apps/worker/       the watcher: reminders and the morning brief (later)
 docs/  specs/  .specify/
 ```

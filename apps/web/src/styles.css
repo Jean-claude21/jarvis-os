@@ -80,6 +80,13 @@
   --font-display: Archivo, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
   --shadow-card: var(--shadow);
+  /* The mockup's corners: 2px, almost sharp — every rounded-* but « full » (dots, avatars, pills). */
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 2px;
+  --radius-2xl: 2px;
 }
 
 html,
@@ -87,6 +94,7 @@ body {
   background: var(--canvas);
   color: var(--ink);
   font-family: var(--font-sans);
+  font-size: 14px;
   overflow-x: clip;
   -webkit-font-smoothing: antialiased;
 }

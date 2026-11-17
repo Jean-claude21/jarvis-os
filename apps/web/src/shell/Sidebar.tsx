@@ -1,18 +1,32 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { ChevronsUpDown, Hammer, Search, Settings } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { api } from '../lib/api';
+import { useKinds } from '../lib/kinds';
 import { useSession } from '../lib/session';
-import { Avatar, Dot, Menu, colorOf as nameColor, cn } from '../ui';
-import { LIVE } from './nav';
+import { AppIcon, Avatar, Caps, Menu, SpaceDot, cn } from '../ui';
+import { ACROSS, APPS, TODAY } from './nav';
+
+// The sidebar, as J-C's design system draws it: on the canvas, the space switcher on top, the
+// search, the groups in mono capitals, the current item lifted on paper, her account at the bottom.
 
 interface MyApps {
   apps: { app: string; kinds: string[] }[];
 }
 
-const linkClass =
-  'flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[14px] text-bark hover:bg-paper hover:text-ink min-w-0';
-const activeClass = 'bg-paper text-ink font-medium shadow-card';
+const item =
+  'flex w-full min-w-0 items-center gap-2.5 rounded-[2px] border border-transparent px-2 py-[7px] text-left text-[14px] no-underline hover:bg-paper/55';
+const current = 'border-rule bg-paper font-semibold shadow-card';
+
+function Group({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Caps className="px-2 pt-1.5 pb-1 text-faint">{label}</Caps>
+      {children}
+    </div>
+  );
+}
 
 export function Sidebar({
   onSearch,
@@ -26,32 +40,46 @@ export function Sidebar({
     queryKey: ['apps', space.id],
     queryFn: () => api<MyApps>('/apps/mine'),
   });
+  // The views across her life: only those some kind she keeps has the facet of (v3 R7).
+  const { data: kinds } = useKinds();
+  const has = new Set(
+    (kinds ?? [])
+      .filter((one) => one.count > 0)
+      .flatMap((one) => (one.facets ?? []).map((facet) => facet.facet)),
+  );
+  const across = ACROSS.filter((one) => has.has(one.facet));
+  // What waits for her now: the red count on « Aujourd'hui ».
+  const { data: now } = useQuery({
+    queryKey: ['now'],
+    queryFn: () => api<{ items: { group: string }[] }>('/now'),
+  });
+  const waiting = (now?.items ?? []).filter((one) =>
+    ['proposed', 'fix', 'late'].includes(one.group),
+  ).length;
   const spaceMenu = me.spaces.map((one) => ({
     label: (
       <span className="flex min-w-0 items-center gap-2">
-        <Dot color={colorOf(one)} />
+        <SpaceDot color={colorOf(one)} />
         <span className="truncate">{one.name}</span>
       </span>
     ),
     onSelect: () => choose(one.id),
   }));
   return (
-    <nav className="flex h-full min-h-0 flex-col gap-1 p-3" aria-label="Navigation">
-      {/* The space she looks at, at the top (and again at the bottom). */}
+    <nav className="flex h-full min-h-0 flex-col gap-3.5 py-1 pr-3 pl-1" aria-label="Navigation">
       <Menu
         align="start"
         items={spaceMenu}
         trigger={
-          <button className="mb-1 flex w-full items-center gap-2.5 rounded-xl border border-rule bg-paper px-2.5 py-2 text-left shadow-card">
-            <span
-              className="grid h-8 w-8 flex-none place-items-center rounded-lg font-display text-sm font-bold text-white"
-              style={{ background: colorOf(space) }}
-            >
-              {space.name.slice(0, 1).toUpperCase()}
+          <button className="flex w-full items-center gap-2.5 rounded-[2px] border border-rule bg-paper px-2.5 py-[9px] text-left">
+            <span className="grid h-[30px] w-[30px] flex-none place-items-center rounded-[2px] bg-primary font-display text-[15px] font-bold text-on-primary">
+              J
             </span>
             <span className="min-w-0 flex-1">
-              <b className="block truncate font-display text-[14px]">Jarvis</b>
-              <span className="block truncate text-xs text-bark">{space.name}</span>
+              <b className="block truncate font-display text-[14px] leading-tight font-semibold">
+                Jarvis OS
+              </b>
+              <small className="block truncate text-xs text-bark">{space.name}</small>
             </span>
             <ChevronsUpDown size={16} className="flex-none text-faint" />
           </button>
@@ -59,101 +87,118 @@ export function Sidebar({
       />
       <button
         onClick={onSearch}
-        className="mb-2 flex items-center gap-2 rounded-lg border border-rule bg-paper px-2.5 py-2 text-left text-sm text-faint hover:text-ink"
+        className="flex items-center gap-2 rounded-[2px] border border-rule bg-paper px-2.5 py-[7px] text-left text-faint"
       >
         <Search size={16} />
-        <span className="flex-1 truncate">Chercher</span>
-        <kbd className="rounded border border-rule px-1 font-mono text-[10px]">Ctrl K</kbd>
+        <span className="flex-1 truncate">Chercher ou noter</span>
+        <kbd className="rounded-[2px] border border-rule px-[5px] py-[3px] font-mono text-[11px] leading-none text-bark">
+          Ctrl K
+        </kbd>
       </button>
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-0.5">
-        <p className="px-2.5 pt-1 pb-1 font-mono text-[10.5px] tracking-wider text-faint uppercase">
-          Vivre
-        </p>
-        {LIVE.map(({ to, label, icon: Icon }) => (
-          <Link
-            key={to}
-            to={to}
-            onClick={onNavigate}
-            className={linkClass}
-            activeProps={{ className: activeClass }}
-            activeOptions={{ exact: to === '/' }}
-          >
-            <Icon size={17} className="flex-none" />
-            <span className="truncate">{label}</span>
-          </Link>
-        ))}
+      <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto">
+        <Link
+          to={TODAY.to}
+          onClick={onNavigate}
+          className={item}
+          activeProps={{ className: current }}
+          activeOptions={{ exact: true }}
+        >
+          <TODAY.icon size={16} className="flex-none" />
+          <span className="flex-1 truncate">{TODAY.label}</span>
+          {waiting > 0 && (
+            <span className="rounded-[2px] bg-primary px-1.5 py-[3px] font-mono text-[11px] leading-none text-on-primary">
+              {waiting}
+            </span>
+          )}
+        </Link>
 
-        {data && data.apps.length > 0 && (
-          <>
-            <p className="px-2.5 pt-4 pb-1 font-mono text-[10.5px] tracking-wider text-faint uppercase">
-              Apps
-            </p>
-            {data.apps.map((one) => (
+        {across.length > 0 && (
+          <Group label="À travers ma vie">
+            {across.map(({ to, label, icon: Icon }) => (
               <Link
-                key={one.app}
-                to="/apps/$name"
-                params={{ name: one.app }}
+                key={to}
+                to={to}
                 onClick={onNavigate}
-                className={linkClass}
-                activeProps={{ className: activeClass }}
+                className={item}
+                activeProps={{ className: current }}
               >
-                <span
-                  className="grid h-[18px] w-[18px] flex-none place-items-center rounded-[5px] font-display text-[10px] font-bold text-white"
-                  style={{ background: nameColor(one.app) }}
-                >
-                  {one.app.slice(0, 1)}
-                </span>
-                <span className="truncate">{one.app}</span>
+                <Icon size={16} className="flex-none" />
+                <span className="truncate">{label}</span>
               </Link>
             ))}
-          </>
+          </Group>
         )}
 
-        <p className="px-2.5 pt-4 pb-1 font-mono text-[10.5px] tracking-wider text-faint uppercase">
-          Espaces
-        </p>
-        {me.spaces.map((one) => (
-          <button
-            key={one.id}
-            onClick={() => {
-              choose(one.id);
-              onNavigate?.();
-            }}
-            className={cn(linkClass, 'w-full text-left', one.id === space.id && activeClass)}
+        <Group label="Mes apps">
+          {(data?.apps ?? []).map((one) => (
+            <Link
+              key={one.app}
+              to="/apps/$name"
+              params={{ name: one.app }}
+              onClick={onNavigate}
+              className={item}
+              activeProps={{ className: current }}
+            >
+              <AppIcon name={one.app} />
+              <span className="truncate">{one.app}</span>
+            </Link>
+          ))}
+          <Link
+            to={APPS.to}
+            onClick={onNavigate}
+            className={cn(item, 'border-dashed border-rule-strong text-faint')}
+            activeProps={{ className: current }}
+            activeOptions={{ exact: true }}
           >
-            <Dot color={colorOf(one)} />
-            <span className="truncate">{one.name}</span>
-          </button>
-        ))}
+            <APPS.icon size={16} className="flex-none" />
+            <span className="truncate">{APPS.label}</span>
+          </Link>
+        </Group>
+
+        <Group label="Espaces">
+          {me.spaces.map((one) => (
+            <button
+              key={one.id}
+              onClick={() => {
+                choose(one.id);
+                onNavigate?.();
+              }}
+              className={cn(item, one.id === space.id && current)}
+            >
+              <SpaceDot color={colorOf(one)} className="mx-1.5" />
+              <span className="truncate">{one.name}</span>
+            </button>
+          ))}
+        </Group>
       </div>
 
-      <div className="flex flex-col gap-0.5 border-t border-rule pt-2">
+      <div className="flex flex-col gap-0.5">
         <Link
           to="/atelier"
           onClick={onNavigate}
-          className={linkClass}
-          activeProps={{ className: activeClass }}
+          className={item}
+          activeProps={{ className: current }}
         >
-          <Hammer size={17} />
+          <Hammer size={16} />
           <span>Atelier</span>
         </Link>
         <Link
           to="/reglages"
           onClick={onNavigate}
-          className={linkClass}
-          activeProps={{ className: activeClass }}
+          className={item}
+          activeProps={{ className: current }}
         >
-          <Settings size={17} />
+          <Settings size={16} />
           <span>Réglages</span>
         </Link>
-        <div className="mt-1 flex items-center gap-2.5 rounded-lg px-2.5 py-2">
-          <Avatar name={me.person.name || me.person.email} size={28} />
-          <span className="min-w-0">
-            <b className="block truncate text-[13px]">{me.person.name}</b>
-            <span className="block truncate text-xs text-faint">{me.person.email}</span>
-          </span>
-        </div>
+      </div>
+      <div className="flex items-center gap-2.5 rounded-[2px] border border-rule bg-paper px-2.5 py-[9px]">
+        <Avatar name={me.person.name || me.person.email} />
+        <span className="min-w-0">
+          <b className="block truncate text-[13px] leading-tight font-semibold">{me.person.name}</b>
+          <small className="block truncate text-xs text-bark">{me.person.email}</small>
+        </span>
       </div>
     </nav>
   );

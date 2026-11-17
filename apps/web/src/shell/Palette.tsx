@@ -4,7 +4,8 @@ import { Command } from 'cmdk';
 import { FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, type Entry } from '../lib/api';
-import { LIVE } from './nav';
+import { ACROSS, APPS, JOURNAL, TODAY } from './nav';
+const LIVE = [TODAY, ...ACROSS, APPS, JOURNAL];
 import { useKindName } from '../lib/kinds';
 
 // Ctrl K (v3 D17): go anywhere, find anything she keeps. Later: commands, and asking an assistant.

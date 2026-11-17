@@ -47,32 +47,29 @@ const routes = [
   page('/agenda', 'Agenda', () => (
     <Soon
       title="Agenda"
-      lead="Ta semaine et ton mois, tout ce qui est daté dans ta vie."
+      lead="Tout ce qui est daté, dans toutes tes apps : ta semaine et ton mois."
       step="le moteur de vues (V5)"
     />
   )),
   page('/documents', 'Documents', () => (
     <Soon
       title="Documents"
-      lead="Tes papiers et tes fichiers, lus, rangés et reliés."
+      lead="Tous tes documents et fichiers, dans toutes tes apps : lus, rangés et reliés."
       step="les Documents vivants (V7)"
     />
   )),
   page('/personnes', 'Personnes', () => (
     <Soon
       title="Personnes"
-      lead="Tes proches, tes contacts et tes cercles."
+      lead="Toutes les personnes et organisations de ta vie, et leurs cercles."
       step="les Personnes (V7)"
     />
   )),
-  page('/argent', 'Argent', () => (
-    <Soon title="Argent" lead="Tes comptes, tes dépenses, ton budget." step="les gabarits (V6)" />
-  )),
-  page('/attente', 'À valider', () => (
+  page('/taches', 'Tâches', () => (
     <Soon
-      title="À valider"
-      lead="Tout ce qui attend ton oui, au même endroit."
-      step="la boîte en verre (V4)"
+      title="Tâches"
+      lead="Tout ce qui est à faire, dans toutes tes apps."
+      step="le moteur de vues (V5)"
     />
   )),
   page('/atelier', 'Atelier', () => (

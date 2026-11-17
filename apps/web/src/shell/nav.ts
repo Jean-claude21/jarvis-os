@@ -1,17 +1,17 @@
 import {
-  Activity,
   CalendarDays,
+  CheckSquare,
   FileText,
-  Inbox,
+  History,
   LayoutGrid,
   Sun,
   Users,
-  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 
-// The world « Vivre » (v3 D2): what everyone sees. The workshop (types, skills, agents) is behind
-// its own door.
+// The menu follows the system (v3 D2, R7): one moment (Aujourd'hui), the views across her whole life
+// — one per facet, shown only when something she keeps has it, nothing imposed — then her apps (the
+// services). The journal sits in the top bar, always in sight.
 
 export interface NavItem {
   to: string;
@@ -19,13 +19,18 @@ export interface NavItem {
   icon: LucideIcon;
 }
 
-export const LIVE: NavItem[] = [
-  { to: '/', label: 'Aujourd’hui', icon: Sun },
-  { to: '/agenda', label: 'Agenda', icon: CalendarDays },
-  { to: '/documents', label: 'Documents', icon: FileText },
-  { to: '/personnes', label: 'Personnes', icon: Users },
-  { to: '/argent', label: 'Argent', icon: Wallet },
-  { to: '/activite', label: 'Activité', icon: Activity },
-  { to: '/attente', label: 'À valider', icon: Inbox },
-  { to: '/apps', label: 'Mes apps', icon: LayoutGrid },
+export const TODAY: NavItem = { to: '/', label: 'Aujourd’hui', icon: Sun };
+
+/** A view across every app, born of a facet. */
+export interface AcrossItem extends NavItem {
+  facet: string;
+}
+export const ACROSS: AcrossItem[] = [
+  { facet: 'dated', to: '/agenda', label: 'Agenda', icon: CalendarDays },
+  { facet: 'todo', to: '/taches', label: 'Tâches', icon: CheckSquare },
+  { facet: 'document', to: '/documents', label: 'Documents', icon: FileText },
+  { facet: 'who', to: '/personnes', label: 'Personnes', icon: Users },
 ];
+
+export const APPS: NavItem = { to: '/apps', label: 'Toutes les apps', icon: LayoutGrid };
+export const JOURNAL: NavItem = { to: '/activite', label: 'Activité', icon: History };

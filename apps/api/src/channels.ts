@@ -151,6 +151,7 @@ export async function tellThrough(
 
 /** A message through the Telegram bot; true when Telegram took it. */
 export async function sendTelegram(token: string, chat: string, text: string): Promise<boolean> {
+  if (process.env.JARVIS_SIDE_EFFECTS === 'off') return false;
   const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

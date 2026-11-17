@@ -16,7 +16,13 @@ export interface Settings {
   };
 }
 
-export type Branch = 'main' | 'dev' | 'test';
+export type Branch = 'main' | 'dev' | 'test' | 'next';
+
+/**
+ * A copy that must not act outside (the « next » preview on a clone of the real data, v3 D19):
+ * no watcher, no Telegram, no collecting, no message. `JARVIS_SIDE_EFFECTS=off`.
+ */
+export const quiet = () => process.env.JARVIS_SIDE_EFFECTS === 'off';
 
 /** The settings of a branch, from `JARVIS_<BRANCH>_*` (written by `pnpm provision`). */
 export function settingsFor(branch: Branch, publicUrl?: string): Settings {

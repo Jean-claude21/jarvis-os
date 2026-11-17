@@ -2,7 +2,7 @@ import { serve } from '@hono/node-server';
 import { pool } from '@jarvis-os/core';
 import { makeApp } from './app';
 import { deliveryFor } from './channels';
-import { settingsFor, type Branch } from './settings';
+import { quiet, settingsFor, type Branch } from './settings';
 import { watch } from './watcher';
 
 // Jarvis OS on a server of its own (Coolify, Docker): the app and its watcher in one process —
@@ -18,12 +18,16 @@ serve({ fetch: app.fetch, port, hostname: '0.0.0.0' }, () =>
 
 const db = pool(settings.appUrl);
 const stop = new AbortController();
-watch(
-  db,
-  deliveryFor(settings),
-  (report) => console.info('[watcher]', JSON.stringify(report)),
-  stop.signal,
-);
+// A quiet copy (next) never runs the watcher: its reminders, messages and collecting are the real
+// ones' copies, and would reach real people twice.
+if (quiet()) console.info('[watcher] side effects off: the watcher does not run');
+else
+  watch(
+    db,
+    deliveryFor(settings),
+    (report) => console.info('[watcher]', JSON.stringify(report)),
+    stop.signal,
+  );
 for (const signal of ['SIGTERM', 'SIGINT'] as const)
   process.on(signal, () => {
     stop.abort();

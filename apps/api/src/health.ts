@@ -37,8 +37,10 @@ export async function healthOf(db: pg.Pool, now = Date.now()): Promise<Health> {
     const late = !at || now - at.getTime() > WATCHER_LATE_MS;
     const failed = Boolean(last?.error);
     const failures = failuresIn(last?.report);
+    // A quiet copy runs no watcher: only its database counts.
+    const off = process.env.JARVIS_SIDE_EFFECTS === 'off';
     return {
-      status: late || failed || failures > 0 ? 'unhealthy' : 'healthy',
+      status: off || !(late || failed || failures > 0) ? 'healthy' : 'unhealthy',
       release: RELEASE,
       database: true,
       watcher: { lastPassAt: at?.toISOString() ?? null, late, failed, failures },

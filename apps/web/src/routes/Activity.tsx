@@ -77,8 +77,6 @@ function Changes({ line }: { line: JournalLine }) {
 }
 
 export function Activity() {
-  const { me } = useSession();
-  const client = useQueryClient();
   const navigate = useNavigate({ from: '/activite' });
   const search = useSearch({ from: '/activite' });
   const author: Author = search.author ?? 'all';
@@ -91,48 +89,10 @@ export function Activity() {
   if (action !== 'all') query.set('commands', ACTIONS[action]);
   const since = sinceOf(period);
   if (since) query.set('since', since);
-  const { data, isLoading } = useQuery({
-    queryKey: ['history', 'activity', author, action, period],
-    queryFn: () => api<JournalLine[]>(`/history?${query.toString()}`),
-  });
-  const [open, setOpen] = useState<number | null>(null);
-  const [fresh, setFresh] = useState<Set<number>>(new Set());
-  useEffect(
-    () =>
-      onChange((change) => {
-        setFresh((was) => new Set(was).add(change.id));
-        setTimeout(
-          () =>
-            setFresh((was) => {
-              const next = new Set(was);
-              next.delete(change.id);
-              return next;
-            }),
-          4000,
-        );
-      }),
-    [],
-  );
-  const undo = useMutation({
-    mutationFn: (journalId: number) => api('/undo', { method: 'POST', body: { journalId } }),
-    onSettled: () => client.invalidateQueries({ queryKey: ['history'] }),
-  });
-  const days: { day: string; lines: JournalLine[] }[] = [];
-  for (const line of data ?? []) {
-    const day = new Date(line.at).toLocaleDateString('fr', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-    });
-    const last = days[days.length - 1];
-    if (last && last.day === day) last.lines.push(line);
-    else days.push({ day, lines: [line] });
-  }
   return (
     <>
       <PageHead
         title="Activité"
-        badge={data ? `${data.length} changement(s)` : undefined}
         lead="Tout ce qui a changé, qui l’a fait et comment. Chaque changement s’ouvre et peut être annulé."
       />
       <div className="flex flex-wrap items-center gap-2">
@@ -172,103 +132,152 @@ export function Activity() {
           ]}
         />
       </div>
-      <Panel bodyClassName="max-h-[calc(100dvh-260px)] overflow-y-auto">
-        {isLoading ? (
-          <div className="space-y-2 p-4">
-            <Skeleton className="h-5" />
-            <Skeleton className="h-5" />
-            <Skeleton className="h-5" />
-          </div>
-        ) : days.length === 0 ? (
-          <Empty title="Rien ici" lead="Aucun changement pour ces filtres." />
-        ) : (
-          days.map(({ day, lines }) => (
-            <div key={day}>
-              <div className="sticky top-0 z-[1] border-b border-rule bg-sand px-4 py-1.5">
-                <Caps>{day}</Caps>
-              </div>
-              {lines.map((line) => {
-                const who = whoOf(line, me.person.id);
-                const undone = line.undoneBy !== null || line.command === 'journal.undo';
-                const isEntry = line.target.startsWith('ent_');
-                const opens = line.command === 'entry.update' || line.command === 'entry.create';
-                const isOpen = open === line.id;
-                return (
-                  <div
-                    key={line.id}
-                    className={cn(
-                      'border-b border-rule transition-colors last:border-0',
-                      fresh.has(line.id) && 'bg-success-surface',
-                    )}
-                  >
-                    <div className="group flex min-w-0 items-center gap-3 px-4 py-2.5 hover:bg-sand">
-                      <Avatar name={who.name} />
-                      <span
-                        className={cn(
-                          'min-w-0 flex-1',
-                          line.undoneBy !== null && 'text-faint line-through',
-                        )}
-                      >
-                        <b className="font-semibold">{who.name}</b> {said(line.command)}{' '}
-                        {isEntry ? (
-                          <Link
-                            to="/entree/$id"
-                            params={{ id: line.target }}
-                            className="text-bark underline-offset-2 hover:underline"
-                          >
-                            {titleOf(line) || line.target}
-                          </Link>
-                        ) : (
-                          <span className="text-bark">{titleOf(line)}</span>
-                        )}
-                        <span className="mt-0.5 block">
-                          <Tag tone="plain">{doorOf(line.door)}</Tag>
-                        </span>
+      <Journal
+        query={query.toString()}
+        queryKey={['history', 'activity', author, action, period]}
+      />
+    </>
+  );
+}
+
+/** The journal's lines for a query, by day: who, how, before → after, undo; new ones lit live. */
+export function Journal({ query, queryKey }: { query: string; queryKey: unknown[] }) {
+  const { me } = useSession();
+  const client = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey,
+    queryFn: () => api<JournalLine[]>(`/history?${query}`),
+  });
+  const [open, setOpen] = useState<number | null>(null);
+  const [fresh, setFresh] = useState<Set<number>>(new Set());
+  useEffect(
+    () =>
+      onChange((change) => {
+        setFresh((was) => new Set(was).add(change.id));
+        setTimeout(
+          () =>
+            setFresh((was) => {
+              const next = new Set(was);
+              next.delete(change.id);
+              return next;
+            }),
+          4000,
+        );
+      }),
+    [],
+  );
+  const undo = useMutation({
+    mutationFn: (journalId: number) => api('/undo', { method: 'POST', body: { journalId } }),
+    onSettled: () => client.invalidateQueries({ queryKey: ['history'] }),
+  });
+  const days: { day: string; lines: JournalLine[] }[] = [];
+  for (const line of data ?? []) {
+    const day = new Date(line.at).toLocaleDateString('fr', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    });
+    const last = days[days.length - 1];
+    if (last && last.day === day) last.lines.push(line);
+    else days.push({ day, lines: [line] });
+  }
+  return (
+    <Panel bodyClassName="max-h-[calc(100dvh-260px)] overflow-y-auto">
+      {isLoading ? (
+        <div className="space-y-2 p-4">
+          <Skeleton className="h-5" />
+          <Skeleton className="h-5" />
+          <Skeleton className="h-5" />
+        </div>
+      ) : days.length === 0 ? (
+        <Empty title="Rien ici" lead="Aucun changement pour ces filtres." />
+      ) : (
+        days.map(({ day, lines }) => (
+          <div key={day}>
+            <div className="sticky top-0 z-[1] border-b border-rule bg-sand px-4 py-1.5">
+              <Caps>{day}</Caps>
+            </div>
+            {lines.map((line) => {
+              const who = whoOf(line, me.person.id);
+              const undone = line.undoneBy !== null || line.command === 'journal.undo';
+              const isEntry = line.target.startsWith('ent_');
+              const opens = line.command === 'entry.update' || line.command === 'entry.create';
+              const isOpen = open === line.id;
+              return (
+                <div
+                  key={line.id}
+                  className={cn(
+                    'border-b border-rule transition-colors last:border-0',
+                    fresh.has(line.id) && 'bg-success-surface',
+                  )}
+                >
+                  <div className="group flex min-w-0 items-center gap-3 px-4 py-2.5 hover:bg-sand">
+                    <Avatar name={who.name} />
+                    <span
+                      className={cn(
+                        'min-w-0 flex-1',
+                        line.undoneBy !== null && 'text-faint line-through',
+                      )}
+                    >
+                      <b className="font-semibold">{who.name}</b> {said(line.command)}{' '}
+                      {isEntry ? (
+                        <Link
+                          to="/entree/$id"
+                          params={{ id: line.target }}
+                          className="text-bark underline-offset-2 hover:underline"
+                        >
+                          {titleOf(line) || line.target}
+                        </Link>
+                      ) : (
+                        <span className="text-bark">{titleOf(line)}</span>
+                      )}
+                      <span className="mt-0.5 block">
+                        <Tag tone="plain">{doorOf(line.door)}</Tag>
                       </span>
-                      <time className="flex-none font-mono text-[11.5px] text-faint">
-                        {new Date(line.at).toLocaleTimeString('fr', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </time>
-                      {opens && (
-                        <Button
-                          size="sm"
-                          tone="quiet"
-                          aria-expanded={isOpen}
-                          onClick={() => setOpen(isOpen ? null : line.id)}
-                          title="Ce qui a changé"
-                        >
-                          <ChevronDown
-                            size={14}
-                            className={cn('transition-transform', isOpen && 'rotate-180')}
-                          />
-                        </Button>
-                      )}
-                      {!undone && line.command.startsWith('entry.') && (
-                        <Button
-                          size="sm"
-                          className="opacity-70 group-hover:opacity-100"
-                          onClick={() => undo.mutate(line.id)}
-                          title="Annuler ce changement"
-                        >
-                          <Undo2 size={14} />
-                          <span className="hidden sm:inline">Annuler</span>
-                        </Button>
-                      )}
-                    </div>
-                    {isOpen && (
-                      <div className="border-t border-rule bg-sand/60 px-4 py-3 sm:pl-[58px]">
-                        <Changes line={line} />
-                      </div>
+                    </span>
+                    <time className="flex-none font-mono text-[11.5px] text-faint">
+                      {new Date(line.at).toLocaleTimeString('fr', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </time>
+                    {opens && (
+                      <Button
+                        size="sm"
+                        tone="quiet"
+                        aria-expanded={isOpen}
+                        onClick={() => setOpen(isOpen ? null : line.id)}
+                        title="Ce qui a changé"
+                      >
+                        <ChevronDown
+                          size={14}
+                          className={cn('transition-transform', isOpen && 'rotate-180')}
+                        />
+                      </Button>
+                    )}
+                    {!undone && line.command.startsWith('entry.') && (
+                      <Button
+                        size="sm"
+                        className="opacity-70 group-hover:opacity-100"
+                        onClick={() => undo.mutate(line.id)}
+                        title="Annuler ce changement"
+                      >
+                        <Undo2 size={14} />
+                        <span className="hidden sm:inline">Annuler</span>
+                      </Button>
                     )}
                   </div>
-                );
-              })}
-            </div>
-          ))
-        )}
-      </Panel>
-    </>
+                  {isOpen && (
+                    <div className="border-t border-rule bg-sand/60 px-4 py-3 sm:pl-[58px]">
+                      <Changes line={line} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))
+      )}
+    </Panel>
   );
 }

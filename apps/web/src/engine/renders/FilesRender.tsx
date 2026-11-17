@@ -1,0 +1,283 @@
+import { useQueryClient } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
+import {
+  Archive,
+  File,
+  FileImage,
+  FileSpreadsheet,
+  FileText,
+  FileType,
+  Upload,
+  type LucideIcon,
+} from 'lucide-react';
+import { useRef, useState } from 'react';
+import { spaceNow } from '../../lib/api';
+import { useKindName } from '../../lib/kinds';
+import { Button, Empty, Segmented, Tag, ago, cn } from '../../ui';
+import type { FileRow } from '../sources';
+import type { ViewSearch, ViewChange } from '../types';
+
+// Les fichiers (gr8r's Files): search, kind of file, newest or by name, a grid or a list; each its
+// coloured icon, size, day and the entries it belongs to; a drop zone and « Déposer » to add one.
+
+const GENRES: {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  color: string;
+  test: (f: FileRow) => boolean;
+}[] = [
+  {
+    key: 'pdf',
+    label: 'PDF',
+    icon: FileText,
+    color: '#b83a1b',
+    test: (f) => /pdf/.test(f.mediaType),
+  },
+  {
+    key: 'image',
+    label: 'Image',
+    icon: FileImage,
+    color: '#2f6f5e',
+    test: (f) => /^image\//.test(f.mediaType),
+  },
+  {
+    key: 'sheet',
+    label: 'Tableur',
+    icon: FileSpreadsheet,
+    color: '#3b7a3a',
+    test: (f) => /sheet|excel|csv/.test(f.mediaType) || /\.(xlsx?|csv|ods)$/i.test(f.name),
+  },
+  {
+    key: 'doc',
+    label: 'Document',
+    icon: FileType,
+    color: '#4a5fa8',
+    test: (f) =>
+      /word|document|text\/|markdown/.test(f.mediaType) || /\.(docx?|odt|txt|md)$/i.test(f.name),
+  },
+  {
+    key: 'archive',
+    label: 'Archive',
+    icon: Archive,
+    color: '#8a5a9e',
+    test: (f) => /zip|compressed|tar/.test(f.mediaType),
+  },
+];
+const genreOf = (file: FileRow) =>
+  GENRES.find((one) => one.test(file)) ?? {
+    key: 'other',
+    label: 'Autre',
+    icon: File,
+    color: '#9a8276',
+    test: () => true,
+  };
+const size = (n: number) =>
+  n >= 1_048_576 ? `${(n / 1_048_576).toFixed(1)} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`;
+
+export function FilesRender({
+  files,
+  state,
+  set,
+}: {
+  files: FileRow[];
+  state: ViewSearch;
+  set: (change: ViewChange) => void;
+}) {
+  const kindName = useKindName();
+  const client = useQueryClient();
+  const input = useRef<HTMLInputElement>(null);
+  const [layout, setLayout] = useState<'grid' | 'list'>('list');
+  const [busy, setBusy] = useState(false);
+  const [hover, setHover] = useState(false);
+  const genre = state.f?.startsWith('genre=') ? state.f.slice(6) : 'all';
+  const words = (state.q ?? '').toLowerCase();
+  const shown = files
+    .filter((one) => genre === 'all' || genreOf(one).key === genre)
+    .filter((one) => !words || `${one.title} ${one.name}`.toLowerCase().includes(words))
+    .sort((a, b) =>
+      state.sort === 'title'
+        ? a.title.localeCompare(b.title, 'fr') * (state.desc ? -1 : 1)
+        : b.createdAt.localeCompare(a.createdAt) * (state.desc ? -1 : 1),
+    );
+  const upload = async (list: FileList | null) => {
+    if (!list?.length) return;
+    setBusy(true);
+    try {
+      for (const file of [...list]) {
+        const form = new FormData();
+        form.append('file', file);
+        const url = new URL('/api/files', location.origin);
+        if (spaceNow()) url.searchParams.set('space', spaceNow()!);
+        await fetch(url, { method: 'POST', body: form, credentials: 'same-origin' });
+      }
+    } finally {
+      setBusy(false);
+      void client.invalidateQueries({ queryKey: ['entries'] });
+    }
+  };
+  const present = GENRES.filter((one) => files.some((file) => one.test(file)));
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2 border-b border-rule bg-sand px-3 py-2">
+        <Segmented
+          label="Genre"
+          value={genre}
+          onChange={(value) => set({ f: value === 'all' ? undefined : `genre=${value}` })}
+          options={[
+            { value: 'all', label: 'Tous', n: files.length },
+            ...present.map((one) => ({ value: one.key, label: one.label })),
+          ]}
+        />
+        <Segmented
+          label="Ordre"
+          value={state.sort === 'title' ? 'title' : 'new'}
+          onChange={(value) =>
+            set({ sort: value === 'title' ? 'title' : undefined, desc: undefined })
+          }
+          options={[
+            { value: 'new', label: 'Récents' },
+            { value: 'title', label: 'Nom' },
+          ]}
+        />
+        <span className="ml-auto flex gap-2">
+          <Segmented
+            label="Disposition"
+            value={layout}
+            onChange={setLayout}
+            options={[
+              { value: 'list', label: 'Liste' },
+              { value: 'grid', label: 'Grille' },
+            ]}
+          />
+          <Button size="sm" tone="solid" disabled={busy} onClick={() => input.current?.click()}>
+            <Upload size={14} />
+            Déposer
+          </Button>
+          <input
+            ref={input}
+            type="file"
+            multiple
+            hidden
+            onChange={(event) => void upload(event.target.files)}
+          />
+        </span>
+      </div>
+      <div
+        onDragOver={(event) => {
+          event.preventDefault();
+          setHover(true);
+        }}
+        onDragLeave={() => setHover(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setHover(false);
+          void upload(event.dataTransfer.files);
+        }}
+        className={cn(
+          'm-3 grid place-items-center rounded-[10px] border border-dashed border-rule-strong px-4 py-4 text-center text-[13px] text-bark',
+          hover && 'border-primary bg-sand',
+        )}
+      >
+        {busy ? 'Dépôt en cours…' : 'Glisse des fichiers ici, ou utilise « Déposer ».'}
+      </div>
+      {!shown.length ? (
+        <Empty
+          title="Aucun fichier"
+          lead="Les fichiers déposés, envoyés par Telegram ou liés à tes entrées apparaissent ici."
+        />
+      ) : layout === 'grid' ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,220px),1fr))] gap-3 px-3 pb-3">
+          {shown.map((file) => {
+            const one = genreOf(file);
+            return (
+              <Link
+                key={file.entryId}
+                to="/entree/$id"
+                params={{ id: file.entryId }}
+                className="flex min-w-0 flex-col gap-1.5 rounded-[10px] border border-rule bg-paper p-3 hover:border-rule-strong"
+              >
+                <span
+                  className="grid h-9 w-9 place-items-center rounded-[8px]"
+                  style={{
+                    background: `color-mix(in srgb, ${one.color} 14%, var(--paper))`,
+                    color: one.color,
+                  }}
+                >
+                  <one.icon size={18} />
+                </span>
+                <b className="truncate text-[13.5px]">{file.title || file.name}</b>
+                <span className="text-xs text-bark">
+                  {one.label} · {size(file.size)} · {ago(file.createdAt)}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[620px] text-[13.5px]">
+            <thead>
+              <tr className="border-y border-rule bg-sand/60 text-left font-mono text-[11px] tracking-[0.04em] text-bark uppercase">
+                <th className="px-3 py-2 font-medium">Nom</th>
+                <th className="px-3 py-2 font-medium">Genre</th>
+                <th className="px-3 py-2 text-right font-medium">Taille</th>
+                <th className="px-3 py-2 font-medium">Lié à</th>
+                <th className="px-3 py-2 font-medium">Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {shown.map((file) => {
+                const one = genreOf(file);
+                return (
+                  <tr
+                    key={file.entryId}
+                    className="border-b border-rule last:border-0 hover:bg-sand"
+                  >
+                    <td className="max-w-[320px] px-3 py-2">
+                      <Link
+                        to="/entree/$id"
+                        params={{ id: file.entryId }}
+                        className="flex min-w-0 items-center gap-2.5"
+                      >
+                        <span
+                          className="grid h-8 w-8 flex-none place-items-center rounded-[8px]"
+                          style={{
+                            background: `color-mix(in srgb, ${one.color} 14%, var(--paper))`,
+                            color: one.color,
+                          }}
+                        >
+                          <one.icon size={16} />
+                        </span>
+                        <span className="truncate font-semibold">{file.title || file.name}</span>
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2 text-bark">{one.label}</td>
+                    <td className="px-3 py-2 text-right font-mono text-bark">{size(file.size)}</td>
+                    <td className="max-w-[220px] px-3 py-2">
+                      <span className="flex flex-wrap gap-1">
+                        {file.links.slice(0, 2).map((link) => (
+                          <Link
+                            key={link.id}
+                            to="/entree/$id"
+                            params={{ id: link.id }}
+                            title={kindName(link.kind)}
+                          >
+                            <Tag tone="neutral" dot={false}>
+                              {link.title}
+                            </Tag>
+                          </Link>
+                        ))}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-bark">{ago(file.createdAt)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}

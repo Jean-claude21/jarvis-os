@@ -1,6 +1,8 @@
 import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
 import { Activity, type ActivitySearch } from './routes/Activity';
-import { AppPage, Apps } from './routes/Apps';
+import { AppPage, Apps, type AppTab } from './routes/Apps';
+import { AgendaPage, DocumentsPage, PeoplePage, TasksPage } from './routes/Across';
+import { viewSearch, type ViewSearch } from './engine/types';
 import { EntryPage } from './routes/Entry';
 import { Soon } from './routes/Soon';
 import { Today } from './routes/Today';
@@ -23,6 +25,16 @@ const page = <P extends string>(path: P, label: string, component: () => React.R
     getParentRoute: () => root,
     path,
     component,
+    staticData: { crumbs: () => [{ label, to: path }] },
+  });
+
+/** A page that shows a view: its state (render, search, filters, sort, groups) in the URL. */
+const viewPage = <P extends string>(path: P, label: string, component: () => React.ReactNode) =>
+  createRoute({
+    getParentRoute: () => root,
+    path,
+    component,
+    validateSearch: viewSearch,
     staticData: { crumbs: () => [{ label, to: path }] },
   });
 
@@ -52,6 +64,10 @@ const routes = [
     getParentRoute: () => root,
     path: '/apps/$name',
     component: AppPage,
+    validateSearch: (search: Record<string, unknown>): ViewSearch & { t?: AppTab | undefined } => ({
+      ...viewSearch(search),
+      ...(search.t === 'overview' || search.t === 'activity' ? { t: search.t } : {}),
+    }),
     staticData: {
       crumbs: (params) => [{ label: 'Mes apps', to: '/apps' }, { label: params.name ?? '' }],
     },
@@ -62,34 +78,10 @@ const routes = [
     component: EntryPage,
     staticData: { crumbs: () => [{ label: 'Entrée' }] },
   }),
-  page('/agenda', 'Agenda', () => (
-    <Soon
-      title="Agenda"
-      lead="Tout ce qui est daté, dans toutes tes apps : ta semaine et ton mois."
-      step="le moteur de vues (V5)"
-    />
-  )),
-  page('/documents', 'Documents', () => (
-    <Soon
-      title="Documents"
-      lead="Tous tes documents et fichiers, dans toutes tes apps : lus, rangés et reliés."
-      step="les Documents vivants (V7)"
-    />
-  )),
-  page('/personnes', 'Personnes', () => (
-    <Soon
-      title="Personnes"
-      lead="Toutes les personnes et organisations de ta vie, et leurs cercles."
-      step="les Personnes (V7)"
-    />
-  )),
-  page('/taches', 'Tâches', () => (
-    <Soon
-      title="Tâches"
-      lead="Tout ce qui est à faire, dans toutes tes apps."
-      step="le moteur de vues (V5)"
-    />
-  )),
+  viewPage('/agenda', 'Agenda', AgendaPage),
+  viewPage('/taches', 'Tâches', TasksPage),
+  viewPage('/documents', 'Documents', DocumentsPage),
+  viewPage('/personnes', 'Personnes', PeoplePage),
   page('/atelier', 'Atelier', () => (
     <Soon
       title="Atelier"

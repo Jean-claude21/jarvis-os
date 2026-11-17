@@ -118,6 +118,48 @@ describe('agents outside Jarvis', () => {
     expect(view.values.url).toEqual(['https://b.com/9']);
   });
 
+  it('keeps every item when one address already belongs to another entry (spec 079)', async () => {
+    await ama.as((tx) =>
+      save(tx, ama.actor, ama.space, {
+        entries: [
+          {
+            kind: 'Model',
+            title: 'Poste',
+            data: {
+              fields: [
+                { name: 'url', type: 'url', unique: true },
+                { name: 'empreinte', type: 'text' },
+              ],
+            },
+          },
+        ],
+      }),
+    );
+    const send = (items: Record<string, unknown>[]) =>
+      ama.as((tx) =>
+        receive(tx, ama.actor, ama.space, { kind: 'Poste', items, match: ['empreinte', 'url'] }),
+      );
+    // Two entries: X found by its fingerprint, Y by its address.
+    await send([
+      { title: 'Data Scientist', url: 'https://x.com/1', empreinte: 'data scientist|jcdecaux' },
+      { title: 'Data Scientist bis', url: 'https://y.com/2' },
+    ]);
+    // X seen again on Y's address, with a brand new one beside it: X keeps its address, the new one
+    // is made, nothing is refused.
+    const got = await send([
+      { title: 'Data Scientist', url: 'https://y.com/2', empreinte: 'data scientist|jcdecaux' },
+      { title: 'Stage NLP', url: 'https://z.com/3' },
+      { title: 'Stage NLP (copie)', url: 'https://z.com/3' },
+    ]);
+    expect(got).toMatchObject({ created: 1, updated: 1, problems: [] });
+    const kept = await ama.as((tx) => find(tx, ama.space, { kind: 'Poste', limit: 10 }));
+    expect(kept.map((one) => one.data.url).sort()).toEqual([
+      'https://x.com/1',
+      'https://y.com/2',
+      'https://z.com/3',
+    ]);
+  });
+
   it('keeps a key within its kinds', async () => {
     const agent = { ...ama.actor, client: 'key:Agent', kinds: ['Offre'] };
     await expect(

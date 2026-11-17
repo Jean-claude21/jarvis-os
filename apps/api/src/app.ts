@@ -24,6 +24,8 @@ import {
   submitShare,
 } from '@jarvis-os/core';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { Hono } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
@@ -218,6 +220,17 @@ export function makeApp(settings: Settings) {
         : 'text/javascript; charset=utf-8',
     );
     return c.body(content);
+  });
+  // The diagrams of her documents (spec 083): Mermaid, served by Jarvis itself — no CDN.
+  let mermaid: string | null = null;
+  app.get('/vendor/mermaid.js', (c) => {
+    mermaid ??= readFileSync(
+      createRequire(import.meta.url).resolve('mermaid/dist/mermaid.min.js'),
+      'utf8',
+    );
+    c.header('cache-control', 'public, max-age=604800');
+    c.header('content-type', 'text/javascript; charset=utf-8');
+    return c.body(mermaid);
   });
   app.get('/app', async (c) => {
     if (!(await sessionOf(c.req.raw))) return c.redirect(SIGN_IN_PAGE);

@@ -9,7 +9,7 @@ export const v2Agenda = `
 let agendaHidden = new Set();
 try { agendaHidden = new Set(JSON.parse(localStorage.getItem('jarvis.agendaHidden') || '[]')); } catch {}
 const SPACE_COLORS = ['var(--primary)', 'var(--ochre)', 'var(--info)', 'var(--success)', 'var(--verify)'];
-const spaceColor = (id) => SPACE_COLORS[Math.max(0, me.spaces.findIndex((s) => s.id === id)) % SPACE_COLORS.length];
+const spaceColor = (id) => spaceColorOf(id);
 const localDay = (d) => d.toLocaleDateString('en-CA');
 const hourOf = (iso) => { const d = new Date(iso); return d.getHours() + d.getMinutes() / 60; };
 const hhmm = (iso) => new Date(iso).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });

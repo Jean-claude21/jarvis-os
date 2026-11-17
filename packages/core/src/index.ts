@@ -70,6 +70,7 @@ export {
   membersOf,
   previewInvitation,
   renameSpace,
+  updateSpace,
   setRole,
   spacesOf,
   spacesOfPerson,

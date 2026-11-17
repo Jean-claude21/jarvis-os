@@ -103,6 +103,8 @@ export {
   toSortOf,
   type ProposalInput,
   type ToSort,
+  proposeApp,
+  APP_PROPOSAL_KIND,
 } from './proposals';
 export {
   prepare,
@@ -241,6 +243,9 @@ export {
   type InstallReport,
   removeApp,
   type RemoveReport,
+  updateApp,
+  type UpdateReport,
+  installedReleases,
 } from './bundles';
 export {
   checkView,

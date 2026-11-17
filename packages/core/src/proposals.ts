@@ -1,3 +1,4 @@
+import { bundleSchema, installApp, type Bundle } from './bundles';
 import { mergeProposals } from './common';
 import type { Actor, Tx } from './db';
 import { archive, find, get, save } from './entries';
@@ -12,9 +13,11 @@ import { z } from 'zod';
 // thing, its warranty). Nothing is done without her yes; each yes is one save, undone at once.
 
 export const PROPOSAL_KIND = 'Proposal';
+/** An app an assistant designed for her (v3 D14), waiting for her yes. */
+export const APP_PROPOSAL_KIND = 'AppProposal';
 
 export interface ToSort {
-  type: 'capture' | 'proposed' | 'proposal' | 'merge';
+  type: 'capture' | 'proposed' | 'proposal' | 'merge' | 'app';
   /** The entry it is about (a capture, a proposed entry, a proposal), or « from→to » for a merge. */
   id: string;
   title: string;
@@ -33,6 +36,30 @@ const proposalSchema = z.object({
   links: z.array(linkInputSchema).max(100).default([]),
 });
 export type ProposalInput = z.input<typeof proposalSchema>;
+
+/**
+ * An app proposed to her (v3 D14): what it is for, and the app itself — tried first, so a bundle
+ * that would not install is refused now, not after her yes.
+ */
+export async function proposeApp(tx: Tx, actor: Actor, spaceId: string, raw: Bundle, why?: string) {
+  const bundle = bundleSchema.parse(raw);
+  await installApp(tx, actor, spaceId, bundle, true);
+  const saved = await save(tx, actor, spaceId, {
+    entries: [
+      {
+        kind: APP_PROPOSAL_KIND,
+        title: bundle.app,
+        data: {
+          status: 'proposed',
+          ...(why ? { why: why.slice(0, 1000) } : {}),
+          bundle,
+        },
+        origin: 'inferred',
+      },
+    ],
+  });
+  return { id: saved.entries[0]!.id, app: bundle.app };
+}
 
 /** A proposal kept to her yes: what it would make, never made yet. */
 export async function propose(tx: Tx, actor: Actor, spaceId: string, input: ProposalInput) {
@@ -74,6 +101,20 @@ export async function toSortOf(tx: Tx, spaceIds: string[]): Promise<ToSort[]> {
       (one) => one.data.status === 'proposed',
     );
     for (const one of proposed) {
+      if (one.kind === APP_PROPOSAL_KIND) {
+        const bundle = one.data.bundle as Bundle | undefined;
+        out.push({
+          type: 'app',
+          id: one.id,
+          title: one.title,
+          spaceId,
+          detail: {
+            why: one.data.why,
+            makes: (bundle?.models ?? []).map((model) => model.title),
+          },
+        });
+        continue;
+      }
       const isProposal = one.kind === PROPOSAL_KIND;
       // What it makes, or which entry it changes and the fields it would write there.
       const makes = [];
@@ -119,6 +160,12 @@ export async function toSortOf(tx: Tx, spaceIds: string[]): Promise<ToSort[]> {
 export async function decide(tx: Tx, actor: Actor, spaceId: string, id: string, yes: boolean) {
   const one = await get(tx, spaceId, id);
   if (!one || one.data.status !== 'proposed') throw new Error(`No proposal ${id} waits here.`);
+  if (one.kind === APP_PROPOSAL_KIND) {
+    if (yes) await installApp(tx, actor, spaceId, one.data.bundle as Bundle, false);
+    return save(tx, actor, spaceId, {
+      entries: [{ id, data: { status: yes ? 'accepted' : 'declined' } }],
+    });
+  }
   if (!yes) {
     if (one.kind === PROPOSAL_KIND) {
       return save(tx, actor, spaceId, { entries: [{ id, data: { status: 'declined' } }] });

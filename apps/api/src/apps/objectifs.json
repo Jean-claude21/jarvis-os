@@ -1,0 +1,98 @@
+{
+  "app": "Objectifs",
+  "version": 1,
+  "release": 1,
+  "description": {
+    "fr": "Tes objectifs de l’année (ou du trimestre, du mois) : mesurables ou non, ce qui les fait avancer, ta courbe.",
+    "en": "Your goals for the year (or the quarter, the month): measurable or not, what moves them, your curve."
+  },
+  "role": {
+    "covers": {
+      "fr": "Tes objectifs : la cible, l’échéance, ce qui les fait avancer, où tu en es.",
+      "en": "Your goals: the target, the deadline, what moves them, where you stand."
+    },
+    "intents": [
+      "objectif",
+      "objectifs",
+      "but",
+      "cible",
+      "résolution",
+      "resolution",
+      "atteindre",
+      "progression",
+      "avancée",
+      "avancee",
+      "goal",
+      "goals"
+    ],
+    "watches": ["Goal", "GoalStep"],
+    "reads": ["Goal", "GoalStep", "Habit", "Project", "Task", "Transaction"],
+    "writes": ["Goal", "GoalStep"],
+    "ask": [
+      { "fr": "Pour quel objectif ?", "en": "For which goal?" },
+      { "fr": "Quelle cible, et pour quand ?", "en": "What target, and by when?" }
+    ],
+    "instructions": {
+      "fr": "Un objectif est un « Goal » : son titre dit ce qu’elle veut, `target` et `unit` la cible quand elle se mesure (500 km, 5 000 €, 24 livres), `start` et `deadline` sa période. Une avancée est un « GoalStep » relié à son objectif (`goal`) : sa `value` (« 5 » km courus) et son `date`. La progression se calcule seule à partir de ce qui est relié à l’objectif — avancées, habitudes, projet, fonds — jamais à la main. Un objectif sans chiffre (« être plus présent ») avance par ce qui lui est relié et tenu.",
+      "en": "A goal is a « Goal »: its title says what she wants, `target` and `unit` the target when it is measured (500 km, 5,000 €, 24 books), `start` and `deadline` its period. A step is a « GoalStep » linked to its goal (`goal`): its `value` (« 5 » km run) and its `date`. Progress is computed from what is linked to the goal — steps, habits, a project, a fund — never by hand. A goal without a number (« be more present ») moves by what is linked to it and kept."
+    },
+    "bridges": []
+  },
+  "models": [
+    {
+      "title": "Goal",
+      "data": {
+        "label": { "fr": "Objectif", "en": "Goal" },
+        "fields": [
+          { "name": "target", "type": "number", "label": { "fr": "Cible", "en": "Target" } },
+          { "name": "unit", "type": "text", "label": { "fr": "Unité", "en": "Unit" } },
+          { "name": "start", "type": "date", "label": { "fr": "Début", "en": "Start" } },
+          { "name": "deadline", "type": "date", "label": { "fr": "Échéance", "en": "Deadline" } },
+          {
+            "name": "status",
+            "type": "choice",
+            "label": { "fr": "Où il en est", "en": "Where it stands" },
+            "options": ["planned", "active", "reached", "dropped"],
+            "optionLabels": {
+              "planned": { "fr": "prévu", "en": "planned" },
+              "active": { "fr": "en cours", "en": "active" },
+              "reached": { "fr": "atteint", "en": "reached" },
+              "dropped": { "fr": "abandonné", "en": "dropped" }
+            },
+            "default": "active"
+          },
+          { "name": "why", "type": "long_text", "label": { "fr": "Pourquoi", "en": "Why" } }
+        ],
+        "facets": [
+          { "facet": "measurable", "target": "target" },
+          { "facet": "dated", "start": "start", "end": "deadline" },
+          { "facet": "stages", "field": "status" }
+        ],
+        "columns": ["target", "unit", "deadline", "status"]
+      }
+    },
+    {
+      "title": "GoalStep",
+      "data": {
+        "label": { "fr": "Avancée", "en": "Step" },
+        "fields": [
+          {
+            "name": "goal",
+            "type": "link",
+            "label": { "fr": "Objectif", "en": "Goal" },
+            "target": "Goal",
+            "inverse": "steps"
+          },
+          { "name": "value", "type": "number", "label": { "fr": "Valeur", "en": "Value" } },
+          { "name": "date", "type": "date", "label": { "fr": "Date", "en": "Date" } },
+          { "name": "note", "type": "text", "label": { "fr": "Note", "en": "Note" } }
+        ],
+        "facets": [{ "facet": "dated", "start": "date" }],
+        "columns": ["goal", "value", "date"]
+      }
+    }
+  ],
+  "pages": [],
+  "rules": [],
+  "scripts": []
+}

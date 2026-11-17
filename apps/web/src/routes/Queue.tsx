@@ -10,7 +10,7 @@ import { Button, Panel, Tag, rowClass, type TagTone } from '../ui';
 // Each nature keeps its own gesture; nothing is done without her yes; every yes can be undone.
 
 export interface ToSort {
-  type: 'capture' | 'proposed' | 'proposal' | 'merge';
+  type: 'capture' | 'proposed' | 'proposal' | 'merge' | 'app';
   id: string;
   title: string;
   spaceId: string;
@@ -22,6 +22,7 @@ const NATURE: Record<ToSort['type'], { label: string; tone: TagTone }> = {
   proposed: { label: 'proposé', tone: 'late' },
   capture: { label: 'à ranger', tone: 'info' },
   merge: { label: 'doublon', tone: 'neutral' },
+  app: { label: 'app proposée', tone: 'info' },
 };
 
 export function useQueue() {
@@ -101,6 +102,11 @@ export function QueuePanel() {
         .join(' · ');
     }
     if (one.type === 'proposed') return kindName(String(d.kind ?? ''));
+    if (one.type === 'app') {
+      const makes = (d.makes as string[] | undefined) ?? [];
+      const why = typeof d.why === 'string' ? d.why : '';
+      return [why, makes.length ? `crée ${makes.join(', ')}` : ''].filter(Boolean).join(' · ');
+    }
     if (one.type === 'capture') {
       const guess = d.guess as { apps?: string[] } | undefined;
       const from = d.source ? `reçu par ${String(d.source)}` : '';
@@ -149,7 +155,7 @@ export function QueuePanel() {
               <span className="block truncate text-[12.5px] text-bark">{what(one)}</span>
             </span>
             <span className="flex flex-none gap-1.5">
-              {(one.type === 'proposal' || one.type === 'proposed') && (
+              {(one.type === 'proposal' || one.type === 'proposed' || one.type === 'app') && (
                 <>
                   <Button
                     size="sm"

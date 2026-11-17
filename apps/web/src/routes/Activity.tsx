@@ -141,7 +141,15 @@ export function Activity() {
 }
 
 /** The journal's lines for a query, by day: who, how, before → after, undo; new ones lit live. */
-export function Journal({ query, queryKey }: { query: string; queryKey: unknown[] }) {
+export function Journal({
+  query,
+  queryKey,
+  title,
+}: {
+  query: string;
+  queryKey: unknown[];
+  title?: string;
+}) {
   const { me } = useSession();
   const client = useQueryClient();
   const { data, isLoading } = useQuery({
@@ -182,7 +190,7 @@ export function Journal({ query, queryKey }: { query: string; queryKey: unknown[
     else days.push({ day, lines: [line] });
   }
   return (
-    <Panel bodyClassName="max-h-[calc(100dvh-260px)] overflow-y-auto">
+    <Panel {...(title ? { title } : {})} bodyClassName="max-h-[calc(100dvh-260px)] overflow-y-auto">
       {isLoading ? (
         <div className="space-y-2 p-4">
           <Skeleton className="h-5" />

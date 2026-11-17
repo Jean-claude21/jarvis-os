@@ -77,6 +77,8 @@ import {
   bundleSchema,
   exportApp,
   installApp,
+  proposeApp,
+  updateApp,
   migrateKind,
   migrationSchema,
   runScript,
@@ -1568,11 +1570,18 @@ export async function mcpServerFor(
         'is already there (same kind and title) is kept; `reuse` lists what she already keeps under another name',
         '(« tu as déjà 5 « Compte » : je les utilise ? ») — offer it, and merge after her yes with `apps` (action',
         '`merge_kinds`). Show her, then install with `dryRun: false`: one step in the journal, undone at once.',
+        '— For an app you design for her, prefer `propose: true` with `bundle` and `why`: it is tried, then waits in her',
+        '« À valider » with what it makes; her yes installs it. Reuse the common kinds (Person, Organization, Event, Task,',
+        'Transaction, Goal…) by extending them, and give each model its facets; never write page layouts — the views come',
+        'from the facets.',
       ].join(' '),
       inputSchema: {
         name: z.string().min(1).optional(),
         bundle: z.record(z.string(), z.unknown()).optional(),
         dryRun: z.boolean().default(true),
+        propose: z.boolean().default(false),
+        why: z.string().max(1000).optional(),
+        update: z.boolean().default(false),
         space: spaceArg,
       },
     },
@@ -1581,6 +1590,9 @@ export async function mcpServerFor(
         name?: string | undefined;
         bundle?: Record<string, unknown> | undefined;
         dryRun: boolean;
+        propose: boolean;
+        why?: string | undefined;
+        update: boolean;
         space?: string | undefined;
       }) => {
         const bundle = args.bundle
@@ -1589,6 +1601,12 @@ export async function mcpServerFor(
             ? shippedApp(args.name)
             : null;
         if (!bundle) throw new Error('Give `name` (an app Jarvis ships) or `bundle`.');
+        // Proposed: it waits in her « À valider » (v3 D14); her yes installs it.
+        if (args.propose)
+          return act((tx) => proposeApp(tx, actor, at(args.space), bundle, args.why));
+        // A newer release of an app she has: layer by layer, what she changed stays hers.
+        if (args.update)
+          return act((tx) => updateApp(tx, actor, at(args.space), bundle, args.dryRun));
         return act((tx) => installApp(tx, actor, at(args.space), bundle, args.dryRun));
       },
     ),

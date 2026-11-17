@@ -15,6 +15,10 @@ import {
   setOccurrence,
   toSortOf,
   timeOf,
+  installedReleases,
+  proposeApp,
+  updateApp,
+  bundleSchema,
 } from '@jarvis-os/core';
 import {
   addFile,
@@ -633,6 +637,48 @@ export function apiRoutes(deps: {
   api.get('/apps', (c) =>
     c.json(shippedApps.map((one) => ({ app: one.app, description: one.description ?? '' }))),
   );
+  // The catalogue (v3 D14): each app Jarvis ships, what it brings, whether it is installed here
+  // and whether a newer release waits.
+  api.get('/apps/catalog', async (c) =>
+    c.json(
+      await act(c, async (tx, _a, space) => {
+        const installed = await installedReleases(tx, space);
+        return shippedApps.map((one) => {
+          const bundle = bundleSchema.parse(one);
+          const at = Object.keys(installed).find(
+            (name) => name.toLowerCase() === bundle.app.toLowerCase(),
+          );
+          return {
+            app: bundle.app,
+            description: bundle.description ?? '',
+            release: bundle.release,
+            kinds: bundle.models.map((model) => model.title),
+            installed: at === undefined ? null : installed[at],
+          };
+        });
+      }),
+    ),
+  );
+  // An app designed for her (by an assistant, an agent): tried, then waiting in « À valider ».
+  api.post('/apps/propose', async (c) => {
+    const body = (await c.req.json()) as { bundle?: unknown; why?: string };
+    const bundle = bundleSchema.parse(body.bundle);
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        proposeApp(tx, actor, space, bundle, typeof body.why === 'string' ? body.why : undefined),
+      ),
+      201,
+    );
+  });
+  api.post('/apps/update', async (c) => {
+    const body = (await c.req.json()) as { name?: string; dryRun?: boolean };
+    const bundle = shippedApp(String(body.name ?? ''));
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        updateApp(tx, actor, space, bundle, body.dryRun !== false),
+      ),
+    );
+  });
 
   // Her apps in this space (I6, I7): each with its role, the line her assistants read, and the
   // bridges among them.

@@ -109,14 +109,22 @@ export async function recordMany(
 export async function history(
   tx: Tx,
   spaceId: string,
-  options: { target?: string; limit?: number } = {},
+  options: { target?: string; limit?: number; kinds?: string[] } = {},
 ): Promise<JournalLine[]> {
   const { rows } = await tx.query<JournalLine & { id: string; undoneBy: string | null }>(
     `select id, to_char(at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as at, command,
             target, before, after, actor, door, client, undone_by as "undoneBy"
        from journal where space_id = $1 and ($2::text is null or target = $2)
+        and ($4::text[] is null or exists (
+          select 1 from entry e where e.id = journal.target and e.space_id = journal.space_id
+             and jarvis_fold(e.kind) = any (select jarvis_fold(k) from unnest($4::text[]) k)))
       order by id desc limit $3`,
-    [spaceId, options.target ?? null, Math.min(options.limit ?? 50, 500)],
+    [
+      spaceId,
+      options.target ?? null,
+      Math.min(options.limit ?? 50, 500),
+      options.kinds?.length ? options.kinds : null,
+    ],
   );
   return rows.map((row) => ({
     ...row,

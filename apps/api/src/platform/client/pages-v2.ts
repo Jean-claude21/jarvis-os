@@ -992,22 +992,29 @@ v2Pages.app = async function (params, name) {
   const kinds = knownKinds.length ? knownKinds : await api(inSpace('/kinds'));
   const models = kinds.filter((k) => k.model && k.model.app === name);
   const [appPages, views] = await Promise.all([api(inSpace('/pages?app=' + encodeURIComponent(name))), api(inSpace('/views?app=' + encodeURIComponent(name))).catch(() => [])]);
-  const habitTab = isHabitApp(models, name) ? params.get('t') || (!params.get('page') && !params.get('kind') && !params.get('view') ? 'aujourdhui' : null) : null;
-  const pageId = habitTab ? null : params.get('page') || (!params.get('kind') && !params.get('view') && appPages[0] ? appPages[0].id : null);
+  const viewTab = AV_TABS.includes(params.get('tab')) ? params.get('tab') : null;
+  const habitTab = viewTab ? null : isHabitApp(models, name) ? params.get('t') || (!params.get('page') && !params.get('kind') && !params.get('view') ? 'aujourdhui' : null) : null;
+  const pageId = habitTab || viewTab ? null : params.get('page') || (!params.get('kind') && !params.get('view') && appPages[0] ? appPages[0].id : null);
   const appHref = '#/app/' + esc(encodeURIComponent(name));
   const tabs = '<nav class="tabs">' +
     (isHabitApp(models, name) ? [['aujourdhui', W.rt_today], ['habitudes', W.rt_habits], ['regularite', W.rt_regularity]].map((t) => '<a href="' + appHref + '?t=' + t[0] + '"' + (habitTab === t[0] ? ' aria-current="page"' : '') + '>' + esc(t[1]) + '</a>').join('') : '') +
     appPages.map((p) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?page=' + esc(encodeURIComponent(p.id)) + '"' + (p.id === pageId ? ' aria-current="page"' : '') + '>' + esc(tr(p.label) || p.title) + '</a>').join('') +
     views.map((v) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?view=' + esc(encodeURIComponent(v.id)) + '"' + (params.get('view') === v.id ? ' aria-current="page"' : '') + '>' + esc(tr(v.label) || v.title) + '</a>').join('') +
+    appViewTabs(name, models, viewTab) +
     // Its pages and views first; its kinds — the raw data — under one « Données » menu (spec 070).
     ((links) => appPages.length ? '<details class="tabs-more"><summary' + (params.get('kind') ? ' aria-current="page"' : '') + '>' + esc(W.dataMenu) + ' ▾</summary><div class="tabs-menu">' + links + '</div></details>' : links)(models.map((k) => '<a href="#/app/' + esc(encodeURIComponent(name)) + '?kind=' + esc(encodeURIComponent(k.kind)) + '"' + (params.get('kind') === k.kind ? ' aria-current="page"' : '') + '>' + esc(kindLabel(k)) + '<span class="n">' + num(k.count || 0) + '</span></a>').join('')) +
-    '<a href="#/role/' + esc(encodeURIComponent(name)) + '">' + esc(W.v2appRoleTab) + '</a></nav>';
+    '<a href="#/role/' + esc(encodeURIComponent(name)) + '">' + esc(W.v2appRoleTab) + '</a>' +
+    (models.length ? '<button class="tabs-add" data-av-new="' + esc(name) + '" title="' + esc(W.avNewView) + '" aria-label="' + esc(W.avNewView) + '">' + ic('i-plus') + '<span>' + esc(W.avView) + '</span></button>' : '') + '</nav>';
   const moves = models.some((k) => k.kind === 'Transaction');
   const head = v2head(esc(name) + ' <span class="built">' + esc(say(W.v2nKinds, { n: models.length })) + '</span>', esc(W.v2appSub), moves ? '<button class="btn solid" data-add-move>' + ic('i-plus') + esc(W.mv_title) + '</button>' : '', v2app(name));
   crumbs([W.navApps, name]);
   if (habitTab) {
     crumbs([W.navApps, name, { aujourdhui: W.rt_today, habitudes: W.rt_habits, regularite: W.rt_regularity }[habitTab] || '']);
     return head + tabs + await habitsView(name, habitTab);
+  }
+  if (viewTab) {
+    crumbs([W.navApps, name, { calendrier: W.avCalendar, frise: W.avTimeline, fichiers: W.avFiles, activite: W.avActivity }[viewTab]]);
+    return head + tabs + await appViewHtml(name, models, viewTab, params);
   }
   if (pageId) {
     const drawn = await drawPageInto(pageId, pageParams(params));

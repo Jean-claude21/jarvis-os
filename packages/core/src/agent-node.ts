@@ -214,9 +214,13 @@ export async function agentsOf(tx: Tx, spaceId: string, now = new Date()): Promi
       order by created_at`,
     [spaceId],
   );
+  // The morning brief is told from her own space: its agent lives there only.
+  const personal = (await spacesOf(tx)).find((one) => one.id === spaceId)?.personal ?? false;
   const names = new Map<string, string>();
   for (const one of [
-    ...BUILTIN_AGENTS.map((a) => a.title),
+    ...BUILTIN_AGENTS.filter((a) => personal || !a.data.builtin?.includes('brief')).map(
+      (a) => a.title,
+    ),
     ...entries.map((e) => e.title),
     ...rules.map((r) => String(r.data.agent)),
   ])

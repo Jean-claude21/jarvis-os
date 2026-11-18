@@ -1457,11 +1457,12 @@ export async function mcpServerFor(
     'set_role',
     {
       description:
-        'What a member may do in a shared space she owns: `owner`, `member` (reads and writes) or `viewer` (reads only). Only after she asks.',
+        'What a member may do in a shared space she owns: `owner`, `member` (reads and writes) or `viewer` (reads only) — and what she sees: `kinds`, the kinds opened to her (« Courses », « Repas »), null for everything; the rest is kept from her by the database. Only after she asks.',
       inputSchema: {
         space: z.string().min(1),
         person: z.string().min(1),
         role: z.enum(['owner', 'member', 'viewer']),
+        kinds: z.array(z.string().min(1).max(80)).max(100).nullable().optional(),
       },
     },
     tool(
@@ -1469,14 +1470,21 @@ export async function mcpServerFor(
         space,
         person,
         role,
+        kinds,
       }: {
         space: string;
         person: string;
         role: 'owner' | 'member' | 'viewer';
+        kinds?: string[] | null | undefined;
       }) =>
         act(async (tx) => {
-          await setRole(tx, actor, { spaceId: at(space), person, role });
-          return { role };
+          await setRole(tx, actor, {
+            spaceId: at(space),
+            person,
+            role,
+            ...(kinds !== undefined ? { kinds } : {}),
+          });
+          return { role, kinds: kinds ?? null };
         }),
     ),
   );

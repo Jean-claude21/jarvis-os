@@ -20,6 +20,8 @@ export interface Member {
   person: string;
   role: 'owner' | 'member' | 'viewer';
   since: string;
+  /** The kinds opened to her (v3 F7); null, everything. An owner always sees everything. */
+  kinds: string[] | null;
 }
 
 export interface Invitation {
@@ -87,7 +89,7 @@ export async function spacesOfPerson(db: pg.Pool, person: string): Promise<Space
 /** Who belongs to a space she belongs to. */
 export async function membersOf(tx: Tx, spaceId: string): Promise<Member[]> {
   const { rows } = await tx.query<Member>(
-    `select person_id as person, role,
+    `select person_id as person, role, kinds,
             to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as since
        from member where space_id = $1 order by created_at`,
     [spaceId],
@@ -339,12 +341,19 @@ export async function leaveSpace(
 
 /**
  * What a member may do in a shared space (spec 016): `owner`, `member` (reads and writes) or
- * `viewer` (reads only). Only an owner changes it; a space keeps at least one owner.
+ * `viewer` (reads only) — and what she sees (v3 F7): `kinds`, the kinds of the space opened to her,
+ * or null for everything; row-level security keeps the rest from her. Only an owner changes it; a
+ * space keeps at least one owner, and an owner sees everything.
  */
 export async function setRole(
   tx: Tx,
   actor: Actor,
-  input: { spaceId: string; person: string; role: 'owner' | 'member' | 'viewer' },
+  input: {
+    spaceId: string;
+    person: string;
+    role: 'owner' | 'member' | 'viewer';
+    kinds?: string[] | null;
+  },
 ): Promise<void> {
   const space = await spaceOf(tx, input.spaceId);
   if (space.personal) throw new Error('Her own space has her alone.');
@@ -359,17 +368,24 @@ export async function setRole(
   ) {
     throw new Error('A space keeps at least one owner.');
   }
-  await tx.query('update member set role = $3 where space_id = $1 and person_id = $2', [
+  const asked = input.kinds === undefined ? one.kinds : input.kinds;
+  const kinds =
+    input.role === 'owner' || !asked
+      ? null
+      : [...new Set(asked.map((kind) => kind.trim()).filter(Boolean))].slice(0, 100);
+  if (kinds && !kinds.length) throw new Error('Open her at least one kind, or everything.');
+  await tx.query('update member set role = $3, kinds = $4 where space_id = $1 and person_id = $2', [
     input.spaceId,
     input.person,
     input.role,
+    kinds,
   ]);
   await record(tx, actor, {
     spaceId: input.spaceId,
     command: 'space.role',
     target: input.person,
-    before: { person: input.person, role: one.role },
-    after: { person: input.person, role: input.role },
+    before: { person: input.person, role: one.role, kinds: one.kinds },
+    after: { person: input.person, role: input.role, kinds },
   });
 }
 

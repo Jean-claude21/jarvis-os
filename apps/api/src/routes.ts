@@ -628,12 +628,21 @@ export function apiRoutes(deps: {
 
   // What a member may do in a shared space (spec 016): owner, member, or viewer (reads only).
   api.post('/spaces/:id/members/:person/role', async (c) => {
-    const body = (await c.req.json()) as { role?: string };
-    const role = z.enum(['owner', 'member', 'viewer']).parse(body.role);
+    const body = z
+      .object({
+        role: z.enum(['owner', 'member', 'viewer']),
+        kinds: z.array(z.string().min(1).max(80)).max(100).nullable().optional(),
+      })
+      .parse(await c.req.json());
     await as(c, (tx, actor) =>
-      setRole(tx, actor, { spaceId: c.req.param('id'), person: c.req.param('person'), role }),
+      setRole(tx, actor, {
+        spaceId: c.req.param('id'),
+        person: c.req.param('person'),
+        role: body.role,
+        ...(body.kinds !== undefined ? { kinds: body.kinds } : {}),
+      }),
     );
-    return c.json({ role });
+    return c.json({ role: body.role, kinds: body.kinds ?? null });
   });
 
   // Her views (spec 015): those she kept, and one run — kept (`id`, with what she changed) or not.

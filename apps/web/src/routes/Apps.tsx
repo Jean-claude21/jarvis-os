@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   Pencil,
   Plus,
+  Trash2,
   type LucideIcon,
 } from 'lucide-react';
 import { PeriodBar } from './PageCompose';
@@ -32,7 +33,8 @@ import {
   inputClass,
   type TagTone,
 } from '../ui';
-import { Select } from '../ui/more';
+import { Select, toast } from '../ui/more';
+import { showValue } from '../engine/format';
 import { PageBlocks, say, type Drawn, type Vocabulary } from '../blocks/Blocks';
 import { Overview } from './Overview';
 import { useFiles, useKindRows } from '../engine/sources';
@@ -62,7 +64,15 @@ interface CatalogApp {
 interface Tried<T> {
   result: T;
 }
+interface Example {
+  kind: string;
+  label: string;
+  title: string;
+  fields: { name: string; label: string; type: string; value: unknown }[];
+}
 interface InstallReport {
+  /** One example entry of each kind it brings (v3 F7): drawn from its models, nothing written. */
+  examples?: Example[];
   created: string[];
   kept: string[];
   reuse: { from: string; to: string; count: number }[];
@@ -318,6 +328,7 @@ export function Apps() {
               <>
                 {'reuse' in report ? (
                   <>
+                    {!!report.examples?.length && <Examples examples={report.examples} />}
                     <Section
                       title="Ce qu’elle ajoute"
                       items={piecesSaid(report.created, open.app.labels)}
@@ -372,6 +383,48 @@ export function Apps() {
         )}
       </Sheet>
     </>
+  );
+}
+
+/** What the app's entries would look like (v3 F7): one example of each kind, as a small fiche. */
+function Examples({ examples }: { examples: Example[] }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <b className="text-[13px] font-semibold">À quoi ça ressemble</b>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {examples.map((one) => (
+          <div key={one.kind} className="min-w-0 rounded-[12px] border border-rule bg-paper">
+            <div className="flex items-center gap-2 border-b border-rule px-3 py-2">
+              <Tag tone="neutral" dot={false}>
+                {one.label}
+              </Tag>
+              <span className="min-w-0 truncate text-[13px] font-semibold text-bark italic">
+                {one.title}
+              </span>
+            </div>
+            <dl className="grid gap-1 px-3 py-2">
+              {one.fields.map((field) => (
+                <div
+                  key={field.name}
+                  className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] gap-2 text-[12.5px]"
+                >
+                  <dt className="truncate text-bark">{field.label}</dt>
+                  <dd className="truncate">
+                    {showValue(field.value, {
+                      path: field.name,
+                      label: field.label,
+                      type: field.type,
+                    } as never)}
+                    {field.type === 'amount' ? ' €' : ''}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-faint">Un exemple, pour voir : rien n’est écrit chez toi.</p>
+    </div>
   );
 }
 
@@ -448,6 +501,32 @@ export function AppPage() {
   const source = useKindRows(names);
   const { files } = useFiles(names);
   const page = tab.startsWith('page:') ? pages.find((one) => `page:${one.id}` === tab) : undefined;
+  // « Désinstaller » (v3 F7): what would go, tried first; her entries always stay; one gesture to
+  // undo it from the Activity.
+  const client = useQueryClient();
+  const [leaving, setLeaving] = useState(false);
+  const labelsHere = Object.fromEntries(mine.map((one) => [one.kind, nameOf(one)]));
+  const removal = useQuery({
+    queryKey: ['apps', 'remove', name],
+    queryFn: () =>
+      api<Tried<{ removed: string[]; kept: string[] }>>('/apps/remove', {
+        method: 'POST',
+        body: { name, dryRun: true },
+      }),
+    enabled: leaving,
+  });
+  const uninstall = useMutation({
+    mutationFn: () => api('/apps/remove', { method: 'POST', body: { name, dryRun: false } }),
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSuccess: () => {
+      setLeaving(false);
+      toast(`« ${name} » est désinstallée. Tes entrées restent ; l’Activité l’annule d’un geste.`);
+      void client.invalidateQueries({ queryKey: ['apps'] });
+      void client.invalidateQueries({ queryKey: ['kinds'] });
+      void client.invalidateQueries({ queryKey: ['history'] });
+      void navigate({ to: '/apps' });
+    },
+  });
   // What waits for her yes among this app's kinds (F5): the one queue, seen from here.
   const { data: queue = [] } = useQueue();
   const kindsHere = mine.map((one) => one.kind);
@@ -544,7 +623,47 @@ export function AppPage() {
         title={name}
         icon={<AppIcon name={name} size={28} />}
         lead={mine.map((one) => nameOf(one)).join(' · ')}
+        actions={
+          <Button size="sm" tone="quiet" onClick={() => setLeaving(true)}>
+            <Trash2 size={14} />
+            Désinstaller
+          </Button>
+        }
       />
+      <Sheet open={leaving} onOpenChange={setLeaving} title={`Désinstaller ${name}`}>
+        <div className="flex flex-col gap-4 p-4">
+          <p className="text-[13.5px]">
+            Ses pages, ses règles, ses scripts et ses types à elle sont mis de côté.{' '}
+            <b>Tes entrées restent toutes</b>, et les types communs restent pour tes autres apps.
+          </p>
+          {removal.isLoading ? (
+            <Skeleton className="h-20" />
+          ) : removal.error ? (
+            <p className="text-[13px] text-error">{(removal.error as Error).message}</p>
+          ) : removal.data ? (
+            <>
+              <Section
+                title="Mis de côté"
+                items={piecesSaid(removal.data.result.removed, labelsHere)}
+              />
+              <Section title="Gardé" items={piecesSaid(removal.data.result.kept, labelsHere)} />
+              <div className="flex gap-2">
+                <Button
+                  tone="danger"
+                  disabled={uninstall.isPending}
+                  onClick={() => uninstall.mutate()}
+                >
+                  Désinstaller
+                </Button>
+                <Button onClick={() => setLeaving(false)}>Annuler</Button>
+              </div>
+              <p className="text-xs text-faint">
+                Une seule ligne au journal : annulable d’un geste depuis l’Activité.
+              </p>
+            </>
+          ) : null}
+        </div>
+      </Sheet>
       {/* On a phone and a tablet: the menu as tabs. */}
       <div className="lg:hidden">
         <Tabs

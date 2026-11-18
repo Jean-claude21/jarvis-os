@@ -146,8 +146,90 @@ function piecesOf(bundle: z.infer<typeof bundleSchema>): [string, Piece[]][] {
   return groups;
 }
 
+/**
+ * What one entry of a kind would look like (v3 F7, « essai avec un exemple visible »): drawn from
+ * its model alone — its fields in her words, each with a value of its type — so she sees the app
+ * before she adds it. Nothing is written: an example is not her data.
+ */
+export interface Example {
+  kind: string;
+  label: string;
+  title: string;
+  fields: { name: string; label: string; type: string; value: unknown }[];
+}
+
+const SKIPPED = new Set(['link', 'formula', 'lines', 'file', 'button', 'list']);
+
+/** An example entry for each kind an app brings (four at most, eight fields each). */
+export function examplesOf(raw: Bundle, today = new Date()): Example[] {
+  const bundle = bundleSchema.parse(raw);
+  const day = today.toISOString().slice(0, 10);
+  const valueOf = (field: { type: string; options?: string[] | undefined }): unknown => {
+    switch (field.type) {
+      case 'number':
+      case 'rating':
+        return 3;
+      case 'amount':
+        return 125;
+      case 'progress':
+        return 40;
+      case 'duration':
+        return '1 h 30';
+      case 'date':
+        return day;
+      case 'datetime':
+        return `${day}T09:00`;
+      case 'time':
+        return '09:00';
+      case 'boolean':
+        return true;
+      case 'choice':
+      case 'multi_choice':
+        return field.options?.[0] ?? null;
+      case 'url':
+        return 'https://exemple.fr';
+      case 'email':
+        return 'contact@exemple.fr';
+      case 'phone':
+        return '06 12 34 56 78';
+      case 'location':
+        return 'Lyon';
+      default:
+        return 'Exemple';
+    }
+  };
+  const said = (label: unknown, fallback: string) =>
+    (label as { fr?: string; en?: string } | undefined)?.fr ??
+    (label as { en?: string } | undefined)?.en ??
+    fallback;
+  return bundle.models.slice(0, 4).map((model) => {
+    const data = model.data as {
+      label?: unknown;
+      fields?: { name: string; type: string; label?: unknown; options?: string[] }[];
+    };
+    const label = said(data.label, model.title);
+    return {
+      kind: model.title,
+      label,
+      title: `Exemple de ${label.toLowerCase()}`,
+      fields: (data.fields ?? [])
+        .filter((field) => !SKIPPED.has(field.type))
+        .slice(0, 8)
+        .map((field) => ({
+          name: field.name,
+          label: said(field.label, field.name.replace(/_/g, ' ')),
+          type: field.type,
+          value: valueOf(field),
+        }))
+        .filter((field) => field.value !== null),
+    };
+  });
+}
+
 export interface InstallReport {
   app: string;
+  /** One example entry of each kind it brings, drawn from its models (v3 F7). */
+  examples: Example[];
   created: string[];
   /** Already there (same kind and title): kept as they are. */
   kept: string[];
@@ -167,7 +249,13 @@ export async function installApp(
   dryRun = true,
 ): Promise<Trial<InstallReport>> {
   const bundle = bundleSchema.parse(raw);
-  const report: InstallReport = { app: bundle.app, created: [], kept: [], reuse: [] };
+  const report: InstallReport = {
+    app: bundle.app,
+    examples: examplesOf(bundle),
+    created: [],
+    kept: [],
+    reuse: [],
+  };
   const groups = piecesOf(bundle);
   return trial(tx, dryRun, async () => {
     const { rows: before } = await tx.query<{ id: string | null }>(

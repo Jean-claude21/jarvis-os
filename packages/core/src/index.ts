@@ -241,6 +241,8 @@ export {
 export { migrateKind, migrationSchema, type Migration, type MigrationReport } from './migrations';
 export {
   bundleSchema,
+  examplesOf,
+  type Example,
   exportApp,
   installApp,
   type Bundle,

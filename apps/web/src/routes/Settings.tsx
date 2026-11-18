@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useSearch } from '@tanstack/react-router';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import {
   Bot,
   CalendarSync,
@@ -33,6 +33,8 @@ import {
   type TagTone,
 } from '../ui';
 import { Logo } from '../ui/identity';
+import { toast } from '../ui/more';
+import { useKindName } from '../lib/kinds';
 
 // Réglages (v3 D15, D16): what is hers to set, in four places — her account, her spaces and who
 // is in them, the services Jarvis reaches for her (connections), and the assistants that reach
@@ -194,7 +196,26 @@ interface Member {
   role: 'owner' | 'member' | 'viewer';
   since: string;
   name: string | null;
+  /** The kinds opened to her (v3 F7); null, everything. */
+  kinds?: string[] | null;
 }
+interface SpaceAgent {
+  title: string;
+  data: { role?: string; paused?: boolean; autonomy?: string };
+  state: string;
+}
+/**
+ * How a space is built (migration 0036): every member reads it so her screens draw, none of it is
+ * hers to open or close — the choice is among the kinds that hold a life.
+ */
+const STRUCTURE = new Set(['model', 'page', 'view', 'app', 'area', 'agent', 'rule', 'script']);
+const AGENT_STATE: Record<string, string> = {
+  idle: 'prêt',
+  working: 'au travail',
+  paused: 'en pause',
+  over_budget: 'budget atteint',
+  failing: 'en échec',
+};
 type SpaceFull = Space & { members: Member[] };
 interface Invitation {
   id: string;
@@ -339,6 +360,30 @@ function SpaceDetail({ space, refresh }: { space: SpaceFull; refresh: () => void
       api(`/spaces/${space.id}/members/${person}`, { method: 'DELETE' }),
     onSettled: refresh,
   });
+  // What a member sees (v3 F7): every kind, or those the owner opens her.
+  const [choosing, setChoosing] = useState<{ person: string; kinds: string[] } | null>(null);
+  const spaceKinds = useQuery({
+    queryKey: ['kinds', space.id],
+    queryFn: () => api<{ kind: string; count: number }[]>('/kinds', { space: space.id }),
+    enabled: owner && !space.personal,
+  });
+  const kindName = useKindName();
+  const sees = useMutation({
+    mutationFn: ({ one, kinds }: { one: Member; kinds: string[] | null }) =>
+      api(`/spaces/${space.id}/members/${one.person}/role`, {
+        method: 'POST',
+        body: { role: one.role, kinds },
+      }),
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSuccess: () => setChoosing(null),
+    onSettled: refresh,
+  });
+  // Who works by itself here (v3 F7): its agents, beside the people.
+  const agents = useQuery({
+    queryKey: ['agents', space.id],
+    queryFn: () => api<SpaceAgent[]>('/agents', { space: space.id }),
+  });
+  const here = useSession().space.id === space.id;
   const changed =
     name !== space.name ||
     description !== (space.description ?? '') ||
@@ -421,6 +466,14 @@ function SpaceDetail({ space, refresh }: { space: SpaceFull; refresh: () => void
                 </b>
                 <span className="block truncate text-[12.5px] text-bark">
                   depuis {ago(one.since)}
+                  {one.role !== 'owner' && !space.personal && (
+                    <>
+                      {' · voit '}
+                      {one.kinds?.length
+                        ? one.kinds.map((kind) => kindName(kind)).join(', ')
+                        : 'tout'}
+                    </>
+                  )}
                 </span>
               </span>
               {owner && !self && !space.personal ? (
@@ -443,6 +496,21 @@ function SpaceDetail({ space, refresh }: { space: SpaceFull; refresh: () => void
                   {ROLES.find((r) => r.value === one.role)?.label ?? one.role}
                 </Tag>
               )}
+              {owner && !self && !space.personal && one.role !== 'owner' && (
+                <Button
+                  size="sm"
+                  aria-expanded={choosing?.person === one.person}
+                  onClick={() =>
+                    setChoosing(
+                      choosing?.person === one.person
+                        ? null
+                        : { person: one.person, kinds: one.kinds ?? [] },
+                    )
+                  }
+                >
+                  Ce qu’il voit
+                </Button>
+              )}
               {!space.personal && (owner || self) && (
                 <Button
                   size="sm"
@@ -461,9 +529,77 @@ function SpaceDetail({ space, refresh }: { space: SpaceFull; refresh: () => void
                   {self ? 'Quitter' : 'Retirer'}
                 </Button>
               )}
+              {choosing?.person === one.person && (
+                <form
+                  className="grid w-full gap-2 border-t border-rule pt-3"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    sees.mutate({ one, kinds: choosing.kinds.length ? choosing.kinds : null });
+                  }}
+                >
+                  <span className="text-[12.5px] text-bark">
+                    Ce que {shown} voit et écrit ici. Rien de coché : tout. Le reste lui est caché
+                    par la base elle-même, avec ses liens et son journal.
+                  </span>
+                  <span className="flex flex-wrap gap-x-4 gap-y-1.5">
+                    {(spaceKinds.data ?? [])
+                      .filter((kind) => kind.count > 0 && !STRUCTURE.has(kind.kind.toLowerCase()))
+                      .map((kind) => (
+                        <label key={kind.kind} className="flex items-center gap-1.5 text-[13.5px]">
+                          <input
+                            type="checkbox"
+                            checked={choosing.kinds.includes(kind.kind)}
+                            onChange={(event) =>
+                              setChoosing({
+                                ...choosing,
+                                kinds: event.target.checked
+                                  ? [...choosing.kinds, kind.kind]
+                                  : choosing.kinds.filter((k) => k !== kind.kind),
+                              })
+                            }
+                          />
+                          {kindName(kind.kind)}
+                          <span className="font-mono text-[11px] text-faint">{kind.count}</span>
+                        </label>
+                      ))}
+                  </span>
+                  <span className="flex gap-2">
+                    <Button size="sm" tone="solid" disabled={sees.isPending}>
+                      {choosing.kinds.length ? 'Ouvrir ces types seulement' : 'Tout ouvrir'}
+                    </Button>
+                    <Button size="sm" type="button" onClick={() => setChoosing(null)}>
+                      Annuler
+                    </Button>
+                  </span>
+                </form>
+              )}
             </div>
           );
         })}
+        {(agents.data ?? []).map((agent) => (
+          <div key={`agent:${agent.title}`} className={rowClass + ' flex-wrap'}>
+            <Avatar name={agent.title} size={30} tinted />
+            <span className="min-w-0 flex-1">
+              {here ? (
+                <Link
+                  to="/construire/agents/$name"
+                  params={{ name: agent.title }}
+                  className="block truncate font-semibold hover:underline"
+                >
+                  {agent.title}
+                </Link>
+              ) : (
+                <b className="block truncate font-semibold">{agent.title}</b>
+              )}
+              <span className="block truncate text-[12.5px] text-bark">
+                {agent.data.role ?? 'agent'}
+              </span>
+            </span>
+            <Tag tone="neutral" dot={false}>
+              agent · {AGENT_STATE[agent.state] ?? agent.state}
+            </Tag>
+          </div>
+        ))}
       </Panel>
       {owner && !space.personal && (
         <Panel title="Inviter" icon={<MailPlus size={16} />}>

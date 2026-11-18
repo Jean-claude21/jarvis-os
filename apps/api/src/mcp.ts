@@ -14,6 +14,7 @@ import {
   type ProposalInput,
   replan,
   windowOf,
+  COMPONENTS,
 } from '@jarvis-os/core';
 import { withWho } from './who';
 import { OCCURRENCE_STATES, setOccurrence, type OccurrenceState } from '@jarvis-os/core';
@@ -661,6 +662,26 @@ export async function mcpServerFor(
       annotations: { readOnlyHint: true },
     },
     tool(async ({ space }: { space?: string | undefined }) => act((tx) => kinds(tx, at(space)))),
+  );
+
+  server.registerTool(
+    'components',
+    {
+      description:
+        'The components of Jarvis (v3 D21) — page formats, figures and charts, lists and views, inputs, identity, content, feedback — each with its names (any of them works), what it needs (facets, fields), when to use it, and, for a page block, an example. Read it before writing a « Page » or proposing an app: choose components, never write a layout. `category` or `need` (a facet) narrows the list.',
+      inputSchema: {
+        category: z.string().max(40).optional(),
+        need: z.string().max(40).optional(),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async ({ category, need }: { category?: string | undefined; need?: string | undefined }) =>
+      COMPONENTS.filter(
+        (one) =>
+          (!category || one.category === category) &&
+          (!need || (one.needs?.facets ?? []).includes(need)),
+      ),
+    ),
   );
 
   server.registerTool(

@@ -458,3 +458,11 @@ export {
   type AgentSettings,
   type AgentView,
 } from './agent-node';
+export {
+  COMPONENTS,
+  COMPONENT_CATEGORIES,
+  blockNamed,
+  componentNamed,
+  type ComponentCategory,
+  type ComponentInfo,
+} from './components';

@@ -8,6 +8,7 @@ import {
   LayoutGrid,
   List,
   ListFilter,
+  PanelLeft,
   Search,
   Table2,
   X,
@@ -23,6 +24,7 @@ import type { Field, RenderKey, Row, ViewSearch, ViewChange } from './types';
 // and the renders this source can take. Every choice goes to the URL.
 
 export const RENDER_WORDS: Record<RenderKey, { label: string; icon: LucideIcon }> = {
+  split: { label: 'Liste + détail', icon: PanelLeft },
   list: { label: 'Liste', icon: List },
   cards: { label: 'Cartes', icon: LayoutGrid },
   table: { label: 'Tableau', icon: Table2 },

@@ -425,7 +425,7 @@ function SpaceDetail({ space, refresh }: { space: SpaceFull; refresh: () => void
               </span>
               {owner && !self && !space.personal ? (
                 <select
-                  className={inputClass + ' w-auto'}
+                  className={inputClass.replace('w-full', 'w-auto')}
                   value={one.role}
                   aria-label={`Rôle de ${shown}`}
                   onChange={(e) =>

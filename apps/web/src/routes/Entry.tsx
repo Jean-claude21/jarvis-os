@@ -94,6 +94,14 @@ const label = (one: Record<string, string> | undefined, fallback: string) =>
 
 export function EntryPage() {
   const { id } = useParams({ from: '/entree/$id' });
+  return <EntryView id={id} />;
+}
+
+/**
+ * The fiche of one entry — a page of its own, or the right side of a « Liste + détail » (v3 D21,
+ * `embedded`: one column, the list beside it).
+ */
+export function EntryView({ id, embedded = false }: { id: string; embedded?: boolean }) {
   const { me } = useSession();
   const client = useQueryClient();
   const kindName = useKindName();
@@ -201,7 +209,14 @@ export function EntryPage() {
         }
         actions={who ? <WhoActions who={who} /> : undefined}
       />
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div
+        className={
+          'grid items-start gap-4 ' +
+          (embedded
+            ? '2xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]'
+            : 'lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]')
+        }
+      >
         <div className="flex min-w-0 flex-col gap-4">
           {isFile && (
             <Panel

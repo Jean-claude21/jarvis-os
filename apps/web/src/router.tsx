@@ -67,7 +67,12 @@ const routes = [
     component: AppPage,
     validateSearch: (search: Record<string, unknown>): ViewSearch & { t?: AppTab | undefined } => ({
       ...viewSearch(search),
-      ...(search.t === 'overview' || search.t === 'activity' ? { t: search.t } : {}),
+      ...(search.t === 'overview' ||
+      search.t === 'activity' ||
+      search.t === 'data' ||
+      (typeof search.t === 'string' && /^page:[\w-]{4,64}$/.test(search.t))
+        ? { t: search.t as AppTab }
+        : {}),
     }),
     staticData: {
       crumbs: (params) => [{ label: 'Mes apps', to: '/apps' }, { label: params.name ?? '' }],

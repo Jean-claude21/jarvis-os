@@ -6,6 +6,7 @@ import { shape } from './apply';
 import { BoardRender } from './renders/BoardRender';
 import { CalendarRender } from './renders/CalendarRender';
 import { CardsRender } from './renders/CardsRender';
+import { SplitRender } from './renders/SplitRender';
 import { FilesRender } from './renders/FilesRender';
 import { ListRender } from './renders/ListRender';
 import { TableRender } from './renders/TableRender';
@@ -57,7 +58,11 @@ export function View({
       shape(
         source.rows,
         source.fields,
-        render === 'list' || render === 'cards' || render === 'table' || render === 'timeline'
+        render === 'list' ||
+          render === 'split' ||
+          render === 'cards' ||
+          render === 'table' ||
+          render === 'timeline'
           ? state
           : { ...state, group: undefined },
         kindName,
@@ -92,6 +97,8 @@ export function View({
           <CalendarRender shaped={shaped} state={state} set={set} />
         ) : render === 'timeline' ? (
           <TimelineRender shaped={shaped} fields={source.fields} state={state} set={set} />
+        ) : render === 'split' ? (
+          <SplitRender shaped={shaped} fields={source.fields} state={state} set={set} />
         ) : render === 'cards' ? (
           <CardsRender shaped={shaped} fields={source.fields} group={state.group} />
         ) : render === 'files' ? (

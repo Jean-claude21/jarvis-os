@@ -8,19 +8,22 @@ import { type Kind, useKinds } from '../lib/kinds';
 import {
   AppIcon,
   Button,
+  Caps,
   Empty,
   PageHead,
   Panel,
-  Segmented,
   Sheet,
   Skeleton,
   Tabs,
   Tag,
+  cn,
+  inputClass,
   type TagTone,
 } from '../ui';
+import { Select } from '../ui/more';
+import { PageBlocks, say, type Drawn, type Vocabulary } from '../blocks/Blocks';
 import { Overview } from './Overview';
 import { useFiles, useKindRows } from '../engine/sources';
-import { RENDER_WORDS } from '../engine/Toolbar';
 import type { RenderKey } from '../engine/types';
 import { View } from '../engine/View';
 import { Journal } from './Activity';
@@ -272,7 +275,8 @@ function Section({ title, items, tone }: { title: string; items: string[]; tone?
   );
 }
 
-export type AppTab = 'overview' | 'activity';
+/** Where she is in an app: its overview, a page of it, its data, its activity. */
+export type AppTab = 'overview' | 'activity' | 'data' | `page:${string}`;
 
 /** An app's kinds, those that hold something first. */
 function useAppKinds(name: string) {
@@ -281,18 +285,28 @@ function useAppKinds(name: string) {
   return { mine, isLoading };
 }
 
-// An app (v3 D14), as gr8r shows a project: its tabs — Aperçu, then the renders its kinds allow
-// (by their facets: a board for steps, a calendar and a timeline for dates), its files and its
-// activity — all the same view engine as the views across her life, its source being its kinds.
+// An app (v3 D21, « Modèle d'app »): its menu on the left — Aperçu, its pages (dashboards its
+// bundle declares), its data (each kind, with the renders its facets allow, « Liste + détail »
+// first), its activity — and the content on the right. On a phone, the menu becomes tabs. A richer
+// app adds pages, never a layout: every app is drawn by this one shell.
 export function AppPage() {
   const { name } = useParams({ from: '/apps/$name' });
   const search = useSearch({ from: '/apps/$name' });
   const navigate = useNavigate({ from: '/apps/$name' });
   const { mine, isLoading } = useAppKinds(name);
-  const kinds = mine.map((one) => one.kind);
+  const { data: pages = [] } = useQuery({
+    queryKey: ['pages', name],
+    queryFn: () => api<AppPageRow[]>(`/pages?app=${encodeURIComponent(name)}`),
+  });
+  const withData = mine.filter((one) => one.count > 0);
+  const tab: AppTab = search.t ?? (search.v || search.kind ? 'data' : 'overview');
+  const kind =
+    search.kind && mine.some((one) => one.kind === search.kind) ? search.kind : undefined;
+  const scope = kind ? mine.filter((one) => one.kind === kind) : mine;
   const has = (facet: string) =>
-    mine.some((one) => (one.facets ?? []).some((f) => f.facet === facet));
+    scope.some((one) => (one.facets ?? []).some((f) => f.facet === facet));
   const renders: RenderKey[] = [
+    'split',
     'list',
     ...(has('who') ? (['cards'] as const) : []),
     'table',
@@ -300,24 +314,66 @@ export function AppPage() {
     ...(has('dated') ? (['calendar', 'timeline'] as const) : []),
     'files',
   ];
-  const tab: AppTab | RenderKey =
-    search.t ?? (search.v && renders.includes(search.v) ? search.v : 'overview');
-  const go = (next: AppTab | RenderKey) =>
+  const go = (next: { t?: AppTab; kind?: string }) =>
     void navigate({
       search: (was: Record<string, unknown>) =>
-        (next === 'overview' || next === 'activity'
-          ? { t: next === 'overview' ? undefined : next }
-          : { ...was, t: undefined, v: next }) as never,
+        ({
+          ...(next.t === 'data' ? { v: was.v } : {}),
+          t: next.t === 'overview' ? undefined : next.t,
+          kind: next.kind,
+        }) as never,
       replace: true,
     });
-  const source = useKindRows(kinds);
-  const { files } = useFiles(kinds);
-  const tabs: { key: AppTab | RenderKey; label: string }[] = [
-    { key: 'overview', label: 'Aperçu' },
-    ...renders.map((key) => ({ key, label: RENDER_WORDS[key].label })),
-    { key: 'activity', label: 'Activité' },
+  const names = scope.map((one) => one.kind);
+  const source = useKindRows(names);
+  const { files } = useFiles(names);
+  const page = tab.startsWith('page:') ? pages.find((one) => `page:${one.id}` === tab) : undefined;
+
+  type Item = { key: string; label: string; n?: number; on: boolean; go: () => void };
+  const groups: { title: string | null; items: Item[] }[] = [
+    {
+      title: null,
+      items: [
+        {
+          key: 'overview',
+          label: 'Aperçu',
+          on: tab === 'overview',
+          go: () => go({ t: 'overview' }),
+        },
+      ],
+    },
+    {
+      title: 'Pages',
+      items: pages.map((one) => ({
+        key: one.id,
+        label: say(one.label, one.title),
+        on: tab === `page:${one.id}`,
+        go: () => go({ t: `page:${one.id}` }),
+      })),
+    },
+    {
+      title: 'Données',
+      items: (withData.length ? withData : mine).map((one) => ({
+        key: one.kind,
+        label: nameOf(one),
+        n: one.count,
+        on: tab === 'data' && kind === one.kind,
+        go: () => go({ t: 'data', kind: one.kind }),
+      })),
+    },
+    {
+      title: null,
+      items: [
+        {
+          key: 'activity',
+          label: 'Activité',
+          on: tab === 'activity',
+          go: () => go({ t: 'activity' }),
+        },
+      ],
+    },
   ];
-  const withData = mine.filter((one) => one.count > 0);
+  const all = groups.flatMap((g) => g.items);
   return (
     <>
       <PageHead
@@ -326,40 +382,125 @@ export function AppPage() {
         badge={`${mine.length} type(s)`}
         lead={mine.map((one) => nameOf(one)).join(' · ')}
       />
-      <Tabs tabs={tabs} value={tab} onChange={go} label="Vues de l’app" />
-      {tab === 'overview' ? (
-        isLoading ? (
-          <Skeleton className="h-40" />
-        ) : (
-          <Overview kinds={mine} />
-        )
-      ) : tab === 'activity' ? (
-        <Journal
-          query={`limit=200&kinds=${encodeURIComponent(kinds.join(','))}`}
-          queryKey={['history', 'app', name]}
+      {/* On a phone and a tablet: the menu as tabs. */}
+      <div className="lg:hidden">
+        <Tabs
+          tabs={all.map((one) => ({ key: one.key, label: one.label }))}
+          value={all.find((one) => one.on)?.key ?? 'overview'}
+          onChange={(key) => all.find((one) => one.key === key)?.go()}
+          label="Menu de l’app"
         />
-      ) : (
-        <>
-          {withData.length > 1 && tab !== 'files' && (
-            <Segmented
-              label="Type"
-              value={search.kind ?? ''}
-              onChange={(value) =>
-                void navigate({
-                  search: (was: Record<string, unknown>) =>
-                    ({ ...was, kind: value || undefined }) as never,
-                  replace: true,
-                })
-              }
-              options={[
-                { value: '', label: 'Tous' },
-                ...withData.map((one) => ({ value: one.kind, label: nameOf(one), n: one.count })),
-              ]}
+      </div>
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[200px_minmax(0,1fr)]">
+        <nav aria-label="Menu de l’app" className="sticky top-0 hidden flex-col gap-3 lg:flex">
+          {groups
+            .filter((g) => g.items.length)
+            .map((g, at) => (
+              <div key={at} className="flex flex-col gap-0.5">
+                {g.title && <Caps className="px-2.5 pb-1">{g.title}</Caps>}
+                {g.items.map((one) => (
+                  <button
+                    key={one.key}
+                    onClick={one.go}
+                    aria-current={one.on ? 'page' : undefined}
+                    className={cn(
+                      'flex cursor-pointer items-center gap-2 rounded-[2px] px-2.5 py-1.5 text-left text-[13.5px]',
+                      one.on
+                        ? 'bg-paper font-semibold text-ink shadow-card'
+                        : 'text-bark hover:bg-sand hover:text-ink',
+                    )}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{one.label}</span>
+                    {one.n !== undefined && (
+                      <span className="font-mono text-[11px] text-faint">{one.n}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ))}
+        </nav>
+        <div className="grid min-w-0 auto-rows-max gap-4">
+          {tab === 'overview' ? (
+            isLoading ? (
+              <Skeleton className="h-40" />
+            ) : (
+              <Overview kinds={mine} />
+            )
+          ) : tab === 'activity' ? (
+            <Journal
+              query={`limit=200&kinds=${encodeURIComponent(mine.map((one) => one.kind).join(','))}`}
+              queryKey={['history', 'app', name]}
             />
+          ) : page ? (
+            <PageView id={page.id} />
+          ) : (
+            <View source={source} files={files} renders={renders} />
           )}
-          <View source={source} files={files} renders={[tab as RenderKey]} />
-        </>
+        </div>
+      </div>
+    </>
+  );
+}
+
+interface AppPageRow {
+  id: string;
+  title: string;
+  app: string | null;
+  label: { fr?: string; en?: string } | null;
+}
+interface DrawnPage {
+  id: string;
+  title: string;
+  label: { fr?: string; en?: string } | null;
+  filters: { name: string; type: string; options?: string[]; value: string; label?: unknown }[];
+  blocks: Drawn[];
+  vocabulary: Vocabulary;
+}
+
+/** A page of an app as a dashboard (v3 D21): its filters, then its blocks from the registry. */
+export function PageView({ id }: { id: string }) {
+  const client = useQueryClient();
+  const [params, setParams] = useState<Record<string, string>>({});
+  const query = new URLSearchParams(params).toString();
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['entries', 'page', id, query],
+    queryFn: () => api<DrawnPage>(`/pages/${id}${query ? `?${query}` : ''}`),
+  });
+  if (isLoading) return <Skeleton className="h-60" />;
+  if (error || !data)
+    return <Empty title="Page indisponible" lead={(error as Error | null)?.message ?? ''} />;
+  return (
+    <>
+      {data.filters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {data.filters.map((filter) =>
+            filter.type === 'month' ? (
+              <input
+                key={filter.name}
+                type="month"
+                aria-label={say(filter.label as never, filter.name)}
+                value={params[filter.name] ?? filter.value}
+                onChange={(event) => setParams({ ...params, [filter.name]: event.target.value })}
+                className={inputClass.replace('w-full', 'w-auto')}
+              />
+            ) : filter.type === 'choice' ? (
+              <Select
+                key={filter.name}
+                label={say(filter.label as never, filter.name)}
+                value={params[filter.name] ?? filter.value}
+                onChange={(value) => setParams({ ...params, [filter.name]: value })}
+                options={(filter.options ?? []).map((one) => ({ value: one, label: one }))}
+                className="w-auto"
+              />
+            ) : null,
+          )}
+        </div>
       )}
+      <PageBlocks
+        blocks={data.blocks}
+        vocabulary={data.vocabulary}
+        refresh={() => void client.invalidateQueries({ queryKey: ['entries'] })}
+      />
     </>
   );
 }

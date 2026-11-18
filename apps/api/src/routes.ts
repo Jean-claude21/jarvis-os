@@ -24,6 +24,8 @@ import {
   agentsOf,
   agentSettingsSchema,
   setAgent,
+  COMPONENTS,
+  COMPONENT_CATEGORIES,
 } from '@jarvis-os/core';
 import {
   addFile,
@@ -763,6 +765,18 @@ export function apiRoutes(deps: {
   api.get('/pages', async (c) =>
     c.json(await act(c, (tx, _a, space) => pagesOf(tx, space, c.req.query('app') || undefined))),
   );
+
+  // The components (v3 D21): the registry the catalogue, the pages and the assistants read.
+  api.get('/components', (c) =>
+    c.json({ categories: COMPONENT_CATEGORIES, components: COMPONENTS }),
+  );
+  // A page tried, not kept: its blocks computed on her data (the catalogue's « Essayer »).
+  api.post('/pages/try', async (c) => {
+    const data = (await c.req.json()) as Record<string, unknown>;
+    return c.json(
+      await act(c, (tx, _a, space) => renderPage(tx, space, { id: 'try', title: 'Essai', data })),
+    );
+  });
 
   api.get('/pages/:id', async (c) => {
     const params = { ...c.req.query() };

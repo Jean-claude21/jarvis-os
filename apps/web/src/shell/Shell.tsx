@@ -3,6 +3,7 @@ import { ChevronRight, History, Menu as MenuIcon, Search } from 'lucide-react';
 import { Fragment, useEffect, useState } from 'react';
 import { useLive } from '../lib/live';
 import { DropLayer } from '../lib/upload';
+import { Toaster } from '../ui/more';
 import { IconButton, Sheet, cn } from '../ui';
 import { Palette } from './Palette';
 import { Sidebar } from './Sidebar';
@@ -126,12 +127,13 @@ export function Shell() {
             <History size={16} />
           </IconButton>
         </header>
-        <div className="grid min-h-0 flex-1 auto-rows-max content-start gap-4 overflow-y-auto px-4 pt-5 pb-7 md:px-6">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] auto-rows-max content-start gap-4 overflow-y-auto px-4 pt-5 pb-7 md:px-6">
           <Outlet />
         </div>
       </main>
       <Palette open={search} setOpen={setSearch} />
       <DropLayer />
+      <Toaster />
     </div>
   );
 }

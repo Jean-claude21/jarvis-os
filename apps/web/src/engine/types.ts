@@ -33,7 +33,8 @@ export interface Row {
   who?: Who | null;
 }
 
-export type RenderKey = 'list' | 'cards' | 'table' | 'board' | 'calendar' | 'timeline' | 'files';
+export type RenderKey =
+  'split' | 'list' | 'cards' | 'table' | 'board' | 'calendar' | 'timeline' | 'files';
 
 /** The state of a view, in the URL. */
 export interface ViewSearch {
@@ -51,19 +52,30 @@ export interface ViewSearch {
   /** A calendar's or a timeline's first month: « 2026-11 ». */
   m?: string | undefined;
   zoom?: 'week' | 'month' | undefined;
+  /** « Liste + détail »: the entry read on the right. */
+  sel?: string | undefined;
 }
 
 /** A change of the state: a key set to undefined is taken away. */
 export type ViewChange = { [K in keyof ViewSearch]?: ViewSearch[K] | undefined };
 
-const RENDERS: RenderKey[] = ['list', 'cards', 'table', 'board', 'calendar', 'timeline', 'files'];
+const RENDERS: RenderKey[] = [
+  'split',
+  'list',
+  'cards',
+  'table',
+  'board',
+  'calendar',
+  'timeline',
+  'files',
+];
 /** Reads a view's state from the URL, keeping only what it understands. */
 export function viewSearch(search: Record<string, unknown>): ViewSearch {
   const text = (value: unknown, max = 200) =>
     typeof value === 'string' && value.length <= max ? value : undefined;
   const out: ViewSearch = {};
   if (RENDERS.includes(search.v as RenderKey)) out.v = search.v as RenderKey;
-  for (const key of ['q', 'sort', 'group', 'by', 'f', 'kind'] as const) {
+  for (const key of ['q', 'sort', 'group', 'by', 'f', 'kind', 'sel'] as const) {
     const value = text(search[key]);
     if (value) out[key] = value;
   }

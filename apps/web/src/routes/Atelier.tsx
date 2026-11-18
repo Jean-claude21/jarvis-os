@@ -29,14 +29,18 @@ import {
   type TagTone,
 } from '../ui';
 import { Journal } from './Activity';
+import { toast } from '../ui/more';
+import { ComponentsCatalog } from './Catalog';
 
 // L'Atelier (v3 D12, D17 « Construire »): who works for her — her agents, each a named setting of
 // the one node (its triggers, its executor, its skills, what it reads and writes, how free it is,
 // its budget, its Pause) — and the skills they follow, in the Agent Skills format.
 
-export type AtelierTab = 'agents' | 'skills';
+export type AtelierTab = 'agents' | 'automations' | 'skills' | 'components';
 export const atelierSearch = (search: Record<string, unknown>): { t?: AtelierTab } =>
-  search.t === 'skills' ? { t: 'skills' } : {};
+  search.t === 'skills' || search.t === 'components' || search.t === 'automations'
+    ? { t: search.t }
+    : {};
 
 interface AgentRule {
   id: string;
@@ -169,7 +173,9 @@ export function AtelierPage() {
       <Tabs
         tabs={[
           { key: 'agents', label: 'Agents' },
+          { key: 'automations', label: 'Automatismes' },
           { key: 'skills', label: 'Skills' },
+          { key: 'components', label: 'Composants' },
         ]}
         value={tab}
         label="Atelier"
@@ -177,7 +183,15 @@ export function AtelierPage() {
           void navigate({ to: '/atelier', search: key === 'agents' ? {} : { t: key } })
         }
       />
-      {tab === 'agents' ? <AgentsList /> : <SkillsList />}
+      {tab === 'agents' ? (
+        <AgentsList />
+      ) : tab === 'automations' ? (
+        <Automations />
+      ) : tab === 'skills' ? (
+        <SkillsList />
+      ) : (
+        <ComponentsCatalog />
+      )}
     </>
   );
 }
@@ -266,36 +280,63 @@ const slug = (name: string) =>
 function SkillsList() {
   const { data, isLoading } = useQuery({
     queryKey: ['skills'],
-    queryFn: () => api<{ jarvis?: Skill[] }>('/skills'),
+    queryFn: () => api<{ jarvis?: Skill[]; mine?: MineSkill[] }>('/skills'),
   });
   if (isLoading) return <Skeleton className="h-40" />;
   const skills = data?.jarvis ?? [];
   return (
-    <Panel
-      title="Les skills de Jarvis"
-      icon={<BookOpen size={16} />}
-      action={
-        <span className="text-xs text-faint">
-          au format Agent Skills : ils marchent aussi dans Claude
-        </span>
-      }
-    >
-      {skills.map((one) => (
-        <div key={one.name} className={rowClass + ' flex-wrap'}>
-          <span className="min-w-0 flex-1">
-            <b className="block truncate font-semibold">{one.name}</b>
-            <span className="line-clamp-2 text-[12.5px] text-bark">Quand {one.when}</span>
+    <div className="grid items-start gap-4 xl:grid-cols-2">
+      <Panel
+        title="Les skills de Jarvis"
+        icon={<BookOpen size={16} />}
+        action={
+          <span className="text-xs text-faint">
+            au format Agent Skills : ils marchent aussi dans Claude
           </span>
-          <a
-            href={`/api/skills/${slug(one.name)}/SKILL.md?download=1`}
-            className="inline-flex h-8 flex-none items-center gap-1.5 rounded-[2px] border border-rule bg-paper px-2.5 text-[13px] font-semibold hover:border-rule-strong"
-          >
-            <Download size={14} />
-            SKILL.md
-          </a>
-        </div>
-      ))}
-    </Panel>
+        }
+      >
+        {skills.map((one) => (
+          <div key={one.name} className={rowClass + ' flex-wrap'}>
+            <span className="min-w-0 flex-1">
+              <b className="block truncate font-semibold">{one.name}</b>
+              <span className="line-clamp-2 text-[12.5px] text-bark">Quand {one.when}</span>
+            </span>
+            <a
+              href={`/api/skills/${slug(one.name)}/SKILL.md?download=1`}
+              className="inline-flex h-8 flex-none items-center gap-1.5 rounded-[2px] border border-rule bg-paper px-2.5 text-[13px] font-semibold hover:border-rule-strong"
+            >
+              <Download size={14} />
+              SKILL.md
+            </a>
+          </div>
+        ))}
+      </Panel>
+      <Panel title="Tes skills" icon={<BookOpen size={16} />}>
+        {!(data?.mine ?? []).length ? (
+          <p className="px-4 py-4 text-[13px] text-bark">
+            Aucun skill à toi : dis à Claude « fais-en un skill » après une façon de faire qui te
+            plaît.
+          </p>
+        ) : (
+          (data?.mine ?? []).map((one) => (
+            <div key={one.id} className={rowClass}>
+              <span className="min-w-0 flex-1">
+                <Link
+                  to="/entree/$id"
+                  params={{ id: one.id }}
+                  className="block truncate font-semibold hover:underline"
+                >
+                  {one.title}
+                </Link>
+                <span className="line-clamp-2 text-[12.5px] text-bark">
+                  {one.when || one.excerpt}
+                </span>
+              </span>
+            </div>
+          ))
+        )}
+      </Panel>
+    </div>
   );
 }
 
@@ -559,3 +600,238 @@ const COUNT_WORDS: Record<string, string> = {
   skipped: 'déjà là',
   problems: 'problème(s)',
 };
+
+interface RuleEntry {
+  id: string;
+  title: string;
+  data: {
+    when?: Record<string, unknown>;
+    then?: Record<string, unknown>[];
+    agent?: string;
+    app?: string;
+    active?: boolean;
+    next?: string;
+    error?: string;
+  };
+}
+interface MineSkill {
+  id: string;
+  title: string;
+  when: string;
+  phrases: string[];
+  repeat: string | null;
+  saved: string | null;
+  excerpt: string;
+}
+
+/** What a rule does, in her words. */
+function thenText(then: Record<string, unknown>[] | undefined, kindName: (kind: string) => string) {
+  return (then ?? [])
+    .map((action) => {
+      if (action.create)
+        return `crée un(e) ${kindName(String((action.create as { kind?: string }).kind ?? '')).toLowerCase()}`;
+      if (action.update) return 'change des champs';
+      if (action.link) return 'relie';
+      if (action.remind)
+        return `te rappelle « ${String((action.remind as { text?: string }).text ?? '')} »`;
+      if (action.run_script)
+        return `lance le script « ${String((action.run_script as { script?: string }).script ?? '')} »`;
+      if (action.call)
+        return `appelle ${String((action.call as { connection?: string }).connection ?? 'un service')}`;
+      return '';
+    })
+    .filter(Boolean)
+    .join(', puis ');
+}
+
+/**
+ * Everything that runs by itself, in one place (v3 D12): her rules — with their agent or none —
+ * and her routines, each with when it runs, what it does, and a way to stop it. And the simplest
+ * one made here: « chaque jour à 7 h, rappelle-moi… ».
+ */
+function Automations() {
+  const kindName = useKindName();
+  const client = useQueryClient();
+  const rules = useQuery({
+    queryKey: ['entries', 'rules'],
+    queryFn: () => api<RuleEntry[]>('/entries?kind=Rule&limit=200'),
+  });
+  const skills = useQuery({
+    queryKey: ['skills'],
+    queryFn: () => api<{ mine?: MineSkill[] }>('/skills'),
+  });
+  const [time, setTime] = useState('07:00');
+  const [text, setText] = useState('');
+  const refresh = () => {
+    void client.invalidateQueries({ queryKey: ['entries', 'rules'] });
+    void client.invalidateQueries({ queryKey: ['agents'] });
+  };
+  const toggle = useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
+      api('/save', { method: 'POST', body: { entries: [{ id, data: { active } }] } }),
+    onSettled: refresh,
+  });
+  const make = useMutation({
+    mutationFn: () => {
+      const [h, m] = time.split(':');
+      return api('/save', {
+        method: 'POST',
+        body: {
+          entries: [
+            {
+              kind: 'Rule',
+              title: `Chaque jour à ${time} : ${text}`.slice(0, 120),
+              data: {
+                when: { schedule: `${Number(m)} ${Number(h)} * * *` },
+                then: [{ remind: { text } }],
+                agent: 'Veilleur d’échéances',
+              },
+            },
+          ],
+        },
+      });
+    },
+    onSuccess: () => {
+      setText('');
+      toast('Automatisme créé : il apparaît ci-dessous et chez le Veilleur.');
+    },
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSettled: refresh,
+  });
+  if (rules.isLoading) return <Skeleton className="h-40" />;
+  const list = (rules.data ?? []).filter((one) => one.data.when);
+  const mine = skills.data?.mine ?? [];
+  return (
+    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+      <Panel title="Ce qui tourne tout seul" icon={<Workflow size={16} />}>
+        {!list.length ? (
+          <Empty
+            title="Aucun automatisme"
+            lead="Les apps en apportent ; tu peux en créer un à droite, ou le demander à Claude."
+          />
+        ) : (
+          list.map((rule) => {
+            const active = rule.data.active !== false;
+            return (
+              <div key={rule.id} className={rowClass + ' flex-wrap'}>
+                <span className="min-w-0 flex-1">
+                  <Link
+                    to="/entree/$id"
+                    params={{ id: rule.id }}
+                    className="block truncate font-semibold hover:underline"
+                  >
+                    {rule.title}
+                  </Link>
+                  <span className="block text-[12.5px] text-bark">
+                    {whenText(rule.data.when ?? {}, kindName)} ·{' '}
+                    {thenText(rule.data.then, kindName) || '—'}
+                  </span>
+                  <span className="block truncate text-[12px] text-faint">
+                    {rule.data.agent ? (
+                      <>
+                        par{' '}
+                        <Link
+                          to="/atelier/agents/$name"
+                          params={{ name: rule.data.agent }}
+                          className="font-semibold text-bark hover:underline"
+                        >
+                          {rule.data.agent}
+                        </Link>
+                      </>
+                    ) : (
+                      'sans agent'
+                    )}
+                    {rule.data.app ? ` · ${rule.data.app}` : ''}
+                    {rule.data.next
+                      ? ` · prochaine fois ${new Date(rule.data.next).toLocaleString('fr', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
+                      : ''}
+                  </span>
+                  {rule.data.error && (
+                    <span className="block truncate text-[12px] text-error">{rule.data.error}</span>
+                  )}
+                </span>
+                {!active && <Tag tone="neutral">arrêté</Tag>}
+                <Button
+                  size="sm"
+                  disabled={toggle.isPending}
+                  onClick={() => toggle.mutate({ id: rule.id, active: !active })}
+                >
+                  {active ? <Pause size={14} /> : <Play size={14} />}
+                  {active ? 'Arrêter' : 'Reprendre'}
+                </Button>
+              </div>
+            );
+          })
+        )}
+      </Panel>
+      <div className="grid gap-4">
+        <Panel title="Chaque jour, à heure fixe" icon={<Gauge size={16} />}>
+          <form
+            className="grid gap-2 px-4 py-3 text-[13px]"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (text.trim()) make.mutate();
+            }}
+          >
+            <span className="flex flex-wrap items-center gap-2">
+              Chaque jour à
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className={inputClass.replace('w-full', 'w-auto')}
+                aria-label="Heure"
+              />
+              rappelle-moi :
+            </span>
+            <input
+              className={inputClass}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="« Regarder mes offres du jour »"
+              aria-label="Le rappel"
+            />
+            <span>
+              <Button tone="solid" disabled={!text.trim() || make.isPending}>
+                Créer
+              </Button>
+            </span>
+            <p className="text-xs text-faint">
+              Pour plus (un bilan écrit, une page à ouvrir, une collecte), dis-le à Claude : il crée
+              l’automatisme et son agent, visibles ici.
+            </p>
+          </form>
+        </Panel>
+        <Panel title="Tes routines" icon={<BookOpen size={16} />}>
+          {!mine.length ? (
+            <p className="px-4 py-4 text-[13px] text-bark">
+              Aucune routine à toi : un bilan du soir, une revue de la semaine… se créent avec
+              Claude.
+            </p>
+          ) : (
+            mine.map((one) => (
+              <div key={one.id} className={rowClass}>
+                <span className="min-w-0 flex-1">
+                  <Link
+                    to="/entree/$id"
+                    params={{ id: one.id }}
+                    className="block truncate font-semibold hover:underline"
+                  >
+                    {one.title}
+                  </Link>
+                  <span className="block truncate text-[12.5px] text-bark">
+                    {one.repeat
+                      ? `répétée : ${one.repeat}`
+                      : one.phrases.length
+                        ? `quand tu dis « ${one.phrases[0]} »`
+                        : one.when || 'à la demande'}
+                  </span>
+                </span>
+              </div>
+            ))
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+}

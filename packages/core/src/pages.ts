@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { agenda } from './agenda';
+import { blockNamed } from './components';
 import { readerOf, type EntryView, type Reader } from './compute';
 import type { Tx } from './db';
 import { evaluate, isScope, parse, todayOf, type Clock } from './formula';
@@ -221,7 +222,19 @@ export type PageData = z.infer<typeof pageDataSchema>;
 
 /** A page's shape, checked; throws a sentence that says what to fix. */
 export function checkPage(data: unknown): PageData {
-  const parsed = pageDataSchema.safeParse(data);
+  // A block may be named in her words (« jauge », « entonnoir »): the registry says which (v3 D21).
+  const named =
+    data && typeof data === 'object' && Array.isArray((data as { blocks?: unknown }).blocks)
+      ? {
+          ...(data as Record<string, unknown>),
+          blocks: ((data as { blocks: unknown[] }).blocks ?? []).map((one) =>
+            one && typeof one === 'object' && typeof (one as { block?: unknown }).block === 'string'
+              ? { ...(one as object), block: blockNamed((one as { block: string }).block) }
+              : one,
+          ),
+        }
+      : data;
+  const parsed = pageDataSchema.safeParse(named);
   if (!parsed.success) {
     const issues = parsed.error.issues
       .map((issue) => `${issue.path.join('.') || 'page'}: ${issue.message}`)

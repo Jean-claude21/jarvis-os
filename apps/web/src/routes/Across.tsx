@@ -3,6 +3,7 @@ import { useAgendaRows, useFiles, useKindRows, useTaskRows } from '../engine/sou
 import { addDays, mondayOf, monthOf, timelineRange } from '../engine/renders/time';
 import { useViewState, View } from '../engine/View';
 import { PageHead, Segmented } from '../ui';
+import { GENRE_WORDS } from '../lib/words';
 
 // The views across her whole life (v3 D2, D10): one per facet, every app at once — the agenda
 // (what is dated), the tasks (what is to do), the documents (her files), the people (who). The
@@ -94,7 +95,27 @@ export function DocumentsPage() {
         title="Documents"
         lead="Tes fichiers, d’où qu’ils viennent : déposés, envoyés par Telegram, liés à tes entrées."
       />
-      <View source={{ rows: [], fields: [], loading }} files={files} renders={['files']} />
+      <View
+        source={{
+          // Her files as rows too: read one by one in « Liste + détail » (v3 D21).
+          rows: files.map((file) => ({
+            id: file.entryId,
+            kind: 'Fichier',
+            title: file.title || file.name,
+            values: {
+              genre: file.genre ? (GENRE_WORDS[file.genre] ?? null) : null,
+              linked: file.links.map((link) => link.title).join(', ') || null,
+            },
+          })),
+          fields: [
+            { path: 'genre', type: 'text', label: 'Genre' },
+            { path: 'linked', type: 'text', label: 'Lié à' },
+          ],
+          loading,
+        }}
+        files={files}
+        renders={['files', 'split']}
+      />
     </>
   );
 }
@@ -141,7 +162,7 @@ export function PeoplePage() {
           />
         </div>
       )}
-      <View source={source} renders={['cards', 'list', 'table']} />
+      <View source={source} renders={['split', 'cards', 'list', 'table']} />
     </>
   );
 }

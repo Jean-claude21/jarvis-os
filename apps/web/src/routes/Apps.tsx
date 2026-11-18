@@ -42,6 +42,8 @@ interface CatalogApp {
   description: string | { fr?: string; en?: string };
   release: number;
   kinds: string[];
+  /** Each kind in her words (« Goal » → « Objectif »). */
+  labels?: Record<string, string>;
   installed: number | null;
 }
 interface Tried<T> {
@@ -63,14 +65,24 @@ interface UpdateReport {
 
 const words = (one: CatalogApp['description']) =>
   typeof one === 'string' ? one : (one.fr ?? one.en ?? '');
-/** « Model « Plante » » → « Plante (type) »: the pieces in her words. */
-const piece = (text: string) =>
-  text
-    .replace(/^Model « (.*) »$/, '$1 (type)')
-    .replace(/^Page « (.*) »$/, '$1 (page)')
-    .replace(/^Rule « (.*) »$/, '$1 (règle)')
-    .replace(/^Script « (.*) »$/, '$1 (script)')
-    .replace(/^App « (.*) »$/, '$1 (app)');
+/**
+ * What an app adds, in her words (v3 D2): its kinds by their names (« Objectif »), its pages, its
+ * automations and its agents; never « Model » or « type ». The app itself is not listed.
+ */
+const piecesSaid = (pieces: string[], labels: Record<string, string> = {}) =>
+  pieces
+    .filter((text) => !/^App « /.test(text))
+    .map((text) =>
+      text
+        .replace(/^Model « (.*) »$/, (_m, kind: string) => labels[kind] ?? kind)
+        .replace(
+          /^Page « (.*) »$/,
+          (_m, page: string) => `page « ${labels[`page:${page}`] ?? page} »`,
+        )
+        .replace(/^Rule « (.*) »$/, 'automatisme « $1 »')
+        .replace(/^Script « (.*) »$/, 'calcul « $1 »')
+        .replace(/^Agent « (.*) »$/, '$1 (agent)'),
+    );
 
 // Her apps and the catalogue (v3 D14): the ones she has (a newer release offered, layer by layer),
 // the ones Jarvis ships — each tried first: what it would create, what of hers it can use.
@@ -212,15 +224,22 @@ export function Apps() {
               <>
                 {'reuse' in report ? (
                   <>
-                    <Section title="Ce qu’elle crée" items={report.created.map(piece)} />
+                    <Section
+                      title="Ce qu’elle ajoute"
+                      items={piecesSaid(report.created, open.app.labels)}
+                    />
                     {report.kept.length > 0 && (
-                      <Section title="Déjà là, gardé tel quel" items={report.kept.map(piece)} />
+                      <Section
+                        title="Déjà là, gardé tel quel"
+                        items={piecesSaid(report.kept, open.app.labels)}
+                      />
                     )}
                     {report.reuse.length > 0 && (
                       <Section
                         title="Ce que tu as déjà et qu’elle peut utiliser"
                         items={report.reuse.map(
-                          (one) => `${one.count} « ${one.from} » → ${one.to}`,
+                          (one) =>
+                            `tes ${one.count} « ${one.from} » deviennent des « ${open.app.labels?.[one.to] ?? one.to} »`,
                         )}
                       />
                     )}
@@ -230,12 +249,15 @@ export function Apps() {
                     <p className="text-[13px]">
                       Version {report.from} → {report.to}. Ce que tu as changé reste à toi.
                     </p>
-                    <Section title="Mis à jour" items={report.updated.map(piece)} />
-                    <Section title="Ajouté" items={report.created.map(piece)} />
+                    <Section
+                      title="Mis à jour"
+                      items={piecesSaid(report.updated, open.app.labels)}
+                    />
+                    <Section title="Ajouté" items={piecesSaid(report.created, open.app.labels)} />
                     {report.conflicts.length > 0 && (
                       <Section
                         title="Gardé comme tu l’as fait (l’app l’a aussi changé)"
-                        items={report.conflicts.map(piece)}
+                        items={piecesSaid(report.conflicts, open.app.labels)}
                         tone="late"
                       />
                     )}
@@ -379,7 +401,6 @@ export function AppPage() {
       <PageHead
         title={name}
         icon={<AppIcon name={name} size={28} />}
-        badge={`${mine.length} type(s)`}
         lead={mine.map((one) => nameOf(one)).join(' · ')}
       />
       {/* On a phone and a tablet: the menu as tabs. */}

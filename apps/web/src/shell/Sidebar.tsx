@@ -6,7 +6,8 @@ import { api } from '../lib/api';
 import { useKinds } from '../lib/kinds';
 import { useSession } from '../lib/session';
 import { AppIcon, Avatar, Caps, Menu, SpaceDot, cn } from '../ui';
-import { ACROSS, APPS, TODAY } from './nav';
+import { ACROSS, APPS, QUEUE, TODAY } from './nav';
+import { useQueue } from '../routes/Queue';
 
 // The sidebar, as J-C's design system draws it: on the canvas, the space switcher on top, the
 // search, the groups in mono capitals, the current item lifted on paper, her account at the bottom.
@@ -53,9 +54,10 @@ export function Sidebar({
     queryKey: ['now'],
     queryFn: () => api<{ items: { group: string }[] }>('/now'),
   });
-  const waiting = (now?.items ?? []).filter((one) =>
-    ['proposed', 'fix', 'late'].includes(one.group),
-  ).length;
+  // Two counts, two meanings: what slips today (late, to fix) on « Aujourd'hui », what waits for
+  // her yes on « À valider ».
+  const slipping = (now?.items ?? []).filter((one) => ['fix', 'late'].includes(one.group)).length;
+  const { data: queue = [] } = useQueue();
   const spaceMenu = me.spaces.map((one) => ({
     label: (
       <span className="flex min-w-0 items-center gap-2">
@@ -106,15 +108,35 @@ export function Sidebar({
         >
           <TODAY.icon size={16} className="flex-none" />
           <span className="flex-1 truncate">{TODAY.label}</span>
-          {waiting > 0 && (
-            <span className="rounded-[2px] bg-primary px-1.5 py-[3px] font-mono text-[11px] leading-none text-on-primary">
-              {waiting}
+          {slipping > 0 && (
+            <span
+              className="rounded-[2px] bg-primary px-1.5 py-[3px] font-mono text-[11px] leading-none text-on-primary"
+              title="En retard ou à régler"
+            >
+              {slipping}
+            </span>
+          )}
+        </Link>
+        <Link
+          to={QUEUE.to}
+          onClick={onNavigate}
+          className={item}
+          activeProps={{ className: current }}
+        >
+          <QUEUE.icon size={16} className="flex-none" />
+          <span className="flex-1 truncate">{QUEUE.label}</span>
+          {queue.length > 0 && (
+            <span
+              className="rounded-[2px] bg-ochre px-1.5 py-[3px] font-mono text-[11px] leading-none text-on-primary"
+              title="Attend ton oui"
+            >
+              {queue.length}
             </span>
           )}
         </Link>
 
         {across.length > 0 && (
-          <Group label="À travers ma vie">
+          <Group label="Ma vie">
             {across.map(({ to, label, icon: Icon }) => (
               <Link
                 key={to}
@@ -175,13 +197,13 @@ export function Sidebar({
 
       <div className="flex flex-col gap-0.5">
         <Link
-          to="/atelier"
+          to="/construire"
           onClick={onNavigate}
           className={item}
           activeProps={{ className: current }}
         >
           <Hammer size={16} />
-          <span>Atelier</span>
+          <span>Construire</span>
         </Link>
         <Link
           to="/reglages"

@@ -3,6 +3,9 @@ import {
   CheckSquare,
   FileText,
   History,
+  Inbox,
+  Target,
+  Wallet,
   LayoutGrid,
   Sun,
   Users,
@@ -30,7 +33,12 @@ export const ACROSS: AcrossItem[] = [
   { facet: 'todo', to: '/taches', label: 'Tâches', icon: CheckSquare },
   { facet: 'document', to: '/documents', label: 'Documents', icon: FileText },
   { facet: 'who', to: '/personnes', label: 'Personnes', icon: Users },
+  { facet: 'amount', to: '/argent', label: 'Argent', icon: Wallet },
+  { facet: 'measurable', to: '/objectifs', label: 'Objectifs', icon: Target },
 ];
+
+/** What waits for her yes (v3 D13), always in the menu. */
+export const QUEUE: NavItem = { to: '/a-valider', label: 'À valider', icon: Inbox };
 
 export const APPS: NavItem = { to: '/apps', label: 'Toutes les apps', icon: LayoutGrid };
 export const JOURNAL: NavItem = { to: '/activite', label: 'Activité', icon: History };

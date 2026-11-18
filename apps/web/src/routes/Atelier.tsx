@@ -166,7 +166,7 @@ export function AtelierPage() {
   return (
     <>
       <PageHead
-        title="Atelier"
+        title="Construire"
         lead="Ce qui travaille pour toi, comment, et dans quelles limites."
       />
       <Tabs
@@ -176,9 +176,9 @@ export function AtelierPage() {
           { key: 'components', label: 'Composants' },
         ]}
         value={tab}
-        label="Atelier"
+        label="Construire"
         onChange={(key) =>
-          void navigate({ to: '/atelier', search: key === 'automations' ? {} : { t: key } })
+          void navigate({ to: '/construire', search: key === 'automations' ? {} : { t: key } })
         }
       />
       {tab === 'automations' ? (
@@ -299,7 +299,7 @@ function SkillsList() {
 }
 
 export function AgentPage() {
-  const { name } = useParams({ from: '/atelier/agents/$name' });
+  const { name } = useParams({ from: '/construire/agents/$name' });
   const kindName = useKindName();
   const client = useQueryClient();
   const { data, isLoading } = useAgents();
@@ -825,7 +825,7 @@ function AgentGroups({
               <span className="flex min-w-0 items-center gap-2.5">
                 <Avatar name={agent.title} size={26} tinted />
                 <Link
-                  to="/atelier/agents/$name"
+                  to="/construire/agents/$name"
                   params={{ name: agent.title }}
                   className="truncate hover:underline"
                 >

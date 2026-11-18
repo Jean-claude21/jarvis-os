@@ -1,7 +1,15 @@
-import { createRootRoute, createRoute, createRouter } from '@tanstack/react-router';
+import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router';
 import { Activity, type ActivitySearch } from './routes/Activity';
 import { AppPage, Apps, type AppTab } from './routes/Apps';
-import { AgendaPage, DocumentsPage, PeoplePage, TasksPage } from './routes/Across';
+import {
+  AgendaPage,
+  DocumentsPage,
+  GoalsPage,
+  MoneyPage,
+  PeoplePage,
+  TasksPage,
+} from './routes/Across';
+import { QueuePage } from './routes/Queue';
 import { viewSearch, type ViewSearch } from './engine/types';
 import { EntryPage } from './routes/Entry';
 import { AgentPage, AtelierPage, atelierSearch } from './routes/Atelier';
@@ -88,19 +96,33 @@ const routes = [
   viewPage('/taches', 'Tâches', TasksPage),
   viewPage('/documents', 'Documents', DocumentsPage),
   viewPage('/personnes', 'Personnes', PeoplePage),
+  viewPage('/argent', 'Argent', MoneyPage),
+  viewPage('/objectifs', 'Objectifs', GoalsPage),
+  page('/a-valider', 'À valider', QueuePage),
+  // « Atelier » became « Construire » (v3 F1): the old addresses still lead there.
   createRoute({
     getParentRoute: () => root,
     path: '/atelier',
-    component: AtelierPage,
-    validateSearch: atelierSearch,
-    staticData: { crumbs: () => [{ label: 'Atelier', to: '/atelier' }] },
+    beforeLoad: ({ search }) => {
+      throw redirect({ to: '/construire', search: search as never });
+    },
   }),
   createRoute({
     getParentRoute: () => root,
-    path: '/atelier/agents/$name',
+    path: '/construire',
+    component: AtelierPage,
+    validateSearch: atelierSearch,
+    staticData: { crumbs: () => [{ label: 'Construire', to: '/construire' }] },
+  }),
+  createRoute({
+    getParentRoute: () => root,
+    path: '/construire/agents/$name',
     component: AgentPage,
     staticData: {
-      crumbs: (params) => [{ label: 'Atelier', to: '/atelier' }, { label: params.name ?? '' }],
+      crumbs: (params) => [
+        { label: 'Construire', to: '/construire' },
+        { label: params.name ?? '' },
+      ],
     },
   }),
   createRoute({

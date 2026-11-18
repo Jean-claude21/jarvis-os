@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router';
 import { Check, X } from 'lucide-react';
 import { api } from '../lib/api';
 import { useKindName } from '../lib/kinds';
-import { Button, Panel, Tag, rowClass, type TagTone } from '../ui';
+import { Button, Empty, PageHead, Panel, Tag, rowClass, type TagTone } from '../ui';
 
 // « À valider » (v3 D13): the one queue of what waits for her yes — the core's own (spec 046):
 // captures to file, entries proposed, proposals that make several entries, kinds that are one.
@@ -205,5 +205,28 @@ export function QueuePanel() {
         ))}
       </div>
     </Panel>
+  );
+}
+
+/** « À valider » as a page of its own (v3 D13): reachable from the menu at any moment. */
+export function QueuePage() {
+  const { data = [], isLoading } = useQueue();
+  return (
+    <>
+      <PageHead
+        title="À valider"
+        lead="Tout ce qui attend ton oui : ce que Jarvis a lu, ce qu’un assistant propose, les doublons. Rien ne se fait sans toi, et tout s’annule."
+      />
+      {isLoading ? null : data.length ? (
+        <QueuePanel />
+      ) : (
+        <Panel>
+          <Empty
+            title="Rien n’attend ton oui"
+            lead="Ce qu’un agent ou un document te propose arrivera ici."
+          />
+        </Panel>
+      )}
+    </>
   );
 }

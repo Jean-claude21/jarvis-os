@@ -1,8 +1,13 @@
-import { useKinds } from '../lib/kinds';
+import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
+import { Target } from 'lucide-react';
+import { api } from '../lib/api';
+import { useKinds, useKindName } from '../lib/kinds';
+import { GaugeBar } from '../blocks/charts';
 import { useAgendaRows, useFiles, useKindRows, useTaskRows } from '../engine/sources';
 import { addDays, mondayOf, monthOf, timelineRange } from '../engine/renders/time';
 import { useViewState, View } from '../engine/View';
-import { PageHead, Segmented } from '../ui';
+import { PageHead, Panel, Segmented, Stat, Stats } from '../ui';
 import { GENRE_WORDS } from '../lib/words';
 
 // The views across her whole life (v3 D2, D10): one per facet, every app at once — the agenda
@@ -163,6 +168,147 @@ export function PeoplePage() {
         </div>
       )}
       <View source={source} renders={['split', 'cards', 'list', 'table']} />
+    </>
+  );
+}
+
+/** Her kinds with this facet, with the facet's settings (the fields it names). */
+function useFacetKinds(facet: string) {
+  const { data = [] } = useKinds();
+  return data
+    .filter((one) => one.count > 0 && (one.facets ?? []).some((f) => f.facet === facet))
+    .map((one) => ({
+      kind: one.kind,
+      facet: (one.facets ?? []).find((f) => f.facet === facet) as Record<string, string>,
+    }));
+}
+
+const euros = (n: number) =>
+  n.toLocaleString('fr', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+/**
+ * Argent (v3 D5, « montant »): everything with an amount, every app at once — this month's money
+ * in and out where her entries say which way, the total of each kind, then the entries themselves.
+ */
+export function MoneyPage() {
+  const kindName = useKindName();
+  const kinds = useFacetKinds('amount');
+  const source = useKindRows(kinds.map((one) => one.kind));
+  const month = new Date().toISOString().slice(0, 7);
+  const thisMonth = source.rows.filter((row) => (row.start ?? '').slice(0, 7) === month);
+  const amountOf = (row: (typeof source.rows)[number]) => {
+    const path = kinds.find((one) => one.kind === row.kind)?.facet.amount;
+    const value = path ? row.values[path] : null;
+    return typeof value === 'number' ? value : 0;
+  };
+  // Which way the money goes, when her entries say it (a « direction » in or out).
+  const way = (row: (typeof source.rows)[number]) => {
+    const value = String(row.values.direction ?? row.values.sens ?? '');
+    return /^(in|entr)/i.test(value) ? 'in' : /^(out|sort)/i.test(value) ? 'out' : null;
+  };
+  const income = thisMonth.filter((row) => way(row) === 'in').reduce((s, r) => s + amountOf(r), 0);
+  const spent = thisMonth.filter((row) => way(row) === 'out').reduce((s, r) => s + amountOf(r), 0);
+  const byKind = kinds
+    .map((one) => ({
+      kind: one.kind,
+      n: source.rows.filter((row) => row.kind === one.kind).length,
+      total: source.rows
+        .filter((row) => row.kind === one.kind)
+        .reduce((s, r) => s + amountOf(r), 0),
+    }))
+    // A kind whose entries say which way the money goes is in the in/out figures already.
+    .filter((one) => one.n > 0)
+    .filter((one) => !source.rows.some((row) => row.kind === one.kind && way(row) !== null));
+  const label = new Date().toLocaleDateString('fr', { month: 'long' });
+  return (
+    <>
+      <PageHead
+        title="Argent"
+        lead="Tout ce qui a un montant, dans toutes tes apps : ce qui entre, ce qui sort, ce qui reste à payer."
+      />
+      <Stats>
+        <Stat
+          label={`Entrées en ${label}`}
+          value={euros(income)}
+          sub="ce que tes entrées disent entrant"
+        />
+        <Stat
+          label={`Sorties en ${label}`}
+          value={euros(spent)}
+          sub="ce que tes entrées disent sortant"
+        />
+        {byKind.slice(0, 2).map((one) => (
+          <Stat
+            key={one.kind}
+            label={kindName(one.kind)}
+            value={euros(one.total)}
+            sub={`${one.n} en tout`}
+          />
+        ))}
+      </Stats>
+      <View source={source} renders={['table', 'list', 'split']} defaults={{ group: 'kind' }} />
+    </>
+  );
+}
+
+interface Goal {
+  id: string;
+  ratio: number | null;
+}
+
+/**
+ * Objectifs (v3 D5, « mesurable »; D6): everything that moves toward a target, every app at once —
+ * a goal, a fund's budget, a habit's consistency — each with where it stands, then the entries.
+ */
+export function GoalsPage() {
+  const kinds = useFacetKinds('measurable');
+  const source = useKindRows(kinds.map((one) => one.kind));
+  // A goal's progress is computed from what feeds it (its steps, spec Objectifs).
+  const { data: goals = [] } = useQuery({
+    queryKey: ['entries', 'goals'],
+    queryFn: () => api<Goal[]>('/goals'),
+    enabled: kinds.length > 0,
+  });
+  // What feeds a goal (its steps) says how far it is, before a figure kept on it.
+  const ratioOf = (row: (typeof source.rows)[number]) =>
+    goals.find((goal) => goal.id === row.id)?.ratio ?? row.progress ?? null;
+  const targetOf = (row: (typeof source.rows)[number]) => {
+    const path = kinds.find((one) => one.kind === row.kind)?.facet.target;
+    const value = path ? row.values[path] : null;
+    return typeof value === 'number' && value > 0 ? value : null;
+  };
+  const shown = source.rows.filter((row) => ratioOf(row) !== null);
+  return (
+    <>
+      <PageHead
+        title="Objectifs"
+        lead="Tout ce qui avance vers une cible, dans toutes tes apps : où tu en es, et ce qui reste."
+      />
+      {shown.length > 0 && (
+        <Panel title="Où j’en suis" icon={<Target size={16} />}>
+          <div className="grid gap-3 px-4 py-3 md:grid-cols-2">
+            {shown.map((row) => {
+              const ratio = ratioOf(row)!;
+              const target = targetOf(row);
+              return (
+                <Link
+                  key={row.id}
+                  to="/entree/$id"
+                  params={{ id: row.id }}
+                  className="block hover:opacity-90"
+                >
+                  <GaugeBar
+                    label={row.title}
+                    value={target ? Math.round(ratio * target * 10) / 10 : Math.round(ratio * 100)}
+                    max={target ?? 100}
+                  />
+                </Link>
+              );
+            })}
+          </div>
+        </Panel>
+      )}
+      <View source={source} renders={['list', 'table', 'split']} />
     </>
   );
 }

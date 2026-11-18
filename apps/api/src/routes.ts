@@ -663,6 +663,16 @@ export function apiRoutes(deps: {
             description: bundle.description ?? '',
             release: bundle.release,
             kinds: bundle.models.map((model) => model.title),
+            // Each kind in her words, so the catalogue never shows « Goal » (v3 D2).
+            labels: Object.fromEntries(
+              [
+                ...bundle.models,
+                ...bundle.pages.map((page) => ({ ...page, title: `page:${page.title}` })),
+              ].map((piece) => {
+                const label = (piece.data as { label?: { fr?: string; en?: string } }).label;
+                return [piece.title, label?.fr ?? label?.en ?? piece.title.replace(/^page:/, '')];
+              }),
+            ),
             installed: at === undefined ? null : installed[at],
           };
         });

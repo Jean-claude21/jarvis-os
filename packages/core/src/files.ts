@@ -14,6 +14,11 @@ export interface Blobs {
   link(key: string, seconds: number): Promise<string>;
   /** The bytes removed, when the storage allows it (spec 022: old backups). */
   remove?(key: string): Promise<void>;
+  /**
+   * Where new files go under (« next/ » on a copy): a copy reads the real files it was cloned
+   * with, but never writes among them.
+   */
+  prefix?: string;
 }
 
 export const FILE_MAX_BYTES = 20 * 1024 * 1024;
@@ -132,7 +137,7 @@ export async function addFile(
     links: (input.links ?? []).map((link) => ({ ...link, from: 'file' })),
   });
   const entryId = saved.entries[0]!.id;
-  const storageKey = `${input.spaceId}/${entryId}`;
+  const storageKey = `${blobs.prefix ?? ''}${input.spaceId}/${entryId}`;
   const words = wordsOf(input.bytes, input.mediaType);
   await blobs.put(storageKey, input.bytes, input.mediaType);
   await tx.query(

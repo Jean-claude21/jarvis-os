@@ -15,7 +15,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useKindName } from '../lib/kinds';
-import { Button, Menu, cn } from '../ui';
+import { Button, GroupedMenu, Menu, cn } from '../ui';
 import { filtersOf, filtersText, valueOf } from './apply';
 import { keyValue, showValue } from './format';
 import type { Field, RenderKey, Row, ViewSearch, ViewChange } from './types';
@@ -52,10 +52,22 @@ export function Toolbar({
   const filters = filtersOf(state.f);
   const labelOf = (path: string) =>
     path === 'title' ? 'Titre' : (fields.find((one) => one.path === path)?.label ?? path);
-  // Filter and group by what has few values: a choice, a kind, a short text.
+  // Filter and group by what sorts entries into a few groups: a choice, a kind, a link, yes/no —
+  // or a short text that repeats. A text each entry has its own (a note, a purpose) is not a filter.
+  const CHOICE_LIKE = new Set([
+    'choice',
+    'multi_choice',
+    'kind',
+    'link',
+    'boolean',
+    'checkbox',
+    'tags',
+  ]);
   const groupable = fields.filter((field) => {
-    const values = new Set(rows.map((row) => keyValue(valueOf(row, field.path))).filter(Boolean));
-    return values.size > 0 && values.size <= 30 && field.type !== 'long_text';
+    const held = rows.map((row) => keyValue(valueOf(row, field.path))).filter(Boolean);
+    const values = new Set(held);
+    if (values.size < 2 || values.size > 30 || field.type === 'long_text') return false;
+    return CHOICE_LIKE.has(field.type) || (values.size <= 15 && values.size < held.length);
   });
   const sortable: Field[] = [{ path: 'title', type: 'text', label: 'Titre' }, ...fields];
   const valuesOf = (path: string) =>
@@ -76,31 +88,37 @@ export function Toolbar({
       </label>
       {render !== 'files' && (
         <>
-          <Menu
-            align="start"
+          <GroupedMenu
             trigger={
-              <Button size="sm">
+              <Button size="sm" className={cn(filters.length > 0 && 'border-primary text-primary')}>
                 <ListFilter size={14} />
-                Filtre
+                Filtre{filters.length ? ` (${filters.length})` : ''}
               </Button>
             }
-            items={groupable.flatMap((one) =>
-              valuesOf(one.path).map((value) => ({
-                label: (
-                  <span className="flex min-w-0 gap-2">
-                    <span className="text-bark">{one.label}</span>
-                    <span className="truncate">{valueLabel(one.path, value)}</span>
-                  </span>
-                ),
-                onSelect: () =>
-                  set({
-                    f: filtersText([
-                      ...filters.filter(([path]) => path !== one.path),
-                      [one.path, value],
-                    ]),
-                  }),
-              })),
-            )}
+            groups={groupable.map((one) => {
+              const counts = new Map<string, number>();
+              for (const row of rows) {
+                const key = keyValue(valueOf(row, one.path));
+                if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+              }
+              const chosen = filters.find(([path]) => path === one.path)?.[1];
+              return {
+                label: one.label,
+                items: valuesOf(one.path).map((value) => ({
+                  label: valueLabel(one.path, value),
+                  n: counts.get(value) ?? 0,
+                  on: chosen === value,
+                  onSelect: () =>
+                    set({
+                      f: filtersText(
+                        chosen === value
+                          ? filters.filter(([path]) => path !== one.path)
+                          : [...filters.filter(([path]) => path !== one.path), [one.path, value]],
+                      ),
+                    }),
+                })),
+              };
+            })}
           />
           <Menu
             align="start"

@@ -1,3 +1,4 @@
+import { quiet } from './settings';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -25,6 +26,9 @@ export function objectStorage(settings: Settings['storage']): Blobs {
   });
   const bucket = settings.bucket;
   return {
+    // A quiet copy (next) shares the real storage to read the files it was cloned with; what it
+    // keeps goes under its own folder (v3 D19).
+    prefix: quiet() ? 'next/' : '',
     async put(key, bytes, mediaType) {
       await s3.send(
         new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: mediaType }),

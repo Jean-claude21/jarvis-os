@@ -496,3 +496,67 @@ export function Tabs<T extends string>({
 /** A text field, a select: the v2 input — ruled, 2px, clay when focused. */
 export const inputClass =
   'h-9 w-full min-w-0 rounded-[2px] border border-rule bg-paper px-3 text-[13.5px] outline-none focus:border-primary disabled:opacity-60';
+
+/**
+ * A menu in groups (a view's filters): each group — a field — opens its own list of choices, each
+ * with how many it holds and a check on the one chosen. Never one long flat list.
+ */
+export function GroupedMenu({
+  trigger,
+  groups,
+  align = 'start',
+}: {
+  trigger: ReactNode;
+  groups: {
+    label: string;
+    items: { label: ReactNode; n?: number; on?: boolean; onSelect: () => void }[];
+  }[];
+  align?: 'start' | 'end';
+}) {
+  const item =
+    'flex cursor-pointer items-center gap-2.5 rounded-[2px] p-2 text-[13.5px] outline-none data-[highlighted]:bg-sand data-[state=open]:bg-sand';
+  return (
+    <Dropdown.Root>
+      <Dropdown.Trigger asChild>{trigger}</Dropdown.Trigger>
+      <Dropdown.Portal>
+        <Dropdown.Content
+          align={align}
+          sideOffset={6}
+          className="z-50 max-h-[70vh] min-w-[220px] overflow-y-auto rounded-[2px] border border-rule bg-paper p-1 shadow-card"
+        >
+          {groups.length === 0 && <p className="p-2 text-[13px] text-faint">Rien à filtrer ici.</p>}
+          {groups.map((group) => (
+            <Dropdown.Sub key={group.label}>
+              <Dropdown.SubTrigger className={item}>
+                <span className="min-w-0 flex-1 truncate">{group.label}</span>
+                {group.items.some((one) => one.on) && (
+                  <span className="h-1.5 w-1.5 flex-none rounded-full bg-primary" />
+                )}
+                <span className="font-mono text-[11px] text-faint">{group.items.length}</span>
+                <span className="text-faint">›</span>
+              </Dropdown.SubTrigger>
+              <Dropdown.Portal>
+                <Dropdown.SubContent
+                  sideOffset={4}
+                  className="z-50 max-h-[60vh] min-w-[220px] overflow-y-auto rounded-[2px] border border-rule bg-paper p-1 shadow-card"
+                >
+                  {group.items.map((one, at) => (
+                    <Dropdown.Item key={at} onSelect={one.onSelect} className={item}>
+                      <span className={cn('min-w-0 flex-1 truncate', one.on && 'font-semibold')}>
+                        {one.label}
+                      </span>
+                      {one.n !== undefined && (
+                        <span className="font-mono text-[11px] text-faint">{one.n}</span>
+                      )}
+                      {one.on && <span className="text-primary">✓</span>}
+                    </Dropdown.Item>
+                  ))}
+                </Dropdown.SubContent>
+              </Dropdown.Portal>
+            </Dropdown.Sub>
+          ))}
+        </Dropdown.Content>
+      </Dropdown.Portal>
+    </Dropdown.Root>
+  );
+}

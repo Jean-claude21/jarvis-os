@@ -44,6 +44,11 @@ export const TOOL_GROUPS: Record<string, { about: string; actions: string[] }> =
       'decide',
     ],
   },
+  agents: {
+    about:
+      'Her agents (who works by itself: the morning brief, the reminders, the reading of her papers, her apps’ hunters and watchers): list them with their state and memory, pause or change one, keep a note in its memory.',
+    actions: ['agents', 'agent_set', 'agent_remember'],
+  },
   history: {
     about:
       'What changed and taking it back: the journal of a space, undoing a change, setting an entry aside.',

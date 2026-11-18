@@ -19,6 +19,7 @@ import {
   COMPONENTS,
 } from '@jarvis-os/core';
 import { withWho } from './who';
+import { agentsOf, agentSettingsSchema, remember, setAgent } from '@jarvis-os/core';
 import { OCCURRENCE_STATES, setOccurrence, type OccurrenceState } from '@jarvis-os/core';
 import { fileCapture, fileSure, inboxOf, type EntryInput } from '@jarvis-os/core';
 import { captureAs } from './capture';
@@ -1755,6 +1756,58 @@ export async function mcpServerFor(
     },
     tool(async (args: { id: string; entries: Amendment[]; space?: string | undefined }) =>
       act((tx) => amendProposal(tx, actor, at(args.space), args.id, args.entries)),
+    ),
+  );
+
+  // Her agents (v3 D12, F6), in the family « agents »: who works by itself, paused in one word.
+  server.registerTool(
+    'agents',
+    {
+      description:
+        'Her agents in a space: each with its role, when it works, its rules, its state (paused, over budget, failing, working, idle), its calls today, its last runs and its memory (its notes, newest first). Read an agent’s memory before doing its work.',
+      inputSchema: { space: spaceArg },
+      annotations: { readOnlyHint: true },
+    },
+    tool(async ({ space }: { space?: string | undefined }) => act((tx) => agentsOf(tx, at(space)))),
+  );
+  server.registerTool(
+    'agent_set',
+    {
+      description:
+        'Change an agent as she asks (« mets le brief du matin en pause », « que le Chasseur me rende compte sur Telegram »): `paused`, `autonomy` (propose · act_and_report · silent), `report` (activity · telegram), its `budget` ({ calls_per_day }) or its `role`. Journaled, undone at once.',
+      inputSchema: {
+        title: z.string().min(1).max(80),
+        settings: agentSettingsSchema.pick({
+          paused: true,
+          autonomy: true,
+          report: true,
+          budget: true,
+          role: true,
+        }),
+        space: spaceArg,
+      },
+    },
+    tool(
+      async (args: {
+        title: string;
+        settings: Record<string, unknown>;
+        space?: string | undefined;
+      }) => act((tx) => setAgent(tx, actor, at(args.space), args.title, args.settings)),
+    ),
+  );
+  server.registerTool(
+    'agent_remember',
+    {
+      description:
+        'Keep a note in an agent’s memory: what it learnt for its next run (« J-C refuse les offres hors Lyon »), in one or two sentences. Its memory is read with `agents`.',
+      inputSchema: {
+        title: z.string().min(1).max(80),
+        text: z.string().min(1).max(4000),
+        space: spaceArg,
+      },
+    },
+    tool(async (args: { title: string; text: string; space?: string | undefined }) =>
+      act((tx) => remember(tx, actor, at(args.space), args.title, args.text)),
     ),
   );
 

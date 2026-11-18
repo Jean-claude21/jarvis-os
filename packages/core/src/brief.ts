@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { agentClient, agentDoing } from './agent-node';
 import { attention, type AttentionItem } from './attention';
 import type { Occurrence } from './agenda';
 import { asPerson, type Actor, type Tx } from './db';
@@ -130,17 +131,29 @@ export async function briefOnce(
   const due = await asPerson(db, person, async (tx) => {
     const own = (await spacesOf(tx)).find((one) => one.personal);
     if (!own) return null;
+    // Its agent (v3 F6), the Assistant du matin: paused, no brief — and it is not marked as sent.
+    const agent = await agentDoing(tx, own.id, 'brief');
+    if (agent?.data.paused) return null;
     const [channel] = await find(tx, own.id, { kind: 'Channel', limit: 1 });
     const at = (await preferencesOf(tx)).brief;
     if (!channel || !at) return null;
     const zone = await zoneOf(tx);
     const last = typeof channel.data.brief_sent === 'string' ? channel.data.brief_sent : null;
     if (!briefDue(at, last, now, zone)) return null;
-    return { space: own.id, channel: channel.id, brief: await morningBrief(tx, now) };
+    return {
+      space: own.id,
+      channel: channel.id,
+      agent: agent?.title ?? null,
+      brief: await morningBrief(tx, now),
+    };
   });
   if (!due) return null;
   const reached = await tell(due.brief);
-  const actor: Actor = { person, door: 'watcher' };
+  const actor: Actor = {
+    person,
+    door: 'watcher',
+    ...(due.agent ? { client: agentClient(due.agent) } : {}),
+  };
   // Marked even when she was not reached: one try a morning, never a flood.
   await asPerson(db, person, (tx) =>
     save(tx, actor, due.space, {

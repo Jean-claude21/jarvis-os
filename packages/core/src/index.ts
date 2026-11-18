@@ -466,9 +466,14 @@ export {
   agentsOf,
   agentSettingsSchema,
   callsToday,
+  remember,
+  reportRun,
   setAgent,
+  BUILTIN_WORKS,
   type Agent,
+  type AgentNote,
   type AgentSettings,
+  type BuiltinWork,
   type AgentView,
 } from './agent-node';
 export {

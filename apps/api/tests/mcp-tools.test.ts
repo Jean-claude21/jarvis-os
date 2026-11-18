@@ -42,6 +42,7 @@ describe('Jarvis’s method on connection (story 3)', () => {
     expect(tools.map((one) => one.name).sort()).toEqual(
       [
         'agenda',
+        'agents',
         'apps',
         'capabilities',
         'components',

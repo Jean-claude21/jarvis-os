@@ -27,6 +27,7 @@ import {
   agentsOf,
   agentSettingsSchema,
   setAgent,
+  remember,
   COMPONENTS,
   COMPONENT_CATEGORIES,
   LARGE_FILE_MAX_BYTES,
@@ -1274,12 +1275,25 @@ export function apiRoutes(deps: {
   api.get('/agents', async (c) => c.json(await act(c, (tx, _a, spaceId) => agentsOf(tx, spaceId))));
   api.patch('/agents/:title', async (c) => {
     const patch = agentSettingsSchema
-      .pick({ paused: true, autonomy: true, budget: true, role: true })
+      .pick({ paused: true, autonomy: true, budget: true, role: true, report: true })
       .parse(await c.req.json());
     return c.json(
       await act(c, (tx, actor, spaceId) =>
         setAgent(tx, actor, spaceId, c.req.param('title'), patch),
       ),
+    );
+  });
+
+  // An agent's memory (v3 F6): a note it keeps, written by her or by the agent.
+  api.post('/agents/:title/memory', async (c) => {
+    const { text } = z
+      .object({ text: z.string().trim().min(1).max(4000) })
+      .parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, spaceId) =>
+        remember(tx, actor, spaceId, c.req.param('title'), text),
+      ),
+      201,
     );
   });
 

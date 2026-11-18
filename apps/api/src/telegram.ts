@@ -114,9 +114,8 @@ export async function readTelegramLinks(
       const sent = sentFile(update.message ?? {});
       let text = update.message?.text?.trim();
       const owner =
-        (text && !text.startsWith('/')) || sound || sent
-          ? await personByChat(db, String(chat))
-          : null;
+        // A « /phrase » is hers too (v3 F6): it reaches the agent whose rule it starts.
+        text || sound || sent ? await personByChat(db, String(chat)) : null;
       if (!owner) continue;
       // A photo or a document (spec 074): kept as her file, with a capture that carries it.
       if (sent) {

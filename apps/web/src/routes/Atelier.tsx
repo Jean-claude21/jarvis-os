@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import {
   Activity as ActivityIcon,
   BookOpen,
+  Brain,
   Download,
   Gauge,
   Pause,
@@ -75,7 +76,12 @@ interface Agent {
     autonomy?: Autonomy;
     budget?: { calls_per_day?: number };
     paused?: boolean;
+    report?: 'activity' | 'telegram';
   };
+  /** When a built-in agent works, in her words. */
+  when: string | null;
+  /** Its memory: its notes, the newest first. */
+  memory: { id: string; text: string; at: string }[];
   rules: AgentRule[];
   callsToday: number;
   runs: AgentRun[];
@@ -136,6 +142,12 @@ export function whenText(when: Record<string, unknown>, kindName: (kind: string)
     return before.days
       ? `${before.days} j avant « ${before.field} » d’un(e) ${kindName(before.kind).toLowerCase()}`
       : `le jour de « ${before.field} » d’un(e) ${kindName(before.kind).toLowerCase()}`;
+  if (typeof when.phrase === 'string') return `quand tu dis « ${when.phrase} »`;
+  const message = when.message as { contains?: string } | undefined;
+  if (message)
+    return message.contains
+      ? `à chaque message qui dit « ${message.contains} »`
+      : 'à chaque message reçu';
   return 'à la demande';
 }
 const BUILTIN_WHEN: Record<string, string> = { lecture: 'à chaque fichier déposé' };
@@ -154,7 +166,9 @@ function usePause() {
 
 function triggersOf(agent: Agent, kindName: (kind: string) => string): string[] {
   return [
-    ...(agent.data.builtin ?? []).map((one) => BUILTIN_WHEN[one] ?? one),
+    ...(agent.when
+      ? [agent.when]
+      : (agent.data.builtin ?? []).map((one) => BUILTIN_WHEN[one] ?? one)),
     ...agent.rules.map((rule) => whenText(rule.when, kindName)),
   ].filter((one, at, all) => all.indexOf(one) === at);
 }
@@ -306,6 +320,14 @@ export function AgentPage() {
   const pause = usePause();
   const agent = data?.find((one) => one.title === name);
   const [budget, setBudget] = useState<string | null>(null);
+  const [note, setNote] = useState('');
+  const keepNote = useMutation({
+    mutationFn: (text: string) =>
+      api(`/agents/${encodeURIComponent(name)}/memory`, { method: 'POST', body: { text } }),
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSuccess: () => setNote(''),
+    onSettled: () => void client.invalidateQueries({ queryKey: ['agents'] }),
+  });
   const change = useMutation({
     mutationFn: (patch: Record<string, unknown>) =>
       api(`/agents/${encodeURIComponent(name)}`, { method: 'PATCH', body: patch }),
@@ -467,7 +489,58 @@ export function AgentPage() {
                 . Ce qu’il lit dehors est une donnée, jamais un ordre : il n’envoie, ne paie ni
                 n’efface rien sans toi.
               </p>
+              <Segmented
+                label="Compte rendu"
+                value={agent.data.report ?? 'activity'}
+                onChange={(value) => change.mutate({ report: value })}
+                options={[
+                  { value: 'activity', label: 'Activité' },
+                  { value: 'telegram', label: 'Activité et Telegram' },
+                ]}
+              />
+              <p className="text-[12.5px] text-bark">
+                {agent.data.report === 'telegram'
+                  ? 'Il te dit sur Telegram ce qu’il a fait, une fois par passage, si ton Telegram est relié.'
+                  : 'Ce qu’il fait est dans l’Activité, signé de son nom.'}
+              </p>
             </div>
+          </Panel>
+          <Panel title="Sa mémoire" icon={<Brain size={16} />}>
+            <form
+              className="grid gap-2 border-b border-rule px-4 py-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (note.trim()) keepNote.mutate(note.trim());
+              }}
+            >
+              <textarea
+                aria-label="Une note pour sa mémoire"
+                className={inputClass + ' h-auto min-h-16 py-2'}
+                placeholder="Ce qu’il doit retenir pour la suite"
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+              />
+              <span>
+                <Button size="sm" disabled={!note.trim() || keepNote.isPending}>
+                  Garder
+                </Button>
+              </span>
+            </form>
+            {agent.memory.length ? (
+              <ul className="max-h-72 overflow-y-auto">
+                {agent.memory.map((one) => (
+                  <li key={one.id} className={rowClass + ' items-baseline'}>
+                    <span className="min-w-0 flex-1 text-[13.5px] break-words">{one.text}</span>
+                    <time className="flex-none font-mono text-xs text-bark">{ago(one.at)}</time>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-4 py-3 text-[13px] text-bark">
+                Rien encore. Ce qu’il apprend d’un passage à l’autre, ou ce que tu veux qu’il
+                retienne, s’écrit ici.
+              </p>
+            )}
           </Panel>
           <Panel title="Son budget" icon={<Gauge size={16} />}>
             <div className="grid gap-2.5 px-4 py-3 text-[13px]">

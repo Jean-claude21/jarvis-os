@@ -1,6 +1,10 @@
 import { z } from 'zod';
+import { comment, commentsOf } from './comments';
 import type { Actor, Tx } from './db';
-import { save } from './entries';
+import { find, save } from './entries';
+import { enterMessage } from './outbox';
+import { preferencesOf } from './prefs';
+import { spacesOf } from './spaces';
 import { zoneOf } from './zone';
 
 // The Agent (v3 D12): not a module more — a named setting of the same node. An agent is an entry
@@ -12,6 +16,10 @@ import { zoneOf } from './zone';
 // what it would write waits for her yes; its changes are journaled with it as their author.
 
 export const AGENT_KIND = 'Agent';
+
+/** The works Jarvis does by itself, each done by one built-in agent. */
+export const BUILTIN_WORKS = ['lecture', 'brief', 'rappels'] as const;
+export type BuiltinWork = (typeof BUILTIN_WORKS)[number];
 
 export const agentSettingsSchema = z.object({
   /** What it does, in one sentence she reads. */
@@ -25,11 +33,13 @@ export const agentSettingsSchema = z.object({
   /** Its scope: the kinds it reads and those it writes. */
   reads: z.array(z.string().trim().min(1).max(80)).max(30).optional(),
   writes: z.array(z.string().trim().min(1).max(80)).max(30).optional(),
-  /** Jarvis's own works it does: « lecture » reads and understands each file dropped. */
-  builtin: z
-    .array(z.enum(['lecture']))
-    .max(5)
-    .optional(),
+  /**
+   * Jarvis's own works it does: « lecture » reads and understands each file dropped, « brief » tells
+   * her her day each morning, « rappels » tells her each reminder on time (v3 F6).
+   */
+  builtin: z.array(z.enum(BUILTIN_WORKS)).max(5).optional(),
+  /** Where it says what it did: the Activity always, and Telegram when she asks (v3 F6). */
+  report: z.enum(['activity', 'telegram']).optional(),
   autonomy: z.enum(['propose', 'act_and_report', 'silent']).optional(),
   budget: z.object({ calls_per_day: z.number().int().min(0).max(1000).optional() }).optional(),
   paused: z.boolean().optional(),
@@ -49,6 +59,24 @@ export const BUILTIN_AGENTS: { title: string; data: AgentSettings }[] = [
       reads: ['Fichier', 'Organization'],
       writes: ['Bill', 'Transaction', 'Warranty', 'Organization'],
       autonomy: 'propose',
+    },
+  },
+  {
+    title: 'Assistant du matin',
+    data: {
+      role: 'Chaque matin, à l’heure choisie, te dit ta journée : ce qui ne va pas, ce qui est en retard, ton agenda, tes habitudes.',
+      executor: 'rule',
+      builtin: ['brief'],
+      autonomy: 'act_and_report',
+    },
+  },
+  {
+    title: 'Gardien des rappels',
+    data: {
+      role: 'Te dit chaque rappel à son heure, sur tes canaux, et reprogramme ceux qui se répètent.',
+      executor: 'rule',
+      builtin: ['rappels'],
+      autonomy: 'act_and_report',
     },
   },
 ];
@@ -83,8 +111,12 @@ export async function agentNamed(tx: Tx, spaceId: string, title: string): Promis
   return builtin ? { id: null, title: builtin.title, data: builtin.data } : null;
 }
 
-/** The agent that does one of Jarvis's own works (« lecture »), if any. */
-export async function agentDoing(tx: Tx, spaceId: string, work: 'lecture'): Promise<Agent | null> {
+/** The agent that does one of Jarvis's own works (« lecture », « brief », « rappels »), if any. */
+export async function agentDoing(
+  tx: Tx,
+  spaceId: string,
+  work: BuiltinWork,
+): Promise<Agent | null> {
   for (const one of BUILTIN_AGENTS)
     if (one.data.builtin?.includes(work)) return agentNamed(tx, spaceId, one.title);
   return null;
@@ -145,8 +177,19 @@ export interface AgentRun {
   counts: Record<string, number>;
   error: string | null;
 }
+/** A note an agent keeps (v3 D12, « mémoire »): what it learnt, in words, journaled like any note. */
+export interface AgentNote {
+  id: string;
+  text: string;
+  at: string;
+}
+
 export interface AgentView extends Agent {
   rules: AgentRule[];
+  /** When a built-in agent works, in her words (« chaque jour à 07:00 »); null for the others. */
+  when: string | null;
+  /** Its memory, the newest first. */
+  memory: AgentNote[];
   callsToday: number;
   /** What it did last: its calls, the newest first. */
   runs: AgentRun[];
@@ -197,6 +240,8 @@ export async function agentsOf(tx: Tx, spaceId: string, now = new Date()): Promi
     const text = (value: unknown) => (typeof value === 'string' && value ? value : null);
     const view: AgentView = {
       ...agent,
+      when: await whenOf(tx, agent),
+      memory: agent.id ? await memoryOf(tx, spaceId, agent.id) : [],
       rules: own.map((rule) => ({
         id: rule.id,
         title: rule.title,
@@ -268,4 +313,79 @@ export async function setAgent(
     title: agent?.title ?? title,
     data: { ...(agent?.data ?? {}), ...patch },
   };
+}
+
+/** When a built-in agent works, in her words. */
+async function whenOf(tx: Tx, agent: Agent): Promise<string | null> {
+  const works = agent.data.builtin ?? [];
+  if (works.includes('brief')) {
+    const at = (await preferencesOf(tx).catch(() => ({}) as { brief?: string })).brief;
+    return at ? `chaque jour à ${at}` : 'quand tu choisis une heure dans Réglages';
+  }
+  if (works.includes('rappels')) return 'à l’heure de chaque rappel';
+  if (works.includes('lecture')) return 'à chaque fichier déposé';
+  return null;
+}
+
+/** An agent's memory: the notes on its entry, the newest first. */
+async function memoryOf(tx: Tx, spaceId: string, id: string): Promise<AgentNote[]> {
+  return (await commentsOf(tx, spaceId, id))
+    .reverse()
+    .slice(0, 50)
+    .map((note) => ({
+      id: note.id,
+      text: String(note.data.text ?? note.title),
+      at: note.createdAt,
+    }));
+}
+
+/**
+ * An agent keeps a note in its memory (v3 D12): what it learnt, for its next run — written by the
+ * agent (signed with its name) or by her. A built-in agent gets its entry now.
+ */
+export async function remember(
+  tx: Tx,
+  actor: Actor,
+  spaceId: string,
+  title: string,
+  text: string,
+): Promise<AgentNote> {
+  const agent = await agentNamed(tx, spaceId, title);
+  const id = agent?.id ?? (await setAgent(tx, actor, spaceId, title, {})).id;
+  if (!id) throw new Error(`No agent « ${title} » in this space.`);
+  const note = await comment(tx, actor, spaceId, id, text);
+  return { id: note.id, text: String(note.data.text ?? note.title), at: note.createdAt };
+}
+
+/**
+ * What an agent did, told to her on Telegram when she asked it to report there (v3 F6): one
+ * message in the outbox, once per run, for whom the run was made — only when her Telegram is
+ * linked. The Activity keeps it in any case (its changes are signed with its name).
+ */
+export async function reportRun(
+  tx: Tx,
+  person: string,
+  agent: Agent,
+  what: string,
+  key: string,
+): Promise<boolean> {
+  if (agent.data.report !== 'telegram') return false;
+  const own = (await spacesOf(tx)).find((one) => one.personal);
+  if (!own) return false;
+  const [channel] = await find(tx, own.id, { kind: 'Channel', limit: 1 });
+  if (
+    !channel ||
+    (typeof channel.data.telegram !== 'string' && typeof channel.data.telegram !== 'number')
+  )
+    return false;
+  const id = await enterMessage(tx, {
+    person,
+    spaceId: own.id,
+    channel: 'telegram',
+    kind: 'report',
+    subject: agent.title,
+    body: what,
+    dedupe: `report:${agent.title}:${key}:${person}`,
+  });
+  return id !== null;
 }

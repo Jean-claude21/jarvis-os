@@ -1,7 +1,7 @@
 import type pg from 'pg';
 import { z } from 'zod';
 import { closeExecution, countOnExecution, openExecution } from './activities';
-import { agentClient, agentNamed, callsToday } from './agent-node';
+import { agentClient, agentNamed, callsToday, reportRun } from './agent-node';
 import { propose } from './proposals';
 import { callConnection, partOf, receive } from './agents';
 import { readerOf, type EntryView, type Reader } from './compute';
@@ -131,6 +131,13 @@ export const ruleDataSchema = z.object({
         days: z.number().int().min(0).max(366),
       }),
     }),
+    // She says a phrase (« /bilan », « bilan de la semaine ») from any door — Telegram, the app,
+    // an assistant: the rule runs on what she said, and her words are filed (v3 D12, F6).
+    z.object({ phrase: z.string().trim().min(2).max(60) }),
+    // A message reaches her (any capture: Telegram, the app, her voice), with these words or any.
+    z.object({
+      message: z.object({ contains: z.string().trim().min(1).max(80).optional() }),
+    }),
   ]),
   if: z.string().trim().min(1).max(2000).optional(),
   then: z.array(actionSchema).min(1).max(10),
@@ -155,7 +162,7 @@ export function checkRule(data: unknown): RuleData {
       .map((issue) => `${issue.path.join('.') || 'rule'}: ${issue.message}`)
       .join('; ');
     throw new Error(
-      `A « ${RULE_KIND} » is { when: { saved: kind } | { changed: { kind, field } } | { schedule: "0 8 1 * *" } | { before: { kind, field, days } }, if?, then: [{ create: { kind, title, data? } } | { update: { set } } | { link: { to, role } } | { remind: { text, at? } } | { run_script: { script, params? } } | { call: { connection, path? | tool?, body?, include?, save?: { kind, at?, match?, title? } } }] } — ${issues}.`,
+      `A « ${RULE_KIND} » is { when: { saved: kind } | { changed: { kind, field } } | { schedule: "0 8 1 * *" } | { before: { kind, field, days } } | { phrase: "/bilan" } | { message: { contains? } }, if?, then: [{ create: { kind, title, data? } } | { update: { set } } | { link: { to, role } } | { remind: { text, at? } } | { run_script: { script, params? } } | { call: { connection, path? | tool?, body?, include?, save?: { kind, at?, match?, title? } } }] } — ${issues}.`,
     );
   }
   const rule = parsed.data;
@@ -292,6 +299,17 @@ async function act(
     client: clientOf(rule, agent?.title),
     depth: (actor.depth ?? 0) + 1,
   };
+  // It says what it did on Telegram when she asked it to (v3 F6): once per run.
+  if (agent)
+    await reportRun(
+      tx,
+      actor.person,
+      agent,
+      agent.data.autonomy === 'propose'
+        ? `« ${rule.title} » : ce que je ferais t’attend dans « À valider ».`
+        : `« ${rule.title} » : fait.`,
+      `${rule.id}:${entryId ?? ''}:${reader.clock.now.toISOString().slice(0, 16)}`,
+    );
   // An agent that proposes: what it would write waits for her yes in « À valider ».
   const call = (input: SaveInput) =>
     agent?.data.autonomy === 'propose' && input.entries?.length
@@ -506,13 +524,22 @@ export async function runRulesAfterSave(
   const rules = await rulesOf(tx, spaceId);
   if (!rules.length) return;
   for (const one of changed) {
+    // A message that just reached her: its words, for the « phrase » and « message » rules.
+    const said =
+      one.created && fold(one.kind) === fold(CAPTURE) ? await wordsOfCapture(tx, one.id) : null;
+    let filed = false;
     for (const rule of rules) {
       const when = rule.data.when;
+      const phrase = 'phrase' in when && said !== null && saysPhrase(said, when.phrase);
       const fires =
         ('saved' in when && fold(when.saved) === fold(one.kind)) ||
         ('changed' in when &&
           fold(when.changed.kind) === fold(one.kind) &&
-          one.fields.some((field) => fold(field) === fold(when.changed.field)));
+          one.fields.some((field) => fold(field) === fold(when.changed.field))) ||
+        phrase ||
+        ('message' in when &&
+          said !== null &&
+          (!when.message.contains || fold(said).includes(fold(when.message.contains))));
       // A rule does not fire again on its own change.
       // A rule (or its agent) does not fire again on its own change.
       if (
@@ -526,7 +553,8 @@ export async function runRulesAfterSave(
       const bridge = rule.data.bridge === true;
       if (bridge) await tx.query('savepoint jarvis_bridge');
       try {
-        await act(tx, actor, spaceId, rule, one.id);
+        const ran = await act(tx, actor, spaceId, rule, one.id);
+        if (phrase && ran) filed = true;
         if (bridge) await tx.query('release savepoint jarvis_bridge');
       } catch (error) {
         const why = (error as Error).message;
@@ -551,8 +579,31 @@ export async function runRulesAfterSave(
         );
       }
     }
+    // A phrase is an order, done: her words leave « À ranger », kept in the journal.
+    if (filed)
+      await save(tx, { ...actor, depth: (actor.depth ?? 0) + 1 }, spaceId, {
+        entries: [{ id: one.id, data: { status: 'filed' }, origin: 'inferred' }],
+      });
   }
 }
+
+const CAPTURE = 'Capture';
+
+/** A capture's words. */
+async function wordsOfCapture(tx: Tx, id: string): Promise<string | null> {
+  const { rows } = await tx.query<{ text: string | null }>(
+    `select coalesce(data->>'text', title) as text from entry where id = $1`,
+    [id],
+  );
+  return rows[0]?.text ?? null;
+}
+
+/** « /bilan » or « /bilan semaine » says the phrase « /bilan »; « bilanx » does not. */
+export const saysPhrase = (words: string, phrase: string) => {
+  const said = fold(words.trim());
+  const wanted = fold(phrase.trim());
+  return said === wanted || said.startsWith(`${wanted} `);
+};
 
 /** Tries a rule on an entry (or on nothing): what it would change, nothing changed. */
 export async function testRule(

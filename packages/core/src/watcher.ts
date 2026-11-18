@@ -1,4 +1,5 @@
 import type pg from 'pg';
+import { agentClient, agentDoing } from './agent-node';
 import { asPerson, type Actor } from './db';
 import { get, save } from './entries';
 import { syncReminders } from './reminders';
@@ -49,13 +50,27 @@ export async function watchOnce(
   for (const row of rows) {
     const keeper = row.persons[0];
     if (!keeper) continue;
-    const actor: Actor = { person: keeper, door: 'watcher' };
-    const [entry, herZone] = await asPerson(
+    const [entry, herZone, agent] = await asPerson(
       db,
       keeper,
-      async (tx) => [await get(tx, row.space_id, row.entry_id), await zoneOf(tx)] as const,
+      async (tx) =>
+        [
+          await get(tx, row.space_id, row.entry_id),
+          await zoneOf(tx),
+          await agentDoing(tx, row.space_id, 'rappels'),
+        ] as const,
     );
     if (!entry) continue;
+    // Its agent (v3 F6), the Gardien des rappels: paused, reminders wait; its name signs its work.
+    if (agent?.data.paused) {
+      report.skipped += 1;
+      continue;
+    }
+    const actor: Actor = {
+      person: keeper,
+      door: 'watcher',
+      ...(agent ? { client: agentClient(agent.title) } : {}),
+    };
     const zone = typeof entry.data.timezone === 'string' ? entry.data.timezone : herZone;
     const repeat = typeof entry.data.repeat === 'string' ? entry.data.repeat : null;
     const write = (data: Record<string, unknown>) =>

@@ -20,6 +20,7 @@ import {
   PageHead,
   Panel,
   Segmented,
+  Sheet,
   Skeleton,
   Tabs,
   Tag,
@@ -29,18 +30,17 @@ import {
   type TagTone,
 } from '../ui';
 import { Journal } from './Activity';
-import { toast } from '../ui/more';
+import { Select, toast } from '../ui/more';
+import { Markdown } from '../ui/Markdown';
 import { ComponentsCatalog } from './Catalog';
 
 // L'Atelier (v3 D12, D17 « Construire »): who works for her — her agents, each a named setting of
 // the one node (its triggers, its executor, its skills, what it reads and writes, how free it is,
 // its budget, its Pause) — and the skills they follow, in the Agent Skills format.
 
-export type AtelierTab = 'agents' | 'automations' | 'skills' | 'components';
+export type AtelierTab = 'automations' | 'skills' | 'components';
 export const atelierSearch = (search: Record<string, unknown>): { t?: AtelierTab } =>
-  search.t === 'skills' || search.t === 'components' || search.t === 'automations'
-    ? { t: search.t }
-    : {};
+  search.t === 'skills' || search.t === 'components' ? { t: search.t } : {};
 
 interface AgentRule {
   id: string;
@@ -163,7 +163,7 @@ function triggersOf(agent: Agent, kindName: (kind: string) => string): string[] 
 export function AtelierPage() {
   const search = useSearch({ strict: false }) as { t?: AtelierTab };
   const navigate = useNavigate();
-  const tab = search.t ?? 'agents';
+  const tab = search.t ?? 'automations';
   return (
     <>
       <PageHead
@@ -172,20 +172,17 @@ export function AtelierPage() {
       />
       <Tabs
         tabs={[
-          { key: 'agents', label: 'Agents' },
-          { key: 'automations', label: 'Automatismes' },
+          { key: 'automations', label: 'Agents et automatismes' },
           { key: 'skills', label: 'Skills' },
           { key: 'components', label: 'Composants' },
         ]}
         value={tab}
         label="Atelier"
         onChange={(key) =>
-          void navigate({ to: '/atelier', search: key === 'agents' ? {} : { t: key } })
+          void navigate({ to: '/atelier', search: key === 'automations' ? {} : { t: key } })
         }
       />
-      {tab === 'agents' ? (
-        <AgentsList />
-      ) : tab === 'automations' ? (
+      {tab === 'automations' ? (
         <Automations />
       ) : tab === 'skills' ? (
         <SkillsList />
@@ -196,78 +193,11 @@ export function AtelierPage() {
   );
 }
 
-function AgentsList() {
-  const kindName = useKindName();
-  const { data, isLoading } = useAgents();
-  const pause = usePause();
-  if (isLoading) return <Skeleton className="h-40" />;
-  if (!data?.length)
-    return (
-      <Panel>
-        <Empty title="Aucun agent" lead="Les apps que tu ajoutes viennent avec leurs agents." />
-      </Panel>
-    );
-  return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] gap-4">
-      {data.map((agent) => {
-        const state = STATE[agent.state];
-        const budget = agent.data.budget?.calls_per_day;
-        return (
-          <div
-            key={agent.title}
-            className="relative flex min-w-0 flex-col gap-3 rounded-[12px] border border-rule bg-paper p-4 hover:border-rule-strong"
-          >
-            <div className="flex min-w-0 items-start gap-3">
-              <Avatar name={agent.title} size={40} tinted />
-              <span className="min-w-0 flex-1">
-                <Link
-                  to="/atelier/agents/$name"
-                  params={{ name: agent.title }}
-                  className="block truncate font-display text-[16px] font-semibold after:absolute after:inset-0"
-                >
-                  {agent.title}
-                </Link>
-                <Tag tone={state.tone}>{state.label}</Tag>
-              </span>
-            </div>
-            {agent.data.role && (
-              <p className="line-clamp-3 text-[13px] text-bark">{agent.data.role}</p>
-            )}
-            <dl className="grid gap-1 text-[12.5px]">
-              <div className="grid grid-cols-[minmax(0,96px)_minmax(0,1fr)] gap-2">
-                <dt className="text-faint">Quand</dt>
-                <dd className="truncate">{triggersOf(agent, kindName).join(' · ') || '—'}</dd>
-              </div>
-              <div className="grid grid-cols-[minmax(0,96px)_minmax(0,1fr)] gap-2">
-                <dt className="text-faint">Aujourd’hui</dt>
-                <dd>
-                  {budget !== undefined
-                    ? `${agent.callsToday} / ${budget} appels`
-                    : `${agent.callsToday} appel(s)`}
-                  {agent.runs[0]?.started ? ` · dernier passage ${ago(agent.runs[0].started)}` : ''}
-                </dd>
-              </div>
-            </dl>
-            <span className="relative z-[1] mt-auto flex gap-2">
-              <Button
-                size="sm"
-                disabled={pause.isPending}
-                onClick={() => pause.mutate({ title: agent.title, paused: !agent.data.paused })}
-              >
-                {agent.data.paused ? <Play size={14} /> : <Pause size={14} />}
-                {agent.data.paused ? 'Reprendre' : 'Pause'}
-              </Button>
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 interface Skill {
   name: string;
   when: string;
+  /** Its instructions, in Markdown: read here, without downloading. */
+  text?: string;
 }
 const slug = (name: string) =>
   name
@@ -282,6 +212,7 @@ function SkillsList() {
     queryKey: ['skills'],
     queryFn: () => api<{ jarvis?: Skill[]; mine?: MineSkill[] }>('/skills'),
   });
+  const [open, setOpen] = useState<Skill | null>(null);
   if (isLoading) return <Skeleton className="h-40" />;
   const skills = data?.jarvis ?? [];
   return (
@@ -297,10 +228,17 @@ function SkillsList() {
       >
         {skills.map((one) => (
           <div key={one.name} className={rowClass + ' flex-wrap'}>
-            <span className="min-w-0 flex-1">
-              <b className="block truncate font-semibold">{one.name}</b>
+            <button
+              onClick={() => setOpen(one)}
+              className="min-w-0 flex-1 cursor-pointer text-left"
+            >
+              <b className="block truncate font-semibold hover:underline">{one.name}</b>
               <span className="line-clamp-2 text-[12.5px] text-bark">Quand {one.when}</span>
-            </span>
+            </button>
+            <Button size="sm" onClick={() => setOpen(one)}>
+              <BookOpen size={14} />
+              Lire
+            </Button>
             <a
               href={`/api/skills/${slug(one.name)}/SKILL.md?download=1`}
               className="inline-flex h-8 flex-none items-center gap-1.5 rounded-[2px] border border-rule bg-paper px-2.5 text-[13px] font-semibold hover:border-rule-strong"
@@ -336,6 +274,27 @@ function SkillsList() {
           ))
         )}
       </Panel>
+      <Sheet
+        open={!!open}
+        onOpenChange={(value) => !value && setOpen(null)}
+        title={open?.name ?? ''}
+      >
+        {open && (
+          <div className="grid gap-3 p-4">
+            <p className="text-[13px] text-bark">
+              <b className="text-ink">Quand :</b> {open.when}
+            </p>
+            <Markdown text={open.text ?? ''} />
+            <a
+              href={`/api/skills/${slug(open.name)}/SKILL.md?download=1`}
+              className="inline-flex h-8 w-fit items-center gap-1.5 rounded-[2px] border border-rule bg-paper px-2.5 text-[13px] font-semibold hover:border-rule-strong"
+            >
+              <Download size={14} />
+              Télécharger SKILL.md
+            </a>
+          </div>
+        )}
+      </Sheet>
     </div>
   );
 }
@@ -703,67 +662,12 @@ function Automations() {
   const mine = skills.data?.mine ?? [];
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-      <Panel title="Ce qui tourne tout seul" icon={<Workflow size={16} />}>
-        {!list.length ? (
-          <Empty
-            title="Aucun automatisme"
-            lead="Les apps en apportent ; tu peux en créer un à droite, ou le demander à Claude."
-          />
-        ) : (
-          list.map((rule) => {
-            const active = rule.data.active !== false;
-            return (
-              <div key={rule.id} className={rowClass + ' flex-wrap'}>
-                <span className="min-w-0 flex-1">
-                  <Link
-                    to="/entree/$id"
-                    params={{ id: rule.id }}
-                    className="block truncate font-semibold hover:underline"
-                  >
-                    {rule.title}
-                  </Link>
-                  <span className="block text-[12.5px] text-bark">
-                    {whenText(rule.data.when ?? {}, kindName)} ·{' '}
-                    {thenText(rule.data.then, kindName) || '—'}
-                  </span>
-                  <span className="block truncate text-[12px] text-faint">
-                    {rule.data.agent ? (
-                      <>
-                        par{' '}
-                        <Link
-                          to="/atelier/agents/$name"
-                          params={{ name: rule.data.agent }}
-                          className="font-semibold text-bark hover:underline"
-                        >
-                          {rule.data.agent}
-                        </Link>
-                      </>
-                    ) : (
-                      'sans agent'
-                    )}
-                    {rule.data.app ? ` · ${rule.data.app}` : ''}
-                    {rule.data.next
-                      ? ` · prochaine fois ${new Date(rule.data.next).toLocaleString('fr', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}`
-                      : ''}
-                  </span>
-                  {rule.data.error && (
-                    <span className="block truncate text-[12px] text-error">{rule.data.error}</span>
-                  )}
-                </span>
-                {!active && <Tag tone="neutral">arrêté</Tag>}
-                <Button
-                  size="sm"
-                  disabled={toggle.isPending}
-                  onClick={() => toggle.mutate({ id: rule.id, active: !active })}
-                >
-                  {active ? <Pause size={14} /> : <Play size={14} />}
-                  {active ? 'Arrêter' : 'Reprendre'}
-                </Button>
-              </div>
-            );
-          })
-        )}
-      </Panel>
+      <AgentGroups
+        rules={list}
+        busy={toggle.isPending}
+        onToggle={(id, active) => toggle.mutate({ id, active })}
+        refresh={refresh}
+      />
       <div className="grid gap-4">
         <Panel title="Chaque jour, à heure fixe" icon={<Gauge size={16} />}>
           <form
@@ -835,3 +739,172 @@ function Automations() {
     </div>
   );
 }
+
+/**
+ * Automations by agent (v3 D12): each agent — who, its state, its budget, its Pause — then what it
+ * runs (its rules, or Jarvis's own work it does). The rules no agent carries yet come last, each
+ * given to one in a click: nothing runs without someone answering for it.
+ */
+function AgentGroups({
+  rules,
+  onToggle,
+  busy,
+  refresh,
+}: {
+  rules: RuleEntry[];
+  onToggle: (id: string, active: boolean) => void;
+  busy: boolean;
+  refresh: () => void;
+}) {
+  const kindName = useKindName();
+  const { data: agents = [], isLoading } = useAgents();
+  const pause = usePause();
+  const give = useMutation({
+    mutationFn: ({ id, agent }: { id: string; agent: string }) =>
+      api('/save', { method: 'POST', body: { entries: [{ id, data: { agent } }] } }),
+    onSuccess: () => toast('Confié.'),
+    onSettled: refresh,
+  });
+  if (isLoading) return <Skeleton className="h-40" />;
+  const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const of = (agent: Agent) =>
+    rules.filter((rule) => rule.data.agent && fold(rule.data.agent) === fold(agent.title));
+  const orphans = rules.filter(
+    (rule) =>
+      !rule.data.agent || !agents.some((agent) => fold(agent.title) === fold(rule.data.agent!)),
+  );
+  const ruleLine = (rule: RuleEntry, offer?: boolean) => {
+    const active = rule.data.active !== false;
+    return (
+      <div key={rule.id} className={rowClass + ' flex-wrap'}>
+        <span className="min-w-0 flex-1">
+          <Link
+            to="/entree/$id"
+            params={{ id: rule.id }}
+            className="block truncate font-semibold hover:underline"
+          >
+            {rule.title}
+          </Link>
+          <span className="block text-[12.5px] text-bark">
+            <b className="font-medium text-ink">{whenText(rule.data.when ?? {}, kindName)}</b> →{' '}
+            {thenText(rule.data.then, kindName) || '—'}
+            {rule.data.app ? <span className="text-faint"> · {rule.data.app}</span> : null}
+          </span>
+          {rule.data.error && (
+            <span className="block truncate text-[12px] text-error">{rule.data.error}</span>
+          )}
+        </span>
+        {!active && <Tag tone="neutral">arrêté</Tag>}
+        {offer && agents.length > 0 && (
+          <Select
+            label={`Confier « ${rule.title} » à un agent`}
+            value=""
+            placeholder="Confier à…"
+            onChange={(agent) => give.mutate({ id: rule.id, agent })}
+            options={agents
+              .filter((a) => !a.data.builtin?.length)
+              .map((a) => ({ value: a.title, label: a.title }))}
+            className="w-44"
+          />
+        )}
+        <Button size="sm" disabled={busy} onClick={() => onToggle(rule.id, !active)}>
+          {active ? <Pause size={14} /> : <Play size={14} />}
+          {active ? 'Arrêter' : 'Reprendre'}
+        </Button>
+      </div>
+    );
+  };
+  return (
+    <div className="grid gap-4">
+      {agents.map((agent) => {
+        const state = STATE[agent.state];
+        const budget = agent.data.budget?.calls_per_day;
+        const mine = of(agent);
+        return (
+          <Panel
+            key={agent.title}
+            title={
+              <span className="flex min-w-0 items-center gap-2.5">
+                <Avatar name={agent.title} size={26} tinted />
+                <Link
+                  to="/atelier/agents/$name"
+                  params={{ name: agent.title }}
+                  className="truncate hover:underline"
+                >
+                  {agent.title}
+                </Link>
+              </span>
+            }
+            action={
+              <span className="flex flex-wrap items-center gap-2">
+                <Tag tone={state.tone}>{state.label}</Tag>
+                <span className="font-mono text-[11.5px] text-bark">
+                  {budget !== undefined
+                    ? `${agent.callsToday} / ${budget} appels`
+                    : `${agent.callsToday} appel(s)`}{' '}
+                  aujourd’hui
+                </span>
+                <Button
+                  size="sm"
+                  disabled={pause.isPending}
+                  onClick={() => pause.mutate({ title: agent.title, paused: !agent.data.paused })}
+                >
+                  {agent.data.paused ? <Play size={14} /> : <Pause size={14} />}
+                  {agent.data.paused ? 'Reprendre' : 'Pause'}
+                </Button>
+              </span>
+            }
+          >
+            {agent.data.role && (
+              <p className="border-b border-rule px-4 py-2.5 text-[13px] text-bark">
+                {agent.data.role}
+                <span className="text-faint">
+                  {' '}
+                  · {WHERE[agent.data.executor ?? 'rule']}
+                  {agent.data.service ? ` : ${agent.data.service}` : ''}
+                </span>
+              </p>
+            )}
+            {(agent.data.builtin ?? []).map((work) => (
+              <div key={work} className={rowClass}>
+                <span className="min-w-0 flex-1">
+                  <b className="block font-semibold">{BUILTIN_TITLE[work] ?? work}</b>
+                  <span className="block text-[12.5px] text-bark">
+                    <b className="font-medium text-ink">{BUILTIN_WHEN[work] ?? work}</b> →{' '}
+                    {BUILTIN_DOES[work] ?? ''}
+                  </span>
+                </span>
+              </div>
+            ))}
+            {mine.map((rule) => ruleLine(rule))}
+            {!mine.length && !(agent.data.builtin ?? []).length && (
+              <p className="px-4 py-3 text-[13px] text-bark">Aucun automatisme confié.</p>
+            )}
+          </Panel>
+        );
+      })}
+      {orphans.length > 0 && (
+        <Panel title="Sans agent : à confier" icon={<Workflow size={16} />}>
+          <p className="border-b border-rule px-4 py-2.5 text-[13px] text-bark">
+            Ils tournent, mais personne n’en répond : pas de Pause commune, pas de budget, signés «
+            règle ». Confie-les à un agent.
+          </p>
+          {orphans.map((rule) => ruleLine(rule, true))}
+        </Panel>
+      )}
+    </div>
+  );
+}
+
+/** Where an agent's work runs, in her words. */
+const WHERE: Record<string, string> = {
+  rule: 'tourne dans Jarvis, sans IA',
+  script: 'tourne dans Jarvis (un script)',
+  llm: 'un modèle avec ses skills',
+  service: 'tourne sur un serveur',
+};
+const BUILTIN_TITLE: Record<string, string> = { lecture: 'Lire les documents déposés' };
+const BUILTIN_DOES: Record<string, string> = {
+  lecture:
+    'dit ce qu’est le document, en tire les faits, propose la facture, le fournisseur, la garantie',
+};

@@ -26,8 +26,9 @@ describe('the Finances app', () => {
       name: 'Finances',
       dryRun: false,
     });
-    // Its 9 pieces, and its role kept as an entry « App » (spec 033).
-    expect(done.value.result.created).toHaveLength(10);
+    // Its 11 pieces (with its agent « Veilleur d’échéances » and the rule « Facture à payer »,
+    // v3 V7–V8), and its role kept as an entry « App » (spec 033).
+    expect(done.value.result.created).toHaveLength(12);
     expect(done.value.result.created).toContain('App « Finances »');
     const unknown = await claude.call<{ error: string }>('app_install', { name: 'Garden' });
     expect(unknown.value.error).toMatch(

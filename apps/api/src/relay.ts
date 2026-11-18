@@ -109,6 +109,10 @@ export interface RelayRequest {
   /** Relative to the provider's base. */
   path: string;
   body?: unknown;
+  /** Bytes sent as they are (a file to Drive), with their type, instead of a JSON body. */
+  raw?: { bytes: Uint8Array; type: string };
+  /** The answer kept as bytes (a file from Drive), not read as text. */
+  binary?: boolean;
 }
 
 /** A provider's answer, read. */
@@ -117,6 +121,9 @@ export interface RelayAnswer {
   ok: boolean;
   data: unknown;
   ms: number;
+  /** The answer's bytes and type, when asked for (`binary`). */
+  bytes?: Uint8Array;
+  type?: string;
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -283,12 +290,17 @@ export function relay(deps: RelayDeps) {
       const headers: Record<string, string> = { accept: 'application/json, text/calendar, */*' };
       if (provider.auth === 'oauth2-google')
         headers.authorization = `Bearer ${await tokenFor(actor.person, id, renewed)}`;
-      if (request.body !== undefined) headers['content-type'] = 'application/json';
+      if (request.raw) headers['content-type'] = request.raw.type;
+      else if (request.body !== undefined) headers['content-type'] = 'application/json';
       try {
         answer = await fetcher(url, {
           method,
           headers,
-          ...(request.body !== undefined ? { body: JSON.stringify(request.body) } : {}),
+          ...(request.raw
+            ? { body: request.raw.bytes as Uint8Array<ArrayBuffer> }
+            : request.body !== undefined
+              ? { body: JSON.stringify(request.body) }
+              : {}),
           signal: AbortSignal.timeout(CALL_MS),
           redirect: 'follow',
         });
@@ -315,6 +327,20 @@ export function relay(deps: RelayDeps) {
     }
     const ms = Date.now() - started;
     const type = answer!.headers.get('content-type') ?? '';
+    if (request.binary && answer!.ok) {
+      const bytes = new Uint8Array(await answer!.arrayBuffer());
+      if (journal)
+        await as(actor.person, (tx) =>
+          recordCall(tx, actor, connector, {
+            tool: `${method} ${url.pathname}`,
+            ok: true,
+            agreed: true,
+            ms,
+            status: answer!.status,
+          }),
+        );
+      return { status: answer!.status, ok: true, data: null, ms, bytes, type };
+    }
     const text = await answer!.text();
     let data: unknown = text;
     if (type.includes('json')) {

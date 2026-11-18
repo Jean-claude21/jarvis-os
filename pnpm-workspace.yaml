@@ -5,5 +5,7 @@ packages:
 # Build scripts run only when approved here.
 allowBuilds:
   esbuild: true
+  # Image thumbnails (v3 médias): its prebuilt binary is checked at install.
+  sharp: true
   # Its install script only asks for donations: not needed.
   tesseract.js: false

@@ -9,7 +9,11 @@ export interface Kind {
   /** The fields its entries use (for a kind kept without a model of its own). */
   fields?: string[];
   facets?: { facet: string }[];
-  model?: { app?: string; label?: Record<string, string> };
+  model?: {
+    app?: string;
+    label?: Record<string, string>;
+    fields?: { name: string; type: string }[];
+  };
   common?: { fr: string; en: string };
 }
 

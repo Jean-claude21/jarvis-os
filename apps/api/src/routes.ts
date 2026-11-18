@@ -1,6 +1,7 @@
 import { withWho } from './who';
 import { readAndUnderstand } from './reading';
 import { logoFor } from './logo';
+import { mediaFacts, thumbnailOf } from './media';
 import { answerOf, appLines, appsOf, bridgesOf, proposeStructure } from '@jarvis-os/core';
 import {
   comment,
@@ -26,6 +27,12 @@ import {
   setAgent,
   COMPONENTS,
   COMPONENT_CATEGORIES,
+  LARGE_FILE_MAX_BYTES,
+  addStoredFile,
+  eraseFile,
+  fileWithPrint,
+  replaceFile,
+  type FileVersion,
 } from '@jarvis-os/core';
 import {
   addFile,
@@ -1124,14 +1131,17 @@ export function apiRoutes(deps: {
           : undefined;
       const links = typeof form.links === 'string' ? linksSchema.parse(JSON.parse(form.links)) : [];
       const bytes = new Uint8Array(await file.arrayBuffer());
+      const mediaType = file.type || 'application/octet-stream';
+      // A photo says when and where it was taken, and its size (v3 médias).
+      const facts = await mediaFacts(bytes, mediaType);
       const stored = await act(c, (tx, actor, space) =>
         addFile(tx, actor, deps.blobs, {
           spaceId: space,
           name: file.name,
-          mediaType: file.type || 'application/octet-stream',
+          mediaType,
           bytes,
           ...(title ? { title } : {}),
-          ...(data ? { data } : {}),
+          data: { ...facts, ...(data ?? {}) },
           links,
         }),
       );
@@ -1188,6 +1198,290 @@ ${base.text}
     });
   });
 
+  // A large file sent in parts (v3 médias): started here, each part straight to storage, then put
+  // together and kept like any file. The key is hers: under her space, made here.
+  const uploadKey = (space: string, key: string) =>
+    key.startsWith(`${deps.blobs.prefix ?? ''}${space}/up-`) && !key.includes('..');
+  api.post('/files/uploads', async (c) => {
+    const body = z
+      .object({
+        name: z.string().trim().min(1).max(200),
+        type: z.string().trim().min(1).max(200),
+        size: z.number().int().min(1).max(LARGE_FILE_MAX_BYTES),
+        empreinte: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+        links: linksSchema.optional(),
+      })
+      .parse(await c.req.json());
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    // The same bytes she already keeps: nothing to send, the file she has is joined.
+    if (body.empreinte) {
+      const same = await act(c, async (tx, actor, spaceId) => {
+        const id = await fileWithPrint(tx, spaceId, body.empreinte!);
+        if (id && body.links?.length)
+          await save(tx, actor, spaceId, {
+            links: body.links.map((link) => ({ ...link, from: id })),
+          });
+        return id;
+      });
+      if (same) return c.json({ duplicate: same });
+    }
+    if (!deps.blobs.startUpload)
+      return c.json({ error: 'This storage takes no large files.' }, 400);
+    const key = `${deps.blobs.prefix ?? ''}${space.id}/up-${crypto.randomUUID()}`;
+    const uploadId = await deps.blobs.startUpload(key, body.type);
+    return c.json({ key, uploadId, partSize: 8 * 1024 * 1024 }, 201);
+  });
+  api.put(
+    '/files/uploads/part',
+    bodyLimit({
+      maxSize: 9 * 1024 * 1024,
+      onError: (c) => c.json({ error: 'A part is 8 MB at most.' }, 400),
+    }),
+    async (c) => {
+      const key = c.req.query('key') ?? '';
+      const uploadId = c.req.query('uploadId') ?? '';
+      const n = Number(c.req.query('n'));
+      const space = spaceFor(
+        c.get('spaces'),
+        c.req.query('space') ?? c.req.header('x-jarvis-space'),
+      );
+      if (!uploadKey(space.id, key) || !uploadId || !Number.isInteger(n) || n < 1 || n > 10_000)
+        return c.json({ error: 'Not an upload of this space.' }, 400);
+      const bytes = new Uint8Array(await c.req.arrayBuffer());
+      const etag = await deps.blobs.uploadPart!(key, uploadId, n, bytes);
+      return c.json({ n, etag });
+    },
+  );
+  api.post('/files/uploads/complete', async (c) => {
+    const body = z
+      .object({
+        key: z.string().min(1).max(300),
+        uploadId: z.string().min(1).max(1000),
+        parts: z.array(z.object({ n: z.number().int().min(1), etag: z.string().min(1) })).min(1),
+        name: z.string().trim().min(1).max(200),
+        type: z.string().trim().min(1).max(200),
+        size: z.number().int().min(1).max(LARGE_FILE_MAX_BYTES),
+        empreinte: z
+          .string()
+          .regex(/^[a-f0-9]{64}$/)
+          .optional(),
+        links: linksSchema.optional(),
+        /** The file these bytes replace (a new version), instead of a new file. */
+        replace: z.string().min(1).max(64).optional(),
+      })
+      .parse(await c.req.json());
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    if (!uploadKey(space.id, body.key))
+      return c.json({ error: 'Not an upload of this space.' }, 400);
+    await deps.blobs.finishUpload!(body.key, body.uploadId, body.parts);
+    const stored = await act(c, (tx, actor, spaceId) =>
+      body.replace
+        ? replaceFile(tx, actor, deps.blobs, spaceId, body.replace, {
+            name: body.name,
+            mediaType: body.type,
+            storageKey: body.key,
+            size: body.size,
+          })
+        : addStoredFile(tx, actor, {
+            spaceId,
+            storageKey: body.key,
+            name: body.name,
+            mediaType: body.type,
+            size: body.size,
+            ...(body.empreinte ? { empreinte: body.empreinte } : {}),
+            links: body.links ?? [],
+          }),
+    );
+    void readAndUnderstand(deps.db, deps.blobs, c.get('person'), space.id, stored.entryId).catch(
+      (error) => console.warn('[reading]', (error as Error).message),
+    );
+    return c.json(stored, 201);
+  });
+  api.post('/files/uploads/abort', async (c) => {
+    const body = z
+      .object({ key: z.string().min(1).max(300), uploadId: z.string().min(1).max(1000) })
+      .parse(await c.req.json());
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    if (!uploadKey(space.id, body.key))
+      return c.json({ error: 'Not an upload of this space.' }, 400);
+    await deps.blobs.abortUpload?.(body.key, body.uploadId).catch(() => undefined);
+    return c.json({ aborted: true });
+  });
+
+  // A file replaced by a new version (v3 médias): the old bytes are kept as a version.
+  api.post(
+    '/files/:id/replace',
+    bodyLimit({
+      maxSize: FILE_MAX_BYTES + 1024 * 1024,
+      onError: (c) =>
+        c.json({ error: `The file is larger than ${FILE_MAX_BYTES / 1024 / 1024} MB.` }, 400),
+    }),
+    async (c) => {
+      const form = await c.req.parseBody();
+      const file = form.file;
+      if (!(file instanceof File))
+        return c.json({ error: 'Send the file in the field « file ».' }, 400);
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const space = spaceFor(
+        c.get('spaces'),
+        c.req.query('space') ?? c.req.header('x-jarvis-space'),
+      );
+      const stored = await act(c, (tx, actor, spaceId) =>
+        replaceFile(tx, actor, deps.blobs, spaceId, c.req.param('id'), {
+          name: file.name,
+          mediaType: file.type || 'application/octet-stream',
+          bytes,
+        }),
+      );
+      void readAndUnderstand(deps.db, deps.blobs, c.get('person'), space.id, stored.entryId).catch(
+        (error) => console.warn('[reading]', (error as Error).message),
+      );
+      return c.json(stored);
+    },
+  );
+  // An earlier version of a file, opened again.
+  api.get('/files/:id/versions/:n', async (c) => {
+    const version = await act(c, async (tx, _a, spaceId) => {
+      const { rows } = await tx.query<{ data: Record<string, unknown> }>(
+        'select data from entry where id = $1 and space_id = $2',
+        [c.req.param('id'), spaceId],
+      );
+      return ((rows[0]?.data.versions as FileVersion[] | undefined) ?? []).find(
+        (one) => one.n === Number(c.req.param('n')),
+      );
+    });
+    if (!version) return c.json({ error: 'No such version.' }, 404);
+    const bytes = await deps.blobs.get(version.key);
+    return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
+      'content-type': version.type,
+      'content-disposition': `inline; filename*=UTF-8''${encodeURIComponent(version.nom)}`,
+    });
+  });
+  // A file erased for good — only on her explicit yes, which the screen asks for.
+  api.post('/files/:id/erase', async (c) => {
+    const body = z.object({ sure: z.literal(true) }).parse(await c.req.json());
+    void body;
+    return c.json(
+      await act(c, (tx, actor, spaceId) =>
+        eraseFile(tx, actor, deps.blobs, spaceId, c.req.param('id')),
+      ),
+    );
+  });
+
+  // Her Google Drive in Documents (v3 médias, D16): with the « drive.file » right, Jarvis sees only
+  // the files it put there or that she opened with it — never her whole Drive. She can bring one
+  // into Jarvis (kept, read, linked like any file) and send a Jarvis file to her Drive.
+  const driveOf = async (c: Context<Env>) => {
+    const list = await deps.connectors.list(
+      c.get('person'),
+      c.get('spaces').map((one) => one.id),
+    );
+    return list.find((one) => one.provider === 'google-drive') ?? null;
+  };
+  api.get('/drive/files', async (c) => {
+    const drive = await driveOf(c);
+    if (!drive) return c.json({ connected: false, files: [] });
+    const answer = await deps.connectors.relay.call(
+      actorOf(c),
+      drive.id,
+      {
+        path: `files?pageSize=100&orderBy=modifiedTime desc&fields=${encodeURIComponent('files(id,name,mimeType,size,modifiedTime,iconLink,webViewLink)')}&q=${encodeURIComponent('trashed = false')}`,
+      },
+      false,
+    );
+    if (!answer.ok)
+      return c.json({
+        connected: true,
+        state: drive.state,
+        error: `Drive answered ${answer.status}.`,
+        files: [],
+      });
+    const files = ((answer.data as { files?: Record<string, unknown>[] }).files ?? []).map(
+      (one) => ({
+        id: String(one.id),
+        name: String(one.name),
+        mediaType: String(one.mimeType),
+        size: Number(one.size ?? 0),
+        modified: String(one.modifiedTime ?? ''),
+        link: typeof one.webViewLink === 'string' ? one.webViewLink : null,
+      }),
+    );
+    return c.json({ connected: true, state: drive.state, name: drive.name, files });
+  });
+  // A Drive file brought into Jarvis: its bytes kept (Google documents exported as PDF).
+  api.post('/drive/files/:fileId/import', async (c) => {
+    const drive = await driveOf(c);
+    if (!drive) return c.json({ error: 'Google Drive is not connected.' }, 400);
+    const fileId = c.req.param('fileId');
+    if (!/^[\w-]{10,200}$/.test(fileId)) return c.json({ error: 'Not a Drive file.' }, 400);
+    const actor = actorOf(c);
+    const meta = await deps.connectors.relay.call(actor, drive.id, {
+      path: `files/${fileId}?fields=${encodeURIComponent('id,name,mimeType,size')}`,
+    });
+    if (!meta.ok) return c.json({ error: `Drive answered ${meta.status}.` }, 400);
+    const info = meta.data as { name: string; mimeType: string; size?: string };
+    const google = info.mimeType.startsWith('application/vnd.google-apps.');
+    if (!google && Number(info.size ?? 0) > FILE_MAX_BYTES)
+      return c.json({ error: `The file is larger than ${FILE_MAX_BYTES / 1024 / 1024} MB.` }, 400);
+    const got = await deps.connectors.relay.call(actor, drive.id, {
+      path: google
+        ? `files/${fileId}/export?mimeType=${encodeURIComponent('application/pdf')}`
+        : `files/${fileId}?alt=media`,
+      binary: true,
+    });
+    if (!got.ok || !got.bytes) return c.json({ error: `Drive answered ${got.status}.` }, 400);
+    const mediaType = google ? 'application/pdf' : info.mimeType;
+    const name = google ? `${info.name}.pdf` : info.name;
+    const facts = await mediaFacts(got.bytes, mediaType);
+    const space = spaceFor(c.get('spaces'), c.req.query('space') ?? c.req.header('x-jarvis-space'));
+    const stored = await act(c, (tx, a, spaceId) =>
+      addFile(tx, a, deps.blobs, {
+        spaceId,
+        name,
+        mediaType,
+        bytes: got.bytes!,
+        data: { ...facts, source: 'Google Drive', drive_id: fileId },
+      }),
+    );
+    void readAndUnderstand(deps.db, deps.blobs, c.get('person'), space.id, stored.entryId).catch(
+      (error) => console.warn('[reading]', (error as Error).message),
+    );
+    return c.json(stored, 201);
+  });
+  // A Jarvis file sent to her Drive (it becomes one Jarvis can see there).
+  api.post('/drive/send/:id', async (c) => {
+    const drive = await driveOf(c);
+    if (!drive) return c.json({ error: 'Google Drive is not connected.' }, 400);
+    const stored = await act(c, (tx, _a, spaceId) => fileOf(tx, spaceId, c.req.param('id')));
+    if (!stored) return c.json({ error: 'No stored file here.' }, 404);
+    const bytes = await deps.blobs.get(stored.storageKey);
+    const boundary = `jarvis${crypto.randomUUID().replace(/-/g, '')}`;
+    const head = new TextEncoder().encode(
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ name: stored.name })}\r\n--${boundary}\r\nContent-Type: ${stored.mediaType}\r\n\r\n`,
+    );
+    const tail = new TextEncoder().encode(`\r\n--${boundary}--`);
+    const body = new Uint8Array(head.length + bytes.length + tail.length);
+    body.set(head, 0);
+    body.set(bytes, head.length);
+    body.set(tail, head.length + bytes.length);
+    const sent = await deps.connectors.relay.call(actorOf(c), drive.id, {
+      method: 'POST',
+      path: '../../upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
+      raw: { bytes: body, type: `multipart/related; boundary=${boundary}` },
+    });
+    if (!sent.ok) return c.json({ error: `Drive answered ${sent.status}.` }, 400);
+    const made = sent.data as { id?: string; webViewLink?: string };
+    await act(c, (tx, actor, spaceId) =>
+      save(tx, actor, spaceId, {
+        entries: [{ id: c.req.param('id'), data: { drive_id: made.id ?? null } }],
+      }),
+    );
+    return c.json({ sent: true, link: made.webViewLink ?? null });
+  });
+
   // The words Jarvis read in a file (a Word document, a scan), for its page (v3 V7).
   api.get('/files/:id/text', async (c) =>
     c.json(
@@ -1227,6 +1521,15 @@ ${base.text}
   api.get('/files/:id', async (c) => {
     const stored = await act(c, (tx, _a, space) => fileOf(tx, space, c.req.param('id')));
     if (!stored) return c.json({ error: `No stored file for entry ${c.req.param('id')}.` }, 404);
+    // Its thumbnail (an image, small): made once, kept beside it (v3 médias).
+    if (c.req.query('thumb')) {
+      const thumb = await thumbnailOf(deps.blobs, stored.storageKey, stored.mediaType);
+      if (!thumb) return c.json({ error: 'No thumbnail for this kind of file.' }, 404);
+      return c.body(thumb as Uint8Array<ArrayBuffer>, 200, {
+        'content-type': 'image/webp',
+        'cache-control': 'private, max-age=604800',
+      });
+    }
     const bytes = await deps.blobs.get(stored.storageKey);
     return c.body(bytes as Uint8Array<ArrayBuffer>, 200, {
       'content-type': stored.mediaType,

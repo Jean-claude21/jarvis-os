@@ -9,6 +9,7 @@ import { addDays, mondayOf, monthOf, timelineRange } from '../engine/renders/tim
 import { useViewState, View } from '../engine/View';
 import { weekStart } from '../engine/renders/CalendarRender';
 import { PageHead, Panel, Segmented, Stat, Stats } from '../ui';
+import { DrivePanel } from './FileParts';
 import { GENRE_WORDS } from '../lib/words';
 
 // The views across her whole life (v3 D2, D10): one per facet, every app at once — the agenda
@@ -125,6 +126,9 @@ export function DocumentsPage() {
         files={files}
         renders={['files', 'split']}
       />
+      <div className="mt-4">
+        <DrivePanel />
+      </div>
     </>
   );
 }

@@ -7,13 +7,26 @@ import { Identity, WhoActions } from '../../ui/identity';
 import type { Shaped } from '../apply';
 import { showValue } from '../format';
 import type { Field, Row } from '../types';
+import { useFiles, type FileRow } from '../sources';
+import { FileThumb, coverOf } from '../../routes/FileParts';
 
 // Les cartes (gr8r's gallery, the v2 people cards): one card per entry — who it is (an avatar, a
 // logo) or its kind, its title, its first values with their names, its step, and the gestures
 // that reach a person. Any source: people, offers, objects.
 
-function Card({ row, fields, group }: { row: Row; fields: Field[]; group?: string | undefined }) {
+function Card({
+  row,
+  fields,
+  group,
+  files,
+}: {
+  row: Row;
+  fields: Field[];
+  group?: string | undefined;
+  files: FileRow[];
+}) {
   const kindName = useKindName();
+  const cover = coverOf(row.values, fields, files);
   const stageField = fields.find((one) => one.path === row.stageField);
   const stage = row.stageField ? row.values[row.stageField] : null;
   const shown = fields
@@ -31,6 +44,15 @@ function Card({ row, fields, group }: { row: Row; fields: Field[]; group?: strin
       className="relative flex min-w-0 flex-col gap-3 rounded-[12px] border border-rule bg-paper p-3.5 hover:border-rule-strong"
       {...rowMenu(row.id, row.title)}
     >
+      {cover && (
+        <FileThumb
+          id={cover.entryId}
+          mediaType={cover.mediaType}
+          name={cover.name}
+          size={0}
+          className="-mx-3.5 -mt-3.5 !h-40 !w-[calc(100%+1.75rem)] max-w-none rounded-none rounded-t-[12px]"
+        />
+      )}
       <div className="flex min-w-0 items-start gap-3">
         {row.who ? (
           <Identity name={row.title} who={row.who} size={40} />
@@ -73,11 +95,12 @@ export function CardsRender({
   fields: Field[];
   group?: string | undefined;
 }) {
+  const { files } = useFiles();
   if (!shaped.rows.length) return <Empty title="Rien ici" lead="Aucune entrée pour cette vue." />;
   const grid = (rows: Row[]) => (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,250px),1fr))] gap-3 p-3">
       {rows.map((row) => (
-        <Card key={row.id} row={row} fields={fields} group={group} />
+        <Card key={row.id} row={row} fields={fields} group={group} files={files} />
       ))}
     </div>
   );

@@ -93,5 +93,10 @@ const COMMON_WORDS: Record<string, string> = {
   note: 'Note',
   tags: 'Étiquettes',
   organization: 'Organisation',
+  pris_le: 'Prise le',
+  lieu: 'Lieu',
+  largeur: 'Largeur',
+  hauteur: 'Hauteur',
+  source: 'Source',
 };
 export const fieldWord = (path: string) => COMMON_WORDS[path] ?? path.replace(/_/g, ' ');

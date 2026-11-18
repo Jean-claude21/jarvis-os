@@ -1,7 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Upload } from 'lucide-react';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { spaceNow } from './api';
+import { sendFile } from './send';
+import { toast } from '../ui/more';
 
 // A file dropped anywhere (v3 V7, « dépôt partout »): on any screen she drags a file in, and it is
 // kept in her space — joined to the entry she is looking at when there is one (« pièce de »).
@@ -28,19 +29,22 @@ export function useDropTarget(next: DropTarget | null) {
   }, [next?.id, next?.title]);
 }
 
-/** Her files, sent one by one; each joined to `to` when given. */
-export async function uploadFiles(files: File[], to?: string | null): Promise<number> {
-  let sent = 0;
+/** Her files, sent one by one (large ones in parts); each joined to `to` when given. */
+export async function uploadFiles(
+  files: File[],
+  to?: string | null,
+): Promise<{ sent: number; duplicates: number; failed: string[] }> {
+  const out = { sent: 0, duplicates: 0, failed: [] as string[] };
   for (const file of files) {
-    const form = new FormData();
-    form.append('file', file);
-    if (to) form.append('links', JSON.stringify([{ to, role: 'pièce de' }]));
-    const url = new URL('/api/files', location.origin);
-    if (spaceNow()) url.searchParams.set('space', spaceNow()!);
-    const response = await fetch(url, { method: 'POST', body: form, credentials: 'same-origin' });
-    if (response.ok) sent += 1;
+    try {
+      const one = await sendFile(file, { to: to ?? null });
+      out.sent += 1;
+      if (one.duplicate) out.duplicates += 1;
+    } catch (error) {
+      out.failed.push(`${file.name} : ${(error as Error).message}`);
+    }
   }
-  return sent;
+  return out;
 }
 
 /** Sends and refreshes what shows files, then what its reading proposes. */
@@ -57,7 +61,9 @@ export function useUpload() {
     if (!files.length) return 0;
     setBusy(true);
     try {
-      return await uploadFiles(files, to);
+      const done = await uploadFiles(files, to);
+      if (done.failed.length) toast(done.failed.join(' · '), 'error');
+      return done.sent;
     } finally {
       setBusy(false);
       refresh();

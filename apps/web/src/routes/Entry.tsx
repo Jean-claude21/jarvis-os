@@ -19,11 +19,13 @@ import { useSession } from '../lib/session';
 import { useDropTarget, useUpload } from '../lib/upload';
 import { GENRE_WORDS, said, whoOf } from '../lib/words';
 import { fieldWord, showValue } from '../engine/format';
+import { useFiles } from '../engine/sources';
 
 import { Avatar, Button, PageHead, Panel, Skeleton, Tag, ago, rowClass } from '../ui';
 import { Identity, WhoActions, type Who } from '../ui/identity';
 import { Markdown } from '../ui/Markdown';
 import { FieldRow, LinksPanel, NotesPanel, TitleEdit, type EditableField } from './EntryParts';
+import { FileActions, FileField, FileThumb } from './FileParts';
 
 // La fiche (v3 D10): one entry, drawn from its kind's facets — who it is (avatar, logo, the
 // gestures that reach them, the last contact), what a document is (its preview, what Jarvis read
@@ -80,7 +82,29 @@ const isEmpty = (value: unknown) =>
   value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length);
 
 /** Keys Jarvis keeps for itself on an entry: never shown as her values. */
-const OWN = new Set(['text', 'source_connection', 'genre', 'facts', 'nom', 'type', 'taille']);
+const OWN = new Set([
+  'text',
+  'source_connection',
+  'genre',
+  'facts',
+  'nom',
+  'type',
+  'taille',
+  'empreinte',
+  'versions',
+  'drive_id',
+  'efface',
+]);
+/** A photo's values (v3 médias), typed when no model names them. */
+const MEDIA_TYPES: Record<string, string> = {
+  pris_le: 'datetime',
+  largeur: 'integer',
+  hauteur: 'integer',
+};
+const placeOf = (value: unknown) =>
+  value && typeof value === 'object' && 'lat' in value && 'lng' in value
+    ? (value as { lat: number; lng: number })
+    : null;
 const FACT_WORDS: Record<string, string> = {
   amount: 'Montant',
   date: 'Date',
@@ -133,6 +157,8 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
     },
   });
   const { send, busy } = useUpload();
+  const { files: stored } = useFiles();
+  const fileTypes = new Map(stored.map((f) => [f.entryId, f.mediaType]));
   const input = useRef<HTMLInputElement>(null);
   // The empty fields of her model wait behind one line, so the values she has come first.
   const [filling, setFilling] = useState(false);
@@ -167,7 +193,7 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
     return {
       ...(own?.target ? { target: own.target } : {}),
       path: name,
-      type: own?.type ?? 'text',
+      type: own?.type ?? MEDIA_TYPES[name] ?? 'text',
       label: label(own?.label, fieldWord(name)),
       ...(own?.options ? { options: own.options } : {}),
       ...(own?.optionLabels
@@ -330,6 +356,9 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
                     const field = fieldOf(name);
                     const links = field.type === 'link' ? linkedBy(name) : [];
                     const value = one.data[name];
+                    if (field.type === 'file')
+                      return <FileField key={name} entryId={one.id} field={field} value={value} />;
+                    const spot = placeOf(value);
                     return (
                       <FieldRow
                         key={name}
@@ -349,6 +378,15 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
                                 {l.entry.title}
                               </Link>
                             ))
+                          ) : spot ? (
+                            <a
+                              href={`https://www.openstreetmap.org/?mlat=${spot.lat}&mlon=${spot.lng}#map=16/${spot.lat}/${spot.lng}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary hover:underline"
+                            >
+                              {spot.lat.toFixed(5)}, {spot.lng.toFixed(5)} · voir sur la carte
+                            </a>
                           ) : field.type === 'url' && typeof value === 'string' ? (
                             <a
                               href={value}
@@ -434,6 +472,7 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
               </dl>
             </Panel>
           )}
+          {isFile && <FileActions id={one.id} title={one.title} data={one.data} />}
           {!isFile && (
             <Panel
               title="Fichiers joints"
@@ -454,7 +493,12 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
               />
               {files.map((l) => (
                 <Link key={l.id} to="/entree/$id" params={{ id: l.entry.id }} className={rowClass}>
-                  <Paperclip size={14} className="flex-none text-bark" />
+                  <FileThumb
+                    id={l.entry.id}
+                    mediaType={fileTypes.get(l.entry.id) ?? ''}
+                    name={l.entry.title}
+                    size={28}
+                  />
                   <span className="min-w-0 flex-1 truncate">{l.entry.title}</span>
                 </Link>
               ))}

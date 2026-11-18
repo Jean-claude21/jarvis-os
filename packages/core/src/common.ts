@@ -46,7 +46,12 @@ export const COMMON_FACETS: Record<string, Facet[]> = {
     { facet: 'dated', start: 'start', end: 'end' },
     { facet: 'recurring', repeat: 'repeat' },
   ],
-  Fichier: [{ facet: 'document' }],
+  // A photo says when and where it was taken (v3 médias): the Agenda and the Map read it.
+  Fichier: [
+    { facet: 'document' },
+    { facet: 'dated', start: 'pris_le' },
+    { facet: 'place', location: 'lieu' },
+  ],
 };
 
 export const COMMON_KINDS: CommonKind[] = [

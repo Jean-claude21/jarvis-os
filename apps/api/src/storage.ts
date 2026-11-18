@@ -1,9 +1,13 @@
 import { quiet } from './settings';
 import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
+  UploadPartCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Blobs } from '@jarvis-os/core';
@@ -32,6 +36,46 @@ export function objectStorage(settings: Settings['storage']): Blobs {
     async put(key, bytes, mediaType) {
       await s3.send(
         new PutObjectCommand({ Bucket: bucket, Key: key, Body: bytes, ContentType: mediaType }),
+      );
+    },
+    // A large file in parts (v3 médias): each part goes straight to storage, never kept here.
+    async startUpload(key, mediaType) {
+      const made = await s3.send(
+        new CreateMultipartUploadCommand({ Bucket: bucket, Key: key, ContentType: mediaType }),
+      );
+      if (!made.UploadId) throw new Error('The storage did not start the upload.');
+      return made.UploadId;
+    },
+    async uploadPart(key, uploadId, n, bytes) {
+      const part = await s3.send(
+        new UploadPartCommand({
+          Bucket: bucket,
+          Key: key,
+          UploadId: uploadId,
+          PartNumber: n,
+          Body: bytes,
+        }),
+      );
+      if (!part.ETag) throw new Error(`The storage did not keep part ${n}.`);
+      return part.ETag;
+    },
+    async finishUpload(key, uploadId, parts) {
+      await s3.send(
+        new CompleteMultipartUploadCommand({
+          Bucket: bucket,
+          Key: key,
+          UploadId: uploadId,
+          MultipartUpload: {
+            Parts: [...parts]
+              .sort((a, b) => a.n - b.n)
+              .map((one) => ({ PartNumber: one.n, ETag: one.etag })),
+          },
+        }),
+      );
+    },
+    async abortUpload(key, uploadId) {
+      await s3.send(
+        new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }),
       );
     },
     async get(key) {

@@ -355,6 +355,15 @@ export {
 } from './connectors';
 export { filesToRead, READ_LATER, setFileWords, type FileToRead } from './files';
 export {
+  LARGE_FILE_MAX_BYTES,
+  addStoredFile,
+  eraseFile,
+  fileWithPrint,
+  fingerprint,
+  replaceFile,
+  type FileVersion,
+} from './files';
+export {
   readFacts,
   understandFile,
   genreLabel,

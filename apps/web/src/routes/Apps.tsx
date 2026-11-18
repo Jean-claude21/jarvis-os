@@ -330,7 +330,10 @@ export function AppPage() {
   const renders: RenderKey[] = [
     'split',
     'list',
-    ...(has('who') ? (['cards'] as const) : []),
+    // Cards for people (who they are) and for what has a photo (its cover).
+    ...(has('who') || scope.some((one) => (one.model?.fields ?? []).some((f) => f.type === 'file'))
+      ? (['cards'] as const)
+      : []),
     ...(has('place') ? (['map'] as const) : []),
     'table',
     ...(has('stages') ? (['board'] as const) : []),

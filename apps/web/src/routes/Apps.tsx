@@ -4,6 +4,7 @@ import {
   Database,
   FileText,
   History,
+  Inbox,
   LayoutGrid,
   Pencil,
   Plus,
@@ -38,6 +39,7 @@ import { useFiles, useKindRows } from '../engine/sources';
 import type { RenderKey } from '../engine/types';
 import { View } from '../engine/View';
 import { Journal } from './Activity';
+import { QueuePanel, forApp, useQueue, type ToSort } from './Queue';
 
 // Her apps (v3 D14, first form): each with its kinds and what they are (their facets). The app's
 // views and its overview come with the view engine (V5) and the templates (V6).
@@ -390,7 +392,7 @@ function Section({ title, items, tone }: { title: string; items: string[]; tone?
 }
 
 /** Where she is in an app: its overview, a page of it, its data, its activity. */
-export type AppTab = 'overview' | 'activity' | 'data' | `page:${string}`;
+export type AppTab = 'overview' | 'queue' | 'activity' | 'data' | `page:${string}`;
 
 /** An app's kinds, those that hold something first. */
 function useAppKinds(name: string) {
@@ -446,6 +448,11 @@ export function AppPage() {
   const source = useKindRows(names);
   const { files } = useFiles(names);
   const page = tab.startsWith('page:') ? pages.find((one) => `page:${one.id}` === tab) : undefined;
+  // What waits for her yes among this app's kinds (F5): the one queue, seen from here.
+  const { data: queue = [] } = useQueue();
+  const kindsHere = mine.map((one) => one.kind);
+  const waitsHere = (one: ToSort) => forApp(one, name, kindsHere);
+  const waiting = queue.filter(waitsHere).length;
 
   type Item = {
     key: string;
@@ -466,6 +473,18 @@ export function AppPage() {
           on: tab === 'overview',
           go: () => go({ t: 'overview' }),
         },
+        ...(waiting || tab === 'queue'
+          ? [
+              {
+                key: 'queue',
+                label: 'À valider',
+                icon: Inbox,
+                n: waiting,
+                on: tab === 'queue',
+                go: () => go({ t: 'queue' }),
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -576,6 +595,17 @@ export function AppPage() {
               <Skeleton className="h-40" />
             ) : (
               <Overview kinds={mine} />
+            )
+          ) : tab === 'queue' ? (
+            waiting ? (
+              <QueuePanel only={waitsHere} />
+            ) : (
+              <Panel>
+                <Empty
+                  title="Rien n’attend ton oui ici"
+                  lead="Ce qu’un agent, un document ou un assistant propose pour cette app arrivera ici."
+                />
+              </Panel>
             )
           ) : tab === 'activity' ? (
             <Journal

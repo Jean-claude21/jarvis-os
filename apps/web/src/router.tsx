@@ -78,6 +78,7 @@ const routes = [
     validateSearch: (search: Record<string, unknown>): ViewSearch & { t?: AppTab | undefined } => ({
       ...viewSearch(search),
       ...(search.t === 'overview' ||
+      search.t === 'queue' ||
       search.t === 'activity' ||
       search.t === 'data' ||
       (typeof search.t === 'string' && /^page:[\w-]{4,64}$/.test(search.t))

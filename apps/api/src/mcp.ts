@@ -11,6 +11,8 @@ import {
   decide,
   propose,
   toSortOf,
+  amendProposal,
+  type Amendment,
   type ProposalInput,
   replan,
   windowOf,
@@ -1724,11 +1726,35 @@ export async function mcpServerFor(
     'decide',
     {
       description:
-        'Her answer to a proposed entry or a proposal: `yes` makes it (one save, undone at once), no sets it aside.',
+        'Her answer to a proposed entry or a proposal: `yes` makes it (one save, undone at once), no sets it aside. On an entry « to verify » (values read from her file), `yes` confirms them as hers.',
       inputSchema: { id: z.string().min(1), yes: z.boolean(), space: spaceArg },
     },
     tool(async (args: { id: string; yes: boolean; space?: string | undefined }) =>
       act((tx) => decide(tx, actor, at(args.space), args.id, args.yes)),
+    ),
+  );
+  server.registerTool(
+    'amend_proposal',
+    {
+      description:
+        'Change what a proposal would make before her yes, as she asks (« le montant est 12 500, pas 125 00 »): for the entry at `at` (0 = first), a new `title` and the values in `data` (null takes one off). What she sets becomes « said »; nothing is made until `decide`.',
+      inputSchema: {
+        id: z.string().min(1),
+        entries: z
+          .array(
+            z.object({
+              at: z.number().int().min(0),
+              title: z.string().min(1).max(500).optional(),
+              data: z.record(z.string(), z.unknown()).default({}),
+            }),
+          )
+          .min(1)
+          .max(100),
+        space: spaceArg,
+      },
+    },
+    tool(async (args: { id: string; entries: Amendment[]; space?: string | undefined }) =>
+      act((tx) => amendProposal(tx, actor, at(args.space), args.id, args.entries)),
     ),
   );
 

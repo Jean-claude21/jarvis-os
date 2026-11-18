@@ -97,12 +97,16 @@ export { impactOf, replan, windowOf, type Impact, type Replan } from './impact';
 export { personCard, type PersonCard } from './people';
 export { answerOf, asksAFigure, periodOf, type Answer } from './answer';
 export {
+  amendProposal,
   decide,
   propose,
   PROPOSAL_KIND,
   toSortOf,
+  toVerifyOf,
+  type Amendment,
   type ProposalInput,
   type ToSort,
+  type ToVerify,
   proposeApp,
   APP_PROPOSAL_KIND,
 } from './proposals';

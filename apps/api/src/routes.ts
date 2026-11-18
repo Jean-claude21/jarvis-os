@@ -17,6 +17,8 @@ import {
   OCCURRENCE_STATES,
   setOccurrence,
   toSortOf,
+  amendProposal,
+  type Amendment,
   timeOf,
   installedReleases,
   proposeApp,
@@ -1905,6 +1907,15 @@ ${base.text}
     const body = z.object({ yes: z.boolean() }).parse(await c.req.json());
     return c.json(
       await act(c, (tx, actor, space) => decide(tx, actor, space, c.req.param('id'), body.yes)),
+    );
+  });
+  // What a proposal would make, changed before her yes (v3 F5).
+  api.put('/to-sort/:id', async (c) => {
+    const body = z.object({ entries: z.array(z.unknown()) }).parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        amendProposal(tx, actor, space, c.req.param('id'), body.entries as Amendment[]),
+      ),
     );
   });
 

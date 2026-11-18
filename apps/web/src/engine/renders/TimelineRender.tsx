@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { peek } from '../peek';
 import { Crosshair } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../../lib/api';
@@ -313,8 +314,8 @@ export function TimelineRender({
                   style={{ top: item.y, height: ROW, width: NAME + width }}
                 >
                   <Link
-                    to="/entree/$id"
-                    params={{ id: item.row.id }}
+                    to="."
+                    search={peek(item.row.id)}
                     style={{ width: NAME }}
                     className="sticky left-0 z-[4] flex flex-none items-center gap-2.5 border-r border-rule bg-paper px-4 hover:bg-sand"
                   >

@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { useLive } from '../lib/live';
 import { DropLayer } from '../lib/upload';
 import { Toaster } from '../ui/more';
+import { PeekSheet } from './PeekSheet';
 import { IconButton, Sheet, cn } from '../ui';
 import { Palette } from './Palette';
 import { Sidebar } from './Sidebar';
@@ -134,6 +135,7 @@ export function Shell() {
       <Palette open={search} setOpen={setSearch} />
       <DropLayer />
       <Toaster />
+      <PeekSheet />
     </div>
   );
 }

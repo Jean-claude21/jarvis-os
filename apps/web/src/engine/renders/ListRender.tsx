@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import { peek } from '../peek';
 import { useKindName } from '../../lib/kinds';
 import { Empty, Tag, colorOf, rowClass } from '../../ui';
 import { Identity, WhoActions } from '../../ui/identity';
@@ -45,8 +46,8 @@ export function RowLine({
       )}
       <span className="min-w-0 flex-1">
         <Link
-          to="/entree/$id"
-          params={{ id: row.id }}
+          to="."
+          search={peek(row.id)}
           className="block truncate font-semibold after:absolute after:inset-0"
         >
           {row.title}

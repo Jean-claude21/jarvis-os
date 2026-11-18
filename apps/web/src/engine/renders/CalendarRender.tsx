@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import { peek } from '../peek';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button, cn, colorOf } from '../../ui';
 import type { Shaped } from '../apply';
@@ -71,8 +72,8 @@ export function CalendarRender({
   const chip = (row: (typeof shaped.rows)[number]) => (
     <Link
       key={row.id + row.start}
-      to="/entree/$id"
-      params={{ id: row.id }}
+      to="."
+      search={peek(row.id)}
       title={row.title}
       className="flex min-w-0 items-baseline gap-1 rounded-[5px] px-1.5 py-0.5 text-[11.5px] leading-tight hover:brightness-95"
       style={{ background: `color-mix(in srgb, ${colorOf(row.kind)} 12%, var(--paper))` }}

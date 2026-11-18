@@ -54,6 +54,8 @@ export interface ViewSearch {
   zoom?: 'week' | 'month' | undefined;
   /** « Liste + détail »: the entry read on the right. */
   sel?: string | undefined;
+  /** The entry open in the side card, over the page (F2). */
+  fiche?: string | undefined;
 }
 
 /** A change of the state: a key set to undefined is taken away. */
@@ -75,7 +77,7 @@ export function viewSearch(search: Record<string, unknown>): ViewSearch {
     typeof value === 'string' && value.length <= max ? value : undefined;
   const out: ViewSearch = {};
   if (RENDERS.includes(search.v as RenderKey)) out.v = search.v as RenderKey;
-  for (const key of ['q', 'sort', 'group', 'by', 'f', 'kind', 'sel'] as const) {
+  for (const key of ['q', 'sort', 'group', 'by', 'f', 'kind', 'sel', 'fiche'] as const) {
     const value = text(search[key]);
     if (value) out[key] = value;
   }

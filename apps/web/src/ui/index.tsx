@@ -372,12 +372,18 @@ export function Sheet({
   title,
   children,
   side = 'right',
+  wide = false,
+  action,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: ReactNode;
   children: ReactNode;
   side?: 'right' | 'left';
+  /** A fiche needs more room than a form. */
+  wide?: boolean;
+  /** A gesture beside the title (« Ouvrir en pleine page »). */
+  action?: ReactNode;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -387,7 +393,10 @@ export function Sheet({
           className={cn(
             'fixed top-0 bottom-0 z-50 flex flex-col shadow-card',
             side === 'right'
-              ? 'right-0 w-full border-l border-rule bg-paper sm:w-[440px]'
+              ? cn(
+                  'right-0 w-full border-l border-rule bg-paper',
+                  wide ? 'sm:w-[min(760px,92vw)]' : 'sm:w-[440px]',
+                )
               : 'left-0 w-[280px] bg-canvas',
           )}
         >
@@ -395,7 +404,8 @@ export function Sheet({
           <Dialog.Description className="sr-only">{title}</Dialog.Description>
           {side === 'right' && (
             <header className="flex items-center justify-between gap-3 border-b border-rule px-4 py-3">
-              <b className="truncate font-display text-[15px] font-semibold">{title}</b>
+              <b className="min-w-0 truncate font-display text-[15px] font-semibold">{title}</b>
+              <span className="ml-auto flex flex-none items-center gap-2">{action}</span>
               <Dialog.Close asChild>
                 <IconButton aria-label="Fermer">
                   <X size={16} />

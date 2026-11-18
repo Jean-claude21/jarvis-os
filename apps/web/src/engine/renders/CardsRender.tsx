@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import { peek } from '../peek';
 import { useKindName } from '../../lib/kinds';
 import { AppIcon, Empty, Tag } from '../../ui';
 import { Identity, WhoActions } from '../../ui/identity';
@@ -34,8 +35,8 @@ function Card({ row, fields, group }: { row: Row; fields: Field[]; group?: strin
         )}
         <span className="min-w-0 flex-1">
           <Link
-            to="/entree/$id"
-            params={{ id: row.id }}
+            to="."
+            search={peek(row.id)}
             className="block truncate font-display text-[15px] font-semibold after:absolute after:inset-0"
           >
             {row.title}

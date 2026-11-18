@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { peek } from '../peek';
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { useKindName } from '../../lib/kinds';
@@ -94,8 +95,8 @@ export function BoardRender({
               {cards.map((row) => (
                 <Link
                   key={row.id}
-                  to="/entree/$id"
-                  params={{ id: row.id }}
+                  to="."
+                  search={peek(row.id)}
                   draggable
                   onDragStart={(event) => event.dataTransfer.setData('text/plain', row.id)}
                   className="flex cursor-grab flex-col gap-1 rounded-[8px] border border-rule bg-paper px-2.5 py-2 hover:border-rule-strong"

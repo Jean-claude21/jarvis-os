@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import { peek } from '../peek';
 import {
   flexRender,
   getCoreRowModel,
@@ -40,11 +41,7 @@ export function TableRender({
         id: 'title',
         header: 'Titre',
         cell: ({ row }) => (
-          <Link
-            to="/entree/$id"
-            params={{ id: row.original.id }}
-            className="font-semibold hover:underline"
-          >
+          <Link to="." search={peek(row.original.id)} className="font-semibold hover:underline">
             {row.original.title}
           </Link>
         ),

@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router';
+import { peek } from '../peek';
 import {
   Archive,
   File,
@@ -178,8 +179,8 @@ export function FilesRender({
             return (
               <Link
                 key={file.entryId}
-                to="/entree/$id"
-                params={{ id: file.entryId }}
+                to="."
+                search={peek(file.entryId)}
                 className="flex min-w-0 flex-col gap-1.5 rounded-[10px] border border-rule bg-paper p-3 hover:border-rule-strong"
               >
                 <span
@@ -221,8 +222,8 @@ export function FilesRender({
                   >
                     <td className="max-w-[320px] px-3 py-2">
                       <Link
-                        to="/entree/$id"
-                        params={{ id: file.entryId }}
+                        to="."
+                        search={peek(file.entryId)}
                         className="flex min-w-0 items-center gap-2.5"
                       >
                         <span
@@ -254,8 +255,8 @@ export function FilesRender({
                         {file.links.slice(0, 2).map((link) => (
                           <Link
                             key={link.id}
-                            to="/entree/$id"
-                            params={{ id: link.id }}
+                            to="."
+                            search={peek(link.id)}
                             title={kindName(link.kind)}
                           >
                             <Tag tone="neutral" dot={false}>

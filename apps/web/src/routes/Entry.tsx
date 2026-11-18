@@ -6,24 +6,24 @@ import {
   FileSearch,
   FileText,
   History,
-  Link2,
   ListTree,
   Paperclip,
   RotateCw,
   Upload,
   UserRound,
 } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { api, type JournalLine } from '../lib/api';
 import { useKinds, useKindName } from '../lib/kinds';
 import { useSession } from '../lib/session';
 import { useDropTarget, useUpload } from '../lib/upload';
 import { GENRE_WORDS, said, whoOf } from '../lib/words';
 import { fieldWord, showValue } from '../engine/format';
-import type { Field } from '../engine/types';
+
 import { Avatar, Button, PageHead, Panel, Skeleton, Tag, ago, rowClass } from '../ui';
 import { Identity, WhoActions, type Who } from '../ui/identity';
 import { Markdown } from '../ui/Markdown';
+import { FieldRow, LinksPanel, NotesPanel, TitleEdit, type EditableField } from './EntryParts';
 
 // La fiche (v3 D10): one entry, drawn from its kind's facets — who it is (avatar, logo, the
 // gestures that reach them, the last contact), what a document is (its preview, what Jarvis read
@@ -36,6 +36,8 @@ interface ModelField {
   label?: Record<string, string>;
   options?: string[];
   optionLabels?: Record<string, Record<string, string>>;
+  /** A link field's kind. */
+  target?: string;
 }
 interface KindShape {
   kind: string;
@@ -73,6 +75,9 @@ interface ReadFact {
   value: string | number;
   quote: string;
 }
+
+const isEmpty = (value: unknown) =>
+  value === null || value === undefined || value === '' || (Array.isArray(value) && !value.length);
 
 /** Keys Jarvis keeps for itself on an entry: never shown as her values. */
 const OWN = new Set(['text', 'source_connection', 'genre', 'facts', 'nom', 'type', 'taille']);
@@ -129,6 +134,8 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
   });
   const { send, busy } = useUpload();
   const input = useRef<HTMLInputElement>(null);
+  // The empty fields of her model wait behind one line, so the values she has come first.
+  const [filling, setFilling] = useState(false);
   useDropTarget(entry.data ? { id: entry.data.id, title: entry.data.title } : null);
 
   if (entry.isLoading) return <Skeleton className="h-40" />;
@@ -155,9 +162,10 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
 
   // Her values, in her model's order and words; then any other she gave.
   const modelFields = shape?.model?.fields ?? [];
-  const fieldOf = (name: string): Field => {
+  const fieldOf = (name: string): EditableField => {
     const own = modelFields.find((f) => f.name === name);
     return {
+      ...(own?.target ? { target: own.target } : {}),
       path: name,
       type: own?.type ?? 'text',
       label: label(own?.label, fieldWord(name)),
@@ -171,13 +179,19 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
         : {}),
     };
   };
+  // Every field of her model — the empty ones too, to fill in place — then any other she gave.
   const names = [
-    ...modelFields.map((f) => f.name).filter((name) => name in one.data),
-    ...Object.keys(one.data).filter((name) => !modelFields.some((f) => f.name === name)),
-  ].filter((name) => !OWN.has(name) && (one.data[name] ?? '') !== '');
+    ...modelFields
+      .filter((f) => !['lines', 'button'].includes(f.type))
+      .filter((f) => f.type !== 'formula' || f.name in one.data)
+      .map((f) => f.name),
+    ...Object.keys(one.data).filter(
+      (name) => !modelFields.some((f) => f.name === name) && (one.data[name] ?? '') !== '',
+    ),
+  ].filter((name) => !OWN.has(name));
   const linkedBy = (role: string) => one.links.out.filter((l) => l.role === role);
 
-  // Its links, both ways, by kind (« Altereo → ses offres (4) »); its files apart.
+  // Its links, both ways (notes and files apart, the fields that are links in its values).
   const files = [...one.links.in, ...one.links.out].filter((l) => /^fichier$/i.test(l.entry.kind));
   const others = [
     ...one.links.out.map((l) => ({ ...l, way: 'out' as const })),
@@ -185,17 +199,16 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
   ].filter(
     (l) =>
       !/^fichier$/i.test(l.entry.kind) &&
+      !/^comment$/i.test(l.entry.kind) &&
       l.role !== 'from_proposal' &&
       !modelFields.some((f) => f.type === 'link' && f.name === l.role && l.way === 'out'),
   );
-  const byKind = new Map<string, typeof others>();
-  for (const l of others) byKind.set(l.entry.kind, [...(byKind.get(l.entry.kind) ?? []), l]);
 
   return (
     <>
       <PageHead
         icon={who ? <Identity name={one.title} who={who} size={40} /> : undefined}
-        title={one.title}
+        title={<TitleEdit key={one.title} entryId={one.id} title={one.title} />}
         lead={
           <span className="flex flex-wrap items-center gap-1.5">
             <Tag tone="neutral">{kindName(one.kind)}</Tag>
@@ -311,76 +324,63 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
               <p className="px-4 py-5 text-[13px] text-bark">Aucune valeur.</p>
             ) : (
               <dl>
-                {names.map((name) => {
-                  const field = fieldOf(name);
-                  const links = field.type === 'link' ? linkedBy(name) : [];
-                  return (
-                    <div
-                      key={name}
-                      className="grid grid-cols-[minmax(0,150px)_minmax(0,1fr)] items-baseline gap-3 border-b border-rule px-4 py-2.5 last:border-0"
-                    >
-                      <dt className="truncate text-[13px] text-bark">{field.label}</dt>
-                      <dd className="flex min-w-0 flex-wrap items-baseline gap-2 break-words">
-                        {links.length ? (
-                          links.map((l) => (
-                            <Link
-                              key={l.id}
-                              to="/entree/$id"
-                              params={{ id: l.entry.id }}
-                              className="font-semibold hover:underline"
+                {names
+                  .filter((name) => filling || !isEmpty(one.data[name]))
+                  .map((name) => {
+                    const field = fieldOf(name);
+                    const links = field.type === 'link' ? linkedBy(name) : [];
+                    const value = one.data[name];
+                    return (
+                      <FieldRow
+                        key={name}
+                        entryId={one.id}
+                        field={field}
+                        value={value}
+                        origin={one.origin[name]}
+                        display={
+                          links.length ? (
+                            links.map((l) => (
+                              <Link
+                                key={l.id}
+                                to="/entree/$id"
+                                params={{ id: l.entry.id }}
+                                className="font-semibold hover:underline"
+                              >
+                                {l.entry.title}
+                              </Link>
+                            ))
+                          ) : field.type === 'url' && typeof value === 'string' ? (
+                            <a
+                              href={value}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-primary hover:underline"
                             >
-                              {l.entry.title}
-                            </Link>
-                          ))
-                        ) : field.type === 'url' && typeof one.data[name] === 'string' ? (
-                          <a
-                            href={String(one.data[name])}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-primary hover:underline"
-                          >
-                            {String(one.data[name])}
-                          </a>
-                        ) : (
-                          <span>{showValue(one.data[name], field) || '—'}</span>
-                        )}
-                        {one.origin[name] === 'read' && (
-                          <Tag tone="late" dot={false}>
-                            lu, à vérifier
-                          </Tag>
-                        )}
-                      </dd>
-                    </div>
-                  );
-                })}
+                              {value}
+                            </a>
+                          ) : (
+                            <span className={showValue(value, field) ? '' : 'text-faint'}>
+                              {showValue(value, field) || '—'}
+                            </span>
+                          )
+                        }
+                      />
+                    );
+                  })}
               </dl>
             )}
+            {names.some((name) => isEmpty(one.data[name])) && (
+              <button
+                onClick={() => setFilling(!filling)}
+                className="w-full cursor-pointer border-t border-rule px-4 py-2.5 text-left text-[13px] font-semibold text-primary hover:bg-sand"
+              >
+                {filling
+                  ? 'Cacher les champs vides'
+                  : `Compléter : ${names.filter((name) => isEmpty(one.data[name])).length} champ(s) vide(s)`}
+              </button>
+            )}
           </Panel>
-          {byKind.size > 0 && (
-            <Panel title="Ses liens" icon={<Link2 size={16} />}>
-              {[...byKind.entries()].map(([kind, links]) => (
-                <div key={kind}>
-                  <div className="flex items-center gap-2 border-b border-rule bg-sand px-4 py-1.5">
-                    <b className="text-[13px] font-semibold">{kindName(kind)}</b>
-                    <span className="font-mono text-[11px] text-faint">{links.length}</span>
-                  </div>
-                  {links.map((l) => (
-                    <Link
-                      key={l.id + l.way}
-                      to="/entree/$id"
-                      params={{ id: l.entry.id }}
-                      className={rowClass}
-                    >
-                      <span className="min-w-0 flex-1 truncate font-semibold">{l.entry.title}</span>
-                      <span className="flex-none text-[12.5px] text-bark">
-                        {l.way === 'out' ? l.role : `← ${l.role}`}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              ))}
-            </Panel>
-          )}
+          <LinksPanel entryId={one.id} links={others} />
         </div>
         <div className="flex min-w-0 flex-col gap-4">
           {isPerson && card.data && (
@@ -465,6 +465,7 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
               </p>
             </Panel>
           )}
+          <NotesPanel entryId={one.id} />
           <Panel title="Son histoire" icon={<History size={16} />}>
             <ul className="max-h-[60vh] overflow-y-auto">
               {(history.data ?? []).map((line) => {

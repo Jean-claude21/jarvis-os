@@ -1070,7 +1070,8 @@
               }
             }
           }
-        ]
+        ],
+        "agent": "Chasseur d’offres"
       }
     },
     {
@@ -1099,7 +1100,8 @@
               "minutes": 120
             }
           }
-        ]
+        ],
+        "agent": "Chasseur d’offres"
       }
     },
     {
@@ -1119,7 +1121,8 @@
               "text": "Relancer : {title} ({company})"
             }
           }
-        ]
+        ],
+        "agent": "Veilleur d’échéances"
       }
     }
   ],
@@ -1176,5 +1179,32 @@
     },
     "capabilities": ["chercher", "lire", "parcourir", "pdf", "situer"],
     "bridges": []
-  }
+  },
+  "agents": [
+    {
+      "title": "Chasseur d’offres",
+      "data": {
+        "role": "Chaque matin, cherche les offres qui te correspondent sur tes sources, puis lit les meilleures en entier.",
+        "executor": "service",
+        "service": "Atelier",
+        "reads": ["JobSearch", "Source"],
+        "writes": ["JobOffer", "Capture"],
+        "autonomy": "act_and_report",
+        "budget": {
+          "calls_per_day": 4
+        }
+      }
+    },
+    {
+      "title": "Veilleur d’échéances",
+      "data": {
+        "role": "Rappelle à temps ce qui arrive à échéance : une relance, une garantie qui finit, une facture à payer.",
+        "executor": "rule",
+        "reads": ["JobOffer", "Warranty", "Bill"],
+        "writes": ["Reminder"],
+        "autonomy": "act_and_report"
+      }
+    }
+  ],
+  "release": 2
 }

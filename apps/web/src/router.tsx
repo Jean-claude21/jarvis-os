@@ -4,7 +4,7 @@ import { AppPage, Apps, type AppTab } from './routes/Apps';
 import { AgendaPage, DocumentsPage, PeoplePage, TasksPage } from './routes/Across';
 import { viewSearch, type ViewSearch } from './engine/types';
 import { EntryPage } from './routes/Entry';
-import { Soon } from './routes/Soon';
+import { AgentPage, AtelierPage, atelierSearch } from './routes/Atelier';
 import { SettingsPage, settingsSearch } from './routes/Settings';
 import { Today } from './routes/Today';
 import { Shell, type Crumb } from './shell/Shell';
@@ -83,13 +83,21 @@ const routes = [
   viewPage('/taches', 'Tâches', TasksPage),
   viewPage('/documents', 'Documents', DocumentsPage),
   viewPage('/personnes', 'Personnes', PeoplePage),
-  page('/atelier', 'Atelier', () => (
-    <Soon
-      title="Atelier"
-      lead="Types, skills, agents et connexions : pour construire."
-      step="les agents (V8)"
-    />
-  )),
+  createRoute({
+    getParentRoute: () => root,
+    path: '/atelier',
+    component: AtelierPage,
+    validateSearch: atelierSearch,
+    staticData: { crumbs: () => [{ label: 'Atelier', to: '/atelier' }] },
+  }),
+  createRoute({
+    getParentRoute: () => root,
+    path: '/atelier/agents/$name',
+    component: AgentPage,
+    staticData: {
+      crumbs: (params) => [{ label: 'Atelier', to: '/atelier' }, { label: params.name ?? '' }],
+    },
+  }),
   createRoute({
     getParentRoute: () => root,
     path: '/reglages',

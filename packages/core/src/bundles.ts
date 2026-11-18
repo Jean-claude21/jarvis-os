@@ -7,6 +7,7 @@ import { MODEL_KIND, modelsOf } from './models';
 import { PAGE_KIND } from './pages';
 import { APP_KIND, roleSchema } from './roles';
 import { RULE_KIND } from './rules';
+import { AGENT_KIND } from './agent-node';
 import { SCRIPT_KIND } from './scripts';
 import { trial, type Trial } from './trial';
 
@@ -33,6 +34,8 @@ export const bundleSchema = z.object({
   pages: z.array(piece).max(40).default([]),
   rules: z.array(piece).max(40).default([]),
   scripts: z.array(piece).max(20).default([]),
+  /** Its agents (v3 D12): who runs its rules — one agent may serve several apps. */
+  agents: z.array(piece).max(10).default([]),
   /** Its role among her apps (spec 033): what it covers, when it is concerned, its bridges. */
   role: roleSchema.optional(),
 });
@@ -79,6 +82,7 @@ export async function exportApp(
     pages: await named(PAGE_KIND),
     rules: await named(RULE_KIND),
     scripts: await named(SCRIPT_KIND),
+    agents: await named(AGENT_KIND),
   };
 }
 
@@ -130,6 +134,7 @@ function piecesOf(bundle: z.infer<typeof bundleSchema>): [string, Piece[]][] {
       SCRIPT_KIND,
       bundle.scripts.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } })),
     ],
+    [AGENT_KIND, bundle.agents.map((one) => ({ ...one, data: { app: bundle.app, ...one.data } }))],
     [
       RULE_KIND,
       [

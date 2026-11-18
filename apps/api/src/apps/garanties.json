@@ -109,7 +109,28 @@
       }
     }
   ],
-  "rules": [],
+  "rules": [
+    {
+      "title": "Fin de garantie",
+      "data": {
+        "when": {
+          "before": {
+            "kind": "Warranty",
+            "field": "ends",
+            "days": 30
+          }
+        },
+        "then": [
+          {
+            "remind": {
+              "text": "Garantie bientôt finie : {title}"
+            }
+          }
+        ],
+        "agent": "Veilleur d’échéances"
+      }
+    }
+  ],
   "scripts": [],
   "role": {
     "covers": {
@@ -140,5 +161,18 @@
       "en": "A warranty is a « Warranty » (item, store, end); link it to the equipment or the purchase when they exist."
     },
     "bridges": []
-  }
+  },
+  "agents": [
+    {
+      "title": "Veilleur d’échéances",
+      "data": {
+        "role": "Rappelle à temps ce qui arrive à échéance : une relance, une garantie qui finit, une facture à payer.",
+        "executor": "rule",
+        "reads": ["JobOffer", "Warranty", "Bill"],
+        "writes": ["Reminder"],
+        "autonomy": "act_and_report"
+      }
+    }
+  ],
+  "release": 2
 }

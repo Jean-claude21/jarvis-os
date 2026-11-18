@@ -1,6 +1,8 @@
 import type pg from 'pg';
 import { z } from 'zod';
 import { closeExecution, countOnExecution, openExecution } from './activities';
+import { agentClient, agentNamed, callsToday } from './agent-node';
+import { propose } from './proposals';
 import { callConnection, partOf, receive } from './agents';
 import { readerOf, type EntryView, type Reader } from './compute';
 import { asPerson, type Actor, type Tx } from './db';
@@ -133,6 +135,8 @@ export const ruleDataSchema = z.object({
   if: z.string().trim().min(1).max(2000).optional(),
   then: z.array(actionSchema).min(1).max(10),
   active: z.boolean().optional(),
+  /** The agent that runs it (v3 D12): its Pause, budget, autonomy and name apply to this rule. */
+  agent: z.string().trim().min(1).max(80).optional(),
   // A bridge between apps (spec 033): never blocks what she saves.
   bridge: z.boolean().optional(),
   app: z.string().trim().min(1).max(60).optional(),
@@ -239,6 +243,10 @@ export async function rulesOf(tx: Tx, spaceId: string): Promise<RuleRow[]> {
   });
 }
 
+/** How a rule's changes are signed: by its agent when it has one, else by the rule. */
+const clientOf = (rule: RuleRow, agent?: string) =>
+  agent ? agentClient(agent) : `rule:${rule.title}`;
+
 /** Runs a rule's actions for an entry (or none, for a schedule), if its condition holds. */
 async function act(
   tx: Tx,
@@ -255,6 +263,24 @@ async function act(
     await reader.around([entryId]);
     scope = reader.view(row);
   }
+  // Its agent (v3 D12): paused, it does nothing; over its budget, its calls wait for tomorrow.
+  // An agent named by its rules only (no settings yet) is that agent, with its defaults.
+  const agent = rule.data.agent
+    ? ((await agentNamed(tx, spaceId, rule.data.agent)) ?? {
+        id: null,
+        title: rule.data.agent,
+        data: {},
+      })
+    : null;
+  if (agent?.data.paused) return false;
+  const budget = agent?.data.budget?.calls_per_day;
+  if (
+    agent &&
+    budget !== undefined &&
+    rule.data.then.some((action) => 'call' in action) &&
+    (await callsToday(tx, spaceId, agent.title, reader.clock.now)) >= budget
+  )
+    return false;
   if (
     rule.data.if &&
     !(await evaluate(parse(rule.data.if), scope ?? { get: () => null }, reader.clock))
@@ -263,10 +289,19 @@ async function act(
   const by: Actor = {
     ...actor,
     door: 'rule',
-    client: `rule:${rule.title}`,
+    client: clientOf(rule, agent?.title),
     depth: (actor.depth ?? 0) + 1,
   };
-  const call = (input: SaveInput) => save(tx, by, spaceId, input);
+  // An agent that proposes: what it would write waits for her yes in « À valider ».
+  const call = (input: SaveInput) =>
+    agent?.data.autonomy === 'propose' && input.entries?.length
+      ? propose(tx, by, spaceId, {
+          title: `${agent.title} : ${rule.title}`,
+          why: agent.data.role ?? `Proposé par ${agent.title}.`,
+          entries: input.entries,
+          links: (input.links ?? []) as never,
+        })
+      : save(tx, by, spaceId, input);
   for (const action of rule.data.then) {
     if ('create' in action) {
       const data: Record<string, unknown> = {};
@@ -479,7 +514,13 @@ export async function runRulesAfterSave(
           fold(when.changed.kind) === fold(one.kind) &&
           one.fields.some((field) => fold(field) === fold(when.changed.field)));
       // A rule does not fire again on its own change.
-      if (!fires || actor.client === `rule:${rule.title}`) continue;
+      // A rule (or its agent) does not fire again on its own change.
+      if (
+        !fires ||
+        actor.client === `rule:${rule.title}` ||
+        (rule.data.agent && actor.client === agentClient(rule.data.agent))
+      )
+        continue;
       // A bridge never blocks what she saves: if the other app cannot take it as it is (a field it
       // requires, unknown here), her entry is kept and a reminder says what to complete.
       const bridge = rule.data.bridge === true;

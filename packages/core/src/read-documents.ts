@@ -2,6 +2,7 @@ import type { Actor, Tx } from './db';
 import { find, get, save } from './entries';
 import { modelsOf } from './models';
 import { propose } from './proposals';
+import { agentClient, agentDoing } from './agent-node';
 import type { EntryInput } from './schemas';
 
 // Documents that live (v3 V7): a file she drops is read (spec 026), then understood — what it is
@@ -210,6 +211,10 @@ export async function understandFile(
   entryId: string,
   text: string,
 ): Promise<{ genre: string | null; proposal: string | null }> {
+  // Its agent (v3 D12): the Secrétaire des papiers — paused, files wait; its name signs the work.
+  const agent = await agentDoing(tx, spaceId, 'lecture');
+  if (agent?.data.paused) return { genre: null, proposal: null };
+  if (agent) actor = { ...actor, client: agentClient(agent.title) };
   const file = await get(tx, spaceId, entryId);
   if (!file || (file.data.genre !== undefined && file.data.genre !== null))
     return { genre: null, proposal: null };
@@ -221,7 +226,8 @@ export async function understandFile(
       .filter((key) => facts[key])
       .map((key) => [key, said(facts[key])]),
   );
-  if (Object.keys(read).length) kept.facts = read;
+  // Facts only for a document of a known genre: a table or a note says no amount « De ».
+  if (facts.genre && Object.keys(read).length) kept.facts = read;
   await save(tx, actor, spaceId, {
     entries: [{ id: entryId, data: kept, origin: 'read' }],
   });

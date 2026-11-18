@@ -539,6 +539,27 @@
           }
         ]
       }
+    },
+    {
+      "title": "Facture à payer",
+      "data": {
+        "when": {
+          "before": {
+            "kind": "Bill",
+            "field": "due",
+            "days": 3
+          }
+        },
+        "if": "state = 'to_pay'",
+        "then": [
+          {
+            "remind": {
+              "text": "À payer : {title} ({amount} €)"
+            }
+          }
+        ],
+        "agent": "Veilleur d’échéances"
+      }
     }
   ],
   "scripts": [
@@ -614,5 +635,18 @@
         "sum": "amount"
       }
     ]
-  }
+  },
+  "agents": [
+    {
+      "title": "Veilleur d’échéances",
+      "data": {
+        "role": "Rappelle à temps ce qui arrive à échéance : une relance, une garantie qui finit, une facture à payer.",
+        "executor": "rule",
+        "reads": ["JobOffer", "Warranty", "Bill"],
+        "writes": ["Reminder"],
+        "autonomy": "act_and_report"
+      }
+    }
+  ],
+  "release": 2
 }

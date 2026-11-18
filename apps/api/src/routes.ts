@@ -21,6 +21,9 @@ import {
   proposeApp,
   updateApp,
   bundleSchema,
+  agentsOf,
+  agentSettingsSchema,
+  setAgent,
 } from '@jarvis-os/core';
 import {
   addFile,
@@ -1061,6 +1064,7 @@ export function apiRoutes(deps: {
           ...(author ? { author } : {}),
           ...(commands.length ? { commands } : {}),
           ...(sinceAt ? { since: sinceAt } : {}),
+          ...(c.req.query('client') ? { client: c.req.query('client')!.slice(0, 120) } : {}),
           limit,
         }),
       ),
@@ -1117,6 +1121,60 @@ export function apiRoutes(deps: {
       );
       return c.json(stored, 201);
     },
+  );
+
+  // Her agents (v3 D12): who works for her, how, within what — and their Pause.
+  api.get('/agents', async (c) => c.json(await act(c, (tx, _a, spaceId) => agentsOf(tx, spaceId))));
+  api.patch('/agents/:title', async (c) => {
+    const patch = agentSettingsSchema
+      .pick({ paused: true, autonomy: true, budget: true, role: true })
+      .parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, spaceId) =>
+        setAgent(tx, actor, spaceId, c.req.param('title'), patch),
+      ),
+    );
+  });
+
+  // A skill in the Agent Skills format (SKILL.md: a name, a description, the instructions): what
+  // is written in Jarvis works in Claude too.
+  api.get('/skills/:name/SKILL.md', async (c) => {
+    const wanted = c.req.param('name').toLowerCase();
+    const slug = (name: string) =>
+      name
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .slice(0, 64);
+    const base = baseRoutines.find((one) => slug(one.name) === slug(wanted));
+    if (!base) return c.json({ error: `No skill « ${c.req.param('name')} ».` }, 404);
+    const description = (base.when || base.name).replace(/\s+/g, ' ').slice(0, 1000);
+    const text = `---
+name: ${slug(base.name)}
+description: ${JSON.stringify(`À suivre quand ${description}`)}
+---
+
+${base.text}
+`;
+    return c.body(text, 200, {
+      'content-type': 'text/markdown; charset=utf-8',
+      'content-disposition': `${c.req.query('download') ? 'attachment' : 'inline'}; filename="SKILL.md"`,
+    });
+  });
+
+  // The words Jarvis read in a file (a Word document, a scan), for its page (v3 V7).
+  api.get('/files/:id/text', async (c) =>
+    c.json(
+      await act(c, async (tx, _a, spaceId) => {
+        const { rows } = await tx.query<{ text: string | null; read_state: string }>(
+          'select text, read_state from file where entry_id = $1 and space_id = $2',
+          [c.req.param('id'), spaceId],
+        );
+        return { text: rows[0]?.text ?? null, state: rows[0]?.read_state ?? 'none' };
+      }),
+    ),
   );
 
   // A file read again (v3 V7): one dropped before Jarvis understood documents, or read wrongly.

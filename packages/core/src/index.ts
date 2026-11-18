@@ -444,3 +444,17 @@ export {
 } from './activities';
 export * from './facets';
 export * from './ics-read';
+export {
+  AGENT_KIND,
+  BUILTIN_AGENTS,
+  agentClient,
+  agentDoing,
+  agentNamed,
+  agentsOf,
+  agentSettingsSchema,
+  callsToday,
+  setAgent,
+  type Agent,
+  type AgentSettings,
+  type AgentView,
+} from './agent-node';

@@ -116,7 +116,7 @@ export type Author = 'me' | 'assistant' | 'auto' | 'telegram';
 const AUTHOR_SQL = `case
   when door = 'telegram' then 'telegram'
   when door in ('watcher', 'rule', 'script') or client like 'rule:%' or client like 'script:%'
-    or client like 'source:%' or client = 'health' then 'auto'
+    or client like 'source:%' or client like 'agent:%' or client = 'health' then 'auto'
   when door = 'mcp' or client is not null then 'assistant'
   else 'me' end`;
 
@@ -134,6 +134,8 @@ export async function history(
     commands?: string[];
     /** Only since this instant. */
     since?: string;
+    /** Only those signed so (an agent: « agent:Le Chasseur d’offres »). */
+    client?: string;
   } = {},
 ): Promise<JournalLine[]> {
   const { rows } = await tx.query<JournalLine & { id: string; undoneBy: string | null }>(
@@ -147,6 +149,7 @@ export async function history(
         and ($6::text[] is null or exists (
           select 1 from unnest($6::text[]) c where journal.command = c or journal.command like c || '%'))
         and ($7::timestamptz is null or at >= $7)
+        and ($8::text is null or client = $8)
       order by id desc limit $3`,
     [
       spaceId,
@@ -156,6 +159,7 @@ export async function history(
       options.author ?? null,
       options.commands?.length ? options.commands : null,
       options.since ?? null,
+      options.client ?? null,
     ],
   );
   return rows.map((row) => ({

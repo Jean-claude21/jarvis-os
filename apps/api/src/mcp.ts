@@ -1573,7 +1573,9 @@ export async function mcpServerFor(
         '— For an app you design for her, prefer `propose: true` with `bundle` and `why`: it is tried, then waits in her',
         '« À valider » with what it makes; her yes installs it. Reuse the common kinds (Person, Organization, Event, Task,',
         'Transaction, Goal…) by extending them, and give each model its facets; never write page layouts — the views come',
-        'from the facets.',
+        'from the facets. What works by itself is an agent: put its settings in `agents` ({ title, data: { role,',
+        'executor, reads, writes, autonomy, budget } }) and name it in each of its rules (`agent`) — she sees it in her',
+        'Atelier, with its budget and its Pause; prefer `autonomy: "propose"` for anything that writes much.',
       ].join(' '),
       inputSchema: {
         name: z.string().min(1).optional(),

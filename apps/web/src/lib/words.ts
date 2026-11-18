@@ -32,6 +32,7 @@ export function whoOf(line: { actor: string; door: string; client: string | null
     return { name: `Source « ${client.slice(7)} »`, kind: 'source' as const };
   if (client === 'health') return { name: 'Vérification', kind: 'rule' as const };
   if (client === 'lecture') return { name: 'Lecture de Jarvis', kind: 'rule' as const };
+  if (client.startsWith('agent:')) return { name: client.slice(6), kind: 'agent' as const };
   if (line.door === 'telegram') return { name: 'Telegram', kind: 'door' as const };
   if (line.door === 'mcp' || /claude|chatgpt|codex|gemini/i.test(client))
     return {

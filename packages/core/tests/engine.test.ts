@@ -321,11 +321,12 @@ describe('an app bundle', () => {
     expect(bundle.scripts.map((one) => one.title)).toEqual(['Import relevé']);
     const kofi = await person('Kofi');
     const tried = await kofi.as((tx) => installApp(tx, kofi.actor, kofi.space, bundle));
-    expect(tried.result.created).toHaveLength(4);
+    // Its App entry (v3 D14, which keeps its layers), two models, a rule, a script.
+    expect(tried.result.created).toHaveLength(5);
     expect(await kofi.as((tx) => find(tx, kofi.space, { kind: 'Model' }))).toHaveLength(0);
     await kofi.as((tx) => installApp(tx, kofi.actor, kofi.space, bundle, false));
     expect(await kofi.as((tx) => find(tx, kofi.space, { kind: 'Model' }))).toHaveLength(2);
     const again = await kofi.as((tx) => installApp(tx, kofi.actor, kofi.space, bundle, false));
-    expect(again.result.kept).toHaveLength(4);
+    expect(again.result.kept).toHaveLength(5);
   });
 });

@@ -16,7 +16,6 @@ import { useKindName } from '../lib/kinds';
 import {
   Avatar,
   Button,
-  Empty,
   PageHead,
   Panel,
   Segmented,
@@ -609,7 +608,6 @@ function thenText(then: Record<string, unknown>[] | undefined, kindName: (kind: 
  * one made here: « chaque jour à 7 h, rappelle-moi… ».
  */
 function Automations() {
-  const kindName = useKindName();
   const client = useQueryClient();
   const rules = useQuery({
     queryKey: ['entries', 'rules'],

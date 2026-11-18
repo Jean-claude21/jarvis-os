@@ -33,6 +33,17 @@ import {
   fileWithPrint,
   replaceFile,
   type FileVersion,
+  answersSchema,
+  choicesOf,
+  composeBlock,
+  fits,
+  readerOf,
+  facetsOf,
+  type KindShape,
+  createCollection,
+  draftCollection,
+  placeCollection,
+  SIMPLE_TYPES,
 } from '@jarvis-os/core';
 import {
   addFile,
@@ -722,6 +733,51 @@ export function apiRoutes(deps: {
     ),
   );
 
+  // « Suivre quelque chose » (v3): her phrase as a first draft of a collection, the apps it can
+  // live in and the collections a link can point to; then the collection made, or moved.
+  api.post('/collections/draft', async (c) => {
+    const { phrase } = z
+      .object({ phrase: z.string().trim().min(2).max(200) })
+      .parse(await c.req.json());
+    const draft = draftCollection(phrase);
+    const known = await act(c, async (tx, _a, space) => ({
+      apps: (await appsOf(tx, space, shippedRoles)).map((one) => one.app),
+      collections: (await readerOf(tx, space))
+        .allModels()
+        .map((one) => ({ kind: one.kind, label: one.label?.fr ?? one.kind })),
+    }));
+    return c.json({ draft, types: SIMPLE_TYPES, ...known });
+  });
+  const draftField = z.object({
+    name: z.string().trim().max(60).default(''),
+    label: z.string().trim().min(1).max(60),
+    type: z.enum(SIMPLE_TYPES),
+    options: z.array(z.string().trim().min(1).max(80)).max(100).optional(),
+    target: z.string().trim().min(1).max(80).optional(),
+  });
+  api.post('/collections', async (c) => {
+    const body = z
+      .object({
+        kind: z.string().trim().min(1).max(80),
+        label: z.string().trim().max(80).default(''),
+        app: z.string().trim().min(1).max(60),
+        fields: z.array(draftField).min(1).max(60),
+      })
+      .parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) => createCollection(tx, actor, space, body)),
+      201,
+    );
+  });
+  api.put('/collections/:kind/app', async (c) => {
+    const { app } = z.object({ app: z.string().trim().min(1).max(60) }).parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        placeCollection(tx, actor, space, decodeURIComponent(c.req.param('kind')), app),
+      ),
+    );
+  });
+
   api.post('/apps/install', async (c) => {
     const body = (await c.req.json()) as { name?: string; dryRun?: boolean };
     const bundle = shippedApp(String(body.name ?? ''));
@@ -795,6 +851,61 @@ export function apiRoutes(deps: {
     );
   });
 
+  // Composing a page on screen (v3 F4): the blocks she can add here (the registry's, with what each
+  // asks), the kinds they fit, the formats to start from; then one block from her answers.
+  const shapesOf = async (tx: Tx, space: string, app?: string) => {
+    const reader = await readerOf(tx, space);
+    const models = reader.allModels();
+    const all = new Map(models.map((one) => [one.kind.toLowerCase(), one]));
+    return models
+      .filter((one) => !app || one.app === app)
+      .filter(
+        (one) =>
+          !['page', 'view', 'app', 'rule', 'script', 'agent'].includes(one.kind.toLowerCase()),
+      )
+      .map((one): KindShape => {
+        const parent = one.extends ? (all.get(one.extends.toLowerCase()) ?? null) : null;
+        return {
+          kind: one.kind,
+          fields: [...(parent?.fields ?? []), ...one.fields].map((field) => ({
+            name: field.name,
+            type: field.type,
+            ...(field.options ? { options: field.options } : {}),
+            ...('target' in field && field.target ? { target: field.target } : {}),
+          })),
+          facets: facetsOf(one, parent),
+        };
+      });
+  };
+  api.get('/pages/composable', async (c) => {
+    const app = c.req.query('app') || undefined;
+    const shapes = await act(c, (tx, _a, space) => shapesOf(tx, space, app));
+    return c.json({
+      categories: COMPONENT_CATEGORIES,
+      components: COMPONENTS.filter((one) => one.block && one.asks).map((one) => ({
+        ...one,
+        kinds: one.asks!.includes('kind')
+          ? shapes.filter((shape) => fits(one.id, shape)).map((shape) => shape.kind)
+          : [],
+      })),
+      kinds: shapes.map((shape) => ({ kind: shape.kind, ...choicesOf(shape) })),
+      labels: Object.fromEntries(
+        COMPONENTS.filter((one) => one.block).map((one) => [one.id, one.label.fr]),
+      ),
+    });
+  });
+  api.post('/pages/compose', async (c) => {
+    const answers = answersSchema.parse(await c.req.json());
+    const block = await act(c, async (tx, _a, space) => {
+      const shapes = answers.kind ? await shapesOf(tx, space) : [];
+      const shape = answers.kind
+        ? (shapes.find((one) => one.kind.toLowerCase() === answers.kind!.toLowerCase()) ?? null)
+        : null;
+      if (answers.kind && !shape) throw new Error(`No kind « ${answers.kind} » here.`);
+      return composeBlock(answers, shape);
+    });
+    return c.json({ block });
+  });
   api.get('/pages/:id', async (c) => {
     const params = { ...c.req.query() };
     delete params.space;

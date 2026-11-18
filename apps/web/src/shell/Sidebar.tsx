@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
-import { ChevronsUpDown, Hammer, Search, Settings } from 'lucide-react';
+import { ChevronsUpDown, Hammer, Plus, Search, Settings } from 'lucide-react';
+import { openFollow } from '../routes/Follow';
 import type { ReactNode } from 'react';
 import { api } from '../lib/api';
 import { useKinds } from '../lib/kinds';
 import { useSession } from '../lib/session';
 import { AppIcon, Avatar, Caps, Menu, SpaceDot, cn } from '../ui';
-import { ACROSS, APPS, QUEUE, TODAY } from './nav';
+import { ACROSS, APPS, BILANS, QUEUE, TODAY } from './nav';
 import { useQueue } from '../routes/Queue';
 
 // The sidebar, as J-C's design system draws it: on the canvas, the space switcher on top, the
@@ -48,7 +49,7 @@ export function Sidebar({
       .filter((one) => one.count > 0)
       .flatMap((one) => (one.facets ?? []).map((facet) => facet.facet)),
   );
-  const across = ACROSS.filter((one) => has.has(one.facet));
+  const across = [...ACROSS.filter((one) => has.has(one.facet)), BILANS];
   // What waits for her now: the red count on « Aujourd'hui ».
   const { data: now } = useQuery({
     queryKey: ['now'],
@@ -176,6 +177,16 @@ export function Sidebar({
             <APPS.icon size={16} className="flex-none" />
             <span className="truncate">{APPS.label}</span>
           </Link>
+          <button
+            onClick={() => {
+              onNavigate?.();
+              openFollow();
+            }}
+            className={cn(item, 'cursor-pointer text-faint hover:text-ink')}
+          >
+            <Plus size={16} className="flex-none" />
+            <span className="truncate">Suivre quelque chose</span>
+          </button>
         </Group>
 
         <Group label="Espaces">

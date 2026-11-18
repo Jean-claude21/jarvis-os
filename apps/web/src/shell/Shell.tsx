@@ -3,6 +3,7 @@ import { ChevronRight, History, Menu as MenuIcon, Search } from 'lucide-react';
 import { Fragment, useEffect, useState } from 'react';
 import { useLive } from '../lib/live';
 import { DropLayer } from '../lib/upload';
+import { FollowLayer } from '../routes/Follow';
 import { Toaster } from '../ui/more';
 import { PeekSheet } from './PeekSheet';
 import { RowMenuLayer } from '../engine/RowMenu';
@@ -135,6 +136,7 @@ export function Shell() {
       </main>
       <Palette open={search} setOpen={setSearch} />
       <DropLayer />
+      <FollowLayer />
       <Toaster />
       <PeekSheet />
       <RowMenuLayer />

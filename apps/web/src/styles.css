@@ -231,3 +231,56 @@ body {
   list-style: none;
   margin-left: -1.2em;
 }
+
+/* Callouts and diagrams of her documents (the v2 reader's, on the v3 tokens). */
+.md .callout {
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: var(--sand);
+}
+.md .callout > * + * {
+  margin-top: 0.5em;
+}
+.md .callout-t {
+  font-weight: 700;
+  font-size: 14px;
+}
+.md .callout.note,
+.md .callout.important {
+  background: var(--info-surface);
+}
+.md .callout.note .callout-t,
+.md .callout.important .callout-t {
+  color: var(--info);
+}
+.md .callout.tip {
+  background: var(--success-surface);
+}
+.md .callout.tip .callout-t {
+  color: var(--success);
+}
+.md .callout.warning {
+  background: var(--verify-surface);
+}
+.md .callout.warning .callout-t {
+  color: var(--verify);
+}
+.md .callout.caution {
+  background: var(--error-surface);
+}
+.md .callout.caution .callout-t {
+  color: var(--error);
+}
+.md pre.mermaid {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+  white-space: pre;
+}
+.md pre.mermaid svg {
+  max-width: 100%;
+  max-height: 340px;
+  height: auto;
+}

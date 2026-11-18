@@ -8,6 +8,7 @@ import { Button, Empty, Panel, Stat, Stats, Tag, cn, inputClass, rowClass } from
 import { Markdown } from '../ui/Markdown';
 import { Select, toast } from '../ui/more';
 import { Bars, Funnel, GaugeBar, Heat, Line, Share, type Point } from './charts';
+import { HighlightsBlock } from './review';
 
 // The render of every page block (v3 D21): one function per block of the registry, fed by what the
 // core computed (`renderPage`). A new block = its entry in the registry + its render here.
@@ -705,10 +706,20 @@ export const BLOCK_RENDERS: Record<string, (props: BlockProps) => ReactNode> = {
   sql: SqlBlock,
   live: LiveBlock,
   view: ViewBlock,
+  highlights: HighlightsBlock,
 };
 
 /** Blocks that take the whole width of a dashboard. */
-export const WIDE = new Set(['table', 'datatable', 'review', 'kanban', 'view', 'live', 'sql']);
+export const WIDE = new Set([
+  'table',
+  'datatable',
+  'review',
+  'kanban',
+  'view',
+  'live',
+  'sql',
+  'highlights',
+]);
 
 /** One block in its panel (a figure stands alone, in the band of figures). */
 export function BlockView(props: BlockProps) {

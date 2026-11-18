@@ -15,6 +15,8 @@ import { EntryPage } from './routes/Entry';
 import { AgentPage, AtelierPage, atelierSearch } from './routes/Atelier';
 import { SettingsPage, settingsSearch } from './routes/Settings';
 import { Today } from './routes/Today';
+import { ComposePage } from './routes/PageCompose';
+import { BilansPage } from './routes/Bilans';
 import { Shell, type Crumb } from './shell/Shell';
 
 // The screens (v3 D17): the URL holds where she is, so back and forth and the breadcrumb work.
@@ -99,6 +101,36 @@ const routes = [
   viewPage('/argent', 'Argent', MoneyPage),
   viewPage('/objectifs', 'Objectifs', GoalsPage),
   page('/a-valider', 'À valider', QueuePage),
+  // Her bilans (v3 F4): pages of the « Revue » format, outside any app.
+  createRoute({
+    getParentRoute: () => root,
+    path: '/bilans',
+    component: BilansPage,
+    validateSearch: (search: Record<string, unknown>): ViewSearch & { page?: string } => ({
+      ...viewSearch(search),
+      ...(typeof search.page === 'string' && search.page.length < 80 ? { page: search.page } : {}),
+    }),
+    staticData: { crumbs: () => [{ label: 'Bilans', to: '/bilans' }] },
+  }),
+  // A page made or changed on screen (v3 F4), for an app or for her.
+  createRoute({
+    getParentRoute: () => root,
+    path: '/composer',
+    component: ComposePage,
+    validateSearch: (
+      search: Record<string, unknown>,
+    ): { page?: string; app?: string; format?: string } => {
+      const text = (value: unknown) =>
+        typeof value === 'string' && value.length < 120 ? value : undefined;
+      const out: { page?: string; app?: string; format?: string } = {};
+      for (const key of ['page', 'app', 'format'] as const) {
+        const value = text(search[key]);
+        if (value) out[key] = value;
+      }
+      return out;
+    },
+    staticData: { crumbs: () => [{ label: 'Composer une page' }] },
+  }),
   // « Atelier » became « Construire » (v3 F1): the old addresses still lead there.
   createRoute({
     getParentRoute: () => root,

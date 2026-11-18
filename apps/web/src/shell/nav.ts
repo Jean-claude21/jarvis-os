@@ -7,6 +7,7 @@ import {
   Target,
   Wallet,
   LayoutGrid,
+  NotebookPen,
   Sun,
   Users,
   type LucideIcon,
@@ -36,6 +37,9 @@ export const ACROSS: AcrossItem[] = [
   { facet: 'amount', to: '/argent', label: 'Argent', icon: Wallet },
   { facet: 'measurable', to: '/objectifs', label: 'Objectifs', icon: Target },
 ];
+
+/** Her bilans (v3 F4): a week, a month, looked back on — always there, whatever she keeps. */
+export const BILANS: NavItem = { to: '/bilans', label: 'Bilans', icon: NotebookPen };
 
 /** What waits for her yes (v3 D13), always in the menu. */
 export const QUEUE: NavItem = { to: '/a-valider', label: 'À valider', icon: Inbox };

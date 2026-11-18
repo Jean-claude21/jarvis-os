@@ -8,6 +8,9 @@ import { labelSchema, type Label } from './models';
 import { query } from './query';
 import { requestSchema, runRequest, withParams } from './request';
 import { runView, viewDataSchema } from './views';
+import { mirrorOf, type Mirror } from './review';
+import { DEFAULT_ZONE, timeOf } from './time';
+import { zoneOf } from './zone';
 
 // Pages (spec 014): what an app shows, declared — filters and blocks — computed by the core and
 // drawn by one renderer, in the app and inside Claude. A page is an entry of kind « Page »; its
@@ -27,6 +30,18 @@ const webAddress = (value: unknown) =>
   typeof value === 'string' && /^https?:\/\/[^\s<>"]+$/.test(value) ? value : null;
 const formula = z.string().trim().min(1).max(1000);
 const kind = z.string().trim().min(1).max(80);
+
+/** What a « highlights » block can tell of a period. */
+export const HIGHLIGHT_PARTS = [
+  'figures',
+  'done',
+  'money',
+  'goals',
+  'habits',
+  'commitments',
+  'people',
+  'intentions',
+] as const;
 
 export const blockSchema = z.discriminatedUnion('block', [
   /** One figure: a query's first row, `value` its column (the first one by default). */
@@ -167,6 +182,19 @@ export const blockSchema = z.discriminatedUnion('block', [
     more: z.array(gesture).max(3).optional(),
   }),
   /**
+   * What happened in the page's period (v3 F4, the « Revue » format): its figures, what was done,
+   * money, goals, habits, commitments, people — computed by Jarvis, never written by hand.
+   */
+  z.object({
+    block: z.literal('highlights'),
+    title,
+    parts: z
+      .array(z.enum(HIGHLIGHT_PARTS))
+      .min(1)
+      .max(HIGHLIGHT_PARTS.length)
+      .default([...HIGHLIGHT_PARTS]),
+  }),
+  /**
    * A live block (spec 071): a component the assistant wrote for one need, run in a sandboxed frame
    * with only the data it declared.
    */
@@ -199,12 +227,17 @@ export type Block = z.infer<typeof blockSchema>;
 
 export const pageDataSchema = z.object({
   app: z.string().trim().min(1).max(60).optional(),
+  /**
+   * Its format (v3 D11): « dashboard » (figures, then a grid of blocks) or « review » (a period —
+   * a week or a month, moved back and forth — its figures, what stood out, her text).
+   */
+  format: z.enum(['dashboard', 'review']).default('dashboard'),
   /** What she can choose on the page; `{name}` puts the choice in the blocks' formulas. */
   filters: z
     .array(
       z.object({
         name: z.string().trim().regex(/^\w+$/).max(40),
-        type: z.enum(['month', 'choice', 'text', 'record']),
+        type: z.enum(['month', 'choice', 'text', 'record', 'period']),
         options: z.array(z.string().min(1).max(80)).max(100).optional(),
         default: z.string().max(80).optional(),
         label: z.union([z.string().max(60), labelSchema]).optional(),
@@ -240,7 +273,7 @@ export function checkPage(data: unknown): PageData {
       .map((issue) => `${issue.path.join('.') || 'page'}: ${issue.message}`)
       .join('; ');
     throw new Error(
-      `A « ${PAGE_KIND} » is { app?, filters?: [{ name, type: month|choice|text|record, options?, default? }], blocks: [{ block: stat|stat_delta|gauge|bar|line|breakdown|heatmap|table|datatable|review|funnel|live|task_list|kanban|calendar|form|record|sql|view, … }] } — ${issues}.`,
+      `A « ${PAGE_KIND} » is { app?, format?: dashboard|review, filters?: [… type: month|choice|text|record|period …], blocks: [{ block: stat|stat_delta|gauge|bar|line|breakdown|heatmap|table|datatable|review|funnel|live|task_list|kanban|calendar|form|record|sql|view|highlights, … }] } — ${issues}.`,
     );
   }
   for (const block of parsed.data.blocks) {
@@ -263,6 +296,55 @@ const previousMonth = (month: string) => {
   return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
 };
 
+/** An ISO week's Monday, « 2026-W46 » → « 2026-11-09 ». */
+function mondayOfWeek(year: number, week: number): string {
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const monday = new Date(jan4.getTime() - ((jan4.getUTCDay() + 6) % 7) * 86_400_000);
+  return new Date(monday.getTime() + (week - 1) * 7 * 86_400_000).toISOString().slice(0, 10);
+}
+const addDays = (day: string, n: number) =>
+  new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+/** The ISO week a day is in: « 2026-W46 ». */
+export function weekOf(day: string): string {
+  const date = new Date(`${day}T00:00:00Z`);
+  const thursday = new Date(date.getTime() + (3 - ((date.getUTCDay() + 6) % 7)) * 86_400_000);
+  const year = thursday.getUTCFullYear();
+  const week = Math.floor((thursday.getTime() - Date.UTC(year, 0, 1)) / (7 * 86_400_000)) + 1;
+  return `${year}-W${String(week).padStart(2, '0')}`;
+}
+
+/**
+ * A period (v3 F4): « week » or « month » (the current one), « 2026-W46 », « 2026-11 », or any days
+ * « 2026-11-10..2026-11-16 » — its
+ * first day and the day after its last, as her days.
+ */
+export function pagePeriod(
+  value: string,
+  today: string,
+): { period: string; unit: 'week' | 'month' | 'days'; from: string; to: string } {
+  const asked = value === 'week' ? weekOf(today) : value === 'month' ? today.slice(0, 7) : value;
+  const week = /^(\d{4})-W(\d{2})$/.exec(asked);
+  if (week) {
+    const from = mondayOfWeek(Number(week[1]), Number(week[2]));
+    return { period: asked, unit: 'week', from, to: addDays(from, 7) };
+  }
+  const span = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/.exec(asked);
+  if (span && span[1]! <= span[2]!)
+    return { period: asked, unit: 'days', from: span[1]!, to: addDays(span[2]!, 1) };
+  const month = /^(\d{4})-(\d{2})$/.exec(asked);
+  if (month) {
+    const [y, m] = [Number(month[1]), Number(month[2])];
+    const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+    return { period: asked, unit: 'month', from: `${asked}-01`, to: `${next}-01` };
+  }
+  return pagePeriod('week', today);
+}
+
+/** The title of a block given none, when it has an obvious one. */
+const DEFAULT_TITLES: Record<string, Label> = {
+  highlights: { fr: 'Ce qui a marqué', en: 'What stood out' },
+};
+
 /** A block, computed: what the renderer draws. */
 export type DrawnBlock = Record<string, unknown> & {
   block: string;
@@ -275,6 +357,9 @@ export interface DrawnPage {
   id: string;
   title: string;
   app: string | null;
+  format: 'dashboard' | 'review';
+  /** A « review »'s period: its value, its unit, its first day and the day after its last. */
+  period: { period: string; unit: 'week' | 'month' | 'days'; from: string; to: string } | null;
   spaceId: string;
   filters: (PageData['filters'][number] & { value: string })[];
   params: Record<string, string>;
@@ -314,7 +399,7 @@ async function drawBlock(
     asked?.groupBy && /^[\p{L}\p{N}_]+$/u.test(asked.groupBy) ? asked.groupBy : undefined;
   const base = {
     block: block.block,
-    title: block.title ?? null,
+    title: block.title ?? DEFAULT_TITLES[block.block] ?? null,
     ...(kindOf ? { kind: kindOf } : {}),
     ...(groupField ? { groupField } : {}),
   };
@@ -575,6 +660,39 @@ async function drawBlock(
         })),
       };
     }
+    case 'highlights': {
+      const zone = params.zone ?? DEFAULT_ZONE;
+      const today = todayOf(reader.clock);
+      const span = params.from && params.to ? params : pagePeriod('week', today);
+      const from = timeOf(`${span.from}T00:00`, zone);
+      const to = timeOf(`${span.to}T00:00`, zone);
+      if (!from || !to) throw new Error('A highlights block needs a period.');
+      const mirror: Mirror = await mirrorOf(tx, [reader.spaceId], from, to);
+      const parts = new Set(block.parts);
+      return {
+        ...base,
+        from: span.from,
+        to: span.to,
+        parts: block.parts,
+        ...(parts.has('figures')
+          ? {
+              figures: {
+                made: mirror.made.reduce((sum, one) => sum + one.n, 0),
+                done: mirror.done.length,
+                kept: mirror.commitments.filter((one) => one.state === 'done').length,
+                late: mirror.commitments.filter((one) => one.state === 'late').length,
+              },
+            }
+          : {}),
+        ...(parts.has('done') ? { done: mirror.done.slice(0, 30) } : {}),
+        ...(parts.has('money') ? { money: mirror.money, spending: mirror.spending } : {}),
+        ...(parts.has('goals') ? { goals: mirror.goals } : {}),
+        ...(parts.has('habits') ? { habits: mirror.habits } : {}),
+        ...(parts.has('commitments') ? { commitments: mirror.commitments } : {}),
+        ...(parts.has('people') ? { people: mirror.people.slice(0, 12) } : {}),
+        ...(parts.has('intentions') ? { intentions: mirror.intentions } : {}),
+      };
+    }
     case 'calendar': {
       const from = new Date(reader.clock.now.getTime());
       from.setUTCHours(0, 0, 0, 0);
@@ -659,8 +777,9 @@ export async function renderPage(
   clock: Clock = { now: new Date() },
 ): Promise<DrawnPage> {
   const data = checkPage(page.data);
-  const reader = await readerOf(tx, spaceId, clock);
-  const today = todayOf(clock);
+  const zone = clock.zone ?? (await zoneOf(tx).catch(() => DEFAULT_ZONE));
+  const reader = await readerOf(tx, spaceId, { ...clock, zone });
+  const today = todayOf({ ...clock, zone });
   const filters = data.filters.map((filter) => {
     const value =
       given[filter.name] ??
@@ -669,20 +788,42 @@ export async function renderPage(
         ? monthOf(today)
         : filter.type === 'choice'
           ? (filter.options?.[0] ?? '')
-          : '');
+          : filter.type === 'period'
+            ? 'week'
+            : '');
     return {
       ...filter,
-      value: filter.type === 'month' && value === 'current' ? monthOf(today) : value,
+      value:
+        filter.type === 'month' && value === 'current'
+          ? monthOf(today)
+          : filter.type === 'period'
+            ? pagePeriod(value, today).period
+            : value,
     };
   });
   const params: Record<string, string> = Object.fromEntries(
     filters.map((filter) => [filter.name, filter.value]),
   );
   if (given.record) params.record = given.record;
+  // A review's period: « {from} » and « {to} » in the blocks' formulas (« date >= '{from}' »), and
+  // « {month} » when it is a month. A review without a period filter is about the current week.
+  const periodFilter = filters.find((filter) => filter.type === 'period');
+  const period =
+    data.format === 'review' || periodFilter
+      ? pagePeriod(periodFilter?.value ?? 'week', today)
+      : null;
+  if (period) {
+    params.from = period.from;
+    params.to = period.to;
+    params.period = period.period;
+    if (period.unit === 'month' && !('month' in params)) params.month = period.period;
+  }
+  // What the blocks read but the page does not show: her time zone.
+  const inside = { ...params, zone };
   const blocks: DrawnBlock[] = [];
   for (const block of data.blocks) {
     try {
-      blocks.push(await drawBlock(reader, tx, block, params));
+      blocks.push(await drawBlock(reader, tx, block, inside));
     } catch (error) {
       blocks.push({
         block: block.block,
@@ -695,6 +836,8 @@ export async function renderPage(
     id: page.id,
     title: page.title,
     app: data.app ?? null,
+    format: data.format,
+    period,
     spaceId,
     filters,
     params,
@@ -729,7 +872,14 @@ export async function pagesOf(
   spaceId: string,
   app?: string,
 ): Promise<
-  { id: string; title: string; label: Label | null; app: string | null; order: number }[]
+  {
+    id: string;
+    title: string;
+    label: Label | null;
+    app: string | null;
+    order: number;
+    format: 'dashboard' | 'review';
+  }[]
 > {
   const { rows } = await tx.query<{ id: string; title: string; data: Record<string, unknown> }>(
     `select id, title, data from entry
@@ -745,6 +895,7 @@ export async function pagesOf(
         row.data.label && typeof row.data.label === 'object' ? (row.data.label as Label) : null,
       app: typeof row.data.app === 'string' ? row.data.app : null,
       order: typeof row.data.order === 'number' ? row.data.order : 100,
+      format: row.data.format === 'review' ? ('review' as const) : ('dashboard' as const),
     }))
     .filter((page) => !app || (page.app ?? '').toLowerCase() === app.toLowerCase())
     .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));

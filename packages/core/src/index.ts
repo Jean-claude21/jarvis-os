@@ -475,3 +475,22 @@ export {
   type ComponentCategory,
   type ComponentInfo,
 } from './components';
+export {
+  answersSchema,
+  choicesOf,
+  composeBlock,
+  fits,
+  type Answers,
+  type Ask,
+  type KindShape,
+} from './compose';
+export { HIGHLIGHT_PARTS, pagePeriod, weekOf } from './pages';
+export {
+  createCollection,
+  draftCollection,
+  fieldSlug,
+  placeCollection,
+  SIMPLE_TYPES,
+  type CollectionDraft,
+  type DraftField,
+} from './follow';

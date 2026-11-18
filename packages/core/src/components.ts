@@ -32,6 +32,11 @@ export interface ComponentInfo {
   block?: boolean;
   /** Its settings, as Claude writes them in a page (an example, valid). */
   example?: Record<string, unknown>;
+  /**
+   * What she answers to compose it on screen (v3 F4): which kind, how to count, by what… A block
+   * without it is written by the assistant only (SQL, a live block, a record page).
+   */
+  asks?: ('kind' | 'measure' | 'group' | 'fields' | 'days' | 'parts' | 'period')[];
 }
 
 export const COMPONENTS: ComponentInfo[] = [
@@ -65,6 +70,20 @@ export const COMPONENTS: ComponentInfo[] = [
     when: 'Une page de chiffres et de blocs : une rangée de chiffres, une grille de blocs, ses filtres en haut. Toute « Page » d’une app s’affiche ainsi.',
   },
   {
+    id: 'review_page',
+    aliases: [
+      'revue',
+      'bilan',
+      'bilan de la semaine',
+      'bilan du mois',
+      'review page',
+      'retrospective',
+    ],
+    category: 'format',
+    label: { fr: 'Revue', en: 'Review' },
+    when: 'Une page sur une période (semaine ou mois, qu’on avance et recule) : ses chiffres et ce qui a marqué. Un bilan écrit selon ses routines est un document « Bilan », pas une page.',
+  },
+  {
     id: 'record_page',
     aliases: ['fiche', 'record', 'entrée'],
     category: 'format',
@@ -79,6 +98,7 @@ export const COMPONENTS: ComponentInfo[] = [
     label: { fr: 'Chiffre clé', en: 'Key figure' },
     when: 'Un seul nombre qui compte (combien, quel total). Quatre au plus côte à côte.',
     block: true,
+    asks: ['kind', 'measure', 'period'],
     example: {
       block: 'stat',
       title: 'Offres',
@@ -101,6 +121,7 @@ export const COMPONENTS: ComponentInfo[] = [
     when: 'Où en est chaque entrée par rapport à un maximum : un budget, un objectif, une régularité.',
     needs: { facets: ['measurable'] },
     block: true,
+    asks: ['kind'],
     example: { block: 'gauge', title: 'Objectifs', kind: 'Goal', value: 'measure', max: 'target' },
   },
   {
@@ -110,6 +131,7 @@ export const COMPONENTS: ComponentInfo[] = [
     label: { fr: 'Barres', en: 'Bars' },
     when: 'Comparer des groupes entre eux (par compte, par catégorie).',
     block: true,
+    asks: ['kind', 'group', 'measure', 'period'],
   },
   {
     id: 'line',
@@ -119,6 +141,7 @@ export const COMPONENTS: ComponentInfo[] = [
     when: 'Une valeur au fil du temps (mois par mois, jour par jour).',
     needs: { facets: ['dated'] },
     block: true,
+    asks: ['kind', 'measure'],
   },
   {
     id: 'breakdown',
@@ -127,6 +150,7 @@ export const COMPONENTS: ComponentInfo[] = [
     label: { fr: 'Répartition', en: 'Breakdown' },
     when: 'La part de chaque valeur dans un tout (humeurs, catégories de dépenses).',
     block: true,
+    asks: ['kind', 'group', 'measure', 'period'],
   },
   {
     id: 'funnel',
@@ -136,6 +160,7 @@ export const COMPONENTS: ComponentInfo[] = [
     when: 'Combien en sont à chaque étape d’un parcours (offres, candidatures, projets).',
     needs: { facets: ['stages'] },
     block: true,
+    asks: ['kind'],
   },
   {
     id: 'heatmap',
@@ -145,6 +170,7 @@ export const COMPONENTS: ComponentInfo[] = [
     when: 'Les jours où quelque chose a été fait, sur des semaines : la régularité d’une habitude.',
     needs: { facets: ['dated'] },
     block: true,
+    asks: ['kind', 'days'],
   },
   // Lists and views.
   {
@@ -154,6 +180,7 @@ export const COMPONENTS: ComponentInfo[] = [
     label: { fr: 'Tableau', en: 'Table' },
     when: 'Des entrées en colonnes, avec un total si une colonne s’additionne.',
     block: true,
+    asks: ['kind', 'fields', 'period'],
   },
   {
     id: 'datatable',
@@ -162,6 +189,7 @@ export const COMPONENTS: ComponentInfo[] = [
     label: { fr: 'Tableau de données', en: 'Data table' },
     when: 'Un tableau qu’on cherche, filtre et trie dans la page, avec des gestes sur chaque ligne (« Postulée », « Écarter »).',
     block: true,
+    asks: ['kind', 'fields', 'period'],
   },
   {
     id: 'task_list',
@@ -173,11 +201,12 @@ export const COMPONENTS: ComponentInfo[] = [
   },
   {
     id: 'review',
-    aliases: ['revue', 'trier', 'décider', 'review'],
+    aliases: ['passer en revue', 'trier', 'décider', 'review'],
     category: 'list',
-    label: { fr: 'Revue', en: 'Review' },
+    label: { fr: 'Passer en revue', en: 'Review one by one' },
     when: 'Passer des entrées une à une pour décider : la liste, la fiche de celle choisie, ses gestes.',
     block: true,
+    asks: ['kind', 'period'],
   },
   {
     id: 'kanban',
@@ -187,6 +216,7 @@ export const COMPONENTS: ComponentInfo[] = [
     when: 'Des entrées en colonnes selon leur étape ; on les fait glisser.',
     needs: { facets: ['stages'] },
     block: true,
+    asks: ['kind'],
   },
   {
     id: 'calendar',
@@ -196,6 +226,7 @@ export const COMPONENTS: ComponentInfo[] = [
     when: 'Les jours à venir de son agenda, toutes apps confondues.',
     needs: { facets: ['dated'] },
     block: true,
+    asks: ['days'],
   },
   {
     id: 'view',
@@ -238,12 +269,23 @@ export const COMPONENTS: ComponentInfo[] = [
   },
   // Input.
   {
+    id: 'highlights',
+    aliases: ['faits marquants', 'ce qui a marqué', 'highlights', 'résumé de la période'],
+    category: 'content',
+    label: { fr: 'Faits marquants', en: 'Highlights' },
+    when: 'Dans une revue : ce que la période a donné, calculé par Jarvis — chiffres, fait, argent, objectifs, habitudes, engagements, personnes, intentions restées sans suite.',
+    block: true,
+    asks: ['parts'],
+    example: { block: 'highlights', parts: ['figures', 'done', 'money', 'goals'] },
+  },
+  {
     id: 'form',
     aliases: ['formulaire', 'ajouter', 'form'],
     category: 'input',
     label: { fr: 'Formulaire', en: 'Form' },
     when: 'Ajouter une entrée d’un type, depuis son modèle.',
     block: true,
+    asks: ['kind'],
   },
   {
     id: 'select',

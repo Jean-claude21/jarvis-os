@@ -1,5 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import {
+  Database,
+  FileText,
+  History,
+  LayoutGrid,
+  Pencil,
+  Plus,
+  type LucideIcon,
+} from 'lucide-react';
+import { PeriodBar } from './PageCompose';
+import { openFollow } from './Follow';
 import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { api } from '../lib/api';
 
@@ -86,6 +97,80 @@ const piecesSaid = (pieces: string[], labels: Record<string, string> = {}) =>
 
 // Her apps and the catalogue (v3 D14): the ones she has (a newer release offered, layer by layer),
 // the ones Jarvis ships — each tried first: what it would create, what of hers it can use.
+/**
+ * Collections that live in no app yet (made before, or by an assistant): each placed in one in a
+ * gesture, so nothing she keeps is out of reach of the menu.
+ */
+function Unplaced({ apps }: { apps: string[] }) {
+  const client = useQueryClient();
+  const { data: kinds = [] } = useKinds();
+  const [fresh, setFresh] = useState<Record<string, string>>({});
+  const place = useMutation({
+    mutationFn: ({ kind, app }: { kind: string; app: string }) =>
+      api(`/collections/${encodeURIComponent(kind)}/app`, { method: 'PUT', body: { app } }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['kinds'] });
+      void client.invalidateQueries({ queryKey: ['apps'] });
+    },
+  });
+  const lost = kinds.filter((one) => one.model && !one.model.app);
+  if (!lost.length) return null;
+  return (
+    <Panel title={`À ranger (${lost.length})`} className="mb-4">
+      <p className="px-4 pt-3 text-[13px] text-bark">
+        Ces collections ne sont dans aucune app : range chacune là où tu la cherches.
+      </p>
+      {lost.map((one) => (
+        <div
+          key={one.kind}
+          className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-2.5 last:border-0"
+        >
+          <span className="min-w-0 flex-1 truncate font-semibold">
+            {one.model?.label?.fr ?? one.kind}
+            <span className="ml-2 font-mono text-[11px] text-faint">{one.count}</span>
+          </span>
+          <Select
+            label={`Ranger ${one.kind}`}
+            value=""
+            placeholder="Ranger dans…"
+            className="w-auto"
+            onChange={(app) =>
+              app === '__new__'
+                ? setFresh({ ...fresh, [one.kind]: '' })
+                : place.mutate({ kind: one.kind, app })
+            }
+            options={[
+              ...apps.map((app) => ({ value: app, label: app })),
+              { value: '__new__', label: 'Une nouvelle app…' },
+            ]}
+          />
+          {one.kind in fresh && (
+            <form
+              className="flex gap-1.5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (fresh[one.kind]?.trim())
+                  place.mutate({ kind: one.kind, app: fresh[one.kind]!.trim() });
+              }}
+            >
+              <input
+                autoFocus
+                className={inputClass.replace('w-full', 'w-44')}
+                value={fresh[one.kind]}
+                placeholder="Nom de l’app"
+                onChange={(event) => setFresh({ ...fresh, [one.kind]: event.target.value })}
+              />
+              <Button size="sm" type="submit">
+                Ranger
+              </Button>
+            </form>
+          )}
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
 export function Apps() {
   const { space } = useSession();
   const client = useQueryClient();
@@ -158,7 +243,14 @@ export function Apps() {
         title="Mes apps"
         badge={`${installed.length + own.length} app(s)`}
         lead={`Les services de l’espace ${space.name}. Demande-en une autre à ton assistant : elle t’attendra dans « À valider ».`}
+        actions={
+          <Button tone="solid" onClick={() => openFollow()}>
+            <Plus size={15} />
+            Suivre quelque chose
+          </Button>
+        }
       />
+      <Unplaced apps={[...installed.map((one) => one.app), ...own.map((one) => one.app)]} />
       {isLoading ? (
         <Skeleton className="h-32" />
       ) : (
@@ -355,7 +447,14 @@ export function AppPage() {
   const { files } = useFiles(names);
   const page = tab.startsWith('page:') ? pages.find((one) => `page:${one.id}` === tab) : undefined;
 
-  type Item = { key: string; label: string; n?: number; on: boolean; go: () => void };
+  type Item = {
+    key: string;
+    label: string;
+    n?: number;
+    on: boolean;
+    go: () => void;
+    icon: LucideIcon;
+  };
   const groups: { title: string | null; items: Item[] }[] = [
     {
       title: null,
@@ -363,6 +462,7 @@ export function AppPage() {
         {
           key: 'overview',
           label: 'Aperçu',
+          icon: LayoutGrid,
           on: tab === 'overview',
           go: () => go({ t: 'overview' }),
         },
@@ -370,22 +470,40 @@ export function AppPage() {
     },
     {
       title: 'Pages',
-      items: pages.map((one) => ({
-        key: one.id,
-        label: say(one.label, one.title),
-        on: tab === `page:${one.id}`,
-        go: () => go({ t: `page:${one.id}` }),
-      })),
+      items: pages
+        .map((one) => ({
+          key: one.id,
+          label: say(one.label, one.title),
+          icon: FileText,
+          on: tab === `page:${one.id}`,
+          go: () => go({ t: `page:${one.id}` }),
+        }))
+        .concat({
+          key: 'new-page',
+          label: 'Nouvelle page',
+          icon: Plus,
+          on: false,
+          go: () => void navigate({ to: '/composer', search: { app: name } }),
+        }),
     },
     {
       title: 'Données',
-      items: (withData.length ? withData : mine).map((one) => ({
-        key: one.kind,
-        label: nameOf(one),
-        n: one.count,
-        on: tab === 'data' && kind === one.kind,
-        go: () => go({ t: 'data', kind: one.kind }),
-      })),
+      items: (withData.length ? withData : mine)
+        .map((one): Item => ({
+          key: one.kind,
+          label: nameOf(one),
+          icon: Database,
+          n: one.count,
+          on: tab === 'data' && kind === one.kind,
+          go: () => go({ t: 'data', kind: one.kind }),
+        }))
+        .concat({
+          key: 'follow',
+          label: 'Suivre quelque chose',
+          icon: Plus,
+          on: false,
+          go: () => openFollow(name),
+        }),
     },
     {
       title: null,
@@ -393,6 +511,7 @@ export function AppPage() {
         {
           key: 'activity',
           label: 'Activité',
+          icon: History,
           on: tab === 'activity',
           go: () => go({ t: 'activity' }),
         },
@@ -417,12 +536,15 @@ export function AppPage() {
         />
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[200px_minmax(0,1fr)]">
-        <nav aria-label="Menu de l’app" className="sticky top-0 hidden flex-col gap-3 lg:flex">
+        <nav aria-label="Menu de l’app" className="sticky top-0 hidden flex-col lg:flex">
           {groups
             .filter((g) => g.items.length)
             .map((g, at) => (
-              <div key={at} className="flex flex-col gap-0.5">
-                {g.title && <Caps className="px-2.5 pb-1">{g.title}</Caps>}
+              <div
+                key={at}
+                className={cn('flex flex-col gap-0.5', at > 0 && 'mt-3 border-t border-rule pt-3')}
+              >
+                {g.title && <Caps className="px-2.5 pb-1.5">{g.title}</Caps>}
                 {g.items.map((one) => (
                   <button
                     key={one.key}
@@ -435,6 +557,10 @@ export function AppPage() {
                         : 'text-bark hover:bg-sand hover:text-ink',
                     )}
                   >
+                    <one.icon
+                      size={14}
+                      className={cn('flex-none', one.on ? 'text-primary' : 'text-faint')}
+                    />
                     <span className="min-w-0 flex-1 truncate">{one.label}</span>
                     {one.n !== undefined && (
                       <span className="font-mono text-[11px] text-faint">{one.n}</span>
@@ -457,7 +583,7 @@ export function AppPage() {
               queryKey={['history', 'app', name]}
             />
           ) : page ? (
-            <PageView id={page.id} />
+            <PageView id={page.id} app={name} />
           ) : (
             <View source={source} files={files} renders={renders} />
           )}
@@ -476,6 +602,7 @@ interface AppPageRow {
 interface DrawnPage {
   id: string;
   title: string;
+  period: { period: string; unit: 'week' | 'month'; from: string; to: string } | null;
   label: { fr?: string; en?: string } | null;
   filters: { name: string; type: string; options?: string[]; value: string; label?: unknown }[];
   blocks: Drawn[];
@@ -483,7 +610,7 @@ interface DrawnPage {
 }
 
 /** A page of an app as a dashboard (v3 D21): its filters, then its blocks from the registry. */
-export function PageView({ id }: { id: string }) {
+export function PageView({ id, app }: { id: string; app?: string }) {
   const client = useQueryClient();
   const [params, setParams] = useState<Record<string, string>>({});
   const query = new URLSearchParams(params).toString();
@@ -496,7 +623,28 @@ export function PageView({ id }: { id: string }) {
     return <Empty title="Page indisponible" lead={(error as Error | null)?.message ?? ''} />;
   return (
     <>
-      {data.filters.length > 0 && (
+      <div className="flex flex-wrap items-center gap-2">
+        {data.period && (
+          <PeriodBar
+            period={data.period}
+            onChange={(value) =>
+              setParams({
+                ...params,
+                [data.filters.find((one) => one.type === 'period')?.name ?? 'period']: value,
+              })
+            }
+          />
+        )}
+        <Link
+          to="/composer"
+          search={{ page: id, ...(app ? { app } : {}) }}
+          className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-[2px] border border-rule bg-paper px-2.5 text-[13px] font-semibold hover:border-rule-strong"
+        >
+          <Pencil size={14} />
+          Modifier la page
+        </Link>
+      </div>
+      {data.filters.some((one) => one.type === 'month' || one.type === 'choice') && (
         <div className="flex flex-wrap items-center gap-2">
           {data.filters.map((filter) =>
             filter.type === 'month' ? (

@@ -5,6 +5,7 @@ import { useLive } from '../lib/live';
 import { DropLayer } from '../lib/upload';
 import { Toaster } from '../ui/more';
 import { PeekSheet } from './PeekSheet';
+import { RowMenuLayer } from '../engine/RowMenu';
 import { IconButton, Sheet, cn } from '../ui';
 import { Palette } from './Palette';
 import { Sidebar } from './Sidebar';
@@ -136,6 +137,7 @@ export function Shell() {
       <DropLayer />
       <Toaster />
       <PeekSheet />
+      <RowMenuLayer />
     </div>
   );
 }

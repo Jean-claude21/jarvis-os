@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { peek } from '../peek';
+import { rowMenu } from '../RowMenu';
 import {
   flexRender,
   getCoreRowModel,
@@ -123,7 +124,11 @@ export function TableRender({
           </thead>
           <tbody>
             {table.getRowModel().rows.map((row) => (
-              <tr key={row.id} className="border-b border-rule last:border-0 hover:bg-sand">
+              <tr
+                key={row.id}
+                className="border-b border-rule last:border-0 hover:bg-sand"
+                {...rowMenu(row.original.id, row.original.title)}
+              >
                 {row.getVisibleCells().map((cell) => {
                   const field = fields.find((one) => one.path === cell.column.id);
                   return (

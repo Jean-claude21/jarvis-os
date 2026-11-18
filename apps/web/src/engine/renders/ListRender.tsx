@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { peek } from '../peek';
+import { rowMenu } from '../RowMenu';
 import { useKindName } from '../../lib/kinds';
 import { Empty, Tag, colorOf, rowClass } from '../../ui';
 import { Identity, WhoActions } from '../../ui/identity';
@@ -35,7 +36,7 @@ export function RowLine({
     .slice(0, 2);
   return (
     // The row opens the entry; its links (write, call, the site) stay links of their own.
-    <div className={rowClass + ' relative'}>
+    <div className={rowClass + ' relative'} {...rowMenu(row.id, row.title)}>
       {row.who ? (
         <Identity name={row.title} who={row.who} size={30} />
       ) : (

@@ -331,6 +331,7 @@ export function AppPage() {
     'split',
     'list',
     ...(has('who') ? (['cards'] as const) : []),
+    ...(has('place') ? (['map'] as const) : []),
     'table',
     ...(has('stages') ? (['board'] as const) : []),
     ...(has('dated') ? (['calendar', 'timeline'] as const) : []),
@@ -440,7 +441,7 @@ export function AppPage() {
               </div>
             ))}
         </nav>
-        <div className="grid min-w-0 auto-rows-max gap-4">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] auto-rows-max gap-4">
           {tab === 'overview' ? (
             isLoading ? (
               <Skeleton className="h-40" />

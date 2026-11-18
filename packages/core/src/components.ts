@@ -79,7 +79,11 @@ export const COMPONENTS: ComponentInfo[] = [
     label: { fr: 'Chiffre clé', en: 'Key figure' },
     when: 'Un seul nombre qui compte (combien, quel total). Quatre au plus côte à côte.',
     block: true,
-    example: { block: 'stat', title: 'Offres', query: { kind: 'JobOffer', aggregate: { n: 'count()' } } },
+    example: {
+      block: 'stat',
+      title: 'Offres',
+      query: { kind: 'JobOffer', aggregate: { n: 'count()' } },
+    },
   },
   {
     id: 'stat_delta',
@@ -207,6 +211,14 @@ export const COMPONENTS: ComponentInfo[] = [
     category: 'list',
     label: { fr: 'Cartes', en: 'Cards' },
     when: 'Des entrées à reconnaître d’un coup d’œil : une personne, un objet, une offre.',
+  },
+  {
+    id: 'map',
+    aliases: ['carte', 'map', 'lieux', 'plan'],
+    category: 'list',
+    label: { fr: 'Carte', en: 'Map' },
+    when: 'Des entrées qui disent où elles sont (un lieu, une adresse et ses coordonnées), sur une carte.',
+    needs: { facets: ['place'] },
   },
   {
     id: 'timeline',

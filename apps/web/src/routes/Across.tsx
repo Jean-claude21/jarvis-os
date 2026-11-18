@@ -7,6 +7,7 @@ import { GaugeBar } from '../blocks/charts';
 import { useAgendaRows, useFiles, useKindRows, useTaskRows } from '../engine/sources';
 import { addDays, mondayOf, monthOf, timelineRange } from '../engine/renders/time';
 import { useViewState, View } from '../engine/View';
+import { weekStart } from '../engine/renders/CalendarRender';
 import { PageHead, Panel, Segmented, Stat, Stats } from '../ui';
 import { GENRE_WORDS } from '../lib/words';
 
@@ -45,6 +46,9 @@ export function AgendaPage() {
     const range = timelineRange(state.m, state.zoom);
     from = range.start;
     to = addDays(range.start, range.days);
+  } else if (render === 'calendar' && state.zoom === 'week') {
+    from = weekStart(state.d);
+    to = addDays(from, 7);
   } else if (render === 'calendar') {
     from = mondayOf(monthOf(state.m));
     to = addDays(from, 42);

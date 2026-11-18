@@ -72,6 +72,15 @@ export const viewDataSchema = z.object({
   /** The view an app opens first for its kind. */
   default: z.boolean().optional(),
   limit: z.number().int().min(1).max(2000).optional(),
+  /**
+   * A view kept from the screen (v3 D10, F3): the page it belongs to (« /agenda »,
+   * « /apps/Finances ») and the state of its engine there (render, filters, sort, groups) — so a
+   * view across her whole life is kept like a view of one kind (`kind` « * »).
+   */
+  place: z.string().trim().min(1).max(200).optional(),
+  state: z
+    .record(z.string().min(1).max(20), z.union([z.string().max(300), z.boolean()]))
+    .optional(),
 });
 export type ViewData = z.input<typeof viewDataSchema>;
 
@@ -247,6 +256,8 @@ export async function runView(
   clock = { now: new Date() },
 ): Promise<ViewResult> {
   const view = checkView(raw);
+  if (view.kind === '*')
+    throw new Error('This view is kept from a page across her life: open it there.');
   const reader = await readerOf(tx, spaceId, clock);
   const fields = fieldsOf(reader, view.kind);
   const known = new Map(fields.map((field) => [field.path, field]));

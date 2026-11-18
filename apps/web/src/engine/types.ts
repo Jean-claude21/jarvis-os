@@ -31,10 +31,12 @@ export interface Row {
   progress?: number | null;
   /** From the « who » facet: a person or an organisation, and how to reach them. */
   who?: Who | null;
+  /** From the « place » facet: where it is (for the Map). */
+  place?: { lat: number; lng: number; address?: string | undefined } | null;
 }
 
 export type RenderKey =
-  'split' | 'list' | 'cards' | 'table' | 'board' | 'calendar' | 'timeline' | 'files';
+  'split' | 'list' | 'cards' | 'map' | 'table' | 'board' | 'calendar' | 'timeline' | 'files';
 
 /** The state of a view, in the URL. */
 export interface ViewSearch {
@@ -52,6 +54,8 @@ export interface ViewSearch {
   /** A calendar's or a timeline's first month: « 2026-11 ». */
   m?: string | undefined;
   zoom?: 'week' | 'month' | undefined;
+  /** A calendar's week: the day it shows the week of, « 2026-11-18 ». */
+  d?: string | undefined;
   /** « Liste + détail »: the entry read on the right. */
   sel?: string | undefined;
   /** The entry open in the side card, over the page (F2). */
@@ -65,6 +69,7 @@ const RENDERS: RenderKey[] = [
   'split',
   'list',
   'cards',
+  'map',
   'table',
   'board',
   'calendar',
@@ -84,5 +89,6 @@ export function viewSearch(search: Record<string, unknown>): ViewSearch {
   if (search.desc === true || search.desc === 'true') out.desc = true;
   if (typeof search.m === 'string' && /^\d{4}-\d{2}$/.test(search.m)) out.m = search.m;
   if (search.zoom === 'week' || search.zoom === 'month') out.zoom = search.zoom;
+  if (typeof search.d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(search.d)) out.d = search.d;
   return out;
 }

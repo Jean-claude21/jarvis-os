@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router';
 import { peek } from '../peek';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { Button, cn, colorOf } from '../../ui';
+import { Button, Segmented, cn, colorOf } from '../../ui';
 import type { Shaped } from '../apply';
 import type { ViewSearch, ViewChange } from '../types';
 import { addDays, asDate, dayKey, hhmm, mondayOf, monthKey, monthOf } from './time';
@@ -49,6 +49,7 @@ export function CalendarRender({
   state: ViewSearch;
   set: (change: ViewChange) => void;
 }) {
+  if (state.zoom === 'week') return <WeekRender shaped={shaped} state={state} set={set} />;
   const month = monthOf(state.m);
   const from = mondayOf(month);
   const today = dayKey(new Date());
@@ -91,6 +92,7 @@ export function CalendarRender({
         onPrev={() => go(-1)}
         onNext={() => go(1)}
         onToday={() => set({ m: undefined })}
+        extra={<CalendarZoom state={state} set={set} />}
       />
       <div className="grid grid-cols-7">
         {names.map((name) => (
@@ -156,6 +158,114 @@ export function CalendarRender({
             <span className="flex min-w-0 flex-col gap-1">{byDay.get(dayKey(day))!.map(chip)}</span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+/** Month or week: the calendar's two scales. */
+function CalendarZoom({ state, set }: { state: ViewSearch; set: (change: ViewChange) => void }) {
+  return (
+    <Segmented
+      label="Échelle"
+      value={state.zoom === 'week' ? 'week' : 'month'}
+      onChange={(value) => set({ zoom: value === 'week' ? 'week' : undefined })}
+      options={[
+        { value: 'month', label: 'Mois' },
+        { value: 'week', label: 'Semaine' },
+      ]}
+    />
+  );
+}
+
+/** The first day of the week a calendar shows (its `d`, else today's week). */
+export const weekStart = (d?: string) =>
+  mondayOf(d ? new Date(`${d}T12:00:00`) : new Date(new Date().setHours(12, 0, 0, 0)));
+
+/**
+ * La semaine (gr8r's week, the v2 agenda's week): seven days side by side, each with everything it
+ * holds — the hour first — nothing hidden behind « +n »; on a phone, the days one under another.
+ */
+function WeekRender({
+  shaped,
+  state,
+  set,
+}: {
+  shaped: Shaped;
+  state: ViewSearch;
+  set: (change: ViewChange) => void;
+}) {
+  const from = weekStart(state.d);
+  const days = Array.from({ length: 7 }, (_, at) => addDays(from, at));
+  const today = dayKey(new Date());
+  const byDay = new Map<string, typeof shaped.rows>();
+  for (const row of shaped.rows) {
+    if (!row.start) continue;
+    const key = dayKey(asDate(row.start));
+    byDay.set(key, [...(byDay.get(key) ?? []), row]);
+  }
+  for (const list of byDay.values())
+    list.sort((a, b) =>
+      a.allDay === b.allDay ? (a.start ?? '').localeCompare(b.start ?? '') : a.allDay ? -1 : 1,
+    );
+  const go = (delta: number) => set({ d: dayKey(addDays(from, delta)) });
+  const last = addDays(from, 6);
+  return (
+    <div>
+      <MonthBar
+        label={`${from.toLocaleDateString('fr', { day: 'numeric', month: 'short' })} – ${last.toLocaleDateString('fr', { day: 'numeric', month: 'short', year: 'numeric' })}`}
+        onPrev={() => go(-7)}
+        onNext={() => go(7)}
+        onToday={() => set({ d: undefined })}
+        extra={<CalendarZoom state={state} set={set} />}
+      />
+      <div className="grid md:grid-cols-7">
+        {days.map((day, at) => {
+          const key = dayKey(day);
+          const here = byDay.get(key) ?? [];
+          return (
+            <div
+              key={key}
+              className={cn(
+                'flex min-w-0 flex-col gap-1.5 border-b border-rule p-2 md:min-h-[320px]',
+                at < 6 && 'md:border-r',
+                (day.getDay() === 0 || day.getDay() === 6) && 'bg-sand/60',
+              )}
+            >
+              <span className="flex items-baseline gap-1.5">
+                <b className="text-[12px] text-bark first-letter:uppercase">
+                  {day.toLocaleDateString('fr', { weekday: 'short' })}
+                </b>
+                <span
+                  className={cn(
+                    'font-mono text-xs',
+                    key === today && 'rounded-[5px] bg-primary px-1.5 text-on-primary',
+                  )}
+                >
+                  {day.getDate()}
+                </span>
+              </span>
+              {here.map((row) => (
+                <Link
+                  key={row.id + row.start}
+                  to="."
+                  search={peek(row.id)}
+                  title={row.title}
+                  className="flex min-w-0 flex-col rounded-[6px] px-2 py-1 text-[12.5px] leading-tight hover:brightness-95"
+                  style={{
+                    background: `color-mix(in srgb, ${colorOf(row.kind)} 12%, var(--paper))`,
+                  }}
+                >
+                  <time className="font-mono text-[10.5px] text-bark">
+                    {row.allDay || !row.start ? 'journée' : hhmm(row.start)}
+                  </time>
+                  <span className="line-clamp-2">{row.title}</span>
+                </Link>
+              ))}
+              {!here.length && <span className="hidden text-[11.5px] text-faint md:block">—</span>}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

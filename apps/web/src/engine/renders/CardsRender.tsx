@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import { peek } from '../peek';
+import { rowMenu } from '../RowMenu';
 import { useKindName } from '../../lib/kinds';
 import { AppIcon, Empty, Tag } from '../../ui';
 import { Identity, WhoActions } from '../../ui/identity';
@@ -26,7 +27,10 @@ function Card({ row, fields, group }: { row: Row; fields: Field[]; group?: strin
     )
     .slice(0, 3);
   return (
-    <div className="relative flex min-w-0 flex-col gap-3 rounded-[12px] border border-rule bg-paper p-3.5 hover:border-rule-strong">
+    <div
+      className="relative flex min-w-0 flex-col gap-3 rounded-[12px] border border-rule bg-paper p-3.5 hover:border-rule-strong"
+      {...rowMenu(row.id, row.title)}
+    >
       <div className="flex min-w-0 items-start gap-3">
         {row.who ? (
           <Identity name={row.title} who={row.who} size={40} />

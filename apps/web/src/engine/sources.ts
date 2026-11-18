@@ -27,6 +27,7 @@ type KindWithModel = Omit<Kind, 'model' | 'facets'> & {
     email?: string;
     phone?: string;
     domain?: string;
+    location?: string;
   }[];
 };
 interface ViewField {
@@ -91,6 +92,7 @@ export function useKindRows(kinds: string[]): Source {
     const stages = facets.find((one) => one.facet === 'stages');
     const measurable = facets.find((one) => one.facet === 'measurable');
     const who = facets.find((one) => one.facet === 'who');
+    const placeFacet = facets.find((one) => one.facet === 'place');
     const progressField = (known.get(kind)?.model?.fields ?? []).find(
       (field) => field.type === 'progress',
     )?.name;
@@ -149,6 +151,17 @@ export function useKindRows(kinds: string[]): Source {
         kind,
         title,
         values,
+        place: (() => {
+          const value = placeFacet?.location ? read[placeFacet.location] : null;
+          const one = value as { lat?: unknown; lng?: unknown; address?: unknown } | null;
+          return one && typeof one.lat === 'number' && typeof one.lng === 'number'
+            ? {
+                lat: one.lat,
+                lng: one.lng,
+                address: typeof one.address === 'string' ? one.address : undefined,
+              }
+            : null;
+        })(),
         who: who
           ? {
               kind: who.kind ?? 'person',

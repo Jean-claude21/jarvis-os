@@ -7,11 +7,13 @@ import { BoardRender } from './renders/BoardRender';
 import { CalendarRender } from './renders/CalendarRender';
 import { CardsRender } from './renders/CardsRender';
 import { SplitRender } from './renders/SplitRender';
+import { MapRender } from './renders/MapRender';
 import { FilesRender } from './renders/FilesRender';
 import { ListRender } from './renders/ListRender';
 import { TableRender } from './renders/TableRender';
 import { TimelineRender } from './renders/TimelineRender';
 import type { FileRow, Source } from './sources';
+import { SavedViews } from './SavedViews';
 import { Toolbar } from './Toolbar';
 import type { RenderKey, ViewSearch, ViewChange } from './types';
 
@@ -71,6 +73,7 @@ export function View({
   );
   return (
     <>
+      <SavedViews search={search} render={render} />
       <Toolbar
         state={state}
         set={set}
@@ -99,6 +102,8 @@ export function View({
           <TimelineRender shaped={shaped} fields={source.fields} state={state} set={set} />
         ) : render === 'split' ? (
           <SplitRender shaped={shaped} fields={source.fields} state={state} set={set} />
+        ) : render === 'map' ? (
+          <MapRender shaped={shaped} />
         ) : render === 'cards' ? (
           <CardsRender shaped={shaped} fields={source.fields} group={state.group} />
         ) : render === 'files' ? (

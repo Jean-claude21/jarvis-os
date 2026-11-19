@@ -8,6 +8,7 @@ import { formulaValue } from './formula';
 import { checkPage } from './pages';
 import { zoneOf } from './zone';
 import { checkRule, runRulesAfterSave, type Changed } from './rules';
+import { checkPhrases } from './triggers';
 import { syncReminders } from './reminders';
 import { closeIntentions } from './intentions';
 import { TIME_FIELDS } from './time';
@@ -559,6 +560,12 @@ export async function save(tx: Tx, actor: Actor, spaceId: string, raw: SaveInput
       if (!rows.length) throw modelError(model, [`« ${field.name} » is required`]);
     }
   }
+  // One phrase starts one thing (F6b): a rule or a skill that takes another's phrase is refused.
+  await checkPhrases(
+    tx,
+    spaceId,
+    changed.filter((one) => /^(rule|routine)$/i.test(foldKind(one.kind))).map((one) => one.id),
+  );
   // Her rules (spec 014) run on what this save made or changed, in the same transaction.
   await runRulesAfterSave(tx, actor, spaceId, changed);
   // What follows a save (specs 037, 040), read in one query: whether an intention is open, which

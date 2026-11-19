@@ -1,7 +1,8 @@
 import type pg from 'pg';
 import { z } from 'zod';
 import { closeExecution, countOnExecution, openExecution } from './activities';
-import { agentClient, agentNamed, callsToday, reportRun } from './agent-node';
+import { agentClient, agentOfRule, callsToday, reportRun } from './agent-node';
+import { triggerSchema } from './triggers';
 import { propose } from './proposals';
 import { callConnection, partOf, receive } from './agents';
 import { readerOf, type EntryView, type Reader } from './compute';
@@ -112,33 +113,8 @@ export const actionSchema = z.union([
 export type Action = z.infer<typeof actionSchema>;
 
 export const ruleDataSchema = z.object({
-  when: z.union([
-    z.object({ saved: z.string().trim().min(1).max(80) }),
-    z.object({
-      changed: z.object({
-        kind: z.string().trim().min(1).max(80),
-        field: z.string().trim().min(1).max(60),
-      }),
-    }),
-    z.object({
-      schedule: z.string().trim().min(9).max(60),
-      timezone: z.string().max(60).optional(),
-    }),
-    z.object({
-      before: z.object({
-        kind: z.string().trim().min(1).max(80),
-        field: z.string().trim().min(1).max(60),
-        days: z.number().int().min(0).max(366),
-      }),
-    }),
-    // She says a phrase (« /bilan », « bilan de la semaine ») from any door — Telegram, the app,
-    // an assistant: the rule runs on what she said, and her words are filed (v3 D12, F6).
-    z.object({ phrase: z.string().trim().min(2).max(60) }),
-    // A message reaches her (any capture: Telegram, the app, her voice), with these words or any.
-    z.object({
-      message: z.object({ contains: z.string().trim().min(1).max(80).optional() }),
-    }),
-  ]),
+  /** When it runs: the one vocabulary of the node (triggers.ts, F6b). */
+  when: triggerSchema,
   if: z.string().trim().min(1).max(2000).optional(),
   then: z.array(actionSchema).min(1).max(10),
   active: z.boolean().optional(),
@@ -271,14 +247,8 @@ async function act(
     scope = reader.view(row);
   }
   // Its agent (v3 D12): paused, it does nothing; over its budget, its calls wait for tomorrow.
-  // An agent named by its rules only (no settings yet) is that agent, with its defaults.
-  const agent = rule.data.agent
-    ? ((await agentNamed(tx, spaceId, rule.data.agent)) ?? {
-        id: null,
-        title: rule.data.agent,
-        data: {},
-      })
-    : null;
+  // Every rule has one (F6b): the one it names, else the one that answers for it by default.
+  const agent = await agentOfRule(tx, spaceId, rule);
   if (agent?.data.paused) return false;
   const budget = agent?.data.budget?.calls_per_day;
   if (
@@ -298,6 +268,7 @@ async function act(
     door: 'rule',
     client: clientOf(rule, agent?.title),
     depth: (actor.depth ?? 0) + 1,
+    rule: rule.id,
   };
   // It says what it did on Telegram when she asked it to (v3 F6): once per run.
   if (agent)
@@ -540,10 +511,10 @@ export async function runRulesAfterSave(
         ('message' in when &&
           said !== null &&
           (!when.message.contains || fold(said).includes(fold(when.message.contains))));
-      // A rule does not fire again on its own change.
-      // A rule (or its agent) does not fire again on its own change.
+      // A rule does not fire again on its own change; nor does an agent she gave it to.
       if (
         !fires ||
+        actor.rule === rule.id ||
         actor.client === `rule:${rule.title}` ||
         (rule.data.agent && actor.client === agentClient(rule.data.agent))
       )

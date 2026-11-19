@@ -44,6 +44,8 @@ export const atelierSearch = (search: Record<string, unknown>): { t?: AtelierTab
 
 interface AgentRule {
   id: string;
+  /** Given to this agent, or answered for by default (F6b). */
+  assigned: boolean;
   title: string;
   when: Record<string, unknown>;
   active: boolean;
@@ -120,6 +122,7 @@ const AUTONOMY: { value: Autonomy; label: string; lead: string }[] = [
 ];
 
 const pad = (n: string) => n.padStart(2, '0');
+const DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 /** A rule's « when », in her words. */
 export function whenText(when: Record<string, unknown>, kindName: (kind: string) => string) {
   if (typeof when.schedule === 'string') {
@@ -128,6 +131,9 @@ export function whenText(when: Record<string, unknown>, kindName: (kind: string)
       const at = `${h} h ${pad(m)}`;
       if (!days || days === '*') return `chaque jour à ${at}`;
       if (days === '1-5') return `en semaine à ${at}`;
+      // « 6 » or « 1,3 »: the days by their names.
+      const named = days.split(',').map((one) => DAYS[Number(one) % 7]);
+      if (named.every(Boolean)) return `chaque ${named.join(' et ')} à ${at}`;
       return `certains jours (${days}) à ${at}`;
     }
     return `selon « ${when.schedule} »`;
@@ -150,7 +156,11 @@ export function whenText(when: Record<string, unknown>, kindName: (kind: string)
       : 'à chaque message reçu';
   return 'à la demande';
 }
-const BUILTIN_WHEN: Record<string, string> = { lecture: 'à chaque fichier déposé' };
+const BUILTIN_WHEN: Record<string, string> = {
+  lecture: 'à chaque fichier déposé',
+  brief: 'chaque matin, à l’heure choisie',
+  rappels: 'à l’heure de chaque rappel',
+};
 
 function useAgents() {
   return useQuery({ queryKey: ['agents'], queryFn: () => api<Agent[]>('/agents') });
@@ -226,6 +236,7 @@ function SkillsList() {
     queryFn: () => api<{ jarvis?: Skill[]; mine?: MineSkill[] }>('/skills'),
   });
   const [open, setOpen] = useState<Skill | null>(null);
+  const kindName = useKindName();
   if (isLoading) return <Skeleton className="h-40" />;
   const skills = data?.jarvis ?? [];
   return (
@@ -279,9 +290,14 @@ function SkillsList() {
                 >
                   {one.title}
                 </Link>
-                <span className="line-clamp-2 text-[12.5px] text-bark">
-                  {one.when || one.excerpt}
+                <span className="block truncate text-[12.5px]">
+                  <b className="font-medium text-ink">
+                    {one.triggers.length
+                      ? one.triggers.map((t) => whenText(t, kindName)).join(' · ')
+                      : 'quand tu le demandes à ton assistant'}
+                  </b>
                 </span>
+                <span className="line-clamp-2 text-[12.5px] text-bark">{one.excerpt}</span>
               </span>
             </div>
           ))
@@ -649,9 +665,8 @@ interface MineSkill {
   id: string;
   title: string;
   when: string;
-  phrases: string[];
-  repeat: string | null;
-  saved: string | null;
+  /** What starts it, in the node's one vocabulary (F6b); none: when she asks for it. */
+  triggers: Record<string, unknown>[];
   excerpt: string;
 }
 
@@ -676,19 +691,15 @@ function thenText(then: Record<string, unknown>[] | undefined, kindName: (kind: 
 }
 
 /**
- * Everything that runs by itself, in one place (v3 D12): her rules — with their agent or none —
- * and her routines, each with when it runs, what it does, and a way to stop it. And the simplest
- * one made here: « chaque jour à 7 h, rappelle-moi… ».
+ * Everything that runs by itself, in one place (v3 D12, F6b): her agents, each with the rules it
+ * answers for — when, what, a way to stop it, and another agent to give it to. Her skills live in
+ * their own tab. And the simplest automation made here: « chaque jour à 7 h, rappelle-moi… ».
  */
 function Automations() {
   const client = useQueryClient();
   const rules = useQuery({
     queryKey: ['entries', 'rules'],
     queryFn: () => api<RuleEntry[]>('/entries?kind=Rule&limit=200'),
-  });
-  const skills = useQuery({
-    queryKey: ['skills'],
-    queryFn: () => api<{ mine?: MineSkill[] }>('/skills'),
   });
   const [time, setTime] = useState('07:00');
   const [text, setText] = useState('');
@@ -730,7 +741,6 @@ function Automations() {
   });
   if (rules.isLoading) return <Skeleton className="h-40" />;
   const list = (rules.data ?? []).filter((one) => one.data.when);
-  const mine = skills.data?.mine ?? [];
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <AgentGroups
@@ -777,44 +787,15 @@ function Automations() {
             </p>
           </form>
         </Panel>
-        <Panel title="Tes routines" icon={<BookOpen size={16} />}>
-          {!mine.length ? (
-            <p className="px-4 py-4 text-[13px] text-bark">
-              Aucune routine à toi : un bilan du soir, une revue de la semaine… se créent avec
-              Claude.
-            </p>
-          ) : (
-            mine.map((one) => (
-              <div key={one.id} className={rowClass}>
-                <span className="min-w-0 flex-1">
-                  <Link
-                    to="/entree/$id"
-                    params={{ id: one.id }}
-                    className="block truncate font-semibold hover:underline"
-                  >
-                    {one.title}
-                  </Link>
-                  <span className="block truncate text-[12.5px] text-bark">
-                    {one.repeat
-                      ? `répétée : ${one.repeat}`
-                      : one.phrases.length
-                        ? `quand tu dis « ${one.phrases[0]} »`
-                        : one.when || 'à la demande'}
-                  </span>
-                </span>
-              </div>
-            ))
-          )}
-        </Panel>
       </div>
     </div>
   );
 }
 
 /**
- * Automations by agent (v3 D12): each agent — who, its state, its budget, its Pause — then what it
- * runs (its rules, or Jarvis's own work it does). The rules no agent carries yet come last, each
- * given to one in a click: nothing runs without someone answering for it.
+ * Automations by agent (v3 D12, F6b): each agent — who, its state, its budget, its Pause — then
+ * what it runs (its rules, or Jarvis's own work it does). Every rule has one: a rule she gave to no
+ * one is shown « par défaut » under the agent that answers for it, and given to another in a click.
  */
 function AgentGroups({
   rules,
@@ -837,14 +818,11 @@ function AgentGroups({
     onSettled: refresh,
   });
   if (isLoading) return <Skeleton className="h-40" />;
-  const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const of = (agent: Agent) =>
-    rules.filter((rule) => rule.data.agent && fold(rule.data.agent) === fold(agent.title));
-  const orphans = rules.filter(
-    (rule) =>
-      !rule.data.agent || !agents.some((agent) => fold(agent.title) === fold(rule.data.agent!)),
-  );
-  const ruleLine = (rule: RuleEntry, offer?: boolean) => {
+  // Every rule has an agent (F6b): the one she gave it to, or the one that answers for it.
+  const of = (agent: Agent) => rules.filter((rule) => agent.rules.some((r) => r.id === rule.id));
+  const byDefault = (agent: Agent, rule: RuleEntry) =>
+    agent.rules.some((r) => r.id === rule.id && !r.assigned);
+  const ruleLine = (rule: RuleEntry, agent: Agent) => {
     const active = rule.data.active !== false;
     return (
       <div key={rule.id} className={rowClass + ' flex-wrap'}>
@@ -866,14 +844,19 @@ function AgentGroups({
           )}
         </span>
         {!active && <Tag tone="neutral">arrêté</Tag>}
-        {offer && agents.length > 0 && (
+        {byDefault(agent, rule) && (
+          <Tag tone="plain" dot={false}>
+            par défaut
+          </Tag>
+        )}
+        {agents.length > 1 && (
           <Select
-            label={`Confier « ${rule.title} » à un agent`}
+            label={`Confier « ${rule.title} » à un autre agent`}
             value=""
             placeholder="Confier à…"
-            onChange={(agent) => give.mutate({ id: rule.id, agent })}
+            onChange={(other) => give.mutate({ id: rule.id, agent: other })}
             options={agents
-              .filter((a) => !a.data.builtin?.length)
+              .filter((a) => a.title !== agent.title && !a.data.builtin?.length)
               .map((a) => ({ value: a.title, label: a.title }))}
             className="w-44"
           />
@@ -941,28 +924,21 @@ function AgentGroups({
                 <span className="min-w-0 flex-1">
                   <b className="block font-semibold">{BUILTIN_TITLE[work] ?? work}</b>
                   <span className="block text-[12.5px] text-bark">
-                    <b className="font-medium text-ink">{BUILTIN_WHEN[work] ?? work}</b> →{' '}
-                    {BUILTIN_DOES[work] ?? ''}
+                    <b className="font-medium text-ink">
+                      {agent.when ?? BUILTIN_WHEN[work] ?? work}
+                    </b>{' '}
+                    → {BUILTIN_DOES[work] ?? ''}
                   </span>
                 </span>
               </div>
             ))}
-            {mine.map((rule) => ruleLine(rule))}
+            {mine.map((rule) => ruleLine(rule, agent))}
             {!mine.length && !(agent.data.builtin ?? []).length && (
               <p className="px-4 py-3 text-[13px] text-bark">Aucun automatisme confié.</p>
             )}
           </Panel>
         );
       })}
-      {orphans.length > 0 && (
-        <Panel title="Sans agent : à confier" icon={<Workflow size={16} />}>
-          <p className="border-b border-rule px-4 py-2.5 text-[13px] text-bark">
-            Ils tournent, mais personne n’en répond : pas de Pause commune, pas de budget, signés «
-            règle ». Confie-les à un agent.
-          </p>
-          {orphans.map((rule) => ruleLine(rule, true))}
-        </Panel>
-      )}
     </div>
   );
 }
@@ -974,8 +950,14 @@ const WHERE: Record<string, string> = {
   llm: 'un modèle avec ses skills',
   service: 'tourne sur un serveur',
 };
-const BUILTIN_TITLE: Record<string, string> = { lecture: 'Lire les documents déposés' };
+const BUILTIN_TITLE: Record<string, string> = {
+  lecture: 'Lire les documents déposés',
+  brief: 'Le brief du matin',
+  rappels: 'Les rappels',
+};
 const BUILTIN_DOES: Record<string, string> = {
   lecture:
     'dit ce qu’est le document, en tire les faits, propose la facture, le fournisseur, la garantie',
+  brief: 'te dit ta journée sur tes canaux',
+  rappels: 'te dit chaque rappel sur tes canaux, reprogramme ceux qui se répètent',
 };

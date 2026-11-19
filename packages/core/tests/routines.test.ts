@@ -21,7 +21,7 @@ describe('structured routines', () => {
 
   it('reads a routine kept as text into its five parts', () => {
     expect(structureFromText('Bilan du soir', text)).toMatchObject({
-      trigger: { repeat: '30 21 * * *', phrases: ['/bilandusoir', '/bilan'] },
+      triggers: [{ phrase: '/bilandusoir' }, { phrase: '/bilan' }, { schedule: '30 21 * * *' }],
       prepare: ['agenda_today', 'mirror_day', 'goals'],
       references: {
         style: 'Ton bref et chaleureux, tutoie-moi.',

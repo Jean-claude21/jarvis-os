@@ -12,6 +12,7 @@ import {
   propose,
   toSortOf,
   amendProposal,
+  phrasesOf,
   type Amendment,
   type ProposalInput,
   replan,
@@ -1053,7 +1054,7 @@ export async function mcpServerFor(
     'routine',
     {
       description:
-        'A routine named in the instructions (Jarvis’s or one of her spaces’), or by a phrase that starts it (« /bilan »), to follow it. Hers in five parts (spec 047) come with what Jarvis prepared (`prepared`: her day, a mirror, her goals…), the instructions, the references (style, criteria) and the result to make (e.g. a « Bilan »); one kept as text comes with `structure`, a proposal of its five parts to offer her (apps family, action `structure_routine`).',
+        'A skill (stored as a « Routine ») named in the instructions (Jarvis’s or one of her spaces’), or by a phrase that starts it (« /bilan », one of its `triggers`), to follow it. Hers in five parts (spec 047) come with what Jarvis prepared (`prepared`: her day, a mirror, her goals…), the instructions, the references (style, criteria) and the result to make (e.g. a « Bilan »); one kept as text comes with `structure`, a proposal of its five parts to offer her (apps family, action `structure_routine`).',
       inputSchema: { name: z.string().min(1) },
       annotations: { readOnlyHint: true },
     },
@@ -1065,11 +1066,9 @@ export async function mcpServerFor(
       const mine = await act(async (tx) => {
         for (const space of reach) {
           for (const entry of await find(tx, space.id, { kind: 'Routine', limit: 100 })) {
-            const phrases = ((entry.data.trigger as { phrases?: unknown } | undefined)?.phrases ??
-              []) as unknown[];
             const named =
               [wanted, bare].includes(entry.title.toLowerCase()) ||
-              phrases.some((one) => typeof one === 'string' && one.toLowerCase() === wanted);
+              phrasesOf(entry.data).some((one) => one.toLowerCase() === wanted);
             if (!named) continue;
             const follow = await routineToFollow(
               tx,

@@ -53,13 +53,19 @@ const spanOf = (one: Bilan) =>
 const localDay = (d: Date) => d.toLocaleDateString('en-CA');
 /** The sentence that asks her assistant to write it (routine « Les bilans »). */
 const askOf = (one: Bilan) =>
-  `Écris mon bilan « ${typeOf(one)} » ${spanOf(one)} (entrée ${one.id}) en suivant ma routine${
+  `Écris mon bilan « ${typeOf(one)} » ${spanOf(one)} (entrée ${one.id}) en suivant mon skill${
     one.data.skill ? ` « ${one.data.skill} »` : ''
   }.`;
 
-/** Her routines that make a bilan: those that say so, and those named for one. */
-const makesBilan = (skill: Skill) =>
-  String(skill.result ?? '').toLowerCase() === 'bilan' || /bilan/i.test(skill.title);
+/**
+ * Her skills that write a bilan (F6b): those that say so (`result: Bilan`). Only when none says it,
+ * those named for one — a skill structured once (« structure_routine ») then says it.
+ */
+const writesBilan = (skill: Skill) => String(skill.result ?? '').toLowerCase() === 'bilan';
+const bilanSkills = (all: Skill[]) => {
+  const said = all.filter(writesBilan);
+  return said.length ? said : all.filter((skill) => /bilan/i.test(skill.title));
+};
 
 export function BilansPage() {
   const search = useSearch({ from: '/bilans' });
@@ -84,7 +90,7 @@ export function BilansPage() {
     <>
       <PageHead
         title="Bilans"
-        lead="Tes bilans, écrits selon tes routines à partir de ce que la période a donné. Tu les lis ici."
+        lead="Tes bilans, écrits selon tes skills à partir de ce que la période a donné. Tu les lis ici."
         actions={
           <Button tone="solid" onClick={() => setMaking(true)}>
             <Plus size={15} />
@@ -98,7 +104,7 @@ export function BilansPage() {
         <Panel>
           <Empty
             title="Aucun bilan pour l’instant"
-            lead="Prépare-en un : choisis la routine qui le structure et sa période ; ton assistant l’écrit."
+            lead="Prépare-en un : choisis le skill qui le structure et sa période ; ton assistant l’écrit."
           />
           <div className="flex justify-center pb-5">
             <Button tone="solid" onClick={() => setMaking(true)}>
@@ -230,7 +236,7 @@ function BilanView({ one }: { one: Bilan }) {
             <div className="grid gap-3 px-4 py-3 text-[13.5px]">
               <p className="text-bark">
                 Ce bilan suit{' '}
-                {one.data.skill ? <b>ta routine « {one.data.skill} »</b> : 'un bilan libre'} : sa
+                {one.data.skill ? <b>ton skill « {one.data.skill} »</b> : 'un bilan libre'} : sa
                 structure, son style, ses critères. Ton assistant l’écrit à partir des faits de la
                 période seulement ; ce qui manque est écrit « non renseigné ».
               </p>
@@ -269,7 +275,7 @@ function NewBilan({ onClose, onMade }: { onClose: () => void; onMade: (id: strin
     queryKey: ['skills'],
     queryFn: () => api<{ mine: Skill[] }>('/skills'),
   });
-  const mine = (skills.data?.mine ?? []).filter(makesBilan);
+  const mine = bilanSkills(skills.data?.mine ?? []);
   const [chosen, setSkill] = useState<string | null>(null);
   // Her routine first: a free bilan only when she picks it.
   const skill = chosen ?? mine[0]?.title ?? '';
@@ -326,9 +332,9 @@ function NewBilan({ onClose, onMade }: { onClose: () => void; onMade: (id: strin
     <Sheet open onOpenChange={(open) => !open && onClose()} title="Nouveau bilan">
       <div className="grid gap-4 p-4 text-[13px]">
         <div className="grid gap-1.5">
-          <span className="font-semibold">La routine qui le structure</span>
+          <span className="font-semibold">Le skill qui le structure</span>
           <Select
-            label="Routine"
+            label="Skill"
             value={skill}
             onChange={setSkill}
             options={[
@@ -338,7 +344,7 @@ function NewBilan({ onClose, onMade }: { onClose: () => void; onMade: (id: strin
           />
           {!mine.length && !skills.isLoading && (
             <span className="text-faint">
-              Aucune de tes routines ne fait de bilan : écris-en une dans Construire › Skills.
+              Aucun de tes skills n’écrit de bilan : écris-en un dans Construire › Skills.
             </span>
           )}
         </div>
@@ -383,7 +389,7 @@ function NewBilan({ onClose, onMade }: { onClose: () => void; onMade: (id: strin
         </div>
         <p className="rounded-[10px] bg-sand px-3 py-2 text-bark">
           Jarvis prépare l’entrée « à écrire » et te donne la phrase pour ton assistant : il l’écrit
-          en suivant ta routine, avec les faits de cette période seulement.
+          en suivant ton skill, avec les faits de cette période seulement.
         </p>
         <span className="flex gap-2">
           <Button tone="solid" disabled={make.isPending} onClick={() => make.mutate()}>

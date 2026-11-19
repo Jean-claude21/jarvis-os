@@ -18,6 +18,7 @@ import {
   setOccurrence,
   toSortOf,
   amendProposal,
+  phrasesOf,
   type Amendment,
   timeOf,
   installedReleases,
@@ -2056,11 +2057,11 @@ ${base.text}
         for (const one of c.get('spaces')) {
           for (const entry of await find(tx, one.id, { kind: 'Routine', limit: 100 })) {
             const data = entry.data as Record<string, unknown>;
-            const trigger = (data.trigger ?? {}) as {
-              phrases?: unknown;
-              repeat?: unknown;
-              saved?: unknown;
-            };
+            // What starts it, in the node's one vocabulary (F6b).
+            const triggers = (Array.isArray(data.triggers) ? data.triggers : []) as Record<
+              string,
+              unknown
+            >[];
             const text = [data.instructions, data.instruction, data.text, data.description].find(
               (v) => typeof v === 'string' && v,
             ) as string | undefined;
@@ -2070,16 +2071,11 @@ ${base.text}
               spaceId: one.id,
               space: one.name,
               when: String(data.when ?? data.quand ?? ''),
-              phrases: Array.isArray(trigger.phrases) ? trigger.phrases : [],
-              repeat:
-                typeof trigger.repeat === 'string'
-                  ? trigger.repeat
-                  : typeof data.repeat === 'string'
-                    ? data.repeat
-                    : null,
-              saved: typeof trigger.saved === 'string' ? trigger.saved : null,
+              triggers,
+              phrases: phrasesOf(data),
+              repeat: typeof data.repeat === 'string' ? data.repeat : null,
               result: (data.result as { kind?: unknown } | undefined)?.kind ?? null,
-              structured: Boolean(data.instructions || data.trigger),
+              structured: Boolean(data.instructions || data.triggers),
               excerpt: (text ?? '')
                 .replace(/[#>*_`]+/g, '')
                 .replace(/\s+/g, ' ')

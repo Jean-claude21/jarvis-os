@@ -153,7 +153,8 @@ describe('a rule', () => {
     const entry = await ama.as((tx) => get(tx, ama.space, saved.entries[0]!.id));
     expect(entry?.data.confirme).toBe(false);
     const lines = await ama.as((tx) => history(tx, ama.space, { limit: 5 }));
-    expect(lines.some((line) => line.door === 'rule' && line.client === 'rule:Fonds dépassé')).toBe(
+    // Every rule has an agent (F6b): a rule of Finances that names none is Finances' own.
+    expect(lines.some((line) => line.door === 'rule' && line.client === 'agent:Finances')).toBe(
       true,
     );
   });

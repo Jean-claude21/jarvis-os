@@ -9,6 +9,7 @@ import { patternsOf } from './patterns';
 import { propose } from './proposals';
 import { mirrorOf } from './review';
 import { repetitionFromWords } from './time';
+import { triggerSchema } from './triggers';
 import { zoneOf } from './zone';
 
 // Structured routines (spec 047, plan v2 C14). A routine is no longer only a text (a skill): it
@@ -31,16 +32,11 @@ const PREPARE = [
 export type Preparation = (typeof PREPARE)[number];
 
 export const structureSchema = z.object({
-  trigger: z
-    .object({
-      /** Five fields or her words (« chaque soir à 21h »): kept as the routine's `repeat`. */
-      repeat: z.string().min(2).max(80).optional(),
-      /** A kind saved that starts it. */
-      saved: z.string().min(1).max(80).optional(),
-      /** What she says to start it (« /bilan », « mon bilan »). */
-      phrases: z.array(z.string().min(1).max(80)).max(10).optional(),
-    })
-    .default({}),
+  /**
+   * What starts it, in the node's one vocabulary (triggers.ts, F6b): a phrase (« /bilan »), a time,
+   * a kind saved… A skill with none is followed when she asks for it by name.
+   */
+  triggers: z.array(triggerSchema).max(10).default([]),
   prepare: z
     .array(
       z.union([
@@ -76,7 +72,7 @@ export type Structure = z.infer<typeof structureSchema>;
 
 /** A routine's structure, when it has one. */
 export function structureOf(data: Record<string, unknown>): Structure | null {
-  if (!data.instructions && !data.prepare && !data.trigger) return null;
+  if (!data.instructions && !data.prepare && !data.triggers) return null;
   const parsed = structureSchema.safeParse(data);
   return parsed.success ? parsed.data : null;
 }
@@ -194,10 +190,12 @@ export function structureFromText(name: string, text: string): Structure {
     said,
   )?.[1];
   return {
-    trigger: {
-      ...(when ? { repeat: repetitionFromWords(when)! } : {}),
-      phrases: [...new Set([`/${fold(name).replace(/[^a-z0-9]+/g, '')}`, ...phrases])],
-    },
+    triggers: [
+      ...[...new Set([`/${fold(name).replace(/[^a-z0-9]+/g, '')}`, ...phrases])]
+        .filter((phrase) => phrase.length >= 2)
+        .map((phrase) => ({ phrase })),
+      ...(when ? [{ schedule: repetitionFromWords(when)! }] : []),
+    ],
     prepare: [...new Set(prepare)],
     instructions: text.trim(),
     references: {
@@ -207,6 +205,10 @@ export function structureFromText(name: string, text: string): Structure {
     result: result ? { kind: result.charAt(0).toUpperCase() + result.slice(1) } : {},
   };
 }
+
+/** The time a skill starts at, if it has one. */
+const scheduleOf = (structure: Structure) =>
+  structure.triggers.flatMap((one) => ('schedule' in one ? [one.schedule] : []))[0] ?? null;
 
 /** Proposes her routine kept as text in its five parts; made only on her yes (`decide`). */
 export async function proposeStructure(tx: Tx, actor: Actor, spaceId: string, id: string) {
@@ -224,9 +226,8 @@ export async function proposeStructure(tx: Tx, actor: Actor, spaceId: string, id
         id,
         data: {
           ...structure,
-          ...(structure.trigger.repeat
-            ? { repeat: structure.trigger.repeat, remind: ['0 min'] }
-            : {}),
+          // A time it starts at is also a reminder on her clock (spec 047).
+          ...(scheduleOf(structure) ? { repeat: scheduleOf(structure), remind: ['0 min'] } : {}),
         },
       },
     ],

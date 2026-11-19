@@ -505,3 +505,4 @@ export {
   type CollectionDraft,
   type DraftField,
 } from './follow';
+export { checkPhrases, phrasesOf, triggerSchema, type Trigger } from './triggers';

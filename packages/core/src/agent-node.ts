@@ -122,6 +122,86 @@ export async function agentDoing(
   return null;
 }
 
+/** Who answers for her own automations, made outside any app, that do more than remind. */
+export const STEWARD = 'Intendant';
+const REMINDERS = 'Gardien des rappels';
+
+interface RuleLike {
+  id: string;
+  title: string;
+  data: Record<string, unknown>;
+}
+
+const actionsOf = (rule: RuleLike) =>
+  (Array.isArray(rule.data.then) ? rule.data.then : []) as Record<string, unknown>[];
+
+/**
+ * Who answers for each rule (v3 D12, F6b): every automation has an agent — its Pause, its budget,
+ * its name in the journal. The one it names; else the agent that reaches the service it calls; else
+ * the one agent its app's other rules name; else an agent named after its app; else, for her own,
+ * the Gardien des rappels when it only reminds, the Intendant otherwise. Nothing is written: she
+ * gives it to another agent when she likes (« Confier à… »).
+ */
+export async function agentsOfRules(
+  tx: Tx,
+  spaceId: string,
+): Promise<Map<string, { title: string; assigned: boolean }>> {
+  const { rows: rules } = await tx.query<RuleLike>(
+    `select id, title, data from entry where space_id = $1 and archived_at is null
+        and jarvis_fold(kind) = 'rule'`,
+    [spaceId],
+  );
+  const { rows: agents } = await tx.query<{ title: string; data: Record<string, unknown> }>(
+    `select title, data from entry where space_id = $1 and archived_at is null
+        and jarvis_fold(kind) = 'agent'`,
+    [spaceId],
+  );
+  const services = [...agents, ...BUILTIN_AGENTS].flatMap((one) =>
+    typeof one.data.service === 'string' ? [{ title: one.title, service: one.data.service }] : [],
+  );
+  const named = (rule: RuleLike) =>
+    typeof rule.data.agent === 'string' && rule.data.agent.trim() ? rule.data.agent : null;
+  const out = new Map<string, { title: string; assigned: boolean }>();
+  for (const rule of rules) {
+    const own = named(rule);
+    if (own) {
+      out.set(rule.id, { title: own, assigned: true });
+      continue;
+    }
+    const calls = actionsOf(rule).flatMap((action) => {
+      const call = action.call as { connection?: unknown } | undefined;
+      return typeof call?.connection === 'string' ? [fold(call.connection)] : [];
+    });
+    const reaching = services.find((one) => calls.includes(fold(one.service)));
+    const app = typeof rule.data.app === 'string' && rule.data.app ? rule.data.app : null;
+    const siblings = app
+      ? [
+          ...new Set(
+            rules
+              .filter((other) => other.data.app === app && named(other))
+              .map((other) => named(other)!),
+          ),
+        ]
+      : [];
+    const title =
+      reaching?.title ??
+      (siblings.length === 1
+        ? siblings[0]!
+        : (app ?? (actionsOf(rule).every((action) => 'remind' in action) ? REMINDERS : STEWARD)));
+    out.set(rule.id, { title, assigned: false });
+  }
+  return out;
+}
+
+/** The agent that answers for one rule, with its settings. */
+export async function agentOfRule(tx: Tx, spaceId: string, rule: RuleLike): Promise<Agent> {
+  const title =
+    (typeof rule.data.agent === 'string' && rule.data.agent) ||
+    (await agentsOfRules(tx, spaceId)).get(rule.id)?.title ||
+    STEWARD;
+  return (await agentNamed(tx, spaceId, title)) ?? { id: null, title, data: {} };
+}
+
 /** How a change made by an agent is signed in the journal. */
 export const agentClient = (title: string) => `agent:${title}`;
 
@@ -160,6 +240,8 @@ export async function callsToday(tx: Tx, spaceId: string, title: string, now = n
 
 export interface AgentRule {
   id: string;
+  /** Given to this agent by her (or its app), or answered for by default (F6b). */
+  assigned: boolean;
   title: string;
   when: Record<string, unknown>;
   active: boolean;
@@ -210,10 +292,12 @@ export async function agentsOf(tx: Tx, spaceId: string, now = new Date()): Promi
     data: Record<string, unknown>;
   }>(
     `select id, title, data from entry where space_id = $1 and archived_at is null
-        and jarvis_fold(kind) = 'rule' and coalesce(data->>'agent', '') <> ''
+        and jarvis_fold(kind) = 'rule'
       order by created_at`,
     [spaceId],
   );
+  const answering = await agentsOfRules(tx, spaceId);
+  const agentOf = (rule: { id: string }) => answering.get(rule.id)?.title ?? STEWARD;
   // The morning brief is told from her own space: its agent lives there only.
   const personal = (await spacesOf(tx)).find((one) => one.id === spaceId)?.personal ?? false;
   const names = new Map<string, string>();
@@ -222,13 +306,13 @@ export async function agentsOf(tx: Tx, spaceId: string, now = new Date()): Promi
       (a) => a.title,
     ),
     ...entries.map((e) => e.title),
-    ...rules.map((r) => String(r.data.agent)),
+    ...rules.map((r) => agentOf(r)),
   ])
     if (!names.has(fold(one))) names.set(fold(one), one);
   const out: AgentView[] = [];
   for (const title of names.values()) {
     const agent = (await agentNamed(tx, spaceId, title)) ?? { id: null, title, data: {} };
-    const own = rules.filter((rule) => fold(String(rule.data.agent)) === fold(agent.title));
+    const own = rules.filter((rule) => fold(agentOf(rule)) === fold(agent.title));
     const { rows: runs } = await tx.query<{
       id: string;
       title: string;
@@ -242,12 +326,22 @@ export async function agentsOf(tx: Tx, spaceId: string, now = new Date()): Promi
     );
     const calls = await callsToday(tx, spaceId, agent.title, now);
     const text = (value: unknown) => (typeof value === 'string' && value ? value : null);
+    // An agent that exists only because rules answer to it says what it is for.
+    if (!agent.data.role && !agent.id)
+      agent.data = {
+        ...agent.data,
+        role:
+          fold(agent.title) === fold(STEWARD)
+            ? 'Fait tourner les automatismes que tu as faits toi-même.'
+            : `Fait tourner les automatismes de ${agent.title}.`,
+      };
     const view: AgentView = {
       ...agent,
       when: await whenOf(tx, agent),
       memory: agent.id ? await memoryOf(tx, spaceId, agent.id) : [],
       rules: own.map((rule) => ({
         id: rule.id,
+        assigned: answering.get(rule.id)?.assigned ?? false,
         title: rule.title,
         when: (rule.data.when ?? {}) as Record<string, unknown>,
         active: rule.data.active !== false,
@@ -294,12 +388,9 @@ export async function setAgent(
   const patch = agentSettingsSchema.parse(raw);
   const agent = await agentNamed(tx, spaceId, title);
   if (!agent) {
-    const { rows } = await tx.query(
-      `select 1 from entry where space_id = $1 and archived_at is null and jarvis_fold(kind) = 'rule'
-          and jarvis_fold(coalesce(data->>'agent', '')) = jarvis_fold($2) limit 1`,
-      [spaceId, title],
-    );
-    if (!rows.length) throw new Error(`No agent « ${title} » in this space.`);
+    const answering = [...(await agentsOfRules(tx, spaceId)).values()];
+    if (!answering.some((one) => fold(one.title) === fold(title)))
+      throw new Error(`No agent « ${title} » in this space.`);
   }
   const saved = await save(tx, actor, spaceId, {
     entries: [

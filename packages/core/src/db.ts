@@ -13,6 +13,8 @@ export interface Actor {
   depth?: number;
   /** A program's key (spec 050): the only kinds it may write. */
   kinds?: string[];
+  /** The rule whose work this is (F6b): a rule never starts itself again. */
+  rule?: string;
 }
 
 export function pool(connectionString: string): pg.Pool {

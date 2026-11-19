@@ -14,6 +14,15 @@ export function dayText(value: string) {
   });
 }
 
+/** A web address, short: its site, without « www. ». */
+export const siteOf = (href: string) => {
+  try {
+    return new URL(href).hostname.replace(/^www\./, '');
+  } catch {
+    return href;
+  }
+};
+
 export function showValue(value: unknown, field?: Field): string {
   if (value === null || value === undefined || value === '') return '';
   if (Array.isArray(value))
@@ -33,6 +42,8 @@ export function showValue(value: unknown, field?: Field): string {
     return value.toLocaleString('fr');
   }
   const text = String(value);
+  // A web address reads as its site (« drive.google.com »); where it can be, it is a link (Value).
+  if (/^https?:\/\/\S+$/i.test(text.trim())) return siteOf(text.trim());
   if (field?.optionLabels?.[text]) return field.optionLabels[text]!;
   if (field?.type === 'choice') return stateOf(text);
   if (isDay(text)) return dayText(text);

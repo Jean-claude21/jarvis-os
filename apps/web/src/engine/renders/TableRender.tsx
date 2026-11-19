@@ -13,7 +13,7 @@ import { useMemo, useState } from 'react';
 import { useKindName } from '../../lib/kinds';
 import { Button, Empty, Menu, cn } from '../../ui';
 import { valueOf, type Shaped } from '../apply';
-import { showValue } from '../format';
+import { Value } from '../../ui/Value';
 import type { Field, Row, ViewSearch, ViewChange } from '../types';
 
 // Le tableau (TanStack Table): a column per field, the title held on the left; a header sorts
@@ -51,9 +51,11 @@ export function TableRender({
         id: field.path,
         header: field.label,
         cell: ({ row }) =>
-          field.path === 'kind'
-            ? kindName(row.original.kind)
-            : showValue(valueOf(row.original, field.path), field),
+          field.path === 'kind' ? (
+            kindName(row.original.kind)
+          ) : (
+            <Value value={valueOf(row.original, field.path)} field={field} />
+          ),
       })),
     ],
     [shown, kindName],

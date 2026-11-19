@@ -19,6 +19,7 @@ import { useSession } from '../lib/session';
 import { useDropTarget, useUpload } from '../lib/upload';
 import { GENRE_WORDS, said, whoOf } from '../lib/words';
 import { fieldWord, showValue } from '../engine/format';
+import { WebAddress } from '../ui/Value';
 import { useFiles } from '../engine/sources';
 
 import { Avatar, Button, PageHead, Panel, Skeleton, Tag, ago, rowClass } from '../ui';
@@ -387,15 +388,8 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
                             >
                               {spot.lat.toFixed(5)}, {spot.lng.toFixed(5)} · voir sur la carte
                             </a>
-                          ) : field.type === 'url' && typeof value === 'string' ? (
-                            <a
-                              href={value}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-primary hover:underline"
-                            >
-                              {value}
-                            </a>
+                          ) : typeof value === 'string' && /^https?:\/\//i.test(value.trim()) ? (
+                            <WebAddress href={value.trim()} />
                           ) : (
                             <span className={showValue(value, field) ? '' : 'text-faint'}>
                               {showValue(value, field) || '—'}

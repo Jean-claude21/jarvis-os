@@ -4,6 +4,7 @@ import { ExternalLink } from 'lucide-react';
 import { useMemo, useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
 import { showValue } from '../engine/format';
+import { Value } from '../ui/Value';
 import { Button, Empty, Panel, Stat, Stats, Tag, cn, inputClass, rowClass } from '../ui';
 import { Markdown } from '../ui/Markdown';
 import { Select, toast } from '../ui/more';
@@ -204,6 +205,8 @@ function TableBlock({ block, vocabulary }: BlockProps) {
                     >
                       {showValue(row[one]) || '—'}
                     </Link>
+                  ) : typeof row[one] === 'string' && /^https?:\/\//i.test(row[one]) ? (
+                    <Value value={row[one]} />
                   ) : (
                     optionLabel(vocabulary, block.kind, one, row[one]) || '—'
                   )}

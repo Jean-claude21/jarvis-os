@@ -1,10 +1,12 @@
 name: CI
 
 # A pull request is checked once; merged one at a time, dev holds exactly what was checked, so a
-# push to dev is not checked again.
+# push to dev is not checked again. The v3 is built on `next` by direct pushes: each one is checked.
 on:
   pull_request:
-    branches: [dev, main]
+    branches: [dev, main, next]
+  push:
+    branches: [next]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -35,6 +37,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Lint, types, formatting
         run: pnpm lint && pnpm typecheck && pnpm format:check
+      - name: The v3 client builds
+        run: pnpm --filter @jarvis-os/web build
 
   check:
     # Each package's tests on a database of their own, on the runner itself: Postgres beside the
@@ -77,3 +81,49 @@ jobs:
           JARVIS_TEST_STORAGE_ACCESS_KEY_ID: ${{ secrets.JARVIS_TEST_STORAGE_ACCESS_KEY_ID }}
           JARVIS_TEST_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.JARVIS_TEST_STORAGE_SECRET_ACCESS_KEY }}
           JARVIS_TEST_AUTH_SECRET: ${{ secrets.JARVIS_TEST_AUTH_SECRET }}
+
+  e2e:
+    # The v3 in a real browser (Chromium), each screen and gesture, at three widths, against the
+    # real server on a database of its own.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 2s --health-timeout 5s
+          --health-retries 30
+    env:
+      CI: 'true'
+      JARVIS_TEST_OWNER_URL: postgres://jarvis_owner@localhost:5432/jarvis
+      JARVIS_TEST_APP_URL: postgres://jarvis_app@localhost:5432/jarvis
+      JARVIS_TEST_STORAGE_ENDPOINT: ${{ secrets.JARVIS_TEST_STORAGE_ENDPOINT }}
+      JARVIS_TEST_STORAGE_REGION: ${{ secrets.JARVIS_TEST_STORAGE_REGION }}
+      JARVIS_TEST_STORAGE_BUCKET: ${{ secrets.JARVIS_TEST_STORAGE_BUCKET }}
+      JARVIS_TEST_STORAGE_ACCESS_KEY_ID: ${{ secrets.JARVIS_TEST_STORAGE_ACCESS_KEY_ID }}
+      JARVIS_TEST_STORAGE_SECRET_ACCESS_KEY: ${{ secrets.JARVIS_TEST_STORAGE_SECRET_ACCESS_KEY }}
+      JARVIS_TEST_AUTH_SECRET: ${{ secrets.JARVIS_TEST_AUTH_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Its database (roles as on Neon)
+        run: psql postgres://postgres@localhost:5432/postgres -v ON_ERROR_STOP=1 -q -f tooling/ci/postgres.sql
+      - name: Chromium for the tests
+        run: pnpm --filter @jarvis-os/e2e exec playwright install --with-deps chromium
+      - name: End to end
+        run: pnpm e2e
+      - name: The report, when something failed
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/e2e/playwright-report
+          retention-days: 7

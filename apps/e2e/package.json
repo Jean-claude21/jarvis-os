@@ -1,0 +1,13 @@
+{
+  "name": "@jarvis-os/e2e",
+  "private": true,
+  "type": "module",
+  "description": "Jarvis OS v3 end to end: each screen and gesture in a real browser, at three widths, against a server on the test database.",
+  "scripts": {
+    "e2e": "playwright test",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.1"
+  }
+}

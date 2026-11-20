@@ -100,7 +100,9 @@ export function makeApp(settings: Settings) {
     const url = new URL(c.req.url);
     const path = url.pathname.replace(/\/auth$/, '');
     url.pathname = `/auth${path}`;
-    return auth.handler(new Request(url, c.req.raw));
+    // A GET without a body: its method and headers, given as such (a Request as the init of
+    // another is refused by Node 26's fetch).
+    return auth.handler(new Request(url, { method: 'GET', headers: c.req.raw.headers }));
   });
 
   app.route(

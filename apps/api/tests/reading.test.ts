@@ -81,8 +81,8 @@ describe('reading her files', () => {
     const invoice = await upload(pdfSaying('Facture eau ZX-40917'), 'facture.pdf', PDF);
     const lease = await upload(docxSaying('Bail appartement QW-88120'), 'bail.docx', DOCX);
     const broken = await upload(new TextEncoder().encode('not a pdf'), 'casse.pdf', PDF);
-    expect((await ama.json<unknown[]>('/api/entries?text=ZX-40917')).body).toEqual([]);
-
+    // Since v3 V7 a file is read as it arrives, out of the request; the watcher's passes read
+    // whatever is still waiting.
     for (let pass = 0; pass < 3; pass += 1) await readOnce(server.db, server.blobs);
 
     const found = async (words: string) =>

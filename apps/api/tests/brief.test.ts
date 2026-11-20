@@ -5,7 +5,7 @@ import { signUp } from './client';
 // Spec 018 through her account: the hour of her brief kept with her preferences; today's brief read
 // now; not sent while she has no Telegram.
 describe('the morning brief', () => {
-  it('is set, read and refused without Telegram', async () => {
+  it('is set, read, and not sent with neither Telegram nor a mailer', async () => {
     const ama = await signUp('Ama');
     await ama.json('/api/save', {
       entries: [{ kind: 'Habitude', title: 'Lire', data: { days: '7/7' } }],
@@ -15,7 +15,11 @@ describe('the morning brief', () => {
     const read = await ama.json<{ text: string; brief: { day: string } }>('/api/me/brief');
     expect(read.status).toBe(200);
     expect(read.body.text).toContain('☀️');
-    expect((await ama.json<{ sent: boolean }>('/api/me/brief', {})).body).toEqual({ sent: false });
+    // No Telegram, and no mailer on this server: it says it was not sent (v3: e-mail otherwise).
+    expect((await ama.json<{ sent: boolean }>('/api/me/brief', {})).body).toEqual({
+      sent: false,
+      via: null,
+    });
     expect((await ama.json('/api/me/prefs', { brief: null })).body).toEqual({ brief: null });
   });
 

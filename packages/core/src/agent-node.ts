@@ -415,7 +415,7 @@ async function whenOf(tx: Tx, agent: Agent): Promise<string | null> {
   const works = agent.data.builtin ?? [];
   if (works.includes('brief')) {
     const at = (await preferencesOf(tx).catch(() => ({}) as { brief?: string })).brief;
-    return at ? `chaque jour à ${at}` : 'quand tu choisis une heure dans Réglages';
+    return at ? `chaque jour à ${at}` : 'quand tu choisis une heure dans Réglages › Compte';
   }
   if (works.includes('rappels')) return 'à l’heure de chaque rappel';
   if (works.includes('lecture')) return 'à chaque fichier déposé';

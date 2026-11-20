@@ -10,6 +10,7 @@ import {
   Plug,
   RefreshCw,
   Send,
+  Sunrise,
   ShieldCheck,
   UserRound,
   Users,
@@ -23,6 +24,7 @@ import {
   Empty,
   PageHead,
   Panel,
+  Sheet,
   Skeleton,
   SpaceDot,
   Tabs,
@@ -100,6 +102,92 @@ const ZONES = [
   'UTC',
 ];
 
+/**
+ * Her morning brief (spec 018, v3): the hour it comes, or none; read it now; have it sent now.
+ * The Assistant du matin sends it each day at that hour, by Telegram when linked, else by e-mail.
+ */
+function BriefPanel() {
+  const client = useQueryClient();
+  const prefs = useQuery({
+    queryKey: ['me', 'prefs'],
+    queryFn: () => api<{ brief?: string | null }>('/me/prefs'),
+  });
+  const setHour = useMutation({
+    mutationFn: (brief: string | null) => api('/me/prefs', { method: 'POST', body: { brief } }),
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['me', 'prefs'] });
+      void client.invalidateQueries({ queryKey: ['agents'] });
+    },
+  });
+  const [reading, setReading] = useState(false);
+  const now = useQuery({
+    queryKey: ['me', 'brief'],
+    queryFn: () => api<{ text: string }>('/me/brief'),
+    enabled: reading,
+  });
+  const send = useMutation({
+    mutationFn: () =>
+      api<{ sent: boolean; via: 'telegram' | 'email' | null }>('/me/brief', { method: 'POST' }),
+    onSuccess: (done) =>
+      toast(
+        done.sent
+          ? `Envoyé ${done.via === 'telegram' ? 'sur Telegram' : 'par e-mail'}.`
+          : 'Pas envoyé : relie ton Telegram, ou demande à ton administrateur de configurer l’e-mail.',
+        done.sent ? undefined : 'error',
+      ),
+    onError: (error) => toast((error as Error).message, 'error'),
+  });
+  const hour = prefs.data?.brief ?? null;
+  return (
+    <Panel title="Ton brief du matin" icon={<Sunrise size={16} />}>
+      <div className="flex flex-col gap-3 px-4 py-3 text-[13px]">
+        <p className="text-bark">
+          Chaque matin, à l’heure choisie, Jarvis te dit ta journée : ce qui ne va pas, ce qui est
+          en retard, ton agenda, tes habitudes. Sur Telegram si tu l’as relié, sinon par e-mail.
+        </p>
+        <label className="flex flex-wrap items-center gap-2">
+          <span className="font-semibold">Chaque jour à</span>
+          <input
+            type="time"
+            aria-label="Heure du brief"
+            className={inputClass.replace('w-full', 'w-auto')}
+            value={hour ?? ''}
+            disabled={!prefs.data || setHour.isPending}
+            onChange={(event) => event.target.value && setHour.mutate(event.target.value)}
+          />
+          {hour ? (
+            <Button size="sm" tone="quiet" onClick={() => setHour.mutate(null)}>
+              Plus de brief
+            </Button>
+          ) : (
+            <span className="text-faint">pas de brief pour l’instant</span>
+          )}
+        </label>
+        <span className="flex flex-wrap gap-2">
+          <Button size="sm" onClick={() => setReading(true)}>
+            Le lire maintenant
+          </Button>
+          <Button size="sm" disabled={send.isPending} onClick={() => send.mutate()}>
+            Me l’envoyer maintenant
+          </Button>
+        </span>
+      </div>
+      <Sheet open={reading} onOpenChange={setReading} title="Ta journée">
+        <div className="p-4">
+          {now.isLoading ? (
+            <Skeleton className="h-40" />
+          ) : (
+            <pre className="font-sans text-[14px] leading-relaxed whitespace-pre-wrap">
+              {now.data?.text ?? ''}
+            </pre>
+          )}
+        </div>
+      </Sheet>
+    </Panel>
+  );
+}
+
 function Account() {
   const { me } = useSession();
   const client = useQueryClient();
@@ -171,6 +259,7 @@ function Account() {
             {telegram.error && <p className="text-error">{(telegram.error as Error).message}</p>}
           </div>
         </Panel>
+        <BriefPanel />
         <Panel title="Tes données" icon={<Download size={16} />}>
           <div className="flex flex-col gap-2 px-4 py-3 text-[13px]">
             <p className="text-bark">

@@ -163,8 +163,8 @@ import { PROVIDERS, providerOf } from './relay';
 import { searchByMeaning } from './embeddings';
 import { connectorChange, connectorInput, type ConnectorService } from './connector-service';
 import { invitationLink, namesOf, spaceFor } from './spaces';
-import { langOf } from './i18n';
-import type { Mailer } from './mail';
+import { langOf, wordsOf } from './i18n';
+import { mailOf, sendQuietly, type Mailer } from './mail';
 import { mailInvitation, mailJoined } from './space-mails';
 import { computeDashboard, widgetSchema, widgetsOf, type Widget } from './views/dashboard';
 import { DOCUMENT_HOURS, documentShown, documentToken } from './views/document';
@@ -2203,10 +2203,26 @@ ${base.text}
     const brief = await as(c, (tx) => morningBrief(tx));
     const token = process.env.JARVIS_TELEGRAM_BOT_TOKEN;
     const channel = await channelOf(deps.db, c.get('person'));
-    const sent = Boolean(
-      token && channel.telegram && (await sendTelegram(token, channel.telegram, briefText(brief))),
+    const text = briefText(brief);
+    // Telegram when it is linked, else her e-mail (v3): the brief reaches her either way.
+    if (token && channel.telegram && (await sendTelegram(token, channel.telegram, text)))
+      return c.json({ sent: true, via: 'telegram' });
+    const [title, ...rest] = text.split(/\n\n/);
+    const words = wordsOf(langOf(c.req.header('accept-language')));
+    const mailed = await sendQuietly(
+      deps.mailer ?? null,
+      {
+        to: c.get('email'),
+        ...mailOf({
+          subject: title ?? '',
+          title: title ?? '',
+          lines: rest,
+          footer: words.mailFooter,
+        }),
+      },
+      'brief',
     );
-    return c.json({ sent });
+    return c.json({ sent: mailed, via: mailed ? 'email' : null });
   });
 
   // Her personal keys (spec 015): made, listed, revoked from her settings; a key is shown once.

@@ -11,68 +11,63 @@ Legend: ✅ covered · ↪ replaced on purpose (the v3 decision is cited) · ❌
 
 ## Pages
 
-| v2 page                                                                                        | v3                                   | State                                          |
-| ---------------------------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------- |
-| Maintenant (`#/`)                                                                              | Aujourd'hui                          | ✅                                             |
-| Agenda, Rappels                                                                                | Agenda (calendar engine)             | ✅                                             |
-| Tâches, Activités                                                                              | Tâches                               | ✅                                             |
-| Ranger                                                                                         | À valider                            | ✅ (F5)                                        |
-| Vie, Entrée                                                                                    | Apps' data, the fiche, the side card | ✅                                             |
-| Documents, Document, Fichiers                                                                  | Documents                            | ✅                                             |
-| Tableaux                                                                                       | An app's pages, Composer             | ✅ (F4)                                        |
-| Personnes                                                                                      | Personnes                            | ✅                                             |
-| Apps, App                                                                                      | Mes apps, an app's menu              | ✅                                             |
-| Bilans                                                                                         | Bilans                               | ✅ (F4)                                        |
-| Skills                                                                                         | Construire › Skills                  | ✅ (F6b)                                       |
-| Journal                                                                                        | Activité                             | ✅                                             |
-| Espaces, Espace, Compte, Connexions                                                            | Réglages                             | ✅ (with the gaps below)                       |
-| Revue (`#/revue`: a guided review with answers and decisions)                                  | Bilans, written by her skill         | ↪ spec 099: a bilan is a document              |
-| Collections, Modèles (her kinds listed)                                                        | Construire, apps' data               | ↪ partly; see « types » below                  |
-| Rôle d'une app (what it covers, the words that call it, what it reads and writes, its bridges) | An app's Aperçu                      | ❌ no screen says an app's role                |
-| Données (export, import, her kinds, what Jarvis sent, backups)                                 | Réglages › Compte: export only       | ❌ see below                                   |
-| Bienvenue (first time: 4 steps)                                                                | —                                    | ❌ a new account lands on an empty Aujourd'hui |
+| v2 page                                                                                        | v3                                   | State                             |
+| ---------------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------- |
+| Maintenant (`#/`)                                                                              | Aujourd'hui                          | ✅                                |
+| Agenda, Rappels                                                                                | Agenda (calendar engine)             | ✅                                |
+| Tâches, Activités                                                                              | Tâches                               | ✅                                |
+| Ranger                                                                                         | À valider                            | ✅ (F5)                           |
+| Vie, Entrée                                                                                    | Apps' data, the fiche, the side card | ✅                                |
+| Documents, Document, Fichiers                                                                  | Documents                            | ✅                                |
+| Tableaux                                                                                       | An app's pages, Composer             | ✅ (F4)                           |
+| Personnes                                                                                      | Personnes                            | ✅                                |
+| Apps, App                                                                                      | Mes apps, an app's menu              | ✅                                |
+| Bilans                                                                                         | Bilans                               | ✅ (F4)                           |
+| Skills                                                                                         | Construire › Skills                  | ✅ (F6b)                          |
+| Journal                                                                                        | Activité                             | ✅                                |
+| Espaces, Espace, Compte, Connexions                                                            | Réglages                             | ✅ (with the gaps below)          |
+| Revue (`#/revue`: a guided review with answers and decisions)                                  | Bilans, written by her skill         | ↪ spec 099: a bilan is a document |
+| Collections, Modèles (her kinds listed)                                                        | Construire, apps' data               | ↪ partly; see « types » below     |
+| Rôle d'une app (what it covers, the words that call it, what it reads and writes, its bridges) | An app's Aperçu, « Son rôle »        | ✅                                |
+| Données (export, import, her kinds, what Jarvis sent, backups)                                 | Réglages › Compte                    | ✅                                |
+| Bienvenue (first time: 4 steps)                                                                | Aujourd'hui, « Pour commencer »      | ✅                                |
 
-## Gestures missing in the v3
+## Gestures missing in the v3 — closed (20 Nov 2026)
 
-### Blocking the switch (she uses them every day, or the v3 points to them)
+Each closed with its end-to-end test (`apps/e2e`), at three widths.
 
-- [ ] **Noter d'un geste.** The sidebar says « Chercher ou noter », but the palette only searches.
-      The v2 kept a capture from anywhere (`POST /inbox`).
-- [ ] **L'heure du brief.** The Assistant du matin says « quand tu choisis une heure dans
-      Réglages », but no setting in Réglages sets it (v2: `/me/prefs`). Also missing: reading the
-      brief now, and sending it now (`/me/brief`).
-- [ ] **Quels espaces un assistant atteint.** Réglages › Assistants revokes an access, but cannot
-      choose the spaces a client reaches (v2: `PUT /clients/:id/spaces`).
+### Blocking the switch
 
-### Before opening sign-ups (not for her own switch)
+- [x] **Noter d'un geste**: « Noter « … » » in the bar (Ctrl K, the sidebar, the phone's top bar).
+- [x] **L'heure du brief**: Réglages › Compte, « Le lire maintenant », « Me l'envoyer maintenant »;
+      by e-mail when Telegram is not linked.
+- [x] **Quels espaces un assistant atteint**: « Ses espaces » in Réglages › Assistants.
 
-- [ ] **Bienvenue**: the first steps of a new account (import notes, a spreadsheet, start from
-      zero).
+### Before opening sign-ups
 
-### Not blocking: an assistant does it, or it is rarely used
+- [x] **Bienvenue**: « Pour commencer » on Aujourd'hui, four steps ticked when done.
 
-- [ ] Ce que Jarvis t'a envoyé (7 days, by channel, failures): `/outbox`. Visible nowhere in the v3.
-- [ ] Sauvegardes: the last backup of each space. Visible nowhere in the v3.
-- [ ] Importer un dossier de notes (Markdown) or a spreadsheet: `/import`. Par l'assistant: no.
-- [ ] Adresse de l'agenda (ICS) to subscribe from a phone: `/agenda/address`. An address already
-      made keeps working.
-- [ ] Ajouter un connecteur MCP from the catalogue: `/connectors/catalog`, `POST /connectors`.
-      The v3 lists, checks and removes them only.
-- [ ] Renommer un type, ranger des types en groupe: `/kinds/rename`, `/kinds/group`. Par
-      l'assistant.
-- [ ] Ranger une app dans un domaine: `/apps/area`. Par l'assistant.
-- [ ] Actions sur plusieurs entrées à la fois: `/entries/bulk`. Par l'assistant.
-- [ ] Créer un partage (a form or a view by link): `/shares`. Par l'assistant. Links already
-      shared keep working (`/p/…` is served by the API).
-- [ ] Tout fusionner (the kinds that are one): `/kinds/merges/all`. One by one in À valider.
-- [ ] Structurer un skill en cinq morceaux, from its line: `/routines/:id/structure`. Par
-      l'assistant (`structure_routine`).
-- [ ] Poser une question chiffrée dans la recherche: `/answer`. Par l'assistant.
-- [ ] Le tableau des habitudes sur 28 jours: `/habits/board`. Habits show in pages (blocks).
+### The others
+
+- [x] Ce que Jarvis t'a envoyé: Réglages › Compte.
+- [x] Sauvegardes: Réglages › Compte, each to download.
+- [x] Importer un dossier de notes (Markdown): Réglages › Compte. A spreadsheet: dropped as a
+      file, read on its page (CSV as a table); no import into entries yet.
+- [x] Adresse de l'agenda: Agenda › « Dans mon téléphone ».
+- [x] Un serveur d'outils (MCP): Réglages › Connexions, from the catalogue or by its address.
+- [x] Renommer un type: in place on its data (« Renommer »), and its fields (« Ses champs »).
+      ↪ Groups of kinds: replaced by apps (the v3 files kinds in apps, spec 099).
+- ↪ Ranger une app dans un domaine: replaced; the v3 has no domains, its menu is her apps.
+- [x] Actions sur plusieurs entrées: the table ticks rows (set aside, file in a folder).
+- [x] Créer un partage: « Partager par un lien » on a kind (a form or a list).
+- [x] Tout fusionner: in À valider.
+- [x] Structurer un skill: « Structurer » in Construire › Skills.
+- [x] Question chiffrée: answered in the bar.
+- [x] Tableau des habitudes: Objectifs, 28 days.
 
 ## After the gaps: the switch itself
 
-- [ ] Each blocking gap above closed and shown on next.
+- [x] Each blocking gap above closed (on next from `81035bb`).
 - [ ] Her data on next checked: migrations 0034–0037, « Lire les offres » under the Chasseur
       d'offres, the bilan skills' triggers (with her yes), Candidatures release 2.
 - [ ] Backup of production, then the migrations of V1–F7 and F6b applied to main.

@@ -119,7 +119,7 @@ export function Shell() {
             />
             {clock.day} · {clock.time}
           </span>
-          <IconButton onClick={() => setSearch(true)} aria-label="Chercher">
+          <IconButton onClick={() => setSearch(true)} aria-label="Chercher ou noter">
             <Search size={16} />
           </IconButton>
           <IconButton

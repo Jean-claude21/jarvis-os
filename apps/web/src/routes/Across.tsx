@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link } from '@tanstack/react-router';
-import { CalendarPlus, Repeat, Target } from 'lucide-react';
+import { Link, useNavigate } from '@tanstack/react-router';
+import { CalendarPlus, FilePlus2, Repeat, Target } from 'lucide-react';
 import { api } from '../lib/api';
 import { useKinds, useKindName } from '../lib/kinds';
 import { GaugeBar } from '../blocks/charts';
@@ -152,6 +152,31 @@ export function TasksPage() {
   );
 }
 
+/** A document written here (v3 D17): a « Document » made, then her text written on its page. */
+function NewDocument() {
+  const navigate = useNavigate();
+  const make = useMutation({
+    mutationFn: () =>
+      api<{ entries: { id: string }[] }>('/save', {
+        method: 'POST',
+        body: { entries: [{ kind: 'Document', title: 'Sans titre', data: { text: '' } }] },
+      }),
+    onSuccess: (made) =>
+      void navigate({
+        to: '/entree/$id',
+        params: { id: made.entries[0]!.id },
+        search: { ecrire: 1 } as never,
+      }),
+    onError: (error) => toast((error as Error).message, 'error'),
+  });
+  return (
+    <Button size="sm" tone="solid" disabled={make.isPending} onClick={() => make.mutate()}>
+      <FilePlus2 size={14} />
+      Nouveau document
+    </Button>
+  );
+}
+
 export function DocumentsPage() {
   const { files, loading } = useFiles();
   return (
@@ -159,6 +184,7 @@ export function DocumentsPage() {
       <PageHead
         title="Documents"
         lead="Tes fichiers, d’où qu’ils viennent : déposés, envoyés par Telegram, liés à tes entrées."
+        actions={<NewDocument />}
       />
       <View
         source={{

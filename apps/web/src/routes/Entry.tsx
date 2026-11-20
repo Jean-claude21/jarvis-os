@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from '@tanstack/react-router';
+import { Link, useParams, useSearch } from '@tanstack/react-router';
 import {
   Download,
   ExternalLink,
@@ -8,6 +8,7 @@ import {
   History,
   ListTree,
   Paperclip,
+  PenLine,
   RotateCw,
   Upload,
   UserRound,
@@ -25,6 +26,7 @@ import { useFiles } from '../engine/sources';
 import { Avatar, Button, PageHead, Panel, Skeleton, Tag, ago, rowClass } from '../ui';
 import { Identity, WhoActions, type Who } from '../ui/identity';
 import { Markdown } from '../ui/Markdown';
+import { TextEditor } from '../ui/TextEditor';
 import { FieldRow, LinksPanel, NotesPanel, TitleEdit, type EditableField } from './EntryParts';
 import { FileActions, FileField, FileThumb } from './FileParts';
 
@@ -124,14 +126,24 @@ const label = (one: Record<string, string> | undefined, fallback: string) =>
 
 export function EntryPage() {
   const { id } = useParams({ from: '/entree/$id' });
-  return <EntryView id={id} />;
+  const { ecrire } = useSearch({ from: '/entree/$id' });
+  return <EntryView id={id} write={ecrire === 1} />;
 }
 
 /**
  * The fiche of one entry — a page of its own, or the right side of a « Liste + détail » (v3 D21,
  * `embedded`: one column, the list beside it).
  */
-export function EntryView({ id, embedded = false }: { id: string; embedded?: boolean }) {
+export function EntryView({
+  id,
+  embedded = false,
+  write = false,
+}: {
+  id: string;
+  embedded?: boolean;
+  /** Opened ready to write its text (« Nouveau document »). */
+  write?: boolean;
+}) {
   const { me } = useSession();
   const client = useQueryClient();
   const kindName = useKindName();
@@ -163,6 +175,21 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
   const input = useRef<HTMLInputElement>(null);
   // The empty fields of her model wait behind one line, so the values she has come first.
   const [filling, setFilling] = useState(false);
+  // Her text written on screen (v3 D17): Markdown, kept as hers (« dit »), journaled.
+  const [writing, setWriting] = useState(write);
+  const writeText = useMutation({
+    mutationFn: (value: string) =>
+      api('/save', {
+        method: 'POST',
+        body: { entries: [{ id: entry.data!.id, data: { text: value }, origin: 'said' }] },
+      }),
+    onSuccess: () => setWriting(false),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['entry'] });
+      void client.invalidateQueries({ queryKey: ['entries'] });
+      void client.invalidateQueries({ queryKey: ['history'] });
+    },
+  });
   useDropTarget(entry.data ? { id: entry.data.id, title: entry.data.title } : null);
 
   if (entry.isLoading) return <Skeleton className="h-40" />;
@@ -341,10 +368,39 @@ export function EntryView({ id, embedded = false }: { id: string; embedded?: boo
               )}
             </Panel>
           )}
-          {text('text') && !isFile && (
-            <Panel title="Le texte" icon={<FileText size={16} />}>
-              <Markdown text={text('text')!} className="px-4 py-4 sm:px-5" />
+          {!isFile && (text('text') || writing) ? (
+            <Panel
+              title="Le texte"
+              icon={<FileText size={16} />}
+              action={
+                !writing && (
+                  <Button size="sm" onClick={() => setWriting(true)}>
+                    <PenLine size={14} />
+                    Modifier
+                  </Button>
+                )
+              }
+            >
+              {writing ? (
+                <TextEditor
+                  value={text('text') ?? ''}
+                  saving={writeText.isPending}
+                  onSave={(value) => writeText.mutate(value)}
+                  onCancel={() => setWriting(false)}
+                />
+              ) : (
+                <Markdown text={text('text')!} className="px-4 py-4 sm:px-5" />
+              )}
             </Panel>
+          ) : (
+            !isFile && (
+              <span>
+                <Button size="sm" onClick={() => setWriting(true)}>
+                  <PenLine size={14} />
+                  Écrire un texte
+                </Button>
+              </span>
+            )
           )}
           <Panel title="Propriétés" icon={<ListTree size={16} />}>
             {names.length === 0 ? (

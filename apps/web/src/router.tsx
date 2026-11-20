@@ -93,6 +93,9 @@ const routes = [
     getParentRoute: () => root,
     path: '/entree/$id',
     component: EntryPage,
+    // « Nouveau document » opens it ready to write (v3 D17).
+    validateSearch: (search: Record<string, unknown>): { ecrire?: 1 } =>
+      search.ecrire ? { ecrire: 1 } : {},
     staticData: { crumbs: () => [{ label: 'Entrée' }] },
   }),
   viewPage('/agenda', 'Agenda', AgendaPage),

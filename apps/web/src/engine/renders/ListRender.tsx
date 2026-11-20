@@ -1,3 +1,5 @@
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
+import { useRef } from 'react';
 import { Link } from '@tanstack/react-router';
 import { peek } from '../peek';
 import { rowMenu } from '../RowMenu';
@@ -68,6 +70,58 @@ export function RowLine({
   );
 }
 
+/** Above this many rows, a list draws only what is on screen (v3 D17, long lists). */
+const LONG = 150;
+
+/**
+ * A long list (TanStack Virtual): only the rows in the window are drawn, measured as they come,
+ * so a thousand entries scroll as lightly as twenty. The page keeps its own scroll.
+ */
+function LongList({
+  rows,
+  fields,
+  group,
+}: {
+  rows: Row[];
+  fields: Field[];
+  group?: string | undefined;
+}) {
+  const list = useRef<HTMLDivElement>(null);
+  const virtual = useWindowVirtualizer({
+    count: rows.length,
+    estimateSize: () => 58,
+    overscan: 8,
+    scrollMargin: list.current?.offsetTop ?? 0,
+  });
+  return (
+    <div
+      ref={list}
+      data-long-list={rows.length}
+      style={{ height: virtual.getTotalSize(), position: 'relative' }}
+    >
+      {virtual.getVirtualItems().map((item) => {
+        const row = rows[item.index]!;
+        return (
+          <div
+            key={row.id + (row.start ?? '')}
+            data-index={item.index}
+            ref={virtual.measureElement}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              transform: `translateY(${item.start - virtual.options.scrollMargin}px)`,
+            }}
+          >
+            <RowLine row={row} fields={fields} group={group} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ListRender({
   shaped,
   fields,
@@ -79,7 +133,9 @@ export function ListRender({
 }) {
   if (!shaped.rows.length) return <Empty title="Rien ici" lead="Aucune entrée pour cette vue." />;
   if (!shaped.groups)
-    return (
+    return shaped.rows.length > LONG ? (
+      <LongList rows={shaped.rows} fields={fields} group={group} />
+    ) : (
       <div>
         {shaped.rows.map((row) => (
           <RowLine key={row.id + (row.start ?? '')} row={row} fields={fields} group={group} />

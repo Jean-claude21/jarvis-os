@@ -64,3 +64,52 @@ test('« Suivre quelque chose » makes a collection from a phrase, in a new app'
   await page.waitForURL(/\/v3\/apps\/Livres/);
   await expect(page.getByText('Lecture').first()).toBeVisible();
 });
+
+test('a document is written on screen, in Markdown, and reads as a page', async ({
+  page,
+  account,
+}) => {
+  void account;
+  await page.goto('/v3/documents');
+  await page.getByRole('button', { name: 'Nouveau document' }).click();
+  await page.waitForURL(/\/v3\/entree\/.+ecrire=1/);
+  const area = page.getByLabel('Le texte');
+  await area.fill('Courses de la semaine\n\n');
+  await page.getByRole('button', { name: 'Case à cocher' }).click();
+  await area.press('End');
+  await page.getByRole('button', { name: 'Garder' }).click();
+  await expect(page.getByRole('button', { name: 'Modifier' })).toBeVisible();
+  await expect(page.getByText('Courses de la semaine')).toBeVisible();
+  // The box reads as a box to tick (☐), with its words.
+  await expect(page.getByText('à faire')).toBeVisible();
+  await fitsTheWidth(page);
+});
+
+test('a long list draws only what is on screen', async ({ page, account }) => {
+  void account;
+  await api(page, '/save', {
+    entries: [
+      {
+        kind: 'Model',
+        title: 'Ligne',
+        data: { app: 'Registre', label: { fr: 'Ligne' }, fields: [{ name: 'n', type: 'number' }] },
+      },
+    ],
+  });
+  // A save takes 50 entries at most.
+  for (let batch = 0; batch < 6; batch += 1)
+    await api(page, '/save', {
+      entries: Array.from({ length: 50 }, (_, at) => ({
+        kind: 'Ligne',
+        title: `Ligne ${batch * 50 + at + 1}`,
+        data: { n: batch * 50 + at + 1 },
+      })),
+    });
+  await page.goto('/v3/apps/Registre?t=data&kind=Ligne&v=list');
+  const list = page.locator('[data-long-list="300"]');
+  await expect(list).toBeVisible();
+  const drawn = await list.locator('[data-index]').count();
+  expect(drawn).toBeGreaterThan(5);
+  expect(drawn).toBeLessThan(80);
+  await fitsTheWidth(page);
+});

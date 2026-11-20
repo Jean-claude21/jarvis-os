@@ -11,7 +11,7 @@ import { Select, toast } from '../ui/more';
 // and chooses the app it lives in (one she has, or a new one); « Créer » and it is there. The
 // facets follow from the fields: a date brings it to the agenda and the bilans, an amount to Argent.
 
-type FieldType =
+export type FieldType =
   | 'text'
   | 'long_text'
   | 'date'
@@ -27,7 +27,7 @@ type FieldType =
   | 'file'
   | 'location'
   | 'url';
-interface Field {
+export interface Field {
   name: string;
   label: string;
   type: FieldType;
@@ -130,8 +130,6 @@ function FollowSheet({ app, onClose }: { app?: string | undefined; onClose: () =
     },
     onError: (error) => toast((error as Error).message, 'error'),
   });
-  const change = (at: number, next: Partial<Field>) =>
-    setFields(fields.map((one, i) => (i === at ? { ...one, ...next } : one)));
   const brings = BRINGS.filter(([types]) => fields.some((f) => types.includes(f.type))).map(
     ([, words]) => words,
   );
@@ -206,76 +204,7 @@ function FollowSheet({ app, onClose }: { app?: string | undefined; onClose: () =
           </div>
           <div className="grid gap-1.5">
             <span className="text-[13px] text-bark">Ses champs</span>
-            {fields.map((field, at) => (
-              <div
-                key={at}
-                className="grid gap-2 rounded-[10px] border border-rule bg-paper p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,190px)_auto]"
-              >
-                <input
-                  className={inputClass}
-                  value={field.label}
-                  aria-label="Nom du champ"
-                  onChange={(e) => change(at, { label: e.target.value, name: '' })}
-                />
-                <Select
-                  label="Genre du champ"
-                  value={field.type}
-                  onChange={(type) => change(at, { type })}
-                  options={(Object.keys(TYPE_WORDS) as FieldType[]).map((one) => ({
-                    value: one,
-                    label: TYPE_WORDS[one],
-                  }))}
-                />
-                <button
-                  onClick={() => setFields(fields.filter((_, i) => i !== at))}
-                  aria-label={`Retirer ${field.label}`}
-                  className="grid h-9 w-9 cursor-pointer place-items-center rounded-[6px] text-bark hover:bg-sand"
-                >
-                  <X size={15} />
-                </button>
-                {(field.type === 'choice' || field.type === 'multi_choice') && (
-                  <input
-                    className={cn(inputClass, 'sm:col-span-3')}
-                    value={(field.options ?? []).join(', ')}
-                    placeholder="Ses choix, séparés par des virgules"
-                    onChange={(e) =>
-                      change(at, {
-                        options: e.target.value
-                          .split(',')
-                          .map((one) => one.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                  />
-                )}
-                {field.type === 'link' && (
-                  <div className="sm:col-span-3">
-                    <Select
-                      label="Vers quelle collection"
-                      value={field.target ?? ''}
-                      placeholder="Vers quelle collection ?"
-                      onChange={(target) => change(at, { target })}
-                      options={known.collections.map((one) => ({
-                        value: one.kind,
-                        label: one.label,
-                      }))}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-            <button
-              onClick={() =>
-                setFields([
-                  ...fields,
-                  { name: '', label: `Champ ${fields.length + 1}`, type: 'text' },
-                ])
-              }
-              className="inline-flex w-fit cursor-pointer items-center gap-1.5 text-[13px] font-semibold text-primary hover:underline"
-            >
-              <Plus size={14} />
-              Ajouter un champ
-            </button>
+            <FieldsEditor fields={fields} setFields={setFields} collections={known.collections} />
           </div>
           {brings.length > 0 && (
             <p className="text-[12.5px] text-bark">Elle ira aussi dans {brings.join(', ')}.</p>
@@ -301,5 +230,101 @@ function FollowSheet({ app, onClose }: { app?: string | undefined; onClose: () =
         </div>
       )}
     </Sheet>
+  );
+}
+
+/**
+ * A collection's fields, in her words (« Suivre quelque chose », and a kind's own fields): each a
+ * name and one of the 15 simple types, a choice's options, a link's collection. `keepNames` keeps
+ * the stored name of a field renamed, so its values stay with it.
+ */
+export function FieldsEditor({
+  fields,
+  setFields,
+  collections,
+  keepNames = false,
+}: {
+  fields: Field[];
+  setFields: (fields: Field[]) => void;
+  collections: { kind: string; label: string }[];
+  keepNames?: boolean;
+}) {
+  const change = (at: number, next: Partial<Field>) =>
+    setFields(fields.map((one, i) => (i === at ? { ...one, ...next } : one)));
+  return (
+    <>
+      {fields.map((field, at) => (
+        <div
+          key={at}
+          className="grid gap-2 rounded-[10px] border border-rule bg-paper p-2.5 sm:grid-cols-[minmax(0,1fr)_minmax(0,190px)_auto]"
+        >
+          <input
+            className={inputClass}
+            value={field.label}
+            aria-label="Nom du champ"
+            onChange={(e) =>
+              change(
+                at,
+                keepNames ? { label: e.target.value } : { label: e.target.value, name: '' },
+              )
+            }
+          />
+          <Select
+            label="Genre du champ"
+            value={field.type}
+            onChange={(type) => change(at, { type })}
+            options={(Object.keys(TYPE_WORDS) as FieldType[]).map((one) => ({
+              value: one,
+              label: TYPE_WORDS[one],
+            }))}
+          />
+          <button
+            onClick={() => setFields(fields.filter((_, i) => i !== at))}
+            aria-label={`Retirer ${field.label}`}
+            className="grid h-9 w-9 cursor-pointer place-items-center rounded-[6px] text-bark hover:bg-sand"
+          >
+            <X size={15} />
+          </button>
+          {(field.type === 'choice' || field.type === 'multi_choice') && (
+            <input
+              className={cn(inputClass, 'sm:col-span-3')}
+              value={(field.options ?? []).join(', ')}
+              placeholder="Ses choix, séparés par des virgules"
+              onChange={(e) =>
+                change(at, {
+                  options: e.target.value
+                    .split(',')
+                    .map((one) => one.trim())
+                    .filter(Boolean),
+                })
+              }
+            />
+          )}
+          {field.type === 'link' && (
+            <div className="sm:col-span-3">
+              <Select
+                label="Vers quelle collection"
+                value={field.target ?? ''}
+                placeholder="Vers quelle collection ?"
+                onChange={(target) => change(at, { target })}
+                options={collections.map((one) => ({
+                  value: one.kind,
+                  label: one.label,
+                }))}
+              />
+            </div>
+          )}
+        </div>
+      ))}
+      <button
+        onClick={() =>
+          setFields([...fields, { name: '', label: `Champ ${fields.length + 1}`, type: 'text' }])
+        }
+        className="inline-flex w-fit cursor-pointer items-center gap-1.5 text-[13px] font-semibold text-primary hover:underline"
+      >
+        <Plus size={14} />
+        Ajouter un champ
+      </button>
+    </>
   );
 }

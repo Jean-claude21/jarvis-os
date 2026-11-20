@@ -130,6 +130,53 @@ export async function createCollection(
   return { id: saved.entries[0]!.id, kind, app };
 }
 
+/**
+ * A collection's fields changed on screen (v3 D4, the types' editor): renamed in her words, given
+ * another simple type, options changed, added, or taken off the model. A field that stays keeps its
+ * name, so her entries keep their values; one taken off the model leaves its values on the entries
+ * (nothing is erased). Its other settings (formulas, workflow, facets…) are kept as they are.
+ */
+export async function changeCollection(
+  tx: Tx,
+  actor: Actor,
+  spaceId: string,
+  kind: string,
+  input: { fields: DraftField[] },
+): Promise<{ kind: string; fields: number }> {
+  const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  const model = (await modelsOf(tx, spaceId)).find((one) => fold(one.kind) === fold(kind));
+  if (!model) throw new Error(`No collection « ${kind} » here.`);
+  const before = new Map(model.fields.map((field) => [field.name, field]));
+  const seen = new Set<string>();
+  const fields = input.fields.map((one) => {
+    const name = one.name && before.has(one.name) ? one.name : fieldSlug(one.name || one.label);
+    if (seen.has(name)) throw new Error(`Two fields are named « ${one.label} ».`);
+    seen.add(name);
+    if ((one.type === 'choice' || one.type === 'multi_choice') && !one.options?.length)
+      throw new Error(`« ${one.label} » is a choice: give its options.`);
+    if (one.type === 'link' && !one.target)
+      throw new Error(`« ${one.label} » is a link: say to which collection.`);
+    const was = before.get(name);
+    return {
+      ...(was ?? {}),
+      name,
+      type: one.type,
+      label: { ...(was?.label ?? {}), fr: one.label.trim() || name },
+      ...(one.options?.length ? { options: one.options.map((o) => o.trim()).filter(Boolean) } : {}),
+      ...(one.type === 'link' ? { target: one.target } : {}),
+    };
+  });
+  // Fields of a type the screen does not edit (formulas, lines, buttons…) stay on the model.
+  const simple = new Set<string>(SIMPLE_TYPES);
+  const kept = model.fields.filter((field) => !simple.has(field.type) && !seen.has(field.name));
+  const { id: _id, kind: _kind, ...rest } = model;
+  void _id;
+  void _kind;
+  const data = modelDataSchema.parse({ ...rest, fields: [...fields, ...kept] });
+  await save(tx, actor, spaceId, { entries: [{ id: model.id, data: { fields: data.fields } }] });
+  return { kind: model.kind, fields: data.fields.length };
+}
+
 /** A collection moved to another app (or given one): its model says where it lives. */
 export async function placeCollection(
   tx: Tx,

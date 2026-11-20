@@ -8,13 +8,14 @@ import {
   LayoutGrid,
   Compass,
   Link2,
+  ListTree,
   Pencil,
   Plus,
   Trash2,
   type LucideIcon,
 } from 'lucide-react';
 import { PeriodBar } from './PageCompose';
-import { openFollow } from './Follow';
+import { FieldsEditor, openFollow, type Field as EditableField } from './Follow';
 import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { api } from '../lib/api';
 
@@ -771,6 +772,7 @@ function KindName({ kind }: { kind: Kind }) {
         <Pencil size={13} />
         Renommer
       </Button>
+      <KindFields kind={kind} />
       <ShareKind kind={kind} />
     </div>
   ) : (
@@ -797,6 +799,107 @@ function KindName({ kind }: { kind: Kind }) {
     </form>
   );
 }
+
+/**
+ * A kind's fields changed on screen (v3 D4, the types' editor): renamed in her words, another
+ * simple type, options, added or taken off the model. Her entries keep their values.
+ */
+function KindFields({ kind }: { kind: Kind }) {
+  const client = useQueryClient();
+  const { data: kinds = [] } = useKinds();
+  const [fields, setFields] = useState<EditableField[] | null>(null);
+  const start = () =>
+    setFields(
+      (kind.model?.fields ?? [])
+        .filter((field) => SIMPLE.has(field.type))
+        .map((field) => ({
+          name: field.name,
+          label: (field as { label?: { fr?: string } }).label?.fr ?? field.name.replace(/_/g, ' '),
+          type: field.type as EditableField['type'],
+          ...((field as { options?: string[] }).options
+            ? { options: (field as { options?: string[] }).options }
+            : {}),
+          ...((field as { target?: string }).target
+            ? { target: (field as { target?: string }).target }
+            : {}),
+        })),
+    );
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/collections/${encodeURIComponent(kind.kind)}/fields`, {
+        method: 'PUT',
+        body: { fields },
+      }),
+    onSuccess: () => {
+      toast('Champs gardés — annulable dans l’Activité.');
+      setFields(null);
+    },
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['kinds'] });
+      void client.invalidateQueries({ queryKey: ['entries'] });
+    },
+  });
+  if (!kind.model) return null;
+  return (
+    <>
+      <Button size="sm" tone="quiet" onClick={start}>
+        <ListTree size={13} />
+        Ses champs
+      </Button>
+      <Sheet
+        open={fields !== null}
+        onOpenChange={(open) => !open && setFields(null)}
+        title={`Les champs de « ${nameOf(kind)} »`}
+        wide
+      >
+        {fields && (
+          <div className="flex flex-col gap-3 p-4">
+            <p className="text-[13px] text-bark">
+              Un champ retiré l’est du modèle seulement : les valeurs déjà notées restent sur tes
+              entrées.
+            </p>
+            <FieldsEditor
+              fields={fields}
+              setFields={setFields}
+              keepNames
+              collections={kinds
+                .filter((one) => one.model)
+                .map((one) => ({ kind: one.kind, label: nameOf(one) }))}
+            />
+            <span className="flex gap-2">
+              <Button
+                tone="solid"
+                disabled={!fields.length || save.isPending}
+                onClick={() => save.mutate()}
+              >
+                Garder
+              </Button>
+              <Button onClick={() => setFields(null)}>Annuler</Button>
+            </span>
+          </div>
+        )}
+      </Sheet>
+    </>
+  );
+}
+const SIMPLE = new Set([
+  'text',
+  'long_text',
+  'date',
+  'datetime',
+  'number',
+  'amount',
+  'choice',
+  'multi_choice',
+  'boolean',
+  'rating',
+  'duration',
+  'link',
+  'file',
+  'location',
+  'url',
+]);
 
 interface ShareRow {
   id: string;

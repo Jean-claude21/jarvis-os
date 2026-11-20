@@ -509,6 +509,7 @@ export {
   draftCollection,
   fieldSlug,
   placeCollection,
+  changeCollection,
   SIMPLE_TYPES,
   type CollectionDraft,
   type DraftField,

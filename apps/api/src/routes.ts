@@ -47,6 +47,7 @@ import {
   createCollection,
   draftCollection,
   placeCollection,
+  changeCollection,
   SIMPLE_TYPES,
 } from '@jarvis-os/core';
 import {
@@ -840,6 +841,20 @@ export function apiRoutes(deps: {
     return c.json(
       await act(c, (tx, actor, space) =>
         placeCollection(tx, actor, space, decodeURIComponent(c.req.param('kind')), app),
+      ),
+    );
+  });
+
+  // A collection's fields changed on screen (v3 D4): what stays keeps its values.
+  api.put('/collections/:kind/fields', async (c) => {
+    const { fields } = z
+      .object({ fields: z.array(draftField).min(1).max(40) })
+      .parse(await c.req.json());
+    return c.json(
+      await act(c, (tx, actor, space) =>
+        changeCollection(tx, actor, space, decodeURIComponent(c.req.param('kind')), {
+          fields,
+        }),
       ),
     );
   });

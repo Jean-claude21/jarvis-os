@@ -978,6 +978,87 @@ interface PersonalKey {
   lastUsedAt: string | null;
 }
 
+/**
+ * The spaces an assistant reaches (spec 004): chosen at consent, changed here. At least one; what
+ * it does not reach, it neither reads nor writes.
+ */
+function ClientSpaces({
+  clientId,
+  name,
+  onDone,
+}: {
+  clientId: string;
+  name: string;
+  onDone: () => void;
+}) {
+  const { me } = useSession();
+  const client = useQueryClient();
+  const reached = useQuery({
+    queryKey: ['assistants', clientId, 'spaces'],
+    queryFn: () => api<Space[]>(`/clients/${encodeURIComponent(clientId)}/spaces`),
+  });
+  const [picked, setPicked] = useState<string[] | null>(null);
+  const chosen = picked ?? (reached.data ?? []).map((one) => one.id);
+  const save = useMutation({
+    mutationFn: () =>
+      api(`/clients/${encodeURIComponent(clientId)}/spaces`, {
+        method: 'PUT',
+        body: { spaces: chosen },
+      }),
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSuccess: () => {
+      toast(`${name} atteint maintenant ${chosen.length} espace(s).`);
+      onDone();
+    },
+    onSettled: () =>
+      void client.invalidateQueries({ queryKey: ['assistants', clientId, 'spaces'] }),
+  });
+  if (reached.isLoading) return <Skeleton className="h-16 w-full" />;
+  return (
+    <form
+      className="grid w-full gap-2 border-t border-rule pt-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (chosen.length) save.mutate();
+      }}
+    >
+      <span className="text-[12.5px] text-bark">
+        Ce que {name} peut lire et écrire. Ce qu’il n’atteint pas lui reste fermé.
+      </span>
+      <span className="flex flex-wrap gap-x-4 gap-y-1.5">
+        {me.spaces.map((space) => (
+          <label key={space.id} className="flex items-center gap-1.5 text-[13.5px]">
+            <input
+              type="checkbox"
+              aria-label={space.name}
+              checked={chosen.includes(space.id)}
+              onChange={(event) =>
+                setPicked(
+                  event.target.checked
+                    ? [...chosen, space.id]
+                    : chosen.filter((one) => one !== space.id),
+                )
+              }
+            />
+            {space.personal ? `${space.name} (ton espace à toi)` : space.name}
+          </label>
+        ))}
+      </span>
+      {!chosen.length && (
+        <span className="text-[12.5px] text-error">Choisis au moins un espace.</span>
+      )}
+      <span className="flex gap-2">
+        <Button size="sm" tone="solid" disabled={!chosen.length || save.isPending}>
+          Garder
+        </Button>
+        <Button size="sm" type="button" onClick={onDone}>
+          Annuler
+        </Button>
+      </span>
+    </form>
+  );
+}
+
 function Assistants() {
   const { me } = useSession();
   const client = useQueryClient();
@@ -991,6 +1072,7 @@ function Assistants() {
   });
   const [name, setName] = useState('');
   const [made, setMade] = useState<string | null>(null);
+  const [choosing, setChoosing] = useState<string | null>(null);
   const cutAccess = useMutation({
     mutationFn: (id: string) => api(`/connections/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     onSettled: () => void client.invalidateQueries({ queryKey: ['assistants'] }),
@@ -1019,7 +1101,7 @@ function Assistants() {
           />
         ) : (
           (access.data ?? []).map((one) => (
-            <div key={one.clientId} className={rowClass}>
+            <div key={one.clientId} className={rowClass + ' flex-wrap'}>
               <Avatar name={one.name ?? 'Assistant'} size={30} tinted />
               <span className="min-w-0 flex-1">
                 <b className="block truncate font-semibold">{one.name ?? 'Assistant'}</b>
@@ -1030,6 +1112,13 @@ function Assistants() {
               </span>
               <Button
                 size="sm"
+                aria-expanded={choosing === one.clientId}
+                onClick={() => setChoosing(choosing === one.clientId ? null : one.clientId)}
+              >
+                Ses espaces
+              </Button>
+              <Button
+                size="sm"
                 disabled={cutAccess.isPending}
                 onClick={() => {
                   if (confirm(`Retirer l’accès de « ${one.name ?? 'cet assistant'} » ?`))
@@ -1038,6 +1127,13 @@ function Assistants() {
               >
                 Retirer l’accès
               </Button>
+              {choosing === one.clientId && (
+                <ClientSpaces
+                  clientId={one.clientId}
+                  name={one.name ?? 'Cet assistant'}
+                  onDone={() => setChoosing(null)}
+                />
+              )}
             </div>
           ))
         )}

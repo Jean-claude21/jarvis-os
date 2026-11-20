@@ -187,8 +187,13 @@ export function signInPage(lang: Lang, words: Words, client: string | null): str
     lang,
     words.signInTitle,
     `<h1>${escape(words.signInTitle)}</h1><p>${escape(lead)}</p>${accountForm(words)}`,
-    `${follow(words)}
-     const query = location.search.slice(1);
+    `${follow(words, 'location.href = back;')}
+     // Where she was going (« suite »), on this site only; the rest of the query is OAuth's.
+     const params = new URLSearchParams(location.search);
+     const asked = params.get('suite');
+     params.delete('suite');
+     const back = asked && asked.startsWith('/') && !asked.startsWith('//') && !asked.includes('\\\\') ? asked : '/';
+     const query = params.toString();
      ${accountScript(words, 'oauth_query: query')}`,
   );
 }

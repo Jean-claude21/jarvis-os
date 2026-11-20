@@ -57,6 +57,8 @@ chaque écran et chaque geste dans un vrai navigateur, aux trois largeurs (`apps
 
 - [ ] Mot de passe oublié : le mail arrive, le lien marche une fois, l'ancien ne marche plus.
 - [ ] Inviter quelqu'un dans un espace : il reçoit le mail ; quand il rejoint, tu reçois un mail.
+- [ ] Le bouton d'un mail, ouvert sans être connecté : après la connexion, tu arrives sur la page
+      du lien (pas sur Aujourd'hui).
 - [ ] « Ce qu'il voit » : ouvrir un seul type à un membre — il ne voit que lui (et ses notes).
 - [ ] Un assistant relié : « Ses espaces » change ce qu'il atteint.
 - [ ] Un serveur d'outils se relie depuis le catalogue.

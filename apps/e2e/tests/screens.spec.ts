@@ -1,4 +1,4 @@
-import { expect, fitsTheWidth, test } from './fixtures';
+import { expect, fitsTheWidth, signUp, test } from './fixtures';
 
 // Every screen of the v3 opens for a new account, says what it is, throws no error and fits the
 // screen, at the three widths.
@@ -30,6 +30,18 @@ for (const screen of SCREENS) {
     await fitsTheWidth(page);
   });
 }
+
+test('a link opened signed out leads there once signed in', async ({ page }) => {
+  const account = await signUp(page);
+  await page.context().clearCookies();
+  await page.goto('/v3/reglages?t=espaces');
+  await expect(page).toHaveURL(/\/connexion\?suite=/);
+  await page.getByLabel('Adresse e-mail').fill(account.email);
+  await page.getByLabel('Mot de passe').fill(account.password);
+  await page.getByRole('button', { name: 'Se connecter' }).click();
+  await expect(page).toHaveURL(/\/v3\/reglages\?t=espaces$/);
+  await expect(page.getByRole('heading', { level: 1 }).first()).toHaveText(/Réglages/);
+});
 
 test('the sign-in page offers a forgotten password', async ({ page }) => {
   await page.goto('/connexion');

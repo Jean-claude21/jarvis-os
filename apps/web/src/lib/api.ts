@@ -67,7 +67,7 @@ export async function api<T>(
     ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
   });
   if (response.status === 401) {
-    location.href = '/connexion';
+    location.href = `/connexion?suite=${encodeURIComponent(location.pathname + location.search)}`;
     throw new ApiError(401, 'Signed out');
   }
   const text = await response.text();

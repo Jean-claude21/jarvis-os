@@ -273,7 +273,11 @@ export function makeApp(settings: Settings, deps: { mailer?: Mailer | null } = {
     return c.body(readFileSync(`${web}assets/${file}`));
   });
   const v3 = async (c: Context) => {
-    if (!(await sessionOf(c.req.raw))) return c.redirect(SIGN_IN_PAGE);
+    // Signed out, she comes back where the link led (a mail's button, a bookmark), once signed in.
+    if (!(await sessionOf(c.req.raw))) {
+      const url = new URL(c.req.url);
+      return c.redirect(`${SIGN_IN_PAGE}?suite=${encodeURIComponent(url.pathname + url.search)}`);
+    }
     if (!existsSync(`${web}index.html`)) return c.text('The v3 client is not built here.', 503);
     c.header('cache-control', 'no-store');
     return c.html(readFileSync(`${web}index.html`, 'utf8'));

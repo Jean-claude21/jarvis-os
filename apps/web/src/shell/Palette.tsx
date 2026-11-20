@@ -57,6 +57,22 @@ export function Palette({ open, setOpen }: { open: boolean; setOpen: (open: bool
     },
     onError: (error) => toast((error as Error).message, 'error'),
   });
+  // A question with a figure (spec 049): « combien en transport en octobre ? » is answered here,
+  // computed from her entries, with how many it counted.
+  const asks =
+    words.length > 6 && /\?$|^(combien|quel total|total|moyenne|how much)\b/i.test(words);
+  const { data: answer } = useQuery({
+    queryKey: ['answer', words],
+    queryFn: () =>
+      api<{
+        figure: number;
+        currency: string | null;
+        count: number;
+        question: { period: string; mode: 'sum' | 'count' };
+      }>(`/answer?q=${encodeURIComponent(words)}`),
+    enabled: open && asks,
+    retry: false,
+  });
   const go = (to: string) => {
     setOpen(false);
     setText('');
@@ -82,6 +98,28 @@ export function Palette({ open, setOpen }: { open: boolean; setOpen: (open: bool
               <Command.Empty className="px-3 py-6 text-center text-sm text-bark">
                 Rien trouvé.
               </Command.Empty>
+              {answer && answer.count > 0 && (
+                <Command.Group
+                  heading="Réponse"
+                  className="[&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:font-mono [&_[cmdk-group-heading]]:text-[10.5px] [&_[cmdk-group-heading]]:text-faint [&_[cmdk-group-heading]]:uppercase"
+                >
+                  <Command.Item
+                    value="answer"
+                    onSelect={() => setOpen(false)}
+                    className="flex cursor-pointer items-baseline gap-2.5 rounded-lg px-2.5 py-2 text-sm data-[selected=true]:bg-sand"
+                  >
+                    <b className="font-display text-[18px]">
+                      {answer.figure.toLocaleString('fr')}
+                      {answer.question.mode === 'sum' && answer.currency
+                        ? ` ${answer.currency}`
+                        : ''}
+                    </b>
+                    <span className="min-w-0 flex-1 truncate text-bark">
+                      {answer.count} entrée(s) · {answer.question.period}
+                    </span>
+                  </Command.Item>
+                </Command.Group>
+              )}
               {words.length > 0 && (
                 <Command.Group
                   heading="Noter"

@@ -102,6 +102,21 @@ export function QueuePanel({ only }: { only?: (one: ToSort) => boolean } = {}) {
           }),
     onSettled: done,
   });
+  // The kinds that are one, merged at once (spec 032): each merge undone on its own in the journal.
+  const mergeAll = useMutation({
+    mutationFn: async () => {
+      let done = 0;
+      for (const space of [
+        ...new Set(data.filter((x) => x.type === 'merge').map((x) => x.spaceId)),
+      ])
+        done += (await api<{ merged: string[] }>('/kinds/merges/all', { method: 'POST', space }))
+          .merged.length;
+      return done;
+    },
+    onSuccess: (done) => toast(`${done} fusion(s) faite(s), chacune annulable dans l’Activité.`),
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSettled: done,
+  });
   const sure = useMutation({
     mutationFn: () => api('/inbox/sure', { method: 'POST' }),
     onSettled: done,
@@ -120,7 +135,13 @@ export function QueuePanel({ only }: { only?: (one: ToSort) => boolean } = {}) {
   if (!data.length) return null;
   const proposals = data.filter((x) => x.type === 'proposal' || x.type === 'proposed').length;
   const captures = data.filter((x) => x.type === 'capture').length;
-  const busy = decide.isPending || aside.isPending || merge.isPending || yesAll.isPending;
+  const merges = data.filter((x) => x.type === 'merge').length;
+  const busy =
+    decide.isPending ||
+    aside.isPending ||
+    merge.isPending ||
+    yesAll.isPending ||
+    mergeAll.isPending;
 
   const what = (one: ToSort): string => {
     const d = one.detail;
@@ -166,6 +187,11 @@ export function QueuePanel({ only }: { only?: (one: ToSort) => boolean } = {}) {
           {captures > 0 && (
             <Button size="sm" disabled={busy} onClick={() => sure.mutate()}>
               Ranger ce qui est sûr
+            </Button>
+          )}
+          {merges > 1 && (
+            <Button size="sm" disabled={busy} onClick={() => mergeAll.mutate()}>
+              Tout fusionner ({merges})
             </Button>
           )}
           {proposals > 1 && (

@@ -1,6 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Target } from 'lucide-react';
+import { CalendarPlus, Target } from 'lucide-react';
 import { api } from '../lib/api';
 import { useKinds, useKindName } from '../lib/kinds';
 import { GaugeBar } from '../blocks/charts';
@@ -8,7 +9,8 @@ import { useAgendaRows, useFiles, useKindRows, useTaskRows } from '../engine/sou
 import { addDays, mondayOf, monthOf, timelineRange } from '../engine/renders/time';
 import { useViewState, View } from '../engine/View';
 import { weekStart } from '../engine/renders/CalendarRender';
-import { PageHead, Panel, Segmented, Stat, Stats } from '../ui';
+import { Button, PageHead, Panel, Segmented, Sheet, Stat, Stats, inputClass } from '../ui';
+import { toast } from '../ui/more';
 import { DrivePanel } from './FileParts';
 import { GENRE_WORDS } from '../lib/words';
 
@@ -35,6 +37,58 @@ function useKindsDatedApart() {
       return one.count > 0 && !!dated?.start && !TIME_FIELDS.includes(dated.start);
     })
     .map((one) => one.kind);
+}
+
+/**
+ * Her agenda in her phone's calendar (spec 011): a private address to subscribe to. Asking again
+ * makes a new one and closes the old.
+ */
+function SubscribeAgenda() {
+  const [open, setOpen] = useState(false);
+  const address = useMutation({
+    mutationFn: () => api<{ url: string; webcal: string }>('/agenda/address', { method: 'POST' }),
+    onError: (error) => toast((error as Error).message, 'error'),
+  });
+  return (
+    <>
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <CalendarPlus size={14} />
+        Dans mon téléphone
+      </Button>
+      <Sheet open={open} onOpenChange={setOpen} title="Ton agenda dans ton téléphone">
+        <div className="flex flex-col gap-3 p-4 text-[13.5px]">
+          <p className="text-bark">
+            Une adresse privée à ajouter comme abonnement dans le calendrier de ton téléphone
+            (iPhone : Réglages › Calendrier › Comptes › Ajouter un calendrier avec abonnement ;
+            Google Agenda : Autres agendas › À partir de l’URL). Il se met à jour tout seul.
+          </p>
+          {address.data ? (
+            <>
+              <a href={address.data.webcal} className="font-semibold text-primary hover:underline">
+                L’ouvrir dans mon calendrier
+              </a>
+              <input
+                readOnly
+                aria-label="Adresse de l’agenda"
+                className={inputClass}
+                value={address.data.url}
+                onFocus={(event) => event.target.select()}
+              />
+              <p className="text-xs text-faint">
+                Garde-la pour toi : qui l’a voit ton agenda. En demander une autre ferme celle-ci.
+              </p>
+            </>
+          ) : (
+            <span>
+              <Button tone="solid" disabled={address.isPending} onClick={() => address.mutate()}>
+                Créer mon adresse
+              </Button>
+            </span>
+          )}
+        </div>
+      </Sheet>
+    </>
+  );
 }
 
 export function AgendaPage() {
@@ -77,6 +131,7 @@ export function AgendaPage() {
       <PageHead
         title="Agenda"
         lead="Tout ce qui est daté dans ta vie, toutes apps confondues — les répétitions comprises."
+        actions={<SubscribeAgenda />}
       />
       <View source={source} renders={['calendar', 'timeline', 'list']} />
     </>

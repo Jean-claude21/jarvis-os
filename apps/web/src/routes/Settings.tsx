@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import {
   Bot,
   CalendarSync,
+  Archive,
   Download,
   KeyRound,
   Link2,
@@ -101,6 +102,108 @@ const ZONES = [
   'America/New_York',
   'UTC',
 ];
+
+interface Sent {
+  id: number;
+  channel: string;
+  kind: string;
+  subject: string;
+  state: 'queued' | 'sent' | 'failed' | 'acted';
+  createdAt: string;
+  lastError: string | null;
+}
+const SENT_STATE: Record<Sent['state'], { label: string; tone: 'ok' | 'late' | 'error' | 'info' }> =
+  {
+    queued: { label: 'en attente', tone: 'late' },
+    sent: { label: 'envoyé', tone: 'ok' },
+    acted: { label: 'suivi', tone: 'info' },
+    failed: { label: 'échec', tone: 'error' },
+  };
+
+/** What Jarvis sent her these seven days (spec 020): each message, its channel, how it went. */
+function SentPanel() {
+  const sent = useQuery({ queryKey: ['outbox'], queryFn: () => api<Sent[]>('/outbox?days=7') });
+  return (
+    <Panel title="Ce que Jarvis t’a envoyé · 7 jours" icon={<Send size={16} />}>
+      {!(sent.data ?? []).length ? (
+        <p className="px-4 py-3 text-[13px] text-bark">Rien envoyé ces 7 jours.</p>
+      ) : (
+        <div className="max-h-72 overflow-y-auto">
+          {(sent.data ?? []).map((one) => (
+            <div key={one.id} className={rowClass}>
+              <span className="min-w-0 flex-1">
+                <b className="block truncate font-semibold">{one.subject || one.kind}</b>
+                <span className="block truncate text-[12.5px] text-bark">
+                  {one.channel === 'email' ? 'e-mail' : one.channel} · {ago(one.createdAt)}
+                  {one.lastError ? ` · ${one.lastError}` : ''}
+                </span>
+              </span>
+              <Tag tone={SENT_STATE[one.state].tone}>{SENT_STATE[one.state].label}</Tag>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+interface Backup {
+  day: string;
+  size: number;
+  files: number;
+}
+
+/** The nightly backups of the space she is in (spec 022): each day, its size, a link to fetch it. */
+function BackupsPanel() {
+  const { space } = useSession();
+  const backups = useQuery({
+    queryKey: ['backups', space.id],
+    queryFn: () => api<Backup[]>('/backups'),
+  });
+  const fetchOne = useMutation({
+    mutationFn: (day: string) => api<{ url: string }>(`/backups/${day}/link`),
+    onSuccess: (link) => window.open(link.url, '_blank', 'noopener'),
+    onError: (error) => toast((error as Error).message, 'error'),
+  });
+  const size = (bytes: number) =>
+    bytes > 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} Mo` : `${Math.ceil(bytes / 1000)} ko`;
+  return (
+    <Panel title={`Sauvegardes de « ${space.name} »`} icon={<Archive size={16} />}>
+      {!(backups.data ?? []).length ? (
+        <p className="px-4 py-3 text-[13px] text-bark">
+          Pas encore de sauvegarde : elle se fait chaque nuit, et se garde quelques semaines.
+        </p>
+      ) : (
+        <div className="max-h-60 overflow-y-auto">
+          {(backups.data ?? []).map((one) => (
+            <div key={one.day} className={rowClass}>
+              <span className="min-w-0 flex-1">
+                <b className="block font-semibold">
+                  {new Date(`${one.day}T12:00:00`).toLocaleDateString('fr', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                  })}
+                </b>
+                <span className="block text-[12.5px] text-bark">
+                  {size(one.size)} · {one.files} fichier(s)
+                </span>
+              </span>
+              <Button
+                size="sm"
+                disabled={fetchOne.isPending}
+                onClick={() => fetchOne.mutate(one.day)}
+              >
+                <Download size={14} />
+                Télécharger
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </Panel>
+  );
+}
 
 /**
  * Her morning brief (spec 018, v3): the hour it comes, or none; read it now; have it sent now.
@@ -260,6 +363,8 @@ function Account() {
           </div>
         </Panel>
         <BriefPanel />
+        <SentPanel />
+        <BackupsPanel />
         <Panel title="Tes données" icon={<Download size={16} />}>
           <div className="flex flex-col gap-2 px-4 py-3 text-[13px]">
             <p className="text-bark">

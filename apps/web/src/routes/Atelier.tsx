@@ -237,6 +237,19 @@ function SkillsList() {
   });
   const [open, setOpen] = useState<Skill | null>(null);
   const kindName = useKindName();
+  const client = useQueryClient();
+  // A skill kept as text, proposed in its five parts (trigger, preparation, instructions,
+  // references, result): it waits for her yes in « À valider ».
+  const structure = useMutation({
+    mutationFn: (one: MineSkill) =>
+      api(`/routines/${encodeURIComponent(one.id)}/structure`, {
+        method: 'POST',
+        space: one.spaceId,
+      }),
+    onSuccess: () => toast('Proposé en cinq morceaux : il t’attend dans « À valider ».'),
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSettled: () => void client.invalidateQueries({ queryKey: ['now'] }),
+  });
   if (isLoading) return <Skeleton className="h-40" />;
   const skills = data?.jarvis ?? [];
   return (
@@ -299,6 +312,15 @@ function SkillsList() {
                 </span>
                 <span className="line-clamp-2 text-[12.5px] text-bark">{one.excerpt}</span>
               </span>
+              {!one.structured && (
+                <Button
+                  size="sm"
+                  disabled={structure.isPending}
+                  onClick={() => structure.mutate(one)}
+                >
+                  Structurer
+                </Button>
+              )}
             </div>
           ))
         )}
@@ -664,6 +686,9 @@ interface RuleEntry {
 interface MineSkill {
   id: string;
   title: string;
+  spaceId: string;
+  /** In its five parts (spec 047); else a text, which can be proposed in them. */
+  structured: boolean;
   when: string;
   /** What starts it, in the node's one vocabulary (F6b); none: when she asks for it. */
   triggers: Record<string, unknown>[];

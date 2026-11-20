@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { fieldWord } from '../engine/format';
 import { peek } from '../engine/peek';
 import { api } from '../lib/api';
-import { useKindName } from '../lib/kinds';
+import { useKindName, useKinds } from '../lib/kinds';
 import { Button, Empty, PageHead, Panel, Tag, inputClass, rowClass, type TagTone } from '../ui';
 import { toast } from '../ui/more';
 
@@ -337,6 +337,14 @@ function ProposalEditor({ one, onDone }: { one: ToSort; onDone: () => void }) {
       }),
   });
   const entries = full?.data.entries ?? [];
+  // A field in her words: her model's label, else the common word (« amount » → « Montant »).
+  const { data: kinds = [] } = useKinds();
+  const labelOf = (kind: string, field: string) => {
+    const own = (kinds.find((one) => one.kind === kind)?.model?.fields ?? []).find(
+      (one) => one.name === field,
+    ) as { label?: { fr?: string } } | undefined;
+    return own?.label?.fr ?? fieldWord(field);
+  };
   // Her changes, by entry: a title, and values as she typed them.
   const [titles, setTitles] = useState<Record<number, string>>({});
   const [values, setValues] = useState<Record<number, Record<string, string>>>({});
@@ -404,7 +412,7 @@ function ProposalEditor({ one, onDone }: { one: ToSort; onDone: () => void }) {
           <div className="grid gap-2 sm:grid-cols-2">
             {Object.entries(entry.data ?? {}).map(([field, value]) => (
               <label key={field} className="grid min-w-0 gap-1 text-[12.5px] text-bark">
-                {fieldWord(field)}
+                {labelOf(entry.kind, field)}
                 <input
                   className={inputClass}
                   defaultValue={shown(value)}

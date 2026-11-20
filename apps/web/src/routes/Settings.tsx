@@ -806,6 +806,7 @@ function SpaceDetail({ space, refresh }: { space: SpaceFull; refresh: () => void
                         <label key={kind.kind} className="flex items-center gap-1.5 text-[13.5px]">
                           <input
                             type="checkbox"
+                            aria-label={kindName(kind.kind)}
                             checked={choosing.kinds.includes(kind.kind)}
                             onChange={(event) =>
                               setChoosing({

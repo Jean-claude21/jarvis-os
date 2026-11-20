@@ -89,7 +89,14 @@ export async function readTelegramLinks(
   db: pg.Pool,
   token: string,
   linked: string,
-  replies: { kept: string; filed: string; unheard?: string; unkept?: string } = {
+  replies: {
+    kept: string;
+    filed: string;
+    unheard?: string;
+    unkept?: string;
+    phraseRule?: string;
+    phraseSkill?: string;
+  } = {
     kept: 'OK',
     filed: 'OK',
   },
@@ -186,7 +193,18 @@ export async function readTelegramLinks(
           at: new Date((update.message?.date ?? Date.now() / 1000) * 1000).toISOString(),
         }),
       );
-      await reply(token, chat, done.filed ? replies.filed : replies.kept);
+      // A phrase says what it started (F6b): the agent that runs it, or the skill to ask for.
+      const started = done.phrase
+        ? done.phrase.kind === 'rule'
+          ? (replies.phraseRule ?? replies.filed)
+              .replace('{phrase}', done.phrase.phrase)
+              .replace('{agent}', done.phrase.agent ?? '')
+              .replace('{title}', done.phrase.title)
+          : (replies.phraseSkill ?? replies.kept)
+              .replace('{phrase}', done.phrase.phrase)
+              .replace('{title}', done.phrase.title)
+        : null;
+      await reply(token, chat, started ?? (done.filed ? replies.filed : replies.kept));
       count += 1;
       continue;
     }

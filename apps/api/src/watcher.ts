@@ -189,6 +189,8 @@ export async function watcherPass(
         {
           kept: wordsOf('fr').captureKept,
           filed: wordsOf('fr').captureFiled,
+          phraseRule: wordsOf('fr').phraseRule,
+          phraseSkill: wordsOf('fr').phraseSkill,
           unheard: wordsOf('fr').voiceUnheard,
           unkept: wordsOf('fr').fileUnkept,
         },

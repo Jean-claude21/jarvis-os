@@ -553,6 +553,26 @@ export async function removeApp(
       await archive(tx, actor, { spaceId, id: row.id });
       report.removed.push(`${row.kind} « ${row.title} »`);
     }
+    // Its agents too (v3 F7): an agent no automation left names, made by no other app, goes with
+    // it — one an other app still uses (the Veilleur d'échéances) stays.
+    const { rows: idle } = await tx.query<{ id: string; title: string }>(
+      `select a.id, a.title from entry a
+        where a.space_id = $1 and a.archived_at is null and jarvis_fold(a.kind) = 'agent'
+          and not (a.data ? 'builtin')
+          and (jarvis_fold(coalesce(a.data->>'app', '')) = jarvis_fold($2)
+               or exists (select 1 from entry r where r.space_id = $1 and jarvis_fold(r.kind) = 'rule'
+                            and r.archived_at is not null
+                            and jarvis_fold(coalesce(r.data->>'app', '')) = jarvis_fold($2)
+                            and jarvis_fold(coalesce(r.data->>'agent', '')) = jarvis_fold(a.title)))
+          and not exists (select 1 from entry r where r.space_id = $1 and r.archived_at is null
+                            and jarvis_fold(r.kind) = 'rule'
+                            and jarvis_fold(coalesce(r.data->>'agent', '')) = jarvis_fold(a.title))`,
+      [spaceId, app],
+    );
+    for (const agent of idle) {
+      await archive(tx, actor, { spaceId, id: agent.id });
+      report.removed.push(`${AGENT_KIND} « ${agent.title} »`);
+    }
     const { rows: lines } = await tx.query<{ id: string }>(
       'select id::text as id from journal where id > $1::bigint and space_id = $2 order by id',
       [before[0]?.id ?? '0', spaceId],

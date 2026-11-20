@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   acceptInvitation,
+  comment,
+  commentsOf,
   examplesOf,
   createSharedSpace,
   find,
@@ -103,11 +105,30 @@ describe('what a member sees, by kind', () => {
       ),
     ).rejects.toThrow();
 
+    // The notes on what she sees are hers to read and to write; those on the rent stay hidden.
+    await ama.as((tx) => comment(tx, ama.actor, home.id, riz, 'Le moins cher au marché.'));
+    await ama.as((tx) => comment(tx, ama.actor, home.id, loyer, 'Payé le 5.'));
+    const notes = async (id: string) =>
+      (await kossi.as((tx) => commentsOf(tx, home.id, id))).map((one) => one.title);
+    expect(await notes(riz)).toEqual(['Le moins cher au marché.']);
+    await kossi.as((tx) => comment(tx, kossi.actor, home.id, riz, 'Pris 2 kg.'));
+    expect(await notes(riz)).toEqual(['Le moins cher au marché.', 'Pris 2 kg.']);
+    expect(
+      (await kossi.as((tx) => find(tx, home.id, { kind: 'Comment', limit: 10 }))).map(
+        (one) => one.title,
+      ),
+    ).not.toContain('Payé le 5.');
+
     // Everything open again.
     await ama.as((tx) =>
       setRole(tx, ama.actor, { spaceId: home.id, person: kossi.id, role: 'member', kinds: null }),
     );
-    expect(await kinds()).toEqual(['Courses', 'Courses', 'Model', 'Transaction']);
+    expect((await kinds()).filter((one) => one !== 'Comment')).toEqual([
+      'Courses',
+      'Courses',
+      'Model',
+      'Transaction',
+    ]);
   });
 });
 

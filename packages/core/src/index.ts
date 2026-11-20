@@ -471,6 +471,8 @@ export {
   AGENT_KIND,
   BUILTIN_AGENTS,
   agentClient,
+  agentOfRule,
+  agentsOfRules,
   agentDoing,
   agentNamed,
   agentsOf,

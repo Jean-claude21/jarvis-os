@@ -9,7 +9,6 @@ export const BASE = `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: './tests',
-  globalSetup: './setup.ts',
   fullyParallel: false,
   workers: 1,
   timeout: 60_000,
@@ -30,8 +29,9 @@ export default defineConfig({
   ],
   webServer: {
     // The client built, then the server on the test branch: no watcher, nothing sent outside.
+    // The database migrated first: the server checks the accounts' tables as it starts.
     command:
-      'pnpm --filter @jarvis-os/web build && pnpm --filter @jarvis-os/api exec tsx src/server.ts',
+      'pnpm exec tsx migrate.ts && pnpm --filter @jarvis-os/web build && pnpm --filter @jarvis-os/api exec tsx src/server.ts',
     url: `${BASE}/alive`,
     reuseExistingServer: !process.env.CI,
     timeout: 240_000,

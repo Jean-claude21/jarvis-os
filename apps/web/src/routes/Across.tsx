@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { CalendarPlus, Target } from 'lucide-react';
+import { CalendarPlus, Repeat, Target } from 'lucide-react';
 import { api } from '../lib/api';
 import { useKinds, useKindName } from '../lib/kinds';
 import { GaugeBar } from '../blocks/charts';
@@ -323,6 +323,71 @@ interface Goal {
  * Objectifs (v3 D5, « mesurable »; D6): everything that moves toward a target, every app at once —
  * a goal, a fund's budget, a habit's consistency — each with where it stands, then the entries.
  */
+interface HabitBoard {
+  days: string[];
+  habits: {
+    id: string;
+    title: string;
+    cadence: string;
+    today: 'done' | 'todo' | null;
+    streak: number;
+    rate30: number | null;
+    line: ('done' | 'miss' | 'off' | 'todo')[];
+  }[];
+}
+const DAY_COLOR: Record<HabitBoard['habits'][number]['line'][number], string> = {
+  done: 'bg-success',
+  miss: 'bg-error/60',
+  off: 'bg-rule',
+  todo: 'bg-paper border border-rule-strong',
+};
+
+/** Her habits on 28 days (spec 044): each day done, missed or free, today, the streak. */
+function HabitsBoard() {
+  const board = useQuery({
+    queryKey: ['entries', 'habits-board'],
+    queryFn: () => api<HabitBoard>('/habits/board?days=28'),
+  });
+  const habits = board.data?.habits ?? [];
+  if (!habits.length) return null;
+  return (
+    <Panel title="Tes habitudes · 28 jours" icon={<Repeat size={16} />}>
+      {habits.map((habit) => (
+        <div
+          key={habit.id}
+          className="flex flex-wrap items-center gap-3 border-b border-rule px-4 py-2.5 last:border-0"
+        >
+          <span className="w-44 min-w-0">
+            <Link
+              to="/entree/$id"
+              params={{ id: habit.id }}
+              className="block truncate font-semibold hover:underline"
+            >
+              {habit.title}
+            </Link>
+            <span className="block truncate text-[12px] text-bark">
+              {habit.streak > 0 ? `${habit.streak} j de suite` : habit.cadence}
+              {habit.rate30 !== null ? ` · ${habit.rate30} % sur 30 j` : ''}
+            </span>
+          </span>
+          <span
+            className="flex min-w-0 flex-1 flex-wrap gap-[3px]"
+            aria-label={`${habit.title} sur 28 jours`}
+          >
+            {habit.line.map((state, at) => (
+              <span
+                key={at}
+                title={`${board.data!.days[at]} · ${state}`}
+                className={`h-4 w-3 rounded-[2px] ${DAY_COLOR[state]}`}
+              />
+            ))}
+          </span>
+        </div>
+      ))}
+    </Panel>
+  );
+}
+
 export function GoalsPage() {
   const kinds = useFacetKinds('measurable');
   const source = useKindRows(kinds.map((one) => one.kind));
@@ -347,6 +412,7 @@ export function GoalsPage() {
         title="Objectifs"
         lead="Tout ce qui avance vers une cible, dans toutes tes apps : où tu en es, et ce qui reste."
       />
+      <HabitsBoard />
       {shown.length > 0 && (
         <Panel title="Où j’en suis" icon={<Target size={16} />}>
           <div className="grid gap-3 px-4 py-3 md:grid-cols-2">

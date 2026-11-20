@@ -13,6 +13,7 @@ import {
   Send,
   Sunrise,
   ShieldCheck,
+  Upload,
   UserRound,
   Users,
 } from 'lucide-react';
@@ -102,6 +103,68 @@ const ZONES = [
   'America/New_York',
   'UTC',
 ];
+
+/**
+ * A folder of notes in Markdown (Obsidian, Notion exported…) brought into the space she is in
+ * (spec 007): each note an entry, its links followed; one line in the journal, undone at once.
+ * Importing it again finds the same entries: nothing is made twice.
+ */
+function ImportNotes() {
+  const client = useQueryClient();
+  const importing = useMutation({
+    mutationFn: async (files: File[]) => {
+      const notes = files.filter((file) => /\.md$/i.test(file.name));
+      if (!notes.length) throw new Error('Aucune note Markdown (.md) dans ce dossier.');
+      const folder = (notes[0]!.webkitRelativePath || notes[0]!.name).split('/')[0] ?? '';
+      const docs = await Promise.all(
+        notes.map(async (file) => ({
+          path: (file.webkitRelativePath || file.name).split('/').slice(1).join('/') || file.name,
+          text: await file.text(),
+        })),
+      );
+      return api<{ created: number; updated: number; unchanged: number }>('/import', {
+        method: 'POST',
+        body: { docs, name: folder },
+      });
+    },
+    onSuccess: (done) =>
+      toast(
+        `${done.created} note(s) ajoutée(s), ${done.updated} mise(s) à jour, ${done.unchanged} inchangée(s) — annulable dans l’Activité.`,
+      ),
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['entries'] });
+      void client.invalidateQueries({ queryKey: ['kinds'] });
+      void client.invalidateQueries({ queryKey: ['history'] });
+    },
+  });
+  return (
+    <div className="flex flex-col gap-2 border-t border-rule px-4 py-3 text-[13px]">
+      <p className="text-bark">
+        Un dossier de notes en Markdown (Obsidian, un export de Notion…) : chaque note devient une
+        entrée, ses liens suivis. Le réimporter ne crée rien deux fois.
+      </p>
+      <label className="inline-flex h-8 w-fit cursor-pointer items-center gap-1.5 rounded-[2px] border border-rule bg-paper px-2.5 font-semibold hover:border-rule-strong">
+        <Upload size={14} />
+        {importing.isPending ? 'Import…' : 'Importer un dossier de notes'}
+        <input
+          type="file"
+          multiple
+          className="sr-only"
+          aria-label="Dossier de notes"
+          {...({ webkitdirectory: '' } as Record<string, string>)}
+          disabled={importing.isPending}
+          onChange={(event) => {
+            // Copied first: emptying the input empties its live list of files.
+            const files = [...(event.target.files ?? [])];
+            event.target.value = '';
+            if (files.length) importing.mutate(files);
+          }}
+        />
+      </label>
+    </div>
+  );
+}
 
 interface Sent {
   id: number;
@@ -379,6 +442,7 @@ function Account() {
               Tout exporter
             </a>
           </div>
+          <ImportNotes />
         </Panel>
       </div>
     </div>
@@ -1064,7 +1128,120 @@ function Connections() {
           <p className="px-4 py-2 text-[13px] text-error">{(connect.error as Error).message}</p>
         )}
       </Panel>
+      <ToolServers />
     </div>
+  );
+}
+
+interface CatalogServer {
+  name: string;
+  url: string;
+  auth: 'none' | 'bearer' | 'oauth';
+  description?: string | { fr?: string; en?: string };
+  ready: boolean;
+}
+
+/**
+ * A server of tools (MCP, spec 025): one from the catalogue, or any by its address and key. Its
+ * tools then answer through Jarvis; what changes, sends or deletes still asks her first.
+ */
+function ToolServers() {
+  const client = useQueryClient();
+  const catalog = useQuery({
+    queryKey: ['connectors', 'catalog'],
+    queryFn: () => api<CatalogServer[]>('/connectors/catalog'),
+  });
+  const [own, setOwn] = useState<{ name: string; url: string; secret: string } | null>(null);
+  const add = useMutation({
+    mutationFn: (input: { name: string; url: string; auth: string; secret?: string }) =>
+      api<{ signIn?: string }>('/connectors', { method: 'POST', body: input }),
+    onSuccess: (made) => {
+      if (made.signIn) window.location.href = made.signIn;
+      else {
+        toast('Serveur relié : ses outils sont dans tes connexions.');
+        setOwn(null);
+      }
+    },
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSettled: () => void client.invalidateQueries({ queryKey: ['connectors'] }),
+  });
+  const said = (text: CatalogServer['description']) =>
+    typeof text === 'string' ? text : (text?.fr ?? text?.en ?? '');
+  return (
+    <Panel title="Un serveur d’outils (MCP)" icon={<Plug size={16} />}>
+      {(catalog.data ?? []).map((one) => (
+        <div key={one.url} className={rowClass}>
+          <Logo name={one.name} domain={null} size={28} />
+          <span className="min-w-0 flex-1">
+            <b className="block truncate font-semibold">{one.name}</b>
+            <span className="line-clamp-2 text-[12.5px] text-bark">{said(one.description)}</span>
+          </span>
+          <Button
+            size="sm"
+            disabled={!one.ready || add.isPending}
+            title={one.ready ? undefined : 'Pas encore disponible sur ce serveur'}
+            onClick={() => add.mutate({ name: one.name, url: one.url, auth: one.auth })}
+          >
+            Relier
+          </Button>
+        </div>
+      ))}
+      {own === null ? (
+        <div className="px-4 py-3">
+          <Button size="sm" onClick={() => setOwn({ name: '', url: '', secret: '' })}>
+            Un autre, par son adresse
+          </Button>
+        </div>
+      ) : (
+        <form
+          className="grid gap-2 px-4 py-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            add.mutate({
+              name: own.name.trim(),
+              url: own.url.trim(),
+              auth: own.secret ? 'bearer' : 'none',
+              ...(own.secret ? { secret: own.secret } : {}),
+            });
+          }}
+        >
+          <input
+            className={inputClass}
+            aria-label="Nom du serveur"
+            placeholder="Son nom (Notion, mon serveur…)"
+            value={own.name}
+            onChange={(event) => setOwn({ ...own, name: event.target.value })}
+          />
+          <input
+            className={inputClass}
+            aria-label="Adresse du serveur"
+            placeholder="https://… /mcp"
+            value={own.url}
+            onChange={(event) => setOwn({ ...own, url: event.target.value })}
+          />
+          <input
+            className={inputClass}
+            type="password"
+            aria-label="Clé du serveur"
+            placeholder="Sa clé, s’il en demande une"
+            value={own.secret}
+            onChange={(event) => setOwn({ ...own, secret: event.target.value })}
+          />
+          <span className="flex gap-2">
+            <Button
+              size="sm"
+              tone="solid"
+              disabled={!own.name.trim() || !/^https?:\/\//.test(own.url.trim()) || add.isPending}
+            >
+              Relier
+            </Button>
+            <Button size="sm" type="button" onClick={() => setOwn(null)}>
+              Annuler
+            </Button>
+          </span>
+        </form>
+      )}
+    </Panel>
   );
 }
 

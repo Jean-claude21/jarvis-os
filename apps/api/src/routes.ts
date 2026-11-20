@@ -613,6 +613,24 @@ export function apiRoutes(deps: {
       ),
     );
   });
+  // A kind's name as she reads it (v3): its model's label; a kind without a model is renamed.
+  api.post('/kinds/label', async (c) => {
+    const body = z
+      .object({ kind: z.string().trim().min(1).max(80), label: z.string().trim().min(1).max(80) })
+      .parse(await c.req.json());
+    return c.json(
+      await act(c, async (tx, actor, space) => {
+        const fold = (text: string) =>
+          text.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+        const model = (await modelsOf(tx, space)).find((one) => fold(one.kind) === fold(body.kind));
+        if (!model) return renameKind(tx, actor, space, { from: body.kind, to: body.label });
+        await save(tx, actor, space, {
+          entries: [{ id: model.id, data: { label: { ...(model.label ?? {}), fr: body.label } } }],
+        });
+        return { kind: model.kind, label: body.label };
+      }),
+    );
+  });
   api.post('/kinds/group', async (c) => {
     const body = (await c.req.json()) as { kind?: string; group?: string | null };
     return c.json(

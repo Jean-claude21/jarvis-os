@@ -6,6 +6,8 @@ import {
   History,
   Inbox,
   LayoutGrid,
+  Compass,
+  Link2,
   Pencil,
   Plus,
   Trash2,
@@ -17,7 +19,7 @@ import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router'
 import { api } from '../lib/api';
 
 import { useSession } from '../lib/session';
-import { type Kind, useKinds } from '../lib/kinds';
+import { type Kind, useKindName, useKinds } from '../lib/kinds';
 import {
   AppIcon,
   Button,
@@ -713,7 +715,10 @@ export function AppPage() {
             isLoading ? (
               <Skeleton className="h-40" />
             ) : (
-              <Overview kinds={mine} />
+              <>
+                <Overview kinds={mine} />
+                <AppRole name={name} />
+              </>
             )
           ) : tab === 'queue' ? (
             waiting ? (
@@ -734,11 +739,250 @@ export function AppPage() {
           ) : page ? (
             <PageView id={page.id} app={name} />
           ) : (
-            <View source={source} files={files} renders={renders} />
+            <>
+              {kind && <KindName kind={mine.find((one) => one.kind === kind)!} />}
+              <View source={source} files={files} renders={renders} />
+            </>
           )}
         </div>
       </div>
     </>
+  );
+}
+
+/** A kind's name as she reads it, changed in place (its model's label; v3). */
+function KindName({ kind }: { kind: Kind }) {
+  const client = useQueryClient();
+  const [draft, setDraft] = useState<string | null>(null);
+  const rename = useMutation({
+    mutationFn: (label: string) =>
+      api('/kinds/label', { method: 'POST', body: { kind: kind.kind, label } }),
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSuccess: () => setDraft(null),
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: ['kinds'] });
+      void client.invalidateQueries({ queryKey: ['history'] });
+    },
+  });
+  return draft === null ? (
+    <div className="flex flex-wrap items-center gap-2">
+      <b className="font-display text-[16px]">{nameOf(kind)}</b>
+      <Button size="sm" tone="quiet" onClick={() => setDraft(nameOf(kind))}>
+        <Pencil size={13} />
+        Renommer
+      </Button>
+      <ShareKind kind={kind} />
+    </div>
+  ) : (
+    <form
+      className="flex flex-wrap items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (draft.trim()) rename.mutate(draft.trim());
+      }}
+    >
+      <input
+        autoFocus
+        aria-label="Nouveau nom"
+        className={inputClass.replace('w-full', 'w-64')}
+        value={draft}
+        onChange={(event) => setDraft(event.target.value)}
+      />
+      <Button size="sm" tone="solid" disabled={!draft.trim() || rename.isPending}>
+        Garder
+      </Button>
+      <Button size="sm" type="button" onClick={() => setDraft(null)}>
+        Annuler
+      </Button>
+    </form>
+  );
+}
+
+interface ShareRow {
+  id: string;
+  title: string;
+  mode: 'form' | 'view';
+  kind: string | null;
+}
+
+/**
+ * A public link to one of her collections (spec 016): a form others fill (what comes through waits
+ * in « À valider »), or a list she shows. The link is shown once; closing it stops it at once.
+ */
+function ShareKind({ kind }: { kind: Kind }) {
+  const client = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<'form' | 'view'>('form');
+  const [link, setLink] = useState<string | null>(null);
+  const fields = (kind.model?.fields ?? []).filter(
+    (field) => !['formula', 'lines', 'button', 'link'].includes(field.type),
+  );
+  const [asked, setAsked] = useState<string[]>(fields.map((field) => field.name));
+  const shares = useQuery({
+    queryKey: ['shares'],
+    queryFn: () => api<ShareRow[]>('/shares'),
+    enabled: open,
+  });
+  const make = useMutation({
+    mutationFn: () =>
+      api<{ link: string }>('/shares', {
+        method: 'POST',
+        body: {
+          name: `${mode === 'form' ? 'Formulaire' : 'Liste'} « ${nameOf(kind)} »`,
+          data:
+            mode === 'form'
+              ? { mode, kind: kind.kind, fields: asked }
+              : { mode, view: { kind: kind.kind } },
+        },
+      }),
+    onSuccess: (made) => setLink(made.link),
+    onError: (error) => toast((error as Error).message, 'error'),
+    onSettled: () => void client.invalidateQueries({ queryKey: ['shares'] }),
+  });
+  const close = useMutation({
+    mutationFn: (id: string) =>
+      api(`/entries/${encodeURIComponent(id)}/archive`, { method: 'POST' }),
+    onSuccess: () => toast('Lien fermé.'),
+    onSettled: () => void client.invalidateQueries({ queryKey: ['shares'] }),
+  });
+  const mine = (shares.data ?? []).filter((one) => one.kind === kind.kind || one.mode === 'view');
+  return (
+    <>
+      <Button size="sm" tone="quiet" onClick={() => setOpen(true)}>
+        <Link2 size={13} />
+        Partager par un lien
+      </Button>
+      <Sheet open={open} onOpenChange={setOpen} title={`Partager « ${nameOf(kind)} »`}>
+        <div className="flex flex-col gap-4 p-4 text-[13.5px]">
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2">
+              <input type="radio" checked={mode === 'form'} onChange={() => setMode('form')} />
+              Un formulaire pour en ajouter (ce qui arrive t’attend dans « À valider »)
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="radio" checked={mode === 'view'} onChange={() => setMode('view')} />
+              Une liste à montrer, en lecture seule
+            </label>
+          </div>
+          {mode === 'form' && fields.length > 0 && (
+            <fieldset className="flex flex-wrap gap-x-4 gap-y-1.5">
+              <legend className="pb-1 text-[12.5px] text-bark">Ce que le formulaire demande</legend>
+              {fields.map((field) => (
+                <label key={field.name} className="flex items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={asked.includes(field.name)}
+                    onChange={(event) =>
+                      setAsked(
+                        event.target.checked
+                          ? [...asked, field.name]
+                          : asked.filter((one) => one !== field.name),
+                      )
+                    }
+                  />
+                  {field.name.replace(/_/g, ' ')}
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {link ? (
+            <div className="flex flex-col gap-1.5">
+              <input
+                readOnly
+                aria-label="Lien de partage"
+                className={inputClass}
+                value={link}
+                onFocus={(event) => event.target.select()}
+              />
+              <span className="text-xs text-faint">
+                Montré une seule fois : copie-le maintenant. Qui a le lien peut l’ouvrir.
+              </span>
+            </div>
+          ) : (
+            <span>
+              <Button tone="solid" disabled={make.isPending} onClick={() => make.mutate()}>
+                Créer le lien
+              </Button>
+            </span>
+          )}
+          {mine.length > 0 && (
+            <div className="flex flex-col gap-1 border-t border-rule pt-3">
+              <b className="text-[13px]">Liens ouverts</b>
+              {mine.map((one) => (
+                <div key={one.id} className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate">{one.title}</span>
+                  <Button size="sm" disabled={close.isPending} onClick={() => close.mutate(one.id)}>
+                    Fermer le lien
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Sheet>
+    </>
+  );
+}
+
+interface AppRoleData {
+  app: string;
+  role: {
+    covers?: string | { fr?: string };
+    intents: string[];
+    reads: string[];
+    writes: string[];
+    watches: string[];
+  };
+  kinds: string[];
+}
+
+/**
+ * An app's role among her apps (spec 033): what it covers, the words that call it, what it reads
+ * and writes, its bridges to the others. Assistants read the same, to know when it is concerned.
+ */
+function AppRole({ name }: { name: string }) {
+  const kindName = useKindName();
+  const mine = useQuery({
+    queryKey: ['apps', 'mine-role'],
+    queryFn: () =>
+      api<{ apps: AppRoleData[]; bridges: { app?: string; title: string }[] }>('/apps/mine'),
+  });
+  const one = mine.data?.apps.find((app) => app.app === name);
+  if (!one) return null;
+  const said = (text: AppRoleData['role']['covers']) =>
+    typeof text === 'string' ? text : (text?.fr ?? '');
+  const bridges = (mine.data?.bridges ?? []).filter((bridge) => bridge.app === name);
+  const chips = (list: string[], kinds: boolean) =>
+    list.length ? (
+      <span className="flex flex-wrap gap-1">
+        {[...new Set(list)].map((word) => (
+          <Tag key={word} tone="neutral" dot={false}>
+            {kinds ? kindName(word) : `« ${word} »`}
+          </Tag>
+        ))}
+      </span>
+    ) : (
+      <span className="text-faint">—</span>
+    );
+  const line = (label: string, value: React.ReactNode) => (
+    <div className="grid grid-cols-[minmax(0,140px)_minmax(0,1fr)] items-baseline gap-3 border-b border-rule px-4 py-2.5 last:border-0">
+      <dt className="text-[13px] text-bark">{label}</dt>
+      <dd className="min-w-0 text-[13.5px]">{value}</dd>
+    </div>
+  );
+  return (
+    <Panel title="Son rôle" icon={<Compass size={16} />}>
+      <dl>
+        {line('Ce qu’elle couvre', said(one.role.covers) || '—')}
+        {line('Ce que tu dis', chips(one.role.intents.slice(0, 20), false))}
+        {line('Elle lit', chips([...one.role.reads, ...one.role.watches], true))}
+        {line('Elle écrit', chips([...one.role.writes, ...one.kinds], true))}
+        {line(
+          'Ses ponts',
+          bridges.length ? bridges.map((bridge) => bridge.title).join(' · ') : '—',
+        )}
+      </dl>
+    </Panel>
   );
 }
 

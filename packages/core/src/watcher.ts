@@ -30,6 +30,8 @@ export interface PassReport {
   scheduled: number;
   skipped: number;
   failed: number;
+  /** The next reminder it saw coming (within a day), so the watcher sleeps until then. */
+  next?: string;
 }
 
 /**
@@ -87,7 +89,11 @@ export async function watchOnce(
         report.scheduled += 1;
         continue;
       }
-      if (!at || at > now) continue;
+      if (at && at > now) {
+        if (!report.next || at.toISOString() < report.next) report.next = at.toISOString();
+        continue;
+      }
+      if (!at) continue;
       if (repeat && now.getTime() - at.getTime() > STALE_MS) {
         await write({ next: next(now) });
         report.skipped += 1;

@@ -20,6 +20,8 @@ import {
   COMPONENTS,
 } from '@jarvis-os/core';
 import { withWho } from './who';
+import type { Mailer } from './mail';
+import { mailInvitation } from './space-mails';
 import { agentsOf, agentSettingsSchema, remember, setAgent } from '@jarvis-os/core';
 import { OCCURRENCE_STATES, setOccurrence, type OccurrenceState } from '@jarvis-os/core';
 import { fileCapture, fileSure, inboxOf, type EntryInput } from '@jarvis-os/core';
@@ -219,6 +221,8 @@ export async function mcpServerFor(
     connectors?: ConnectorService;
     /** Search by meaning (spec 028), when this server has a model. */
     embedder?: Embedder | null;
+    /** Who sends the mails of spaces: an invitation (v3 mails). */
+    mailer?: Mailer | null;
   },
   who: McpPerson,
 ): Promise<McpServer> {
@@ -462,16 +466,25 @@ export async function mcpServerFor(
     'invite',
     {
       description:
-        'Invite an e-mail address into a shared space she owns: returns a link valid 14 days, which she sends herself (Jarvis sends no mail). The invited person signs in with that address and accepts.',
+        'Invite an e-mail address into a shared space she owns: Jarvis e-mails the invitation (`mailed`), and returns its link, valid 14 days, to pass by hand too. The invited person signs in with that address and accepts.',
       inputSchema: { space: z.string().min(1), email: z.string().min(3).max(320) },
     },
     tool(async ({ space, email }: { space: string; email: string }) => {
-      const made = await act((tx) => invite(tx, actor, { spaceId: at(space), email }));
-      return {
-        link: invitationLink(deps.publicUrl, made.token),
-        expiresAt: made.expiresAt,
-        email: email.trim().toLowerCase(),
-      };
+      const spaceId = at(space);
+      const made = await act((tx) => invite(tx, actor, { spaceId, email }));
+      const link = invitationLink(deps.publicUrl, made.token);
+      const mailed = await mailInvitation(
+        { db: deps.db, mailer: deps.mailer ?? null, publicUrl: deps.publicUrl },
+        {
+          lang: 'fr',
+          person: who.person,
+          space: reach.find((one) => one.id === spaceId)?.name ?? '',
+          email: email.trim().toLowerCase(),
+          link,
+          expiresAt: made.expiresAt,
+        },
+      );
+      return { link, expiresAt: made.expiresAt, email: email.trim().toLowerCase(), mailed };
     }),
   );
 

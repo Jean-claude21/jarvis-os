@@ -79,6 +79,42 @@ const words = {
     fileUnkept:
       'Je n’ai pas pu garder ce fichier (plus de 20 Mo, ou stockage indisponible). Réessaie plus petit ?',
     briefEnd: 'Dis à Claude ce que tu veux en faire.',
+    // v3 mails: a forgotten password, an invitation, someone who joined.
+    forgotLink: 'Mot de passe oublié ?',
+    forgotTitle: 'Mot de passe oublié',
+    forgotLead:
+      'Donne l’adresse de ton compte : Jarvis t’envoie un lien pour en choisir un nouveau.',
+    forgotSend: 'Recevoir le lien',
+    forgotSent:
+      'Si un compte existe à cette adresse, le lien vient de partir. Il marche une heure. Pense à regarder tes indésirables.',
+    backToSignIn: 'Revenir à la connexion',
+    resetTitle: 'Un nouveau mot de passe',
+    resetLead: 'Choisis-en un de 10 caractères au moins.',
+    resetNew: 'Nouveau mot de passe',
+    resetAgain: 'Le même, une seconde fois',
+    resetSave: 'Enregistrer',
+    resetMismatch: 'Les deux ne sont pas pareils.',
+    resetDone: 'C’est fait : ton mot de passe est changé, et tes autres connexions sont fermées.',
+    resetInvalid:
+      'Ce lien n’est plus valide (il marche une heure, une fois). Demande-en un nouveau.',
+    mailResetSubject: 'Ton nouveau mot de passe Jarvis',
+    mailResetTitle: 'Choisis un nouveau mot de passe',
+    mailResetLead: 'Quelqu’un, sans doute toi, a demandé à changer le mot de passe de {email}.',
+    mailResetButton: 'Choisir un nouveau mot de passe',
+    mailResetAfter:
+      'Ce lien marche une heure, une fois. Si ce n’est pas toi, ignore ce message : rien ne change.',
+    mailInviteSubject: '{who} t’invite dans « {space} » sur Jarvis',
+    mailInviteTitle: 'Rejoins « {space} »',
+    mailInviteLead:
+      '{who} t’invite dans son espace partagé « {space} » sur Jarvis : ce que vous y gardez, vous le voyez tous les deux. Ton espace à toi reste privé.',
+    mailInviteButton: 'Voir l’invitation',
+    mailInviteAfter: 'L’invitation marche jusqu’au {until}, pour l’adresse {email} seulement.',
+    mailJoinedSubject: '{who} a rejoint « {space} »',
+    mailJoinedTitle: '{who} a rejoint « {space} »',
+    mailJoinedLead:
+      '{who} ({email}) fait maintenant partie de « {space} ». Tu règles ce qu’il ou elle peut faire et voir dans Réglages › Espaces.',
+    mailJoinedButton: 'Ouvrir les membres',
+    mailFooter: 'Envoyé par Jarvis OS.',
   },
   en: {
     signInTitle: 'Sign in to Jarvis',
@@ -155,6 +191,39 @@ const words = {
     fileUnkept:
       'I could not keep this file (over 20 MB, or storage unavailable). Try a smaller one?',
     briefEnd: 'Tell Claude what you want to do with it.',
+    forgotLink: 'Forgot your password?',
+    forgotTitle: 'Forgotten password',
+    forgotLead: 'Give your account’s address: Jarvis sends you a link to choose a new one.',
+    forgotSend: 'Send me the link',
+    forgotSent:
+      'If an account has this address, the link is on its way. It works for an hour. Check your spam too.',
+    backToSignIn: 'Back to sign-in',
+    resetTitle: 'A new password',
+    resetLead: 'Choose one of at least 10 characters.',
+    resetNew: 'New password',
+    resetAgain: 'The same, once more',
+    resetSave: 'Save',
+    resetMismatch: 'The two are not the same.',
+    resetDone: 'Done: your password is changed, and your other sessions are closed.',
+    resetInvalid: 'This link is no longer valid (it works once, for an hour). Ask for a new one.',
+    mailResetSubject: 'Your new Jarvis password',
+    mailResetTitle: 'Choose a new password',
+    mailResetLead: 'Someone, probably you, asked to change the password of {email}.',
+    mailResetButton: 'Choose a new password',
+    mailResetAfter:
+      'This link works once, for an hour. If it was not you, ignore this message: nothing changes.',
+    mailInviteSubject: '{who} invites you into « {space} » on Jarvis',
+    mailInviteTitle: 'Join « {space} »',
+    mailInviteLead:
+      '{who} invites you into the shared space « {space} » on Jarvis: what you keep there, you both see. Your own space stays private.',
+    mailInviteButton: 'See the invitation',
+    mailInviteAfter: 'The invitation works until {until}, for {email} only.',
+    mailJoinedSubject: '{who} joined « {space} »',
+    mailJoinedTitle: '{who} joined « {space} »',
+    mailJoinedLead:
+      '{who} ({email}) is now part of « {space} ». Set what they may do and see in Settings › Spaces.',
+    mailJoinedButton: 'Open the members',
+    mailFooter: 'Sent by Jarvis OS.',
   },
 } as const;
 

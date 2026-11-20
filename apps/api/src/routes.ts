@@ -163,6 +163,9 @@ import { PROVIDERS, providerOf } from './relay';
 import { searchByMeaning } from './embeddings';
 import { connectorChange, connectorInput, type ConnectorService } from './connector-service';
 import { invitationLink, namesOf, spaceFor } from './spaces';
+import { langOf } from './i18n';
+import type { Mailer } from './mail';
+import { mailInvitation, mailJoined } from './space-mails';
 import { computeDashboard, widgetSchema, widgetsOf, type Widget } from './views/dashboard';
 import { DOCUMENT_HOURS, documentShown, documentToken } from './views/document';
 import { zip } from './zip';
@@ -233,6 +236,8 @@ export function apiRoutes(deps: {
   self?: (request: Request) => Promise<Response> | Response;
   /** The journal, live (v3 D9). */
   live?: LiveHub;
+  /** Who sends the mails of spaces: an invitation, someone who joined (v3 mails). */
+  mailer?: Mailer | null;
 }) {
   const api = new Hono<Env>();
   const keyUsed = new Map<string, number>();
@@ -376,11 +381,26 @@ export function apiRoutes(deps: {
     const made = await as(c, (tx, actor) =>
       invite(tx, actor, { spaceId: c.req.param('id'), email }),
     );
+    const link = invitationLink(deps.publicUrl, made.token);
+    // The invitation by e-mail (v3 mails); the link is also given back, to be passed by hand.
+    const space = (await as(c, (tx) => spacesOf(tx))).find((one) => one.id === c.req.param('id'));
+    const mailed = await mailInvitation(
+      { db: deps.db, mailer: deps.mailer ?? null, publicUrl: deps.publicUrl },
+      {
+        lang: langOf(c.req.header('accept-language')),
+        person: c.get('person'),
+        space: space?.name ?? '',
+        email: email.trim().toLowerCase(),
+        link,
+        expiresAt: made.expiresAt,
+      },
+    );
     return c.json(
       {
         invitationId: made.invitationId,
-        link: invitationLink(deps.publicUrl, made.token),
+        link,
         expiresAt: made.expiresAt,
+        mailed,
       },
       201,
     );
@@ -414,9 +434,24 @@ export function apiRoutes(deps: {
 
   api.post('/invitations/accept', async (c) => {
     const { token } = z.object({ token: z.string().min(10).max(200) }).parse(await c.req.json());
-    return c.json(
-      await as(c, (tx, actor) => acceptInvitation(tx, actor, { token, email: c.get('email') })),
+    const joined = await as(c, (tx, actor) =>
+      acceptInvitation(tx, actor, { token, email: c.get('email') }),
     );
+    // Its owners learn who joined (v3 mails).
+    const owners = (await as(c, (tx) => membersOf(tx, joined.id)))
+      .filter((one) => one.role === 'owner')
+      .map((one) => one.person);
+    await mailJoined(
+      { db: deps.db, mailer: deps.mailer ?? null, publicUrl: deps.publicUrl },
+      {
+        lang: langOf(c.req.header('accept-language')),
+        person: c.get('person'),
+        email: c.get('email'),
+        space: joined.name,
+        owners,
+      },
+    );
+    return c.json(joined);
   });
 
   // The spaces a client (Claude, ChatGPT…) may reach for her: set at consent, or from her account.

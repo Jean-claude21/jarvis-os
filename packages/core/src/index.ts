@@ -321,7 +321,15 @@ export {
   type Weekday,
 } from './habits';
 export { preferencesOf, preferencesSchema, setPreferences, type Preferences } from './prefs';
-export { briefDue, briefOnce, briefPeople, localOf, morningBrief, type Brief } from './brief';
+export {
+  briefDue,
+  briefOnce,
+  briefPeople,
+  localOf,
+  morningBrief,
+  nextBriefAt,
+  type Brief,
+} from './brief';
 export {
   enterMessage,
   markActed,

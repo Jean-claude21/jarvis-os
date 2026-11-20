@@ -10,7 +10,11 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import pg from 'pg';
 
-const NAME = 'jarvis-os';
+// The production project, or — `JARVIS_NEON_PROJECT_NAME=jarvis-os-dev pnpm provision` — a project of
+// its own for `dev` and `test` (after the Neon quota of 19 Nov 2026): what a laptop and the test
+// suites spend never reaches production's compute hours.
+const NAME = process.env.JARVIS_NEON_PROJECT_NAME ?? 'jarvis-os';
+const SEPARATE = NAME !== 'jarvis-os';
 const REGION = 'aws-eu-central-1';
 const BRANCHES = ['main', 'dev', 'test'] as const;
 type BranchName = (typeof BRANCHES)[number];
@@ -204,21 +208,52 @@ async function storage(projectId: string, branch: Branch, prefix: string): Promi
 
 const projectId = await project();
 const all = await branches(projectId);
-const lines = [
-  `# Jarvis OS — Neon project ${projectId} (written by pnpm provision; never commit).`,
-  `JARVIS_NEON_PROJECT_ID=${projectId}`,
-  `JARVIS_APP_PASSWORD=${appPassword}`,
-];
-// Production (`main`) is reached by Netlify only (spec 010): no credential of it lands on a laptop.
-lines.push(
-  '',
-  '# Branch main (production): credentials in Netlify only',
-  `JARVIS_MAIN_BRANCH_ID=${all.main.id}`,
-);
+const lines = SEPARATE
+  ? [
+      `# Jarvis OS — production in Neon project ${current.JARVIS_NEON_PROJECT_ID ?? '?'}; dev and test in ${projectId} (written by pnpm provision; never commit).`,
+      `JARVIS_NEON_PROJECT_ID=${current.JARVIS_NEON_PROJECT_ID ?? ''}`,
+      `JARVIS_NEON_DEV_PROJECT_ID=${projectId}`,
+      `JARVIS_APP_PASSWORD=${appPassword}`,
+    ]
+  : [
+      `# Jarvis OS — Neon project ${projectId} (written by pnpm provision; never commit).`,
+      `JARVIS_NEON_PROJECT_ID=${projectId}`,
+      `JARVIS_APP_PASSWORD=${appPassword}`,
+    ];
+// Production (`main`) is reached by its host only (spec 010): no credential of it lands on a laptop.
+if (!SEPARATE)
+  lines.push(
+    '',
+    '# Branch main (production): credentials on its host only',
+    `JARVIS_MAIN_BRANCH_ID=${all.main.id}`,
+  );
+else if (current.JARVIS_MAIN_BRANCH_ID)
+  lines.push(
+    '',
+    '# Branch main (production)',
+    `JARVIS_MAIN_BRANCH_ID=${current.JARVIS_MAIN_BRANCH_ID}`,
+  );
 for (const name of BRANCHES.filter((one) => one !== 'main')) {
   const branch = all[name];
   const prefix = `JARVIS_${name.toUpperCase()}`;
-  const files = await storage(projectId, branch, prefix);
+  // In a project of its own (dev and test), a branch whose storage cannot be made keeps the one it
+  // had: files are not counted in compute hours.
+  const files = await storage(projectId, branch, prefix).catch((error: Error) => {
+    const was = {
+      endpoint: current[`${prefix}_STORAGE_ENDPOINT`],
+      region: current[`${prefix}_STORAGE_REGION`],
+      accessKeyId: current[`${prefix}_STORAGE_ACCESS_KEY_ID`],
+      secretAccessKey: current[`${prefix}_STORAGE_SECRET_ACCESS_KEY`],
+    };
+    if (!SEPARATE || !was.endpoint || !was.accessKeyId || !was.secretAccessKey) throw error;
+    console.info(`storage of ${name} kept as it was (${error.message})`);
+    return was as {
+      endpoint: string;
+      region: string;
+      accessKeyId: string;
+      secretAccessKey: string;
+    };
+  });
   lines.push(
     '',
     `# Branch ${name}`,
@@ -239,7 +274,7 @@ lines.push(
   `JARVIS_TEST_AUTH_SECRET=${current.JARVIS_TEST_AUTH_SECRET || randomBytes(32).toString('base64url')}`,
 );
 // What provisioning does not manage (the tunnel, the Netlify site, Telegram…) is kept as it was.
-const managed = /^JARVIS_(NEON_PROJECT_ID|APP_PASSWORD|(MAIN|DEV|TEST)_.+)$/;
+const managed = /^JARVIS_(NEON_PROJECT_ID|NEON_DEV_PROJECT_ID|APP_PASSWORD|(MAIN|DEV|TEST)_.+)$/;
 const kept = Object.entries(current).filter(([key]) => !managed.test(key));
 if (kept.length)
   lines.push('', '# Kept as it was', ...kept.map(([key, value]) => `${key}=${value}`));

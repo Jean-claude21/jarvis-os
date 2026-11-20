@@ -96,7 +96,8 @@ const accountForm = (words: Words) => `
        <button id="submit">${escape(words.signIn)}</button>
      </form>
      <p class="error" id="error" role="alert"></p>
-     <p id="switch-row"><span id="switch-lead">${escape(words.noAccount)}</span> <a href="#" id="switch">${escape(words.signUp)}</a></p>`;
+     <p id="switch-row"><span id="switch-lead">${escape(words.noAccount)}</span> <a href="#" id="switch">${escape(words.signUp)}</a></p>
+     <p><a href="${FORGOT_PAGE}">${escape(words.forgotLink)}</a></p>`;
 
 /** The form's script; `extra` is added to the body sent (the OAuth request, when there is one). */
 const accountScript = (words: Words, extra: string) => `
@@ -115,6 +116,70 @@ const accountScript = (words: Words, extra: string) => `
        if (creating) call('/auth/sign-up/email', { ...body, name: form.get('name') || form.get('email') });
        else call('/auth/sign-in/email', body);
      });`;
+
+/** Where she asks for a new password, and where its link brings her (v3 mails). */
+export const FORGOT_PAGE = '/mot-de-passe-oublie';
+export const RESET_PAGE = '/mot-de-passe';
+
+/** A forgotten password: her address, then a link by e-mail. It never says whether an account exists. */
+export function forgotPage(lang: Lang, words: Words): string {
+  return page(
+    lang,
+    words.forgotTitle,
+    `<h1>${escape(words.forgotTitle)}</h1><p>${escape(words.forgotLead)}</p>
+     <form id="form">
+       <label>${escape(words.email)}<input name="email" type="email" autocomplete="email" required></label>
+       <button id="submit">${escape(words.forgotSend)}</button>
+     </form>
+     <p class="error" id="error" role="alert"></p>
+     <p class="done" id="done" role="status" hidden>${escape(words.forgotSent)}</p>
+     <p><a href="/connexion">${escape(words.backToSignIn)}</a></p>`,
+    `const error = document.getElementById('error');
+     document.getElementById('form').addEventListener('submit', async (event) => {
+       event.preventDefault(); error.textContent = '';
+       const email = new FormData(event.target).get('email');
+       const response = await fetch('/auth/request-password-reset', { method: 'POST', credentials: 'same-origin',
+         headers: { 'content-type': 'application/json' },
+         body: JSON.stringify({ email, redirectTo: location.origin + '${RESET_PAGE}' }) });
+       if (response.status === 429) { error.textContent = ${JSON.stringify(words.tooMany)}; return; }
+       event.target.hidden = true;
+       document.getElementById('done').hidden = false;
+     });`,
+  );
+}
+
+/** The link of the mail lands here: a new password, twice; then her other sessions are closed. */
+export function resetPage(lang: Lang, words: Words): string {
+  return page(
+    lang,
+    words.resetTitle,
+    `<h1>${escape(words.resetTitle)}</h1><p id="lead">${escape(words.resetLead)}</p>
+     <form id="form">
+       <label>${escape(words.resetNew)}<input name="password" type="password" autocomplete="new-password" minlength="10" required></label>
+       <label>${escape(words.resetAgain)}<input name="again" type="password" autocomplete="new-password" minlength="10" required></label>
+       <button id="submit">${escape(words.resetSave)}</button>
+     </form>
+     <p class="error" id="error" role="alert"></p>
+     <p class="done" id="done" role="status" hidden>${escape(words.resetDone)}</p>
+     <p><a href="/connexion">${escape(words.backToSignIn)}</a> · <a href="${FORGOT_PAGE}">${escape(words.forgotLink)}</a></p>`,
+    `const error = document.getElementById('error');
+     const form = document.getElementById('form');
+     const query = new URLSearchParams(location.search);
+     const token = query.get('token');
+     if (!token || query.get('error')) { form.hidden = true; error.textContent = ${JSON.stringify(words.resetInvalid)}; }
+     form.addEventListener('submit', async (event) => {
+       event.preventDefault(); error.textContent = '';
+       const data = new FormData(form);
+       if (data.get('password') !== data.get('again')) { error.textContent = ${JSON.stringify(words.resetMismatch)}; return; }
+       const response = await fetch('/auth/reset-password', { method: 'POST', credentials: 'same-origin',
+         headers: { 'content-type': 'application/json' },
+         body: JSON.stringify({ newPassword: data.get('password'), token }) });
+       if (!response.ok) { error.textContent = ${JSON.stringify(words.resetInvalid)}; return; }
+       form.hidden = true;
+       document.getElementById('done').hidden = false;
+     });`,
+  );
+}
 
 export function signInPage(lang: Lang, words: Words, client: string | null): string {
   const lead = client ? fill(words.signInLead, { client }) : words.signInLeadPlain;

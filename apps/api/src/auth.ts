@@ -4,6 +4,8 @@ import { betterAuth } from 'better-auth';
 import { APIError } from 'better-auth/api';
 import { bearer, jwt } from 'better-auth/plugins';
 import type pg from 'pg';
+import { fill, langOf, wordsOf } from './i18n';
+import { mailOf, sendQuietly, type Mailer } from './mail';
 
 /** The paths of Jarvis's own sign-in and consent pages (spec 003). */
 export const SIGN_IN_PAGE = '/connexion';
@@ -71,6 +73,8 @@ export function makeAuth(input: {
   signUp?: SignUpRule;
   /** Attempts counted (spec 024): on, unless a caller or `JARVIS_RATE_LIMIT=off` turns it off. */
   rateLimit?: boolean;
+  /** Who sends the mails of accounts: a forgotten password (v3 mails). */
+  mailer?: Mailer | null;
 }) {
   const rule = input.signUp ?? signUpRuleOf();
   return betterAuth({
@@ -82,7 +86,33 @@ export function makeAuth(input: {
     trustedOrigins: [input.publicUrl],
     // The JWT plugin signs the access tokens; its own session-to-JWT endpoint is not needed.
     disabledPaths: ['/token'],
-    emailAndPassword: { enabled: true, autoSignIn: true, minPasswordLength: 10 },
+    emailAndPassword: {
+      enabled: true,
+      autoSignIn: true,
+      minPasswordLength: 10,
+      // A forgotten password (v3 mails): a link that works once, for an hour, by e-mail; once
+      // changed, her other sessions are closed.
+      resetPasswordTokenExpiresIn: 3600,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }, request) => {
+        const words = wordsOf(langOf(request?.headers.get('accept-language') ?? undefined));
+        await sendQuietly(
+          input.mailer ?? null,
+          {
+            to: user.email,
+            ...mailOf({
+              subject: words.mailResetSubject,
+              title: words.mailResetTitle,
+              lines: [fill(words.mailResetLead, { email: user.email })],
+              button: { label: words.mailResetButton, url },
+              after: words.mailResetAfter,
+              footer: words.mailFooter,
+            }),
+          },
+          'password reset',
+        );
+      },
+    },
     // Her session read from its signed cookie for five minutes, not from the database on each
     // request (the database is often far away); signing out ends it at once on this device.
     session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },

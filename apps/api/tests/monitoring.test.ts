@@ -67,7 +67,9 @@ describe('the health of the server', () => {
     const now = await healthOf(server.db);
     expect(now.database).toBe(true);
     expect(now.watcher.late).toBe(false);
-    const later = await healthOf(server.db, Date.now() + 10 * 60_000);
+    // It sleeps up to an hour when nothing is due (spec 105): late after an hour and a quarter.
+    expect((await healthOf(server.db, Date.now() + 60 * 60_000)).watcher.late).toBe(false);
+    const later = await healthOf(server.db, Date.now() + 80 * 60_000);
     expect(later).toMatchObject({ status: 'unhealthy', watcher: { late: true } });
     const answer = await server.app.request('/health');
     expect([200, 503]).toContain(answer.status);

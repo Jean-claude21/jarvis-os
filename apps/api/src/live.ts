@@ -27,6 +27,16 @@ export function liveHub(databaseUrl: string) {
   const listeners = new Set<Listener>();
   let client: pg.Client | null = null;
   let starting: Promise<void> | null = null;
+  // Rest for the database: the listening connection closes a minute after the last screen left,
+  // so an idle server lets its database suspend.
+  let closing: ReturnType<typeof setTimeout> | null = null;
+  const close = () => {
+    closing = null;
+    if (listeners.size || !client) return;
+    const one = client;
+    client = null;
+    void one.end().catch(() => undefined);
+  };
 
   const start = async () => {
     const one = new pg.Client({ connectionString: directUrl(databaseUrl) });
@@ -55,6 +65,10 @@ export function liveHub(databaseUrl: string) {
     subscribe(spaces: string[], send: (event: LiveEvent) => void): () => void {
       const listener: Listener = { spaces: new Set(spaces), send };
       listeners.add(listener);
+      if (closing) {
+        clearTimeout(closing);
+        closing = null;
+      }
       if (!client && !starting)
         starting = start()
           .catch((error) => console.warn('[live] cannot listen:', (error as Error).message))
@@ -63,6 +77,7 @@ export function liveHub(databaseUrl: string) {
           });
       return () => {
         listeners.delete(listener);
+        if (!listeners.size && !closing) closing = setTimeout(close, 60_000);
       };
     },
   };

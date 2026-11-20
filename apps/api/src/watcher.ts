@@ -2,6 +2,7 @@ import {
   asPerson,
   briefOnce,
   briefPeople,
+  nextBriefAt,
   find,
   giveLease,
   pool,
@@ -34,7 +35,8 @@ import {
 } from './channels';
 import { wordsOf, type Lang } from './i18n';
 import { quickjsRunner } from './scripts';
-import { readTelegramLinks } from './telegram';
+import { readTelegramLinks, telegramWaiting } from './telegram';
+import { takeActivity } from './activity';
 import { connectorService } from './connector-service';
 import { secretsKey } from './secrets';
 import { settingsFor, type Branch } from './settings';
@@ -42,8 +44,14 @@ import { settingsFor, type Branch } from './settings';
 /** Who this watcher is, for its lease (spec 021): the machine and this process. */
 export const WATCHER_HOLDER = `${process.env.NETLIFY ? 'netlify' : hostname()}:${process.pid}:${randomBytes(3).toString('hex')}`;
 
-/** How often the watcher looks: once a minute, the precision of a reminder. */
+/** How often the watcher looks at the clock: once a minute, the precision of a reminder. */
 export const WATCH_EVERY_MS = 60_000;
+/**
+ * The longest it sleeps without a look at the database (rest for the database, after the Neon
+ * quota of 19 Nov 2026): what has no time of its own — the « before » rules of a new day, long work
+ * past its time — waits at most this long. Neon suspends a database after 5 minutes without a query.
+ */
+export const LONGEST_SLEEP_MS = 60 * 60_000;
 
 // Her channels moved to `channels.ts` (spec 020); kept here for the doors that import them.
 export { channelOf, sendTelegram } from './channels';
@@ -155,7 +163,7 @@ export async function watcherPass(
   delivery: Delivery,
   now: Date = new Date(),
   holder: string = WATCHER_HOLDER,
-): Promise<PassReport | null> {
+): Promise<(PassReport & { wake: string }) | null> {
   useScriptRunner(quickjsRunner);
   // One watcher at a time on a database (spec 021): another holding the lease, this pass is skipped.
   try {
@@ -236,7 +244,30 @@ export async function watcherPass(
     const rules = await runDueRules(db, now);
     done.rules = rules;
     if (rules.failed) console.warn('[watcher] rules', rules);
-    return report;
+    // When it is next needed: the next reminder, brief, scheduled rule or message to try again;
+    // at once when a batch may have more (files to read, vectors, backups); at the latest, in an hour.
+    const times: number[] = [now.getTime() + LONGEST_SLEEP_MS];
+    if (report.next) times.push(Date.parse(report.next));
+    for (const person of await briefPeople(db)) {
+      const at = await nextBriefAt(db, person, now).catch(() => null);
+      if (at) times.push(at.getTime());
+    }
+    const { rows: soon } = await db.query<{ rule: Date | null; outbox: Date | null }>(
+      'select jarvis_next_rule_run() as rule, jarvis_outbox_next() as outbox',
+    );
+    for (const one of [soon[0]?.rule, soon[0]?.outbox])
+      if (one) times.push(new Date(one).getTime());
+    const more = (part: unknown) =>
+      !!part &&
+      typeof part === 'object' &&
+      Object.entries(part as Record<string, unknown>).some(
+        ([key, value]) => key !== 'failed' && typeof value === 'number' && value > 0,
+      );
+    if (more(done.reading) || more(done.meaning) || more(done.backups) || more(done.outbox))
+      times.push(now.getTime() + WATCH_EVERY_MS);
+    const wake = new Date(Math.max(Math.min(...times), now.getTime() + WATCH_EVERY_MS));
+    done.wake = wake.toISOString();
+    return { ...report, wake: wake.toISOString() };
   } catch (error) {
     failure = (error as Error).message;
     console.error('[watcher]', failure);
@@ -251,7 +282,12 @@ export async function watcherPass(
   }
 }
 
-/** The watcher's loop: a pass each minute, never two at once; it stops when `signal` aborts. */
+/**
+ * The watcher's loop (rest for the database): it looks at the clock each minute, and opens the
+ * database only when it is needed — the time the last pass gave, a change made through a door of
+ * this server, a message waiting on Telegram. Never two passes at once; it stops when `signal`
+ * aborts.
+ */
 export function watch(
   db: pg.Pool,
   delivery: Delivery,
@@ -259,19 +295,27 @@ export function watch(
   signal?: AbortSignal,
 ) {
   let running = false;
-  const pass = async () => {
+  let wakeAt = 0;
+  const tick = async () => {
     if (running || signal?.aborted) return;
     running = true;
     try {
+      const due =
+        Date.now() >= wakeAt ||
+        takeActivity() ||
+        (delivery.telegramToken ? await telegramWaiting(delivery.telegramToken) : false);
+      if (!due) return;
       const report = await watcherPass(db, delivery);
+      // A pass that failed is tried again in five minutes, not each minute.
+      wakeAt = report ? Date.parse(report.wake) : Date.now() + 5 * WATCH_EVERY_MS;
       if (report) onPass(report);
     } finally {
       running = false;
     }
   };
-  const timer = setInterval(pass, WATCH_EVERY_MS);
+  const timer = setInterval(() => void tick(), WATCH_EVERY_MS);
   signal?.addEventListener('abort', () => clearInterval(timer));
-  void pass();
+  void tick();
 }
 
 // `pnpm --filter @jarvis-os/api watcher` — the watcher alone, on the dev branch (or JARVIS_BRANCH).

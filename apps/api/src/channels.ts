@@ -14,7 +14,7 @@ import {
   type Embedder,
   type Message,
 } from '@jarvis-os/core';
-import nodemailer from 'nodemailer';
+import { mailerFromEnv, type Mailer } from './mail';
 import type pg from 'pg';
 import { ACTIONS, actionToken, actionWord } from './act';
 import { wordsOf, type Lang } from './i18n';
@@ -23,15 +23,12 @@ import { objectStorage } from './storage';
 import { embedderFor } from './embeddings';
 
 // Her channels (spec 020): every message enters the outbox, then is delivered here — Telegram by its
-// bot, e-mail by any SMTP server — and its delivery written back (sent, or tried again later).
+// bot, e-mail by the mailer (mail.ts) — and its delivery written back (sent, or tried again later).
+
+export type { Mailer } from './mail';
 
 export type Channel = 'telegram' | 'email';
 export type Kind = 'reminder' | 'brief';
-
-/** Sends an e-mail; throws with the server's reason when it refuses. */
-export interface Mailer {
-  send(mail: { to: string; subject: string; text: string; html: string }): Promise<void>;
-}
 
 /** What delivering needs: the bot, the mailer, and what signs her action links. */
 export interface Delivery {
@@ -46,26 +43,12 @@ export interface Delivery {
   embedder?: Embedder | null;
 }
 
-/** E-mail through SMTP (`JARVIS_SMTP_URL`, `JARVIS_EMAIL_FROM`); null when it is not configured. */
-export function smtpMailer(url: string | undefined, from: string | undefined): Mailer | null {
-  if (!url || !from) return null;
-  const transport = nodemailer.createTransport(url);
-  return {
-    async send(mail) {
-      await transport.sendMail({ from, ...mail });
-    },
-  };
-}
-
 /** The delivery of a server: its environment and its branch's settings. */
 export function deliveryFor(settings: Settings, mailer?: Mailer | null): Delivery {
   const telegramToken = process.env.JARVIS_TELEGRAM_BOT_TOKEN;
   return {
     ...(telegramToken ? { telegramToken } : {}),
-    mailer:
-      mailer === undefined
-        ? smtpMailer(process.env.JARVIS_SMTP_URL, process.env.JARVIS_EMAIL_FROM)
-        : mailer,
+    mailer: mailer === undefined ? mailerFromEnv() : mailer,
     publicUrl: settings.publicUrl,
     secret: settings.authSecret,
     blobs: objectStorage(settings.storage),

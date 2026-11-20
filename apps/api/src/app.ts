@@ -35,7 +35,18 @@ import { CONSENT_PAGE, makeAuth, mcpResource, SIGN_IN_PAGE } from './auth';
 import { FEED_DAYS_AFTER, FEED_DAYS_BEFORE, icsOf, type Series } from './ics';
 import { fill, langOf, wordsOf } from './i18n';
 import { mcpServerFor } from './mcp';
-import { consentPage, invitationPage, messagePage, signInPage } from './pages';
+import {
+  consentPage,
+  FORGOT_PAGE,
+  forgotPage,
+  invitationPage,
+  messagePage,
+  RESET_PAGE,
+  resetPage,
+  signInPage,
+} from './pages';
+import { mailerFromEnv, type Mailer } from './mail';
+import { noteActivity } from './activity';
 import { apiRoutes } from './routes';
 import { quickjsRunner } from './scripts';
 import type { Settings } from './settings';
@@ -63,7 +74,7 @@ import { readUploadToken, uploadView } from './views/upload';
  * The Jarvis OS server: accounts and OAuth (`/auth`), the REST API (`/api`), the MCP server
  * (`/mcp`), the sign-in and consent pages, and the discovery documents MCP clients read.
  */
-export function makeApp(settings: Settings) {
+export function makeApp(settings: Settings, deps: { mailer?: Mailer | null } = {}) {
   const db = pool(settings.appUrl);
   // Her scripts (spec 014) run in QuickJS, whichever door starts them.
   useScriptRunner(quickjsRunner);
@@ -78,15 +89,35 @@ export function makeApp(settings: Settings) {
   });
   // A rule's `call` (spec 050) reaches her connections through this service.
   setCallOut(connectors.callOut);
-  const auth = makeAuth({ db, secret: settings.authSecret, publicUrl: settings.publicUrl });
+  // Her mails (v3): a forgotten password, invitations, someone who joined.
+  const mailer = deps.mailer === undefined ? mailerFromEnv() : deps.mailer;
+  const auth = makeAuth({
+    db,
+    secret: settings.authSecret,
+    publicUrl: settings.publicUrl,
+    mailer,
+  });
   const resource = mcpResource(settings.publicUrl);
   const app = new Hono();
 
   // For a monitor outside (spec 023): the database answers, the watcher passed lately and without
   // failure. Nothing personal, nor who runs the watcher. 503 when something is wrong.
+  // Rest for the database (after the Neon quota of 19 Nov 2026): the container's own check asks
+  // whether the process answers (`/alive`), never the database; `/health` reads the database at
+  // most every quarter of an hour, so a monitor outside does not keep it awake.
+  app.get('/alive', (c) => c.json({ alive: true }));
+  let healthKept: { at: number; health: Awaited<ReturnType<typeof healthOf>> } | null = null;
   app.get('/health', async (c) => {
-    const health = await healthOf(db);
+    const keep = Number(process.env.JARVIS_HEALTH_CACHE_MS ?? 15 * 60_000);
+    if (!healthKept || Date.now() - healthKept.at > keep)
+      healthKept = { at: Date.now(), health: await healthOf(db) };
+    const health = healthKept.health;
     return c.json(health, health.status === 'healthy' ? 200 : 503);
+  });
+  // A change made through a door: the watcher sharing this process looks at its next minute.
+  app.use('*', async (c, next) => {
+    if (c.req.method !== 'GET' && c.req.method !== 'HEAD') noteActivity();
+    await next();
   });
   app.on(['GET', 'POST'], '/auth/*', (c) => auth.handler(c.req.raw));
   // Actions from an e-mail (spec 020): a signed link, a page that asks, a button that acts.
@@ -117,6 +148,7 @@ export function makeApp(settings: Settings) {
       secret: settings.authSecret,
       self: (request: Request) => app.fetch(request),
       live: liveHub(settings.appUrl),
+      mailer,
     }),
   );
 
@@ -135,6 +167,16 @@ export function makeApp(settings: Settings) {
     return c.html(
       signInPage(lang, wordsOf(lang), await clientName(c.req.query('client_id') ?? null)),
     );
+  });
+
+  // A forgotten password (v3 mails): her address, then the page the mail's link brings her to.
+  app.get(FORGOT_PAGE, (c) => {
+    const lang = langOf(c.req.header('accept-language'));
+    return c.html(forgotPage(lang, wordsOf(lang)));
+  });
+  app.get(RESET_PAGE, (c) => {
+    const lang = langOf(c.req.header('accept-language'));
+    return c.html(resetPage(lang, wordsOf(lang)));
   });
 
   app.get(CONSENT_PAGE, async (c) => {
@@ -512,6 +554,7 @@ export function makeApp(settings: Settings) {
           embedder,
           publicUrl: settings.publicUrl,
           secret: settings.authSecret,
+          mailer,
         },
         {
           person,

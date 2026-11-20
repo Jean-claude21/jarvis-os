@@ -48,7 +48,8 @@ const checkConnections = async () => {
       .catch((error) => console.warn('[sources]', row.id, (error as Error).message));
 };
 if (!quiet()) {
-  const hourly = setInterval(() => void checkConnections().catch(() => undefined), 3_600_000);
+  // Every six hours, not each hour: each look wakes the database (rest for the database).
+  const hourly = setInterval(() => void checkConnections().catch(() => undefined), 6 * 3_600_000);
   setTimeout(() => void checkConnections().catch(() => undefined), 60_000);
   stop.signal.addEventListener('abort', () => clearInterval(hourly));
 }

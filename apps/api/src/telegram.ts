@@ -64,6 +64,24 @@ export async function telegramLink(
 let offset = 0;
 
 /**
+ * Whether a message waits for the bot, without touching the database (rest for the database): the
+ * watcher opens it only then. Nothing is taken: the next pass reads the same messages.
+ */
+export async function telegramWaiting(token: string): Promise<boolean> {
+  if (process.env.JARVIS_SIDE_EFFECTS === 'off') return false;
+  try {
+    const response = await fetch(
+      `${API}/bot${token}/getUpdates?timeout=0&limit=1&offset=${offset}&allowed_updates=%5B%22message%22%5D`,
+    );
+    if (!response.ok) return false;
+    const body = (await response.json()) as { result?: unknown[] };
+    return (body.result?.length ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * What the bot received: each « /start <code> » links that chat to whoever the code was made for;
  * any other message from a linked chat is kept in her inbox (spec 035).
  */

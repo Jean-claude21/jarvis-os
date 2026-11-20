@@ -5,8 +5,11 @@ import type pg from 'pg';
 // answers; the watcher passed in the last five minutes; its last pass did not fail; nothing failed
 // in it (a reminder, a message, a backup, a rule). Counts only: nothing personal, not who runs it.
 
-/** A watcher silent this long is said down. */
-export const WATCHER_LATE_MS = 5 * 60_000;
+/**
+ * A watcher silent this long is said down. It sleeps up to an hour when nothing is due (rest for
+ * the database), so a quarter of an hour more.
+ */
+export const WATCHER_LATE_MS = 75 * 60_000;
 
 export interface Health {
   status: 'healthy' | 'unhealthy';

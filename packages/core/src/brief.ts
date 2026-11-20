@@ -111,6 +111,27 @@ export async function morningBrief(tx: Tx, now = new Date()): Promise<Brief> {
   };
 }
 
+/**
+ * When a person's brief is next due (rest for the database): today at her hour if it has not gone
+ * yet, else tomorrow at her hour. Null when she asked for none.
+ */
+export async function nextBriefAt(db: pg.Pool, person: string, now: Date): Promise<Date | null> {
+  return asPerson(db, person, async (tx) => {
+    const own = (await spacesOf(tx)).find((one) => one.personal);
+    if (!own) return null;
+    const at = (await preferencesOf(tx)).brief;
+    if (!at) return null;
+    const [channel] = await find(tx, own.id, { kind: 'Channel', limit: 1 });
+    const zone = await zoneOf(tx);
+    const local = localOf(now, zone);
+    const sent = channel?.data.brief_sent === local.day;
+    // Minutes from now to her hour today on her clock; past it and sent, tomorrow's.
+    let wait = (minutes(at) - minutes(local.time)) * 60_000;
+    if (wait < 0 && sent) wait += 86_400_000;
+    return new Date(now.getTime() + Math.max(wait, 0) - now.getSeconds() * 1000);
+  });
+}
+
 /** The people who asked for a brief and have where to be told. */
 export async function briefPeople(db: pg.Pool): Promise<string[]> {
   const { rows } = await db.query<{ person: string }>('select person from jarvis_brief_people()');

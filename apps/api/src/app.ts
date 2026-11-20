@@ -45,6 +45,7 @@ import { connectorService } from './connector-service';
 import { embedderFor } from './embeddings';
 import { secretsKey } from './secrets';
 import { healthOf } from './health';
+import { noteActivity } from './activity';
 import { computeDashboard, dashboardView, widgetsOf } from './views/dashboard';
 import { pageView } from './views/page';
 import { sharedView } from './views/shared';
@@ -82,9 +83,22 @@ export function makeApp(settings: Settings) {
 
   // For a monitor outside (spec 023): the database answers, the watcher passed lately and without
   // failure. Nothing personal, nor who runs the watcher. 503 when something is wrong.
+  // Rest for the database (after the Neon quota of 19 Nov 2026): the container's own check asks
+  // whether the process answers (`/alive`), never the database; `/health` reads the database at
+  // most every quarter of an hour, so a monitor outside does not keep it awake.
+  app.get('/alive', (c) => c.json({ alive: true }));
+  let healthKept: { at: number; health: Awaited<ReturnType<typeof healthOf>> } | null = null;
   app.get('/health', async (c) => {
-    const health = await healthOf(db);
+    const keep = Number(process.env.JARVIS_HEALTH_CACHE_MS ?? 15 * 60_000);
+    if (!healthKept || Date.now() - healthKept.at > keep)
+      healthKept = { at: Date.now(), health: await healthOf(db) };
+    const health = healthKept.health;
     return c.json(health, health.status === 'healthy' ? 200 : 503);
+  });
+  // A change made through a door: the watcher sharing this process looks at its next minute.
+  app.use('*', async (c, next) => {
+    if (c.req.method !== 'GET' && c.req.method !== 'HEAD') noteActivity();
+    await next();
   });
   app.on(['GET', 'POST'], '/auth/*', (c) => auth.handler(c.req.raw));
   // Actions from an e-mail (spec 020): a signed link, a page that asks, a button that acts.
@@ -98,7 +112,9 @@ export function makeApp(settings: Settings) {
     const url = new URL(c.req.url);
     const path = url.pathname.replace(/\/auth$/, '');
     url.pathname = `/auth${path}`;
-    return auth.handler(new Request(url, c.req.raw));
+    // A GET without a body: its method and headers, given as such (a Request as the init of
+    // another is refused by Node 26's fetch).
+    return auth.handler(new Request(url, { method: 'GET', headers: c.req.raw.headers }));
   });
 
   app.route(

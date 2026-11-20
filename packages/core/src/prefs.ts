@@ -42,6 +42,8 @@ export const preferencesSchema = z
       .optional(),
     /** The apps she said « not for me » to (spec 034): never proposed again. */
     appsDeclined: z.array(z.string().min(1).max(60)).max(200).optional(),
+    /** She has seen her first steps (v3 « Pour commencer »): the panel no longer shows. */
+    welcomed: z.boolean().optional(),
     /** The merges of kinds she said no to (spec 032): « dépense→Transaction ». */
     mergesDismissed: z.array(z.string().min(3).max(200)).max(500).optional(),
   })

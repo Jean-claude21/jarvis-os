@@ -17,6 +17,7 @@ import {
   rowClass,
   type TagTone,
 } from '../ui';
+import { Welcome } from './Welcome';
 import { QueuePanel, useQueue } from './Queue';
 
 // « Aujourd'hui » (v3 D11), the one door of the present, drawn like the v2 « Maintenant »: the
@@ -191,6 +192,11 @@ export function Today() {
           day: 'numeric',
           month: 'long',
         })}
+      />
+      <Welcome
+        onNote={() =>
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }))
+        }
       />
       <Stats>
         {stats.map(({ label, value, icon: Icon, bad, sub }) => (

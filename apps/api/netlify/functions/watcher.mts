@@ -18,12 +18,11 @@ setCallOut(
     .callOut,
 );
 
+// No schedule any more (rest for the database, after the Neon quota of 19 Nov 2026): a pass each
+// minute, and a ping that kept the site awake, kept its database awake day and night. The watcher
+// runs on the server of its own (host.ts), and opens the database only when something is due. This
+// function stays, to be called by hand.
 export default async () => {
-  // The site's own server kept awake: a sleeping one takes seconds to start for her first click.
-  const awake = fetch(`${settings.publicUrl.replace(/\/$/, '')}/health`).catch(() => undefined);
   const report = await watcherPass(db, delivery);
-  await awake;
   console.info('[watcher] pass', report ? JSON.stringify(report) : 'failed');
 };
-
-export const config = { schedule: '* * * * *' };

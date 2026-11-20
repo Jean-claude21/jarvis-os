@@ -92,6 +92,11 @@ export async function receive(
   problems: string[];
 }> {
   const input = receiveSchema.parse(raw);
+  // A key that may not write this kind is refused at once, whole: not item by item (spec 079 keeps
+  // one refused item from losing the others, not a whole answer of a kind it was never lent).
+  const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+  if (actor.kinds && !actor.kinds.some((one) => fold(one) === fold(input.kind)))
+    throw new Error(`This key may not write « ${input.kind} » (only ${actor.kinds.join(', ')}).`);
   const model = await modelOf(tx, spaceId, input.kind);
   const entries: { id?: string; kind?: string; title?: string; data: Record<string, unknown> }[] =
     [];

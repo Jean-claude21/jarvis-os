@@ -95,3 +95,8 @@
 - His routines online carry wrongly proposed triggers: bilan-hebdo every day at 9 h, bilan-mensuel
   every Monday. They are corrected only with his yes.
 - Changing a composed block's settings, and dragging blocks.
+
+## Since
+
+- Spec 107 (21 Nov 2026): a page is changed on the page itself (« Modifier », « Ajouter une carte »),
+  her pages’ named blocks become cards, and Aujourd’hui and a fiche get pages of their own.

@@ -725,8 +725,18 @@ export const WIDE = new Set([
 ]);
 
 /** One block in its panel (a figure stands alone, in the band of figures). */
-export function BlockView(props: BlockProps) {
-  const { block } = props;
+/** A card's width (spec 107): what it says, or a wide block the whole width, the others half. */
+export const sizeOf = (block: { block: string; size?: unknown }): 's' | 'm' | 'l' =>
+  block.size === 's' || block.size === 'm' || block.size === 'l'
+    ? block.size
+    : WIDE.has(block.block)
+      ? 'l'
+      : 'm';
+/** Its columns in the page's grid of six (one column on a narrow screen). */
+export const SPANS = { s: 'lg:col-span-2', m: 'lg:col-span-3', l: 'lg:col-span-6' } as const;
+
+export function BlockView(props: BlockProps & { action?: ReactNode }) {
+  const { block, action } = props;
   const Render = BLOCK_RENDERS[block.block];
   const body = block.error ? (
     <p className="px-4 py-4 text-[13px] text-error">{block.error}</p>
@@ -736,7 +746,7 @@ export function BlockView(props: BlockProps) {
     <Empty title={`« ${block.block} »`} lead="Ce composant n’a pas encore de rendu." />
   );
   return (
-    <Panel title={say(block.title, '')} className={WIDE.has(block.block) ? 'lg:col-span-2' : ''}>
+    <Panel title={say(block.title, '')} action={action} className={SPANS[sizeOf(block)]}>
       {body}
     </Panel>
   );
@@ -765,7 +775,7 @@ export function PageBlocks({
           ))}
         </Stats>
       )}
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <div className="grid items-start gap-4 lg:grid-cols-6">
         {rest.map((block, at) => (
           <BlockView key={at} block={block} vocabulary={vocabulary} refresh={refresh} />
         ))}

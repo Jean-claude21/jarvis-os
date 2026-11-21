@@ -30,6 +30,9 @@ const webAddress = (value: unknown) =>
   typeof value === 'string' && /^https?:\/\/[^\s<>"]+$/.test(value) ? value : null;
 const formula = z.string().trim().min(1).max(1000);
 const kind = z.string().trim().min(1).max(80);
+/** A card's width on a page (spec 107): a third, half or the whole width. */
+export const CARD_SIZES = ['s', 'm', 'l'] as const;
+const size = z.enum(CARD_SIZES).optional();
 
 /** What a « highlights » block can tell of a period. */
 export const HIGHLIGHT_PARTS = [
@@ -48,6 +51,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('stat'),
     title,
+    size,
     query: requestSchema,
     value: z.string().optional(),
     unit: z.string().max(20).optional(),
@@ -56,6 +60,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('stat_delta'),
     title,
+    size,
     query: requestSchema,
     value: z.string().optional(),
     unit: z.string().max(20).optional(),
@@ -64,6 +69,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('gauge'),
     title,
+    size,
     kind,
     where: formula.optional(),
     value: formula,
@@ -74,6 +80,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.enum(['bar', 'line', 'breakdown']),
     title,
+    size,
     query: requestSchema,
     label: z.string().optional(),
     value: z.string().optional(),
@@ -82,6 +89,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('heatmap'),
     title,
+    size,
     kind,
     where: formula.optional(),
     date: formula.default('date'),
@@ -91,6 +99,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('table'),
     title,
+    size,
     query: requestSchema,
     total: z.string().optional(),
   }),
@@ -101,6 +110,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('task_list'),
     title,
+    size,
     kind,
     where: formula.optional(),
     detail: formula.optional(),
@@ -113,6 +123,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('kanban'),
     title,
+    size,
     kind,
     by: z.string().trim().min(1).max(60),
     where: formula.optional(),
@@ -130,14 +141,16 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('calendar'),
     title,
+    size,
     days: z.number().int().min(1).max(31).default(7),
   }),
   /** A form to add an entry of a kind, from its model. */
-  z.object({ block: z.literal('form'), title, kind }),
+  z.object({ block: z.literal('form'), title, size, kind }),
   /** The escape hatch (decision 0004): one `select` over her copies, drawn as a figure, bars, a line or a table. */
   z.object({
     block: z.literal('sql'),
     title,
+    size,
     sql: z.string().trim().min(1).max(10_000),
     chart: z.enum(['number', 'bar', 'line', 'table']).default('table'),
   }),
@@ -145,11 +158,12 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('record'),
     title,
+    size,
     kind,
     relations: z.array(z.string().min(1).max(60)).max(10).optional(),
   }),
   /** A view of a kind inside the page (spec 016): table, kanban, calendar, map, gallery, timeline, tree. */
-  z.object({ block: z.literal('view'), title, view: viewDataSchema }),
+  z.object({ block: z.literal('view'), title, size, view: viewDataSchema }),
   /**
    * A data table (spec 070): its entries with their columns and facets, searched, filtered, sorted
    * and acted on in the page itself.
@@ -157,6 +171,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('datatable'),
     title,
+    size,
     kind,
     where: formula.optional(),
     columns: z.array(z.string().trim().min(1).max(60)).min(1).max(12),
@@ -170,6 +185,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('review'),
     title,
+    size,
     kind,
     where: formula.optional(),
     subtitle: z.array(z.string().trim().min(1).max(60)).max(3).optional(),
@@ -188,6 +204,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('highlights'),
     title,
+    size,
     parts: z
       .array(z.enum(HIGHLIGHT_PARTS))
       .min(1)
@@ -201,6 +218,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('live'),
     title,
+    size,
     data: z
       .object({
         kind,
@@ -217,6 +235,7 @@ export const blockSchema = z.discriminatedUnion('block', [
   z.object({
     block: z.literal('funnel'),
     title,
+    size,
     kind,
     where: formula.optional(),
     by: z.string().trim().min(1).max(60),
@@ -250,6 +269,10 @@ export const pageDataSchema = z.object({
   label: labelSchema.optional(),
   /** Its place among the app's pages. */
   order: z.number().int().optional(),
+  /** Aujourd'hui's band of cards (spec 107): her own cards, one page per space. */
+  today: z.boolean().optional(),
+  /** A kind's fiche (spec 107): drawn for one entry of it, `{record}` its id. */
+  for: kind.optional(),
 });
 export type PageData = z.infer<typeof pageDataSchema>;
 
@@ -350,6 +373,7 @@ export type DrawnBlock = Record<string, unknown> & {
   block: string;
   title: string | Label | null;
   kind?: string;
+  size?: (typeof CARD_SIZES)[number];
   error?: string;
 };
 
@@ -823,11 +847,13 @@ export async function renderPage(
   const blocks: DrawnBlock[] = [];
   for (const block of data.blocks) {
     try {
-      blocks.push(await drawBlock(reader, tx, block, inside));
+      const drawn = await drawBlock(reader, tx, block, inside);
+      blocks.push(block.size ? { ...drawn, size: block.size } : drawn);
     } catch (error) {
       blocks.push({
         block: block.block,
         title: block.title ?? null,
+        ...(block.size ? { size: block.size } : {}),
         error: (error as Error).message,
       });
     }
@@ -867,10 +893,16 @@ export async function renderPage(
 }
 
 /** The pages of a space (of one app if given), in their order. */
+/**
+ * Where a page stands (spec 107): in an app (or none: her bilans), Aujourd'hui's band, or a kind's
+ * fiche. An app's list never holds the band nor a fiche.
+ */
+export type PagePlace = { app?: string; today?: boolean; for?: string };
+
 export async function pagesOf(
   tx: Tx,
   spaceId: string,
-  app?: string,
+  place: string | PagePlace = {},
 ): Promise<
   {
     id: string;
@@ -881,6 +913,8 @@ export async function pagesOf(
     format: 'dashboard' | 'review';
   }[]
 > {
+  const where: PagePlace = typeof place === 'string' ? { app: place } : place;
+  const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
   const { rows } = await tx.query<{ id: string; title: string; data: Record<string, unknown> }>(
     `select id, title, data from entry
       where space_id = $1 and archived_at is null and jarvis_fold(kind) = jarvis_fold($2)
@@ -896,8 +930,26 @@ export async function pagesOf(
       app: typeof row.data.app === 'string' ? row.data.app : null,
       order: typeof row.data.order === 'number' ? row.data.order : 100,
       format: row.data.format === 'review' ? ('review' as const) : ('dashboard' as const),
+      today: row.data.today === true,
+      for: typeof row.data.for === 'string' ? row.data.for : null,
     }))
-    .filter((page) => !app || (page.app ?? '').toLowerCase() === app.toLowerCase())
+    .filter((page) =>
+      where.today
+        ? page.today
+        : where.for
+          ? fold(page.for ?? '') === fold(where.for)
+          : !page.today &&
+            !page.for &&
+            (!where.app || (page.app ?? '').toLowerCase() === where.app.toLowerCase()),
+    )
+    .map((page) => {
+      const kept: Omit<typeof page, 'today' | 'for'> & { today?: boolean; for?: string | null } = {
+        ...page,
+      };
+      delete kept.today;
+      delete kept.for;
+      return kept as Omit<typeof page, 'today' | 'for'>;
+    })
     .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
 }
 

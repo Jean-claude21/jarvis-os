@@ -9,6 +9,7 @@ import { Avatar, Button, Empty, Menu, Panel, Segmented, Skeleton, Tabs, Tag, cn 
 import { Identity } from '../ui/identity';
 import { Markdown } from '../ui/Markdown';
 import { DateInput, DropZone, FileIcon, Select, toast, useConfirm } from '../ui/more';
+import { CatalogCards } from '../blocks/Cards';
 
 // The catalogue of components (v3 D21): every component of the registry, by category — a live
 // preview, when to use it, what it needs, its names, the sentence to say to Claude, and for a
@@ -681,6 +682,7 @@ export function ComponentsCatalog() {
   const shown = data.components.filter((one) => category === 'all' || one.category === category);
   return (
     <>
+      <CatalogCards />
       <div className="flex flex-wrap items-center gap-2">
         <Segmented
           label="Catégorie"

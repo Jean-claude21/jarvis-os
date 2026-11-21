@@ -106,6 +106,7 @@ import {
   type Space,
   type Tx,
   withComputed,
+  cardsOf,
   pagesOf,
   renderPage,
   installApp,
@@ -916,9 +917,23 @@ export function apiRoutes(deps: {
   });
 
   // The pages of her apps (spec 014): the list, and one computed for her filters.
-  api.get('/pages', async (c) =>
-    c.json(await act(c, (tx, _a, space) => pagesOf(tx, space, c.req.query('app') || undefined))),
-  );
+  // Where a page stands (spec 107): an app's, Aujourd'hui's band (`today=1`), a kind's fiche (`for`).
+  api.get('/pages', async (c) => {
+    const [app, kind] = [c.req.query('app'), c.req.query('for')];
+    const place = {
+      ...(app ? { app } : {}),
+      ...(c.req.query('today') ? { today: true } : {}),
+      ...(kind ? { for: kind } : {}),
+    };
+    return c.json(await act(c, (tx, _a, space) => pagesOf(tx, space, place)));
+  });
+  // Her cards (spec 107): what « Ajouter une carte » and the catalogue offer — this app's first,
+  // or a fiche's (`kind`).
+  api.get('/cards', async (c) => {
+    const [app, kind] = [c.req.query('app'), c.req.query('kind')];
+    const place = { ...(app ? { app } : {}), ...(kind ? { kind } : {}) };
+    return c.json(await act(c, (tx, _a, space) => cardsOf(tx, space, place)));
+  });
 
   // The components (v3 D21): the registry the catalogue, the pages and the assistants read.
   api.get('/components', (c) =>
@@ -927,8 +942,12 @@ export function apiRoutes(deps: {
   // A page tried, not kept: its blocks computed on her data (the catalogue's « Essayer »).
   api.post('/pages/try', async (c) => {
     const data = (await c.req.json()) as Record<string, unknown>;
+    // A fiche's page tried for the entry it shows (spec 107).
+    const record = c.req.query('record');
     return c.json(
-      await act(c, (tx, _a, space) => renderPage(tx, space, { id: 'try', title: 'Essai', data })),
+      await act(c, (tx, _a, space) =>
+        renderPage(tx, space, { id: 'try', title: 'Essai', data }, record ? { record } : {}),
+      ),
     );
   });
 

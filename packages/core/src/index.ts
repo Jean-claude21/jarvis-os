@@ -204,6 +204,7 @@ export {
   checkPage,
   PAGE_KIND,
   pageDataSchema,
+  CARD_SIZES,
   pagesOf,
   renderPage,
   renderRecord,
@@ -211,7 +212,9 @@ export {
   type DrawnBlock,
   type DrawnPage,
   type PageData,
+  type PagePlace,
 } from './pages';
+export { cardIdOf, cardsOf, familyOf, type Card, type CardFamily } from './cards';
 export { trial, type Trial, type TrialChange } from './trial';
 export {
   actionSchema,

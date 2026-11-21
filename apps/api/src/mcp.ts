@@ -17,6 +17,7 @@ import {
   type ProposalInput,
   replan,
   windowOf,
+  cardsOf,
   COMPONENTS,
 } from '@jarvis-os/core';
 import { withWho } from './who';
@@ -685,19 +686,42 @@ export async function mcpServerFor(
     'components',
     {
       description:
-        'The components of Jarvis (v3 D21) — page formats, figures and charts, lists and views, inputs, identity, content, feedback — each with its names (any of them works), what it needs (facets, fields), when to use it, and, for a page block, an example. Read it before writing a « Page » or proposing an app: choose components, never write a layout. `category` or `need` (a facet) narrows the list.',
+        'The components of Jarvis (v3 D21) — page formats, figures and charts, lists and views, inputs, identity, content, feedback — each with its names (any of them works), what it needs (facets, fields), when to use it, and, for a page block, an example. Read it before writing a « Page » or proposing an app: choose components, never write a layout. `category` or `need` (a facet) narrows the list. With `cards: true`, her cards instead (spec 107): the named blocks of her pages, each once, ready to put on another page as they are (an app’s first with `app`; a fiche’s with `kind`, read for one entry by `{record}`). A block may say its `size`: s, m or l. A page with `today: true` is her band on Aujourd’hui; with `for: <kind>`, the fiche of that kind.',
       inputSchema: {
         category: z.string().max(40).optional(),
         need: z.string().max(40).optional(),
+        cards: z.boolean().optional(),
+        app: z.string().max(60).optional(),
+        kind: z.string().max(80).optional(),
+        space: spaceArg,
       },
       annotations: { readOnlyHint: true },
     },
-    tool(async ({ category, need }: { category?: string | undefined; need?: string | undefined }) =>
-      COMPONENTS.filter(
-        (one) =>
-          (!category || one.category === category) &&
-          (!need || (one.needs?.facets ?? []).includes(need)),
-      ),
+    tool(
+      async ({
+        category,
+        need,
+        cards,
+        app,
+        kind,
+        space,
+      }: {
+        category?: string | undefined;
+        need?: string | undefined;
+        cards?: boolean | undefined;
+        app?: string | undefined;
+        kind?: string | undefined;
+        space?: string | undefined;
+      }) =>
+        cards
+          ? act((tx) =>
+              cardsOf(tx, at(space), { ...(app ? { app } : {}), ...(kind ? { kind } : {}) }),
+            )
+          : COMPONENTS.filter(
+              (one) =>
+                (!category || one.category === category) &&
+                (!need || (one.needs?.facets ?? []).includes(need)),
+            ),
     ),
   );
 

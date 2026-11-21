@@ -29,6 +29,7 @@ import { Markdown } from '../ui/Markdown';
 import { TextEditor } from '../ui/TextEditor';
 import { FieldRow, LinksPanel, NotesPanel, TitleEdit, type EditableField } from './EntryParts';
 import { FileActions, FileField, FileThumb } from './FileParts';
+import { PlaceCards } from '../blocks/Cards';
 
 // La fiche (v3 D10): one entry, drawn from its kind's facets — who it is (avatar, logo, the
 // gestures that reach them, the last contact), what a document is (its preview, what Jarvis read
@@ -521,6 +522,16 @@ export function EntryView({
                 )}
               </dl>
             </Panel>
+          )}
+          {/* Its cards (spec 107): the kind's fiche page, computed for this entry. */}
+          {!isFile && shape?.model && (
+            <PlaceCards
+              place={{ for: one.kind }}
+              record={one.id}
+              title={`Fiche ${kindName(one.kind)}`}
+              heading="Ses cartes"
+              emptyLead={`Ajoute des cartes : elles vaudront pour chaque ${kindName(one.kind).toLowerCase()}.`}
+            />
           )}
           {isFile && <FileActions id={one.id} title={one.title} data={one.data} />}
           {!isFile && (

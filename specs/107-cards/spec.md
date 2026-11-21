@@ -1,0 +1,103 @@
+# 107 — Les cartes: dashboards made on the page itself, at every scale
+
+_21 Nov 2026. After the study of a reference CRM (dashboards of named cards, « Add card » on the
+page, the same cards on a record). The author validated the plan the same day._
+
+## Step back (the standing rule)
+
+What it is in the v3 model: **not a new module**. A card is a **block of the registry, already set
+and named** — a page is already a list of blocks (spec 014), drawn by one renderer (D21). What the
+v3 lacks is not an engine but three gestures and one scale:
+
+1. **Named cards.** Today a block is generic: she answers questions to set it. Yet her apps' pages
+   already hold blocks set and named (« Dépenses du mois », « À payer »). Those are the cards.
+2. **Changing the page on the page.** Today « Modifier la page » leaves for the Composer. The page
+   itself should open « Ajouter une carte », show what is « Sur la page », move, widen, remove.
+3. **The fiche as a scale.** An entry's fiche has no cards. A page attached to a kind, computed for
+   one entry (`{record}`, already understood by every formula), gives it some.
+4. **Aujourd'hui** stays a moment, not a dashboard (never mix natures): it gains only a band of
+   cards of her own, made the same way.
+
+What already exists and stays: an app's menu (Aperçu, its pages, its data, its activity) is
+already its tabs; the Composer stays, as « Un bloc à moi » for what no card covers.
+
+## What changes
+
+### 1. A card (core)
+
+- `cardsOf(space, { app?, kind? })`: every block **with a title** on her pages, each once (the
+  same settings twice are one card), with its app, the page it comes from and its family:
+  - **Chiffres**: stat, stat_delta, gauge;
+  - **Graphiques**: bar, line, breakdown, heatmap, funnel, sql;
+  - **Listes**: table, datatable, task_list, kanban, review, calendar, view, record, highlights;
+  - **Saisie**: form.
+- For a fiche (`kind`): the cards **derived from her models** — for every kind that points to this
+  one by a relation field: « Ses <kind> » (a table of those that point to this entry), and when
+  that kind has an amount, « Total <kind> ». Nothing is written per domain: an app that relates its
+  kinds gets fiche cards.
+- A block may say its **size**: `s`, `m` or `l` (a third, half or the whole width). Without it, a
+  wide block (table, kanban, calendar…) is `l`, the others `m`. The figures stay in their band.
+- A page may be **Aujourd'hui's band** (`today: true`, one per space) or **a kind's fiche**
+  (`for: <kind>`, one per kind), drawn with `record` = the entry shown.
+
+### 2. Changing on the page (client)
+
+- Every page (an app's page, Aujourd'hui's band, a fiche) has « Modifier ». In that mode:
+  - each card has: move up, move down, its size (S, M, L), remove;
+  - « Ajouter une carte » opens a panel: a search, the families (Toutes, Chiffres, Graphiques,
+    Listes, Saisie), each card with its app and its sentence, « Sur la page » when it is there, « + »
+    otherwise; at the end, « Un bloc à moi » (the Composer);
+  - « Enregistrer » keeps the page; « Annuler » leaves it as it was.
+- On the phone: one column, the same buttons (no dragging).
+
+### 3. The scales
+
+- **An app**: its menu stays its tabs; « + Nouvelle page » at the end of its pages.
+- **Aujourd'hui**: « Mes cartes », a band under the figures; empty, it offers « Ajouter une carte ».
+- **A fiche**: « Ses cartes » under its fields, the kind's page drawn for this entry; the first card
+  added makes the kind's page.
+
+### 4. The catalogue of components
+
+- A section « Cartes de tes apps » above the blocks: each card computed on her data, with
+  « Ajouter à… » (her pages, Aujourd'hui).
+- One source: the panel and the catalogue read the same `GET /api/cards`.
+
+### 5. Through the assistant
+
+- The MCP tool that lists components also lists her cards; Claude adds one to a page by saving the
+  page, as it already does.
+
+## How it fits
+
+```mermaid
+flowchart LR
+  P[Her pages<br/>kind « Page »] -->|named blocks, once each| C[cardsOf]
+  M[Her models<br/>a link to the kind] -->|« X liés », « Total des X »| C
+  C --> API[GET /api/cards]
+  C --> MCP[MCP components, cards: true]
+  API --> Panel[« Ajouter une carte »]
+  API --> Cat[Catalogue › Cartes de tes apps]
+  Panel --> AppPage[An app's page]
+  Panel --> Band[Aujourd'hui › Mes cartes<br/>page today: true]
+  Panel --> Fiche[A fiche › Ses cartes<br/>page for: kind, drawn with record]
+  Cat -->|Ajouter à…| AppPage
+  Cat -->|Ajouter à…| Band
+```
+
+A figure (`stat`, `stat_delta`) stands in the band of figures at the top of a page: in
+« Modifier » it is moved or removed, never widened. Every other card has its size.
+
+## Proof
+
+- Core (Vitest): cards from pages, once each, with their family; fiche cards derived from a
+  relation; a page `today` and a page `for` checked; sizes.
+- API (Vitest): `GET /api/cards`, `GET /api/pages?today=1`, `GET /api/pages?for=<kind>`, a fiche page
+  drawn for one entry.
+- End to end (Playwright, three widths): on an app's page, « Modifier », add a card, widen it, move
+  it, remove one, save, reload — the page is as left; Aujourd'hui's band from empty; a fiche's
+  cards; the catalogue's « Ajouter à… ».
+
+## Out of scope (next: spec 108)
+
+Agents' questions, signals in Aujourd'hui with tabs by app, skills as buttons on a fiche.

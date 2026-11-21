@@ -44,6 +44,14 @@ chaque écran et chaque geste dans un vrai navigateur, aux trois largeurs (`apps
 - [ ] Objectifs : où tu en es, et tes habitudes sur 28 jours.
 - [ ] « Nouveau bilan » propose tes skills de bilan seulement.
 
+## 3 bis. Les cartes (spec 107)
+
+- [ ] Sur une page d'app, « Modifier » : ajouter une carte, la déplacer, l'élargir, en retirer
+      une, « Enregistrer » ; recharger : la page est comme laissée. « Annuler » ne change rien.
+- [ ] Aujourd'hui › « Mes cartes » : depuis rien, une carte ajoutée reste là chaque jour.
+- [ ] Une fiche (un compte, un abonnement) › « Ses cartes » : les entrées liées à elle seule.
+- [ ] Construire › Composants › « Cartes de tes apps » : « Voir », puis « Ajouter à… ».
+
 ## 4. Ceux qui travaillent pour toi
 
 - [ ] Construire : chaque agent et ses automatismes ; ceux « par défaut » sont les bons.

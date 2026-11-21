@@ -39,6 +39,7 @@ import {
 import { Select, toast } from '../ui/more';
 import { showValue } from '../engine/format';
 import { PageBlocks, say, type Drawn, type Vocabulary } from '../blocks/Blocks';
+import { CardsEditor } from '../blocks/Cards';
 import { Overview } from './Overview';
 import { useFiles, useKindRows } from '../engine/sources';
 import type { RenderKey } from '../engine/types';
@@ -1109,6 +1110,16 @@ interface DrawnPage {
 export function PageView({ id, app }: { id: string; app?: string }) {
   const client = useQueryClient();
   const [params, setParams] = useState<Record<string, string>>({});
+  // « Modifier » (spec 107): the page changed on the page itself.
+  const [editing, setEditing] = useState(false);
+  const raw = useQuery({
+    queryKey: ['entry', id],
+    queryFn: () =>
+      api<{ id: string; title: string; data: Record<string, unknown> & { blocks?: never[] } }>(
+        `/entries/${id}`,
+      ),
+    enabled: editing,
+  });
   const query = new URLSearchParams(params).toString();
   const { data, isLoading, error } = useQuery({
     queryKey: ['entries', 'page', id, query],
@@ -1117,6 +1128,17 @@ export function PageView({ id, app }: { id: string; app?: string }) {
   if (isLoading) return <Skeleton className="h-60" />;
   if (error || !data)
     return <Empty title="Page indisponible" lead={(error as Error | null)?.message ?? ''} />;
+  if (editing)
+    return raw.data ? (
+      <CardsEditor
+        page={raw.data}
+        place={app ? { app } : {}}
+        title={raw.data.title}
+        onDone={() => setEditing(false)}
+      />
+    ) : (
+      <Skeleton className="h-60" />
+    );
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -1131,14 +1153,10 @@ export function PageView({ id, app }: { id: string; app?: string }) {
             }
           />
         )}
-        <Link
-          to="/composer"
-          search={{ page: id, ...(app ? { app } : {}) }}
-          className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-[2px] border border-rule bg-paper px-2.5 text-[13px] font-semibold hover:border-rule-strong"
-        >
+        <Button size="sm" className="ml-auto" onClick={() => setEditing(true)}>
           <Pencil size={14} />
-          Modifier la page
-        </Link>
+          Modifier
+        </Button>
       </div>
       {data.filters.some((one) => one.type === 'month' || one.type === 'choice') && (
         <div className="flex flex-wrap items-center gap-2">

@@ -131,6 +131,42 @@ describe('the v3 routes', () => {
     expect(gone.body.error).toContain('No app « Garanties »');
   });
 
+  it('cards: her pages’ named blocks, Aujourd’hui’s band and a fiche apart (spec 107)', async () => {
+    const ama = await signUp('Ama');
+    expect((await ama.json('/api/apps/install', { name: 'finances', dryRun: false })).status).toBe(
+      200,
+    );
+    const cards = await ama.json<{ title: unknown; family: string; app: string }[]>(
+      '/api/cards?app=Finances',
+    );
+    expect(cards.status).toBe(200);
+    expect(cards.body.length).toBeGreaterThan(3);
+    expect(cards.body[0]?.app).toBe('Finances');
+    expect(new Set(cards.body.map((one) => one.family))).toEqual(
+      new Set(['figure', 'chart', 'list', 'input']),
+    );
+    const band = cards.body.slice(0, 2).map((one) => ({
+      ...(one as unknown as { block: Record<string, unknown> }).block,
+      size: 'l',
+    }));
+    expect(
+      (
+        await ama.json('/api/save', {
+          entries: [{ kind: 'Page', title: 'Mes cartes', data: { today: true, blocks: band } }],
+        })
+      ).status,
+    ).toBe(200);
+    const today = await ama.json<{ title: string }[]>('/api/pages?today=1');
+    expect(today.body.map((one) => one.title)).toEqual(['Mes cartes']);
+    const finances = await ama.json<{ title: string }[]>('/api/pages?app=Finances');
+    expect(finances.body.some((one) => one.title === 'Mes cartes')).toBe(false);
+    // A fiche of Account: the transactions that point to it, and their total.
+    const fiche = await ama.json<{ title: { fr: string } }[]>('/api/cards?kind=Account');
+    expect(fiche.body.map((one) => one.title.fr)).toEqual(
+      expect.arrayContaining(['Mouvements liés', 'Total des mouvements']),
+    );
+  });
+
   it('a phrase taken twice is refused in words; the brief is sent nowhere without a channel', async () => {
     const ama = await signUp('Ama');
     const rule = (title: string) => ({

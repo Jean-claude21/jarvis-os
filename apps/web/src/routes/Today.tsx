@@ -19,6 +19,7 @@ import {
 } from '../ui';
 import { Welcome } from './Welcome';
 import { QueuePanel, useQueue } from './Queue';
+import { PlaceCards } from '../blocks/Cards';
 
 // « Aujourd'hui » (v3 D11), the one door of the present, drawn like the v2 « Maintenant »: the
 // figures; « À valider » first (the one queue, v3 D13); what else waits for her; her day; and the
@@ -210,6 +211,13 @@ export function Today() {
           />
         ))}
       </Stats>
+      {/* Her own cards (spec 107): a band under the figures, made on the spot. */}
+      <PlaceCards
+        place={{ today: true }}
+        title="Mes cartes"
+        heading="Mes cartes"
+        emptyLead="Pose ici les chiffres et les listes de tes apps que tu veux voir chaque jour."
+      />
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="flex min-w-0 flex-col gap-4">
           <QueuePanel />

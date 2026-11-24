@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { ArrowLeft, LayoutDashboard, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, ChevronRight, LayoutDashboard, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { CardsEditor, type Card } from '../blocks/Cards';
 import { api } from '../lib/api';
@@ -44,6 +44,83 @@ export function overviewOf(cards: Card[]): Card['block'][] {
 }
 
 const nameOf = (one: PageRow) => one.label?.fr ?? one.title;
+
+/** Whether « Dans tes apps » is open: kept on this device only, closed by default. */
+const OPEN_KEY = 'jarvis.dashboards.inApps';
+const readOpen = () => {
+  try {
+    return localStorage.getItem(OPEN_KEY) === 'open';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Her apps' own dashboards (spec 107): never listed twice — a folded line, one row per app, its
+ * dashboards as links; open or closed as she left it.
+ */
+function InApps({ pages, onOpen }: { pages: PageRow[]; onOpen: (one: PageRow) => void }) {
+  const [open, setOpen] = useState(readOpen);
+  const byApp = new Map<string, PageRow[]>();
+  for (const one of pages) byApp.set(one.app!, [...(byApp.get(one.app!) ?? []), one]);
+  const apps = [...byApp.keys()].sort((a, b) => a.localeCompare(b, 'fr'));
+  const toggle = () => {
+    setOpen(!open);
+    try {
+      localStorage.setItem(OPEN_KEY, open ? 'closed' : 'open');
+    } catch {
+      // A browser that keeps nothing: open or closed for this visit only.
+    }
+  };
+  return (
+    <section aria-label="Dans tes apps" className="rounded-[12px] border border-rule bg-paper">
+      <button
+        onClick={toggle}
+        aria-expanded={open}
+        className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left"
+      >
+        <ChevronRight
+          size={16}
+          aria-hidden
+          className={open ? 'rotate-90 transition-transform' : 'transition-transform'}
+        />
+        <b className="text-[14px]">Dans tes apps</b>
+        <span className="text-[12.5px] text-bark">
+          {apps.length} app{apps.length > 1 ? 's' : ''} · {pages.length} tableau
+          {pages.length > 1 ? 'x' : ''}
+        </span>
+        <span className="ml-auto text-[12.5px] text-bark">{open ? 'Cacher' : 'Afficher'}</span>
+      </button>
+      {open && (
+        <ul className="border-t border-rule">
+          {apps.map((app) => (
+            <li
+              key={app}
+              className="flex flex-wrap items-center gap-2 border-b border-rule px-4 py-2.5 last:border-b-0"
+            >
+              <span className="flex w-full items-center gap-2 sm:w-52 sm:flex-none">
+                <AppIcon name={app} size={22} />
+                <b className="truncate text-[13.5px]">{app}</b>
+              </span>
+              <span className="flex min-w-0 flex-1 flex-wrap gap-1.5">
+                {byApp.get(app)!.map((one) => (
+                  <button
+                    key={one.id}
+                    onClick={() => onOpen(one)}
+                    aria-label={`${app} › ${nameOf(one)}`}
+                    className="cursor-pointer rounded-[2px] border border-rule bg-sand px-2 py-1 text-[12.5px] hover:border-rule-strong hover:text-ink"
+                  >
+                    {nameOf(one)}
+                  </button>
+                ))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 export function DashboardsPage() {
   const search = useSearch({ from: '/tableaux' });
@@ -240,23 +317,7 @@ export function DashboardsPage() {
               <div className="flex justify-center pb-5">{actions}</div>
             </Panel>
           )}
-          {inApps.length > 0 && (
-            <p aria-label="Dans mes apps" className="text-[13px] text-bark">
-              Les tableaux de chaque app sont dans l’app :{' '}
-              {inApps.map((one, at) => (
-                <span key={one.id}>
-                  {at > 0 && ', '}
-                  <button
-                    onClick={() => choose(one)}
-                    className="cursor-pointer font-semibold text-primary underline"
-                  >
-                    {one.app} › {nameOf(one)}
-                  </button>
-                </span>
-              ))}
-              .
-            </p>
-          )}
+          {inApps.length > 0 && <InApps pages={inApps} onOpen={choose} />}
         </>
       )}
       {confirm.node}

@@ -502,7 +502,11 @@ export {
 export {
   answersSchema,
   choicesOf,
+  answersOf,
   composeBlock,
+  reshapeBlock,
+  SETTABLE,
+  WITHIN,
   fits,
   type Answers,
   type Ask,

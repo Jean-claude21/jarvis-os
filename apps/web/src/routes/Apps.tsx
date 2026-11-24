@@ -39,7 +39,7 @@ import {
 import { Select, toast } from '../ui/more';
 import { showValue } from '../engine/format';
 import { PageBlocks, say, type Drawn, type Vocabulary } from '../blocks/Blocks';
-import { CardsEditor } from '../blocks/Cards';
+import { CardsEditor, useQuickCharts } from '../blocks/Cards';
 import { Overview } from './Overview';
 import { useFiles, useKindRows } from '../engine/sources';
 import type { RenderKey } from '../engine/types';
@@ -1118,8 +1118,9 @@ export function PageView({ id, app }: { id: string; app?: string }) {
       api<{ id: string; title: string; data: Record<string, unknown> & { blocks?: never[] } }>(
         `/entries/${id}`,
       ),
-    enabled: editing,
   });
+  // A chart's shape and time, set on the page itself (spec 107).
+  const actionFor = useQuickCharts(raw.data as never);
   const query = new URLSearchParams(params).toString();
   const { data, isLoading, error } = useQuery({
     queryKey: ['entries', 'page', id, query],
@@ -1187,6 +1188,7 @@ export function PageView({ id, app }: { id: string; app?: string }) {
         blocks={data.blocks}
         vocabulary={data.vocabulary}
         refresh={() => void client.invalidateQueries({ queryKey: ['entries'] })}
+        actionFor={actionFor}
       />
     </>
   );

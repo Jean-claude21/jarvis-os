@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Pencil, Plus, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Pencil, Plus, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { api } from '../lib/api';
 import {
@@ -17,6 +17,8 @@ import {
 import { Select, toast } from '../ui/more';
 import { BlockView, PageBlocks, SPANS, say, sizeOf, type Drawn, type Vocabulary } from './Blocks';
 import { AddBlock, type Composable } from '../routes/PageCompose';
+import { CardSettings, QuickChart } from './CardSettings';
+import { useKinds } from '../lib/kinds';
 
 // The cards (spec 107): a page changed on the page itself. « Modifier » puts each card's gestures
 // on it (move, its size, remove) and « Ajouter une carte » opens her cards — her pages' named
@@ -250,6 +252,8 @@ export function CardsEditor({
   const client = useQueryClient();
   const [blocks, setBlocks] = useState<Block[]>(() => page?.data.blocks ?? []);
   const [adding, setAdding] = useState(false);
+  // « Régler » (spec 107): the card whose settings are open.
+  const [setting, setSetting] = useState<number | null>(null);
   const data = useMemo(
     () => ({ ...(page?.data ?? place), blocks }) as Record<string, unknown>,
     [page, place, blocks],
@@ -382,6 +386,14 @@ export function CardsEditor({
                 <Button
                   size="sm"
                   tone="quiet"
+                  aria-label={`Régler « ${name} »`}
+                  onClick={() => setSetting(at)}
+                >
+                  <SlidersHorizontal size={14} />
+                </Button>
+                <Button
+                  size="sm"
+                  tone="quiet"
                   aria-label={`Retirer « ${name} »`}
                   onClick={() => setBlocks((was) => was.filter((_, i) => i !== at))}
                 >
@@ -409,6 +421,16 @@ export function CardsEditor({
             );
           })}
         </div>
+      )}
+      {setting !== null && blocks[setting] && (
+        <CardSettings
+          block={blocks[setting]}
+          open
+          onOpenChange={(open) => !open && setSetting(null)}
+          onApply={(set) =>
+            setBlocks((was) => was.map((one, i) => (i === setting ? (set as Block) : one)))
+          }
+        />
       )}
       <CardPanel
         open={adding}
@@ -460,6 +482,7 @@ export function PlaceCards({
     enabled: !!id && !editing,
   });
   const client = useQueryClient();
+  const actionFor = useQuickCharts(entry.data);
   if (pages.isLoading || (id && entry.isLoading)) return <Skeleton className="h-24" />;
   return (
     <section aria-label={heading} className="flex flex-col gap-3">
@@ -487,6 +510,7 @@ export function PlaceCards({
           blocks={drawn.data.blocks}
           vocabulary={drawn.data.vocabulary}
           refresh={() => void client.invalidateQueries({ queryKey: ['entries'] })}
+          actionFor={actionFor}
         />
       ) : (
         <Skeleton className="h-24" />
@@ -617,4 +641,31 @@ export function CatalogCards() {
       </ul>
     </section>
   );
+}
+
+/**
+ * On a saved page (spec 107), the quick settings of its charts — shape and time — kept on the page
+ * at once: `actionFor` for `PageBlocks`.
+ */
+export function useQuickCharts(page: PageEntry | undefined) {
+  const client = useQueryClient();
+  const { data: kinds = [] } = useKinds();
+  const save = async (at: number, block: Block) => {
+    if (!page) return;
+    const blocks = (page.data.blocks ?? []).map((one, i) => (i === at ? block : one));
+    await api('/save', {
+      method: 'POST',
+      body: { entries: [{ id: page.id, title: page.title, data: { ...page.data, blocks } }] },
+    });
+    await client.invalidateQueries({ queryKey: ['entry'] });
+    await client.invalidateQueries({ queryKey: ['entries'] });
+  };
+  return (at: number) => {
+    const block = page?.data.blocks?.[at];
+    if (!block || !['bar', 'line', 'breakdown'].includes(block.block)) return null;
+    const kind = (block.query as { kind?: string } | undefined)?.kind;
+    const dated =
+      kinds.find((one) => one.kind === kind)?.facets?.some((one) => one.facet === 'dated') ?? false;
+    return <QuickChart block={block} dated={dated} onChange={(set) => save(at, set)} />;
+  };
 }

@@ -166,6 +166,51 @@ describe('the v3 routes', () => {
     );
   });
 
+  it('a card set on screen: read back, changed, drawn (spec 107)', async () => {
+    const ama = await signUp('Ama');
+    await ama.json('/api/apps/install', { name: 'finances', dryRun: false });
+    const cards =
+      await ama.json<{ title: { fr: string }; block: Record<string, unknown> }[]>(
+        '/api/cards?app=Finances',
+      );
+    const of = (fr: string) => cards.body.find((one) => one.title.fr === fr)!.block;
+    // A figure with its comparison is not set on screen: its name and size only.
+    const spending = await ama.json<{ answers: unknown; settable: boolean }>('/api/cards/answers', {
+      block: of('Dépenses du mois'),
+    });
+    expect(spending.body).toEqual({ answers: null, settable: false });
+    // Spending by fund: read back (by the fund it points to), made bars over three months, drawn.
+    const byFund = of('Dépenses par fonds');
+    const read = await ama.json<{ answers: Record<string, unknown> }>('/api/cards/answers', {
+      block: byFund,
+    });
+    expect(read.body.answers).toMatchObject({
+      component: 'breakdown',
+      kind: 'Transaction',
+      measure: 'amount',
+      group: 'fund',
+      only: { field: 'direction', value: 'out' },
+    });
+    const set = await ama.json<{ block: { block: string; query: { where: string } } }>(
+      '/api/cards/reshape',
+      { block: byFund, answers: { ...read.body.answers, component: 'bar', within: '3m' } },
+    );
+    expect(set.status).toBe(200);
+    expect(set.body.block.block).toBe('bar');
+    expect(set.body.block.query.where).toContain('last_days(date, 92)');
+    const drawn = await ama.json<{ blocks: { error?: string }[] }>('/api/pages/try', {
+      blocks: [set.body.block],
+      filters: [{ name: 'month', type: 'month' }],
+    });
+    expect(drawn.body.blocks[0]?.error).toBeUndefined();
+    // Refused in words: a kind that does not exist here.
+    const refused = await ama.json('/api/cards/reshape', {
+      block: byFund,
+      answers: { component: 'stat', kind: 'Personne' },
+    });
+    expect(refused.status).toBe(400);
+  });
+
   it('a phrase taken twice is refused in words; the brief is sent nowhere without a channel', async () => {
     const ama = await signUp('Ama');
     const rule = (title: string) => ({

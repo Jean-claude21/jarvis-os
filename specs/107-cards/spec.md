@@ -88,6 +88,40 @@ The author asked where the dashboards are: they lived only inside an app. Now:
   block made from plain answers (which kind, how to count, by what), named; once saved, it is one of
   her cards everywhere. It replaces the link « Un bloc à moi ».
 
+### 7. A card set on screen (added 24 Nov 2026)
+
+The author: « certaines données peuvent être configurées dans certains graphes quand j'aimerais —
+valable pour tout composant ». A card placed was fixed (moved, widened, removed only).
+
+- **Read back, set anew.** The core reads a card back as the Composer's plain answers
+  (`answersOf`): its shape (the component), of what, how to count, by what, over which time, only
+  which value, its columns, its days. She changes them; the core sets the card anew
+  (`reshapeBlock`) by the Composer's own rules — the same for every component it composes. A card
+  of the same component keeps what composing does not write (a kanban's gestures and links, a
+  table's order while its column is there); its size stays, and its title in every language while
+  she keeps its words. A part of its condition the screen cannot read is kept as it is, shown,
+  and can be removed.
+- **Two new answers**: « Sur » — this month, the last 3, 6 or 12 months (`this_month`,
+  `last_days`) — and « Seulement » — one value of a choice field. A group by a link reads and
+  writes as the title of the entry it points to (« fund.title »).
+- **What is not set on screen** — a query of its own, a formula, a figure with its comparison, a
+  card whose answers would not make it again: its name and size only; the rest is asked of the
+  assistant. Offered only when the answers make the card again.
+- **« Régler »** on each card in « Modifier »: the panel of its settings; « Appliquer » changes the
+  card on the page, « Enregistrer » keeps the page.
+- **On a chart, without « Modifier »**: its shape (barres, courbe, répartition — a curve needs a
+  date) and its time, one gesture each, kept on the page at once. On an app's page, a dashboard,
+  Aujourd'hui's band, a fiche.
+- **A card set on a page is that page's**: the page it came from does not change.
+- **Doors**: `POST /api/cards/answers` `{ block }` → `{ answers | null, settable }`;
+  `POST /api/cards/reshape` `{ block, answers }` → `{ block }`, refused in words.
+
+### 8. Her apps' dashboards, folded (added 24 Nov 2026)
+
+« Dans tes apps » is one folded line (« 5 apps · 19 tableaux »): opened, one row per app — its
+icon, its name, its dashboards as links. Closed by default; open or closed as she left it, on
+this device.
+
 ## How it fits
 
 ```mermaid

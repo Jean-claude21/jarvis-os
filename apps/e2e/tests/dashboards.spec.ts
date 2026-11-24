@@ -22,7 +22,13 @@ test('the menu leads to her dashboards; her overview is made in one gesture', as
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tableaux de bord');
   // None of her own yet; her apps' dashboards are not listed twice, a line leads to them.
   await expect(page.getByText('Aucun tableau de bord pour l’instant')).toBeVisible();
+  // Folded by default, opened in one gesture, remembered on this device.
+  const fold = page.getByRole('button', { name: /Dans tes apps/ });
+  await expect(fold).toHaveAttribute('aria-expanded', 'false');
+  await fold.click();
   const inApp = page.getByRole('button', { name: 'Finances › Vue du mois' });
+  await expect(inApp).toBeVisible();
+  await page.reload();
   await expect(inApp).toBeVisible();
   await expect(page.getByRole('button', { name: /Supprimer « Vue du mois »/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Ma vue d’ensemble' }).first().click();

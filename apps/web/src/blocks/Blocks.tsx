@@ -757,10 +757,13 @@ export function PageBlocks({
   blocks,
   vocabulary,
   refresh,
+  actionFor,
 }: {
   blocks: Drawn[];
   vocabulary: Vocabulary;
   refresh: () => void;
+  /** A gesture on a block's header (spec 107: a chart's quick settings), by its place on the page. */
+  actionFor?: (at: number) => ReactNode;
 }) {
   const figures = blocks.filter(
     (b) => (b.block === 'stat' || b.block === 'stat_delta') && !b.error,
@@ -777,7 +780,13 @@ export function PageBlocks({
       )}
       <div className="grid items-start gap-4 lg:grid-cols-6">
         {rest.map((block, at) => (
-          <BlockView key={at} block={block} vocabulary={vocabulary} refresh={refresh} />
+          <BlockView
+            key={at}
+            block={block}
+            vocabulary={vocabulary}
+            refresh={refresh}
+            action={actionFor?.(blocks.indexOf(block))}
+          />
         ))}
       </div>
     </>

@@ -55,6 +55,10 @@ chaque écran et chaque geste dans un vrai navigateur, aux trois largeurs (`apps
       revient ; « Supprimer » après confirmation, l'Activité le rend. Ceux des apps : une ligne y
       mène, pas de doublon.
 - [ ] « Ma vue d'ensemble » en un geste ; « Nouveau tableau de bord », nommé, rempli, gardé.
+- [ ] « Dans tes apps » : replié d'abord ; ouvert, une ligne par app ; il reste comme tu l'as laissé.
+- [ ] Un graphique : « Barres / Courbe / Répartition » et « Période » d'un geste ; la page le garde.
+- [ ] « Modifier » › « Régler » une carte : nom, forme, de quoi, compter, par, sur, seulement,
+      colonnes ; « Appliquer » puis « Enregistrer ». Une carte de l'assistant : son nom seulement.
 - [ ] « Ajouter une carte » › « Créer une carte » : un chiffre de tes types, nommé ; il revient
       ensuite parmi tes cartes.
 - [ ] Connexion : « Continuer avec Google » crée le compte ou connecte ; relier Claude marche aussi

@@ -37,9 +37,13 @@ import {
   fileWithPrint,
   replaceFile,
   type FileVersion,
+  answersOf,
+  blockSchema,
   answersSchema,
   choicesOf,
   composeBlock,
+  reshapeBlock,
+  SETTABLE,
   fits,
   readerOf,
   facetsOf,
@@ -1005,6 +1009,31 @@ export function apiRoutes(deps: {
       return composeBlock(answers, shape);
     });
     return c.json({ block });
+  });
+  // A card set on screen (spec 107): its settings read back as her answers (null: only its name and
+  // size change there), then the card set anew from the answers she changed.
+  const shapeOfBlock = async (tx: Tx, space: string, kind: unknown) =>
+    typeof kind === 'string'
+      ? ((await shapesOf(tx, space)).find((one) => one.kind.toLowerCase() === kind.toLowerCase()) ??
+        null)
+      : null;
+  const kindOfBlock = (block: Record<string, unknown>) =>
+    block.kind ?? (block.query as { kind?: unknown } | undefined)?.kind;
+  api.post('/cards/answers', async (c) => {
+    const block = blockSchema.parse(((await c.req.json()) as { block?: unknown }).block);
+    const answers = await act(c, async (tx, _a, space) =>
+      answersOf(block, await shapeOfBlock(tx, space, kindOfBlock(block))),
+    );
+    return c.json({ answers, settable: SETTABLE.has(block.block) });
+  });
+  api.post('/cards/reshape', async (c) => {
+    const body = (await c.req.json()) as { block?: unknown; answers?: unknown };
+    const block = blockSchema.parse(body.block);
+    const answers = answersSchema.parse(body.answers);
+    const set = await act(c, async (tx, _a, space) =>
+      reshapeBlock(block, answers, await shapeOfBlock(tx, space, answers.kind)),
+    );
+    return c.json({ block: set });
   });
   api.get('/pages/:id', async (c) => {
     const params = { ...c.req.query() };

@@ -86,6 +86,8 @@ test('a document is written on screen, in Markdown, and reads as a page', async 
 });
 
 test('a long list draws only what is on screen', async ({ page, account }) => {
+  // Its 300 entries are saved first, 50 at a time, against a database that may be far away.
+  test.setTimeout(180_000);
   void account;
   await api(page, '/save', {
     entries: [

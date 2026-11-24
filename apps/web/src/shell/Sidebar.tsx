@@ -7,7 +7,7 @@ import { api } from '../lib/api';
 import { useKinds } from '../lib/kinds';
 import { useSession } from '../lib/session';
 import { AppIcon, Avatar, Caps, Menu, SpaceDot, cn } from '../ui';
-import { ACROSS, APPS, BILANS, QUEUE, TODAY } from './nav';
+import { ACROSS, APPS, BILANS, DASHBOARDS, QUEUE, TODAY } from './nav';
 import { useQueue } from '../routes/Queue';
 
 // The sidebar, as J-C's design system draws it: on the canvas, the space switcher on top, the
@@ -49,7 +49,7 @@ export function Sidebar({
       .filter((one) => one.count > 0)
       .flatMap((one) => (one.facets ?? []).map((facet) => facet.facet)),
   );
-  const across = [...ACROSS.filter((one) => has.has(one.facet)), BILANS];
+  const across = [...ACROSS.filter((one) => has.has(one.facet)), DASHBOARDS, BILANS];
   // What waits for her now: the red count on « Aujourd'hui ».
   const { data: now } = useQuery({
     queryKey: ['now'],

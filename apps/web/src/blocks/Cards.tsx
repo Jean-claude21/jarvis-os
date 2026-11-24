@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
 import { ArrowDown, ArrowUp, Pencil, Plus, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { api } from '../lib/api';
@@ -17,6 +16,7 @@ import {
 } from '../ui';
 import { Select, toast } from '../ui/more';
 import { BlockView, PageBlocks, SPANS, say, sizeOf, type Drawn, type Vocabulary } from './Blocks';
+import { AddBlock, type Composable } from '../routes/PageCompose';
 
 // The cards (spec 107): a page changed on the page itself. « Modifier » puts each card's gestures
 // on it (move, its size, remove) and « Ajouter une carte » opens her cards — her pages' named
@@ -77,6 +77,16 @@ export function sameCard(block: Block): string {
   return JSON.stringify(stable(rest));
 }
 
+/** A block's family, as the core sorts cards. */
+const familyOf = (block: string): CardFamily =>
+  ['stat', 'stat_delta', 'gauge'].includes(block)
+    ? 'figure'
+    : ['bar', 'line', 'breakdown', 'heatmap', 'funnel', 'sql'].includes(block)
+      ? 'chart'
+      : block === 'form'
+        ? 'input'
+        : 'list';
+
 const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 /** Her cards for a place: an app's first, or a fiche's. */
@@ -100,17 +110,24 @@ export function CardPanel({
   place,
   onPage,
   onAdd,
-  compose,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   place: Place;
   onPage: Set<string>;
   onAdd: (card: Card) => void;
-  /** The Composer, for a block no card covers. */
-  compose?: { page?: string; app?: string };
 }) {
   const cards = useCards(place, open);
+  // « Créer une carte » (spec 107): a block from plain answers, named, added like the others.
+  const [creating, setCreating] = useState(false);
+  const composable = useQuery({
+    queryKey: ['pages', 'composable', place.app ?? ''],
+    queryFn: () =>
+      api<Composable>(
+        `/pages/composable${place.app ? `?app=${encodeURIComponent(place.app)}` : ''}`,
+      ),
+    enabled: open && creating,
+  });
   const [family, setFamily] = useState<CardFamily | 'all'>('all');
   const [text, setText] = useState('');
   const shown = (cards.data ?? []).filter(
@@ -123,6 +140,34 @@ export function CardPanel({
   return (
     <Sheet open={open} onOpenChange={onOpenChange} title="Ajouter une carte">
       <div className="flex flex-col gap-3 p-4">
+        {!place.for &&
+          (creating ? (
+            composable.data ? (
+              <AddBlock
+                composable={composable.data}
+                format="dashboard"
+                onAdd={(block) => {
+                  onAdd({
+                    id: 'new',
+                    title: block.title ?? block.block,
+                    family: familyOf(block.block),
+                    app: place.app ?? null,
+                    from: null,
+                    block: block as Block,
+                  });
+                  setCreating(false);
+                }}
+                onClose={() => setCreating(false)}
+              />
+            ) : (
+              <Skeleton className="h-24" />
+            )
+          ) : (
+            <Button onClick={() => setCreating(true)}>
+              <Plus size={14} />
+              Créer une carte
+            </Button>
+          ))}
         <label className="relative block">
           <Search size={15} className="absolute top-2.5 left-3 text-faint" aria-hidden />
           <input
@@ -178,18 +223,6 @@ export function CardPanel({
             })}
           </ul>
         )}
-        {compose && (
-          <Link
-            to="/composer"
-            search={{
-              ...(compose.page ? { page: compose.page } : {}),
-              ...(compose.app ? { app: compose.app } : {}),
-            }}
-            className="text-[13px] font-semibold text-primary underline"
-          >
-            Un bloc à moi, dans le Composer
-          </Link>
-        )}
       </div>
     </Sheet>
   );
@@ -212,7 +245,7 @@ export function CardsEditor({
   title: string;
   /** The entry a fiche shows. */
   record?: string;
-  onDone: (saved: boolean) => void;
+  onDone: (saved: boolean, id?: string) => void;
 }) {
   const client = useQueryClient();
   const [blocks, setBlocks] = useState<Block[]>(() => page?.data.blocks ?? []);
@@ -244,9 +277,9 @@ export function CardsEditor({
       if (!blocks.length) {
         // Nothing left: the page goes (archived, undone from the Activity).
         if (page) await api(`/entries/${page.id}/archive`, { method: 'POST', body: {} });
-        return;
+        return undefined;
       }
-      await api('/save', {
+      const saved = await api<{ entries: { id: string }[] }>('/save', {
         method: 'POST',
         body: {
           entries: [
@@ -256,15 +289,16 @@ export function CardsEditor({
           ],
         },
       });
+      return saved.entries[0]?.id;
     },
     onError: (error) => toast((error as Error).message, 'error'),
-    onSuccess: () => {
-      toast('Page enregistrée.');
+    onSuccess: (id) => {
+      toast(blocks.length ? 'Page enregistrée.' : 'Page retirée.');
       void client.invalidateQueries({ queryKey: ['pages'] });
       void client.invalidateQueries({ queryKey: ['entries'] });
       void client.invalidateQueries({ queryKey: ['entry'] });
       void client.invalidateQueries({ queryKey: ['cards'] });
-      onDone(true);
+      onDone(true, id);
     },
   });
   const shown = drawn.data?.blocks ?? [];
@@ -382,14 +416,6 @@ export function CardsEditor({
           setBlocks((was) => [...was, card.block]);
           toast(`« ${say(card.title as never)} » ajoutée.`);
         }}
-        {...(place.for || place.today
-          ? {}
-          : {
-              compose: {
-                ...(page ? { page: page.id } : {}),
-                ...(place.app ? { app: place.app } : {}),
-              },
-            })}
       />
     </div>
   );

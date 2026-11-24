@@ -6,6 +6,7 @@ import {
   Inbox,
   Target,
   Wallet,
+  LayoutDashboard,
   LayoutGrid,
   NotebookPen,
   Sun,
@@ -37,6 +38,13 @@ export const ACROSS: AcrossItem[] = [
   { facet: 'amount', to: '/argent', label: 'Argent', icon: Wallet },
   { facet: 'measurable', to: '/objectifs', label: 'Objectifs', icon: Target },
 ];
+
+/** Her dashboards (spec 107): cards of all her apps, across her life — always there. */
+export const DASHBOARDS: NavItem = {
+  to: '/tableaux',
+  label: 'Tableaux de bord',
+  icon: LayoutDashboard,
+};
 
 /** Her bilans (v3 F4): a week, a month, looked back on — always there, whatever she keeps. */
 export const BILANS: NavItem = { to: '/bilans', label: 'Bilans', icon: NotebookPen };

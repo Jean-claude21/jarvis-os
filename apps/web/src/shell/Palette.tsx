@@ -5,8 +5,8 @@ import { Command } from 'cmdk';
 import { FileText, PenLine } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, type Entry } from '../lib/api';
-import { ACROSS, APPS, JOURNAL, TODAY } from './nav';
-const LIVE = [TODAY, ...ACROSS, APPS, JOURNAL];
+import { ACROSS, APPS, DASHBOARDS, JOURNAL, TODAY } from './nav';
+const LIVE = [TODAY, ...ACROSS, DASHBOARDS, APPS, JOURNAL];
 import { useKindName } from '../lib/kinds';
 import { toast } from '../ui/more';
 

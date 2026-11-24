@@ -75,8 +75,11 @@ export function makeAuth(input: {
   rateLimit?: boolean;
   /** Who sends the mails of accounts: a forgotten password (v3 mails). */
   mailer?: Mailer | null;
+  /** Signing in with Google: Jarvis's Google client, when whoever runs it set one. */
+  google?: { clientId: string; clientSecret: string } | null;
 }) {
   const rule = input.signUp ?? signUpRuleOf();
+  const google = input.google === undefined ? googleOf() : input.google;
   return betterAuth({
     database: input.db,
     ...(input.quiet ? { logger: { disabled: true } } : {}),
@@ -113,6 +116,17 @@ export function makeAuth(input: {
         );
       },
     },
+    // Google (an account or a sign-in in one gesture): the same rule as by e-mail — on
+    // invitation, a stranger is refused by the hook below; an account already made with the same
+    // address, verified by Google, is the same person.
+    ...(google
+      ? {
+          socialProviders: {
+            google: { ...google, prompt: 'select_account' as const },
+          },
+          account: { accountLinking: { enabled: true, trustedProviders: ['google'] } },
+        }
+      : {}),
     // Her session read from its signed cookie for five minutes, not from the database on each
     // request (the database is often far away); signing out ends it at once on this device.
     session: { cookieCache: { enabled: true, maxAge: 5 * 60 } },
@@ -158,6 +172,15 @@ export function makeAuth(input: {
       },
     },
   });
+}
+
+/** Jarvis's Google client (the same that relates Drive, Gmail, Agenda), or none. */
+export function googleOf(
+  env: Record<string, string | undefined> = process.env,
+): { clientId: string; clientSecret: string } | null {
+  const clientId = env.JARVIS_GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = env.JARVIS_GOOGLE_CLIENT_SECRET?.trim();
+  return clientId && clientSecret ? { clientId, clientSecret } : null;
 }
 
 /** The MCP protected resource: tokens are bound to it. */

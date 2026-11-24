@@ -18,6 +18,7 @@ import { Today } from './routes/Today';
 import { ComposePage } from './routes/PageCompose';
 import { BilansPage } from './routes/Bilans';
 import { Shell, type Crumb } from './shell/Shell';
+import { DashboardsPage } from './routes/Dashboards';
 
 // The screens (v3 D17): the URL holds where she is, so back and forth and the breadcrumb work.
 
@@ -105,6 +106,15 @@ const routes = [
   viewPage('/argent', 'Argent', MoneyPage),
   viewPage('/objectifs', 'Objectifs', GoalsPage),
   page('/a-valider', 'À valider', QueuePage),
+  // Her dashboards (spec 107): pages of cards outside any app, one tab each.
+  createRoute({
+    getParentRoute: () => root,
+    path: '/tableaux',
+    component: DashboardsPage,
+    validateSearch: (search: Record<string, unknown>): { d?: string } =>
+      typeof search.d === 'string' && search.d.length < 80 ? { d: search.d } : {},
+    staticData: { crumbs: () => [{ label: 'Tableaux de bord', to: '/tableaux' }] },
+  }),
   // Her bilans (v3 F4): pages of the « Revue » format, outside any app.
   createRoute({
     getParentRoute: () => root,

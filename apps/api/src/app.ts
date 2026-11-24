@@ -31,7 +31,7 @@ import { createRequire } from 'node:module';
 import { Hono, type Context } from 'hono';
 import { bodyLimit } from 'hono/body-limit';
 import { cors } from 'hono/cors';
-import { CONSENT_PAGE, makeAuth, mcpResource, SIGN_IN_PAGE } from './auth';
+import { CONSENT_PAGE, googleOf, makeAuth, mcpResource, SIGN_IN_PAGE } from './auth';
 import { FEED_DAYS_AFTER, FEED_DAYS_BEFORE, icsOf, type Series } from './ics';
 import { fill, langOf, wordsOf } from './i18n';
 import { mcpServerFor } from './mcp';
@@ -91,11 +91,14 @@ export function makeApp(settings: Settings, deps: { mailer?: Mailer | null } = {
   setCallOut(connectors.callOut);
   // Her mails (v3): a forgotten password, invitations, someone who joined.
   const mailer = deps.mailer === undefined ? mailerFromEnv() : deps.mailer;
+  // Signing in with Google, when Jarvis has its client: read once, for the door and the page.
+  const google = googleOf();
   const auth = makeAuth({
     db,
     secret: settings.authSecret,
     publicUrl: settings.publicUrl,
     mailer,
+    google,
   });
   const resource = mcpResource(settings.publicUrl);
   const app = new Hono();
@@ -165,7 +168,12 @@ export function makeApp(settings: Settings, deps: { mailer?: Mailer | null } = {
   app.get(SIGN_IN_PAGE, async (c) => {
     const lang = langOf(c.req.header('accept-language'));
     return c.html(
-      signInPage(lang, wordsOf(lang), await clientName(c.req.query('client_id') ?? null)),
+      signInPage(
+        lang,
+        wordsOf(lang),
+        await clientName(c.req.query('client_id') ?? null),
+        google !== null,
+      ),
     );
   });
 

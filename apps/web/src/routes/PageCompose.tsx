@@ -30,7 +30,7 @@ interface PageData {
   blocks: Block[];
   order?: number;
 }
-interface Composable {
+export interface Composable {
   categories: { id: string; fr: string }[];
   components: {
     id: string;
@@ -179,7 +179,7 @@ function useBlockWords(composable: Composable | undefined) {
   };
 }
 
-function AddBlock({
+export function AddBlock({
   composable,
   format,
   onAdd,

@@ -136,9 +136,8 @@ describe('the v3 routes', () => {
     expect((await ama.json('/api/apps/install', { name: 'finances', dryRun: false })).status).toBe(
       200,
     );
-    const cards = await ama.json<{ title: unknown; family: string; app: string }[]>(
-      '/api/cards?app=Finances',
-    );
+    const cards =
+      await ama.json<{ title: unknown; family: string; app: string }[]>('/api/cards?app=Finances');
     expect(cards.status).toBe(200);
     expect(cards.body.length).toBeGreaterThan(3);
     expect(cards.body[0]?.app).toBe('Finances');

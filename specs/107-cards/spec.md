@@ -68,6 +68,20 @@ already its tabs; the Composer stays, as « Un bloc à moi » for what no card c
 - The MCP tool that lists components also lists her cards; Claude adds one to a page by saving the
   page, as it already does.
 
+### 6. Her dashboards (added 24 Nov 2026)
+
+The author asked where the dashboards are: they lived only inside an app. Now:
+
+- **« Tableaux de bord »** in the menu, after the views across her life, always there: her
+  dashboards — pages of cards **outside any app** (no `app`, format `dashboard`) — one tab each. An
+  app's own pages stay in the app; these mix the cards of all of them.
+- **« Nouveau tableau de bord »**: its name, then « Modifier » at once; kept on « Enregistrer ».
+- **« Ma vue d'ensemble »**: one gesture — of each app, its first two figures and one chart or list
+  (16 cards at most), then hers to change.
+- **« Créer une carte »** at the top of « Ajouter une carte » (not on a fiche): the Composer's
+  block made from plain answers (which kind, how to count, by what), named; once saved, it is one of
+  her cards everywhere. It replaces the link « Un bloc à moi ».
+
 ## How it fits
 
 ```mermaid
@@ -98,6 +112,6 @@ A figure (`stat`, `stat_delta`) stands in the band of figures at the top of a pa
   it, remove one, save, reload — the page is as left; Aujourd'hui's band from empty; a fiche's
   cards; the catalogue's « Ajouter à… ».
 
-## Out of scope (next: spec 108)
+## Out of scope (next: spec 109)
 
 Agents' questions, signals in Aujourd'hui with tabs by app, skills as buttons on a fiche.

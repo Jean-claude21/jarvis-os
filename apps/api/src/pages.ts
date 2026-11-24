@@ -29,6 +29,8 @@ const style = `
            border: 1px solid var(--ink); background: var(--ink); color: var(--paper); cursor: pointer; }
   button.quiet { background: transparent; color: var(--ink); }
   .row { display: flex; gap: 8px; } .row button { flex: 1; }
+  #google { width: 100%; }
+  .or { text-align: center; font-size: 13px; }
   .error { color: var(--accent); min-height: 1.6em; }
   .done { color: var(--ink); }
   fieldset { border: 1px solid var(--line); border-radius: 2px; padding: 8px 12px; margin: 0; display: grid; gap: 6px; }
@@ -181,12 +183,21 @@ export function resetPage(lang: Lang, words: Words): string {
   );
 }
 
-export function signInPage(lang: Lang, words: Words, client: string | null): string {
+export function signInPage(
+  lang: Lang,
+  words: Words,
+  client: string | null,
+  google = false,
+): string {
   const lead = client ? fill(words.signInLead, { client }) : words.signInLeadPlain;
   return page(
     lang,
     words.signInTitle,
-    `<h1>${escape(words.signInTitle)}</h1><p>${escape(lead)}</p>${accountForm(words)}`,
+    `<h1>${escape(words.signInTitle)}</h1><p>${escape(lead)}</p>${
+      google
+        ? `<button type="button" id="google" class="quiet">${escape(words.withGoogle)}</button><p class="or">${escape(words.or)}</p>`
+        : ''
+    }${accountForm(words)}`,
     `${follow(words, 'location.href = back;')}
      // Where she was going (« suite »), on this site only; the rest of the query is OAuth's.
      const params = new URLSearchParams(location.search);
@@ -194,6 +205,11 @@ export function signInPage(lang: Lang, words: Words, client: string | null): str
      params.delete('suite');
      const back = asked && asked.startsWith('/') && !asked.startsWith('//') && !asked.includes('\\\\') ? asked : '/';
      const query = params.toString();
+     // Google (when Jarvis has its client): back where she was going, or on with the assistant
+     // that asked (its OAuth request goes along).
+     const google = document.getElementById('google');
+     if (google) google.addEventListener('click', () =>
+       call('/auth/sign-in/social', { provider: 'google', callbackURL: back, ...(query ? { oauth_query: query } : {}) }));
      ${accountScript(words, 'oauth_query: query')}`,
   );
 }

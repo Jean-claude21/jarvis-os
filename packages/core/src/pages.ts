@@ -911,6 +911,7 @@ export async function pagesOf(
     app: string | null;
     order: number;
     format: 'dashboard' | 'review';
+    cards: number;
   }[]
 > {
   const where: PagePlace = typeof place === 'string' ? { app: place } : place;
@@ -930,6 +931,8 @@ export async function pagesOf(
       app: typeof row.data.app === 'string' ? row.data.app : null,
       order: typeof row.data.order === 'number' ? row.data.order : 100,
       format: row.data.format === 'review' ? ('review' as const) : ('dashboard' as const),
+      /** How many cards it holds (spec 107: her dashboards listed). */
+      cards: Array.isArray(row.data.blocks) ? row.data.blocks.length : 0,
       today: row.data.today === true,
       for: typeof row.data.for === 'string' ? row.data.for : null,
     }))

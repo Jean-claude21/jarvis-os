@@ -72,9 +72,13 @@ already its tabs; the Composer stays, as « Un bloc à moi » for what no card c
 
 The author asked where the dashboards are: they lived only inside an app. Now:
 
-- **« Tableaux de bord »** in the menu, after the views across her life, always there: her
-  dashboards — pages of cards **outside any app** (no `app`, format `dashboard`) — one tab each. An
-  app's own pages stay in the app; these mix the cards of all of them.
+- **« Tableaux de bord »** in the menu, after the views across her life, always there. It first
+  lists **every** dashboard (the author asked, 24 Nov 2026): « Mes tableaux de bord » — pages of
+  cards outside any app (no `app`, format `dashboard`) that mix all her apps — then « Dans mes apps
+  », each app's own. Each says its app and its number of cards. One gesture opens it (an app's opens
+  in the app); « Tous les tableaux » comes back.
+- **Supprimer**, on each one and on the one open, after a confirmation: archived — her data stays,
+  the Activity gives it back in one gesture.
 - **« Nouveau tableau de bord »**: its name, then « Modifier » at once; kept on « Enregistrer ».
 - **« Ma vue d'ensemble »**: one gesture — of each app, its first two figures and one chart or list
   (16 cards at most), then hers to change.

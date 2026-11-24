@@ -51,8 +51,9 @@ chaque écran et chaque geste dans un vrai navigateur, aux trois largeurs (`apps
 - [ ] Aujourd'hui › « Mes cartes » : depuis rien, une carte ajoutée reste là chaque jour.
 - [ ] Une fiche (un compte, un abonnement) › « Ses cartes » : les entrées liées à elle seule.
 - [ ] Construire › Composants › « Cartes de tes apps » : « Voir », puis « Ajouter à… ».
-- [ ] Menu › « Tableaux de bord » : « Ma vue d'ensemble » en un geste ; « Nouveau tableau de bord »,
-      nommé, rempli, gardé ; un onglet par tableau.
+- [ ] Menu › « Tableaux de bord » : tous listés (les miens, puis ceux de mes apps) ; un clic ouvre,
+      « Tous les tableaux » revient ; « Supprimer » après confirmation, l'Activité le rend.
+- [ ] « Ma vue d'ensemble » en un geste ; « Nouveau tableau de bord », nommé, rempli, gardé.
 - [ ] « Ajouter une carte » › « Créer une carte » : un chiffre de tes types, nommé ; il revient
       ensuite parmi tes cartes.
 - [ ] Connexion : « Continuer avec Google » crée le compte ou connecte ; relier Claude marche aussi

@@ -8,9 +8,9 @@ import { AppIcon, Button, Empty, IconButton, PageHead, Panel, Skeleton, inputCla
 import { toast, useConfirm } from '../ui/more';
 import { PageView } from './Apps';
 
-// Her dashboards (spec 107): every one of them listed first — hers, which mix the cards of all her
-// apps, then those of each app — one gesture opens it, one deletes it (archived: the Activity gives
-// it back). An app's own pages open in the app.
+// Her dashboards (spec 107): hers listed first — pages of cards that mix all her apps — one gesture
+// opens one, one deletes it (archived: the Activity gives it back). An app's own dashboards live in
+// the app (never twice): a line at the end leads there, and nothing here deletes them.
 
 interface PageRow {
   id: string;
@@ -86,9 +86,7 @@ export function DashboardsPage() {
   const askRemove = (one: PageRow) =>
     confirm.ask({
       title: `Supprimer « ${nameOf(one)} » ?`,
-      lead: one.app
-        ? `C’est une page de l’app ${one.app}. Tes données restent ; l’Activité la rend d’un geste.`
-        : 'Tes données restent ; seules ses cartes partent. L’Activité le rend d’un geste.',
+      lead: 'Tes données restent ; seules ses cartes partent. L’Activité le rend d’un geste.',
       yes: 'Supprimer',
       danger: true,
       then: () => remove.mutate(one),
@@ -168,7 +166,7 @@ export function DashboardsPage() {
         lead={
           open
             ? 'Un de tes tableaux de bord : « Modifier » pour changer ses cartes.'
-            : 'Tous tes tableaux de bord : les tiens, qui réunissent tes apps, et ceux de chaque app.'
+            : 'Tes tableaux de bord : chacun réunit les chiffres, graphiques et listes de tes apps.'
         }
         actions={
           open ? (
@@ -227,31 +225,37 @@ export function DashboardsPage() {
         <Skeleton className="h-60" />
       ) : open ? (
         <PageView key={open.id} id={open.id} />
-      ) : !all.length ? (
-        <Panel>
-          <Empty
-            title="Aucun tableau de bord pour l’instant"
-            lead="Compose ta vue d’ensemble en un geste, ou crée un tableau et pose-y les cartes de tes apps."
-          />
-          <div className="flex justify-center pb-5">{actions}</div>
-        </Panel>
       ) : (
         <>
-          <section aria-label="Mes tableaux de bord" className="grid gap-2">
-            <h2 className="font-display text-[15px] font-semibold">Mes tableaux de bord</h2>
-            {mine.length ? (
+          {mine.length ? (
+            <section aria-label="Mes tableaux de bord">
               <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{mine.map(tile)}</ul>
-            ) : (
-              <p className="text-[13px] text-bark">
-                Aucun encore : « Ma vue d’ensemble » en compose un en un geste.
-              </p>
-            )}
-          </section>
-          {inApps.length > 0 && (
-            <section aria-label="Dans mes apps" className="grid gap-2">
-              <h2 className="font-display text-[15px] font-semibold">Dans mes apps</h2>
-              <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{inApps.map(tile)}</ul>
             </section>
+          ) : (
+            <Panel>
+              <Empty
+                title="Aucun tableau de bord pour l’instant"
+                lead="Compose ta vue d’ensemble en un geste, ou crée un tableau et pose-y les cartes de tes apps."
+              />
+              <div className="flex justify-center pb-5">{actions}</div>
+            </Panel>
+          )}
+          {inApps.length > 0 && (
+            <p aria-label="Dans mes apps" className="text-[13px] text-bark">
+              Les tableaux de chaque app sont dans l’app :{' '}
+              {inApps.map((one, at) => (
+                <span key={one.id}>
+                  {at > 0 && ', '}
+                  <button
+                    onClick={() => choose(one)}
+                    className="cursor-pointer font-semibold text-primary underline"
+                  >
+                    {one.app} › {nameOf(one)}
+                  </button>
+                </span>
+              ))}
+              .
+            </p>
           )}
         </>
       )}

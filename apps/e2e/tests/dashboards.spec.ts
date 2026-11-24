@@ -1,8 +1,8 @@
 import { api, expect, fitsTheWidth, test } from './fixtures';
 
-// Spec 107: « Tableaux de bord » — every dashboard listed (hers, then each app's), opened in one
-// gesture, deleted with the Activity to give it back; her overview in one gesture; a new one named
-// then filled, and a card created on the spot.
+// Spec 107: « Tableaux de bord » — hers listed, opened in one gesture, deleted with the Activity to
+// give it back; her apps' own reached by a line, never listed twice; her overview in one gesture; a
+// new one named then filled, and a card created on the spot.
 
 test('the menu leads to her dashboards; her overview is made in one gesture', async ({
   page,
@@ -20,30 +20,29 @@ test('the menu leads to her dashboards; her overview is made in one gesture', as
     .first()
     .click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tableaux de bord');
-  // Her apps' dashboards are there already; none of her own yet.
-  await expect(
-    page.getByRole('region', { name: 'Mes tableaux de bord' }).getByText(/Aucun encore/),
-  ).toBeVisible();
+  // None of her own yet; her apps' dashboards are not listed twice, a line leads to them.
+  await expect(page.getByText('Aucun tableau de bord pour l’instant')).toBeVisible();
+  const inApp = page.getByRole('button', { name: 'Finances › Vue du mois' });
+  await expect(inApp).toBeVisible();
+  await expect(page.getByRole('button', { name: /Supprimer « Vue du mois »/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Ma vue d’ensemble' }).first().click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Vue d’ensemble');
   await expect(page.getByText('Solde de tous les comptes')).toBeVisible();
   await fitsTheWidth(page);
-  // Back to all of them: hers, and those of her apps.
+  // Back to all of hers.
   await page.getByRole('button', { name: 'Tous les tableaux' }).click();
   const mine = page.getByRole('region', { name: 'Mes tableaux de bord' });
-  const apps = page.getByRole('region', { name: 'Dans mes apps' });
   await expect(mine.getByText('Vue d’ensemble', { exact: true })).toBeVisible();
-  await expect(apps.getByText('Vue du mois', { exact: true })).toBeVisible();
   await fitsTheWidth(page);
-  // One of the app's opens in the app.
-  await apps.getByText('Vue du mois', { exact: true }).click();
+  // An app's dashboard opens in the app.
+  await inApp.click();
   await expect(page).toHaveURL(/\/v3\/apps\/Finances\?t=page/);
   await page.goBack();
   // Deleted, after a confirmation; the list says so.
   await mine.getByRole('button', { name: 'Supprimer « Vue d’ensemble »' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Supprimer' }).click();
   await expect(page.getByText('« Vue d’ensemble » est supprimé.', { exact: false })).toBeVisible();
-  await expect(mine.getByText('Vue d’ensemble', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Aucun tableau de bord pour l’instant')).toBeVisible();
 });
 
 test('a new dashboard: named, given a card of an app and one created on the spot', async ({
@@ -56,6 +55,9 @@ test('a new dashboard: named, given a card of an app and one created on the spot
   await page.getByRole('button', { name: 'Nouveau tableau de bord' }).first().click();
   await page.getByLabel('Nom du tableau de bord').fill('Mon mois');
   await page.getByRole('button', { name: 'Continuer' }).click();
+  // Without a card it is not kept: said, not lost without a word.
+  await page.getByRole('button', { name: 'Enregistrer' }).click();
+  await expect(page.getByText(/Ajoute au moins une carte/)).toBeVisible();
   await page.getByRole('button', { name: 'Ajouter une carte' }).click();
   const panel = page.getByRole('dialog');
   await panel.getByLabel('Chercher une carte').fill('à payer');

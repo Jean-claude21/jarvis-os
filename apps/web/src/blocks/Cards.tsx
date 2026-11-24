@@ -274,6 +274,9 @@ export function CardsEditor({
     });
   const save = useMutation({
     mutationFn: async () => {
+      // A page never kept had no card yet: said, rather than lost without a word.
+      if (!blocks.length && !page)
+        throw new Error('Ajoute au moins une carte : une page sans carte n’est pas gardée.');
       if (!blocks.length) {
         // Nothing left: the page goes (archived, undone from the Activity).
         if (page) await api(`/entries/${page.id}/archive`, { method: 'POST', body: {} });

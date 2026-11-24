@@ -73,6 +73,16 @@ chaque écran et chaque geste dans un vrai navigateur, aux trois largeurs (`apps
 - [ ] La mémoire d'un agent garde une note ; « Activité et Telegram » envoie un compte rendu.
 - [ ] Skills : chacun dit quand il démarre ; « Structurer » propose les cinq morceaux.
 
+## 4 bis. Les agents et leurs tâches (spec 109)
+
+- [ ] Construire : une ligne par agent, sa prochaine action ; « Nouvel agent ».
+- [ ] « Nouvelle tâche » : certains jours, une heure ; « Suivre un skill » sur la semaine ; la phrase
+      se relit ; « Essai à blanc » n'écrit rien ; « Créer la tâche ».
+- [ ] Une tâche : « Lancer » (le bilan à rédiger arrive), l'interrupteur l'arrête, « Modifier »,
+      « Retirer », « Confier à… ».
+- [ ] « Ses consignes » : « Tirer les tâches » propose une ligne par moment ; le reste est gardé.
+- [ ] Skills : « Suivi par… » ; un ancien moment devient une tâche d'un agent.
+
 ## 5. Réglages, espaces, mails
 
 - [ ] Mot de passe oublié : le mail arrive, le lien marche une fois, l'ancien ne marche plus.

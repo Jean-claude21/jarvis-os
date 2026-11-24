@@ -1,38 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useParams, useSearch } from '@tanstack/react-router';
-import {
-  Activity as ActivityIcon,
-  BookOpen,
-  Brain,
-  Download,
-  Gauge,
-  Pause,
-  Play,
-  Settings2,
-  Workflow,
-} from 'lucide-react';
+import { Link, useNavigate, useSearch } from '@tanstack/react-router';
+import { BookOpen, Download } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '../lib/api';
 import { useKindName } from '../lib/kinds';
-import {
-  Avatar,
-  Button,
-  PageHead,
-  Panel,
-  Segmented,
-  Sheet,
-  Skeleton,
-  Tabs,
-  Tag,
-  ago,
-  inputClass,
-  rowClass,
-  type TagTone,
-} from '../ui';
-import { Journal } from './Activity';
+import { Button, PageHead, Panel, Sheet, Skeleton, Tabs, rowClass } from '../ui';
 import { Select, toast } from '../ui/more';
 import { Markdown } from '../ui/Markdown';
 import { ComponentsCatalog } from './Catalog';
+import {
+  AgentPage,
+  AgentsList,
+  TaskEditor,
+  planOfSchedule,
+  useAgents,
+  useTasks,
+  whenText,
+  type Plan,
+} from './Agents';
+
+export { AgentPage };
 
 // L'Atelier (v3 D12, D17 « Construire »): who works for her — her agents, each a named setting of
 // the one node (its triggers, its executor, its skills, what it reads and writes, how free it is,
@@ -41,147 +28,6 @@ import { ComponentsCatalog } from './Catalog';
 export type AtelierTab = 'automations' | 'skills' | 'components';
 export const atelierSearch = (search: Record<string, unknown>): { t?: AtelierTab } =>
   search.t === 'skills' || search.t === 'components' ? { t: search.t } : {};
-
-interface AgentRule {
-  id: string;
-  /** Given to this agent, or answered for by default (F6b). */
-  assigned: boolean;
-  title: string;
-  when: Record<string, unknown>;
-  active: boolean;
-  next: string | null;
-  lastRun: string | null;
-  error: string | null;
-  app: string | null;
-}
-interface AgentRun {
-  id: string;
-  title: string;
-  status: string;
-  started: string | null;
-  ended: string | null;
-  counts: Record<string, number>;
-  error: string | null;
-}
-type Autonomy = 'propose' | 'act_and_report' | 'silent';
-interface Agent {
-  id: string | null;
-  title: string;
-  data: {
-    role?: string;
-    executor?: 'rule' | 'script' | 'llm' | 'service';
-    service?: string;
-    skills?: string[];
-    reads?: string[];
-    writes?: string[];
-    builtin?: string[];
-    autonomy?: Autonomy;
-    budget?: { calls_per_day?: number };
-    paused?: boolean;
-    report?: 'activity' | 'telegram';
-  };
-  /** When a built-in agent works, in her words. */
-  when: string | null;
-  /** Its memory: its notes, the newest first. */
-  memory: { id: string; text: string; at: string }[];
-  rules: AgentRule[];
-  callsToday: number;
-  runs: AgentRun[];
-  state: 'paused' | 'over_budget' | 'failing' | 'working' | 'idle';
-}
-
-const STATE: Record<Agent['state'], { label: string; tone: TagTone }> = {
-  idle: { label: 'prêt', tone: 'ok' },
-  working: { label: 'au travail', tone: 'info' },
-  paused: { label: 'en pause', tone: 'neutral' },
-  over_budget: { label: 'budget du jour atteint', tone: 'late' },
-  failing: { label: 'en échec', tone: 'error' },
-};
-const EXECUTOR: Record<string, string> = {
-  rule: 'ses règles, sans IA',
-  script: 'un script',
-  llm: 'un modèle avec ses skills',
-  service: 'un service',
-};
-const AUTONOMY: { value: Autonomy; label: string; lead: string }[] = [
-  {
-    value: 'propose',
-    label: 'Propose',
-    lead: 'tout ce qu’il écrirait t’attend dans « À valider »',
-  },
-  {
-    value: 'act_and_report',
-    label: 'Agit et rend compte',
-    lead: 'il agit, tout est au journal, annulable',
-  },
-  {
-    value: 'silent',
-    label: 'Discret',
-    lead: 'pour le trivial seulement : il agit sans te le signaler',
-  },
-];
-
-const pad = (n: string) => n.padStart(2, '0');
-const DAYS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
-/** A rule's « when », in her words. */
-export function whenText(when: Record<string, unknown>, kindName: (kind: string) => string) {
-  if (typeof when.schedule === 'string') {
-    const [m, h, , , days] = when.schedule.trim().split(/\s+/);
-    if (m && h && /^\d+$/.test(m) && /^\d+$/.test(h)) {
-      const at = `${h} h ${pad(m)}`;
-      if (!days || days === '*') return `chaque jour à ${at}`;
-      if (days === '1-5') return `en semaine à ${at}`;
-      // « 6 » or « 1,3 »: the days by their names.
-      const named = days.split(',').map((one) => DAYS[Number(one) % 7]);
-      if (named.every(Boolean)) return `chaque ${named.join(' et ')} à ${at}`;
-      return `certains jours (${days}) à ${at}`;
-    }
-    return `selon « ${when.schedule} »`;
-  }
-  if (typeof when.saved === 'string')
-    return `à chaque ${kindName(when.saved).toLowerCase()} enregistré(e)`;
-  const changed = when.changed as { kind?: string; field?: string } | undefined;
-  if (changed?.kind)
-    return `quand « ${changed.field} » change sur un(e) ${kindName(changed.kind).toLowerCase()}`;
-  const before = when.before as { kind?: string; field?: string; days?: number } | undefined;
-  if (before?.kind)
-    return before.days
-      ? `${before.days} j avant « ${before.field} » d’un(e) ${kindName(before.kind).toLowerCase()}`
-      : `le jour de « ${before.field} » d’un(e) ${kindName(before.kind).toLowerCase()}`;
-  if (typeof when.phrase === 'string') return `quand tu dis « ${when.phrase} »`;
-  const message = when.message as { contains?: string } | undefined;
-  if (message)
-    return message.contains
-      ? `à chaque message qui dit « ${message.contains} »`
-      : 'à chaque message reçu';
-  return 'à la demande';
-}
-const BUILTIN_WHEN: Record<string, string> = {
-  lecture: 'à chaque fichier déposé',
-  brief: 'chaque matin, à l’heure choisie',
-  rappels: 'à l’heure de chaque rappel',
-};
-
-function useAgents() {
-  return useQuery({ queryKey: ['agents'], queryFn: () => api<Agent[]>('/agents') });
-}
-function usePause() {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: ({ title, paused }: { title: string; paused: boolean }) =>
-      api(`/agents/${encodeURIComponent(title)}`, { method: 'PATCH', body: { paused } }),
-    onSettled: () => void client.invalidateQueries({ queryKey: ['agents'] }),
-  });
-}
-
-function triggersOf(agent: Agent, kindName: (kind: string) => string): string[] {
-  return [
-    ...(agent.when
-      ? [agent.when]
-      : (agent.data.builtin ?? []).map((one) => BUILTIN_WHEN[one] ?? one)),
-    ...agent.rules.map((rule) => whenText(rule.when, kindName)),
-  ].filter((one, at, all) => all.indexOf(one) === at);
-}
 
 export function AtelierPage() {
   const search = useSearch({ strict: false }) as { t?: AtelierTab };
@@ -206,7 +52,7 @@ export function AtelierPage() {
         }
       />
       {tab === 'automations' ? (
-        <Automations />
+        <AgentsList />
       ) : tab === 'skills' ? (
         <SkillsList />
       ) : (
@@ -216,6 +62,16 @@ export function AtelierPage() {
   );
 }
 
+interface MineSkill {
+  id: string;
+  title: string;
+  spaceId: string;
+  /** In its five parts (spec 047); else a text, which can be proposed in them. */
+  structured: boolean;
+  /** What started it before spec 109: a phrase stays its shortcut, a moment moves to a task. */
+  triggers: Record<string, unknown>[];
+  excerpt: string;
+}
 interface Skill {
   name: string;
   when: string;
@@ -238,6 +94,31 @@ function SkillsList() {
   const [open, setOpen] = useState<Skill | null>(null);
   const kindName = useKindName();
   const client = useQueryClient();
+  const { data: tasks = [] } = useTasks();
+  const { data: agents = [] } = useAgents();
+  // « En faire une tâche » (spec 109): a skill's moment moves to a task of an agent; the skill keeps
+  // its method — once the task is kept, its moment leaves the skill.
+  const [making, setMaking] = useState<{
+    skill: MineSkill;
+    agent: string;
+    plan: Plan | null;
+  } | null>(null);
+  const moved = useMutation({
+    mutationFn: (one: MineSkill) =>
+      api('/save', {
+        method: 'POST',
+        space: one.spaceId,
+        body: {
+          entries: [
+            {
+              id: one.id,
+              data: { triggers: one.triggers.filter((t) => typeof t.schedule !== 'string') },
+            },
+          ],
+        },
+      }),
+    onSettled: () => void client.invalidateQueries({ queryKey: ['skills'] }),
+  });
   // A skill kept as text, proposed in its five parts (trigger, preparation, instructions,
   // references, result): it waits for her yes in « À valider ».
   const structure = useMutation({
@@ -293,36 +174,86 @@ function SkillsList() {
             plaît.
           </p>
         ) : (
-          (data?.mine ?? []).map((one) => (
-            <div key={one.id} className={rowClass}>
-              <span className="min-w-0 flex-1">
-                <Link
-                  to="/entree/$id"
-                  params={{ id: one.id }}
-                  className="block truncate font-semibold hover:underline"
-                >
-                  {one.title}
-                </Link>
-                <span className="block truncate text-[12.5px]">
-                  <b className="font-medium text-ink">
-                    {one.triggers.length
-                      ? one.triggers.map((t) => whenText(t, kindName)).join(' · ')
-                      : 'quand tu le demandes à ton assistant'}
-                  </b>
+          (data?.mine ?? []).map((one) => {
+            const moments = one.triggers.filter((t) => typeof t.schedule === 'string');
+            const phrases = one.triggers.filter((t) => typeof t.phrase === 'string');
+            const users = tasks.filter((task) => task.skill === one.title);
+            return (
+              <div key={one.id} className={rowClass + ' flex-wrap'}>
+                <span className="min-w-0 flex-1">
+                  <Link
+                    to="/entree/$id"
+                    params={{ id: one.id }}
+                    className="block truncate font-semibold hover:underline"
+                  >
+                    {one.title}
+                  </Link>
+                  <span className="line-clamp-2 text-[12.5px] text-bark">{one.excerpt}</span>
+                  <span className="block text-[12.5px]">
+                    {users.length ? (
+                      <>
+                        Suivi par{' '}
+                        {users.map((task, at) => (
+                          <span key={task.id}>
+                            {at > 0 && ', '}
+                            <Link
+                              to="/construire/agents/$name"
+                              params={{ name: task.agent ?? '' }}
+                              className="font-medium text-ink underline underline-offset-2"
+                            >
+                              {task.agent} › {task.title}
+                            </Link>
+                          </span>
+                        ))}
+                      </>
+                    ) : (
+                      <span className="text-bark">Suivi quand tu le demandes à ton assistant.</span>
+                    )}
+                    {phrases.length > 0 && (
+                      <span className="text-bark">
+                        {' '}
+                        · raccourci {phrases.map((t) => `« ${String(t.phrase)} »`).join(', ')}
+                      </span>
+                    )}
+                  </span>
+                  {moments.length > 0 && (
+                    <span className="mt-1 flex flex-wrap items-center gap-2 text-[12.5px] text-ochre">
+                      Son moment (
+                      {moments
+                        .map((t) => whenText(t, planOfSchedule(String(t.schedule)), kindName))
+                        .join(', ')}
+                      ) appartient à une tâche :
+                      <Select
+                        label={`Faire de « ${one.title} » une tâche de l’agent…`}
+                        value=""
+                        placeholder="En faire une tâche de…"
+                        onChange={(agent) =>
+                          setMaking({
+                            skill: one,
+                            agent,
+                            plan: planOfSchedule(String(moments[0]!.schedule)),
+                          })
+                        }
+                        options={agents
+                          .filter((a) => !a.data.builtin?.length)
+                          .map((a) => ({ value: a.title, label: a.title }))}
+                        className="w-52"
+                      />
+                    </span>
+                  )}
                 </span>
-                <span className="line-clamp-2 text-[12.5px] text-bark">{one.excerpt}</span>
-              </span>
-              {!one.structured && (
-                <Button
-                  size="sm"
-                  disabled={structure.isPending}
-                  onClick={() => structure.mutate(one)}
-                >
-                  Structurer
-                </Button>
-              )}
-            </div>
-          ))
+                {!one.structured && (
+                  <Button
+                    size="sm"
+                    disabled={structure.isPending}
+                    onClick={() => structure.mutate(one)}
+                  >
+                    Structurer
+                  </Button>
+                )}
+              </div>
+            );
+          })
         )}
       </Panel>
       <Sheet
@@ -346,643 +277,15 @@ function SkillsList() {
           </div>
         )}
       </Sheet>
+      {making && (
+        <TaskEditor
+          agent={making.agent}
+          draft={{ skill: making.skill.title, ...(making.plan ? { plan: making.plan } : {}) }}
+          open
+          onOpenChange={(value) => !value && setMaking(null)}
+          onSaved={() => moved.mutate(making.skill)}
+        />
+      )}
     </div>
   );
 }
-
-export function AgentPage() {
-  const { name } = useParams({ from: '/construire/agents/$name' });
-  const kindName = useKindName();
-  const client = useQueryClient();
-  const { data, isLoading } = useAgents();
-  const pause = usePause();
-  const agent = data?.find((one) => one.title === name);
-  const [budget, setBudget] = useState<string | null>(null);
-  const [note, setNote] = useState('');
-  const keepNote = useMutation({
-    mutationFn: (text: string) =>
-      api(`/agents/${encodeURIComponent(name)}/memory`, { method: 'POST', body: { text } }),
-    onError: (error) => toast((error as Error).message, 'error'),
-    onSuccess: () => setNote(''),
-    onSettled: () => void client.invalidateQueries({ queryKey: ['agents'] }),
-  });
-  const change = useMutation({
-    mutationFn: (patch: Record<string, unknown>) =>
-      api(`/agents/${encodeURIComponent(name)}`, { method: 'PATCH', body: patch }),
-    onSettled: () => {
-      setBudget(null);
-      void client.invalidateQueries({ queryKey: ['agents'] });
-    },
-  });
-  if (isLoading) return <Skeleton className="h-40" />;
-  if (!agent) return <PageHead title="Introuvable" lead="Aucun agent de ce nom dans cet espace." />;
-  const state = STATE[agent.state];
-  const limit = agent.data.budget?.calls_per_day;
-  const kinds = (list?: string[]) =>
-    list?.length ? (
-      <span className="flex flex-wrap gap-1">
-        {list.map((one) => (
-          <Tag key={one} tone="neutral" dot={false}>
-            {kindName(one)}
-          </Tag>
-        ))}
-      </span>
-    ) : (
-      '—'
-    );
-  const line = (label: string, value: React.ReactNode) => (
-    <div className="grid grid-cols-[minmax(0,130px)_minmax(0,1fr)] items-baseline gap-3 border-b border-rule px-4 py-2.5 last:border-0">
-      <dt className="text-[13px] text-bark">{label}</dt>
-      <dd className="min-w-0 text-[13.5px]">{value}</dd>
-    </div>
-  );
-  return (
-    <>
-      <PageHead
-        icon={<Avatar name={agent.title} size={40} tinted />}
-        title={agent.title}
-        lead={
-          <span className="flex flex-wrap items-center gap-1.5">
-            <Tag tone={state.tone}>{state.label}</Tag>
-            {agent.data.role && <span>{agent.data.role}</span>}
-          </span>
-        }
-        actions={
-          <Button
-            tone={agent.data.paused ? 'solid' : 'plain'}
-            disabled={pause.isPending}
-            onClick={() => pause.mutate({ title: agent.title, paused: !agent.data.paused })}
-          >
-            {agent.data.paused ? <Play size={15} /> : <Pause size={15} />}
-            {agent.data.paused ? 'Reprendre' : 'Mettre en pause'}
-          </Button>
-        }
-      />
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-        <div className="flex min-w-0 flex-col gap-4">
-          <Panel title="Comment il travaille" icon={<Settings2 size={16} />}>
-            <dl>
-              {line(
-                'Quand',
-                <ul className="grid gap-0.5">
-                  {triggersOf(agent, kindName).map((one) => (
-                    <li key={one}>{one}</li>
-                  ))}
-                </ul>,
-              )}
-              {line(
-                'Avec',
-                `${EXECUTOR[agent.data.executor ?? 'rule']}${agent.data.service ? ` : ${agent.data.service}` : ''}`,
-              )}
-              {line(
-                'Skills',
-                agent.data.skills?.length ? (
-                  <span className="flex flex-wrap gap-2">
-                    {agent.data.skills.map((one) => (
-                      <a
-                        key={one}
-                        href={`/api/skills/${slug(one)}/SKILL.md`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary underline underline-offset-2"
-                      >
-                        {one}
-                      </a>
-                    ))}
-                  </span>
-                ) : (
-                  '—'
-                ),
-              )}
-              {line('Lit', kinds(agent.data.reads))}
-              {line('Écrit', kinds(agent.data.writes))}
-            </dl>
-          </Panel>
-          <Panel title="Ses comptes rendus" icon={<ActivityIcon size={16} />}>
-            {!agent.runs.length ? (
-              <p className="px-4 py-5 text-[13px] text-bark">
-                Pas encore d’appel. Ce qu’il écrit apparaît aussi dans son journal ci-dessous.
-              </p>
-            ) : (
-              agent.runs.map((run) => {
-                const counts = Object.entries(run.counts).filter(([, n]) => n > 0);
-                return (
-                  <div key={run.id} className={rowClass + ' flex-wrap'}>
-                    <Tag
-                      tone={
-                        run.status === 'done' ? 'ok' : run.status === 'failed' ? 'error' : 'info'
-                      }
-                    >
-                      {run.status === 'done'
-                        ? 'fait'
-                        : run.status === 'failed'
-                          ? 'échec'
-                          : 'en cours'}
-                    </Tag>
-                    <span className="min-w-0 flex-1">
-                      <Link
-                        to="/entree/$id"
-                        params={{ id: run.id }}
-                        className="block truncate font-semibold hover:underline"
-                      >
-                        {run.title}
-                      </Link>
-                      <span className="block truncate text-[12.5px] text-bark">
-                        {counts.length
-                          ? counts.map(([key, n]) => `${n} ${COUNT_WORDS[key] ?? key}`).join(' · ')
-                          : 'rien de nouveau'}
-                        {run.error ? ` · ${run.error}` : ''}
-                      </span>
-                    </span>
-                    {run.started && (
-                      <time className="flex-none font-mono text-xs text-bark">
-                        {ago(run.started)}
-                      </time>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </Panel>
-          <Journal
-            title="Son journal"
-            query={`limit=15&client=${encodeURIComponent(`agent:${agent.title}`)}`}
-            queryKey={['history', 'agent', agent.title]}
-          />
-        </div>
-        <div className="flex min-w-0 flex-col gap-4">
-          <Panel title="Sa liberté" icon={<Workflow size={16} />}>
-            <div className="grid gap-2 px-4 py-3">
-              <Segmented
-                label="Autonomie"
-                value={agent.data.autonomy ?? 'act_and_report'}
-                onChange={(value) => change.mutate({ autonomy: value })}
-                options={AUTONOMY.map((one) => ({ value: one.value, label: one.label }))}
-              />
-              <p className="text-[12.5px] text-bark">
-                {
-                  AUTONOMY.find((one) => one.value === (agent.data.autonomy ?? 'act_and_report'))
-                    ?.lead
-                }
-                . Ce qu’il lit dehors est une donnée, jamais un ordre : il n’envoie, ne paie ni
-                n’efface rien sans toi.
-              </p>
-              <Segmented
-                label="Compte rendu"
-                value={agent.data.report ?? 'activity'}
-                onChange={(value) => change.mutate({ report: value })}
-                options={[
-                  { value: 'activity', label: 'Activité' },
-                  { value: 'telegram', label: 'Activité et Telegram' },
-                ]}
-              />
-              <p className="text-[12.5px] text-bark">
-                {agent.data.report === 'telegram'
-                  ? 'Il te dit sur Telegram ce qu’il a fait, une fois par passage, si ton Telegram est relié.'
-                  : 'Ce qu’il fait est dans l’Activité, signé de son nom.'}
-              </p>
-            </div>
-          </Panel>
-          <Panel title="Sa mémoire" icon={<Brain size={16} />}>
-            <form
-              className="grid gap-2 border-b border-rule px-4 py-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (note.trim()) keepNote.mutate(note.trim());
-              }}
-            >
-              <textarea
-                aria-label="Une note pour sa mémoire"
-                className={inputClass + ' h-auto min-h-16 py-2'}
-                placeholder="Ce qu’il doit retenir pour la suite"
-                value={note}
-                onChange={(event) => setNote(event.target.value)}
-              />
-              <span>
-                <Button size="sm" disabled={!note.trim() || keepNote.isPending}>
-                  Garder
-                </Button>
-              </span>
-            </form>
-            {agent.memory.length ? (
-              <ul className="max-h-72 overflow-y-auto">
-                {agent.memory.map((one) => (
-                  <li key={one.id} className={rowClass + ' items-baseline'}>
-                    <span className="min-w-0 flex-1 text-[13.5px] break-words">{one.text}</span>
-                    <time className="flex-none font-mono text-xs text-bark">{ago(one.at)}</time>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="px-4 py-3 text-[13px] text-bark">
-                Rien encore. Ce qu’il apprend d’un passage à l’autre, ou ce que tu veux qu’il
-                retienne, s’écrit ici.
-              </p>
-            )}
-          </Panel>
-          <Panel title="Son budget" icon={<Gauge size={16} />}>
-            <div className="grid gap-2.5 px-4 py-3 text-[13px]">
-              <p>
-                Aujourd’hui : <b>{agent.callsToday}</b>
-                {limit !== undefined ? ` / ${limit}` : ''} appel(s)
-              </p>
-              {limit !== undefined && limit > 0 && (
-                <span className="h-2 overflow-hidden rounded-full bg-sand">
-                  <span
-                    className={
-                      'block h-full rounded-full ' +
-                      (agent.callsToday >= limit ? 'bg-ochre' : 'bg-success')
-                    }
-                    style={{ width: `${Math.min(100, (agent.callsToday / limit) * 100)}%` }}
-                  />
-                </span>
-              )}
-              <form
-                className="flex items-center gap-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const n = Number(budget);
-                  if (Number.isInteger(n) && n >= 0)
-                    change.mutate({ budget: { calls_per_day: n } });
-                }}
-              >
-                <input
-                  type="number"
-                  min={0}
-                  max={1000}
-                  className={inputClass.replace('w-full', 'w-24 flex-none')}
-                  value={budget ?? (limit !== undefined ? String(limit) : '')}
-                  placeholder="—"
-                  onChange={(e) => setBudget(e.target.value)}
-                  aria-label="Appels par jour au plus"
-                />
-                <span className="text-bark">appels par jour au plus</span>
-                <Button size="sm" disabled={budget === null || change.isPending}>
-                  Garder
-                </Button>
-              </form>
-              <p className="text-xs text-faint">
-                Le budget atteint, ses appels attendent le lendemain.
-              </p>
-            </div>
-          </Panel>
-          <Panel title="Ses règles" icon={<Workflow size={16} />}>
-            {!agent.rules.length ? (
-              <p className="px-4 py-4 text-[13px] text-bark">
-                {agent.data.builtin?.length
-                  ? 'Il fait un travail de Jarvis : aucune règle à lui.'
-                  : 'Aucune règle.'}
-              </p>
-            ) : (
-              agent.rules.map((rule) => (
-                <div key={rule.id} className={rowClass + ' flex-wrap'}>
-                  <span className="min-w-0 flex-1">
-                    <Link
-                      to="/entree/$id"
-                      params={{ id: rule.id }}
-                      className="block truncate font-semibold hover:underline"
-                    >
-                      {rule.title}
-                    </Link>
-                    <span className="block truncate text-[12.5px] text-bark">
-                      {whenText(rule.when, kindName)}
-                      {rule.app ? ` · ${rule.app}` : ''}
-                    </span>
-                    {rule.error && (
-                      <span className="block truncate text-[12px] text-error">{rule.error}</span>
-                    )}
-                  </span>
-                  {!rule.active && <Tag tone="neutral">arrêtée</Tag>}
-                </div>
-              ))
-            )}
-          </Panel>
-        </div>
-      </div>
-    </>
-  );
-}
-
-const COUNT_WORDS: Record<string, string> = {
-  created: 'créée(s)',
-  updated: 'mise(s) à jour',
-  skipped: 'déjà là',
-  problems: 'problème(s)',
-};
-
-interface RuleEntry {
-  id: string;
-  title: string;
-  data: {
-    when?: Record<string, unknown>;
-    then?: Record<string, unknown>[];
-    agent?: string;
-    app?: string;
-    active?: boolean;
-    next?: string;
-    error?: string;
-  };
-}
-interface MineSkill {
-  id: string;
-  title: string;
-  spaceId: string;
-  /** In its five parts (spec 047); else a text, which can be proposed in them. */
-  structured: boolean;
-  when: string;
-  /** What starts it, in the node's one vocabulary (F6b); none: when she asks for it. */
-  triggers: Record<string, unknown>[];
-  excerpt: string;
-}
-
-/** What a rule does, in her words. */
-function thenText(then: Record<string, unknown>[] | undefined, kindName: (kind: string) => string) {
-  return (then ?? [])
-    .map((action) => {
-      if (action.create)
-        return `crée un(e) ${kindName(String((action.create as { kind?: string }).kind ?? '')).toLowerCase()}`;
-      if (action.update) return 'change des champs';
-      if (action.link) return 'relie';
-      if (action.remind)
-        return `te rappelle « ${String((action.remind as { text?: string }).text ?? '')} »`;
-      if (action.run_script)
-        return `lance le script « ${String((action.run_script as { script?: string }).script ?? '')} »`;
-      if (action.call)
-        return `appelle ${String((action.call as { connection?: string }).connection ?? 'un service')}`;
-      return '';
-    })
-    .filter(Boolean)
-    .join(', puis ');
-}
-
-/**
- * Everything that runs by itself, in one place (v3 D12, F6b): her agents, each with the rules it
- * answers for — when, what, a way to stop it, and another agent to give it to. Her skills live in
- * their own tab. And the simplest automation made here: « chaque jour à 7 h, rappelle-moi… ».
- */
-function Automations() {
-  const client = useQueryClient();
-  const rules = useQuery({
-    queryKey: ['entries', 'rules'],
-    queryFn: () => api<RuleEntry[]>('/entries?kind=Rule&limit=200'),
-  });
-  const [time, setTime] = useState('07:00');
-  const [text, setText] = useState('');
-  const refresh = () => {
-    void client.invalidateQueries({ queryKey: ['entries', 'rules'] });
-    void client.invalidateQueries({ queryKey: ['agents'] });
-  };
-  const toggle = useMutation({
-    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
-      api('/save', { method: 'POST', body: { entries: [{ id, data: { active } }] } }),
-    onSettled: refresh,
-  });
-  const make = useMutation({
-    mutationFn: () => {
-      const [h, m] = time.split(':');
-      return api('/save', {
-        method: 'POST',
-        body: {
-          entries: [
-            {
-              kind: 'Rule',
-              title: `Chaque jour à ${time} : ${text}`.slice(0, 120),
-              data: {
-                when: { schedule: `${Number(m)} ${Number(h)} * * *` },
-                then: [{ remind: { text } }],
-                agent: 'Veilleur d’échéances',
-              },
-            },
-          ],
-        },
-      });
-    },
-    onSuccess: () => {
-      setText('');
-      toast('Automatisme créé : il apparaît ci-dessous et chez le Veilleur.');
-    },
-    onError: (error) => toast((error as Error).message, 'error'),
-    onSettled: refresh,
-  });
-  if (rules.isLoading) return <Skeleton className="h-40" />;
-  const list = (rules.data ?? []).filter((one) => one.data.when);
-  return (
-    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-      <AgentGroups
-        rules={list}
-        busy={toggle.isPending}
-        onToggle={(id, active) => toggle.mutate({ id, active })}
-        refresh={refresh}
-      />
-      <div className="grid gap-4">
-        <Panel title="Chaque jour, à heure fixe" icon={<Gauge size={16} />}>
-          <form
-            className="grid gap-2 px-4 py-3 text-[13px]"
-            onSubmit={(event) => {
-              event.preventDefault();
-              if (text.trim()) make.mutate();
-            }}
-          >
-            <span className="flex flex-wrap items-center gap-2">
-              Chaque jour à
-              <input
-                type="time"
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className={inputClass.replace('w-full', 'w-auto')}
-                aria-label="Heure"
-              />
-              rappelle-moi :
-            </span>
-            <input
-              className={inputClass}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="« Regarder mes offres du jour »"
-              aria-label="Le rappel"
-            />
-            <span>
-              <Button tone="solid" disabled={!text.trim() || make.isPending}>
-                Créer
-              </Button>
-            </span>
-            <p className="text-xs text-faint">
-              Pour plus (un bilan écrit, une page à ouvrir, une collecte), dis-le à Claude : il crée
-              l’automatisme et son agent, visibles ici.
-            </p>
-          </form>
-        </Panel>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Automations by agent (v3 D12, F6b): each agent — who, its state, its budget, its Pause — then
- * what it runs (its rules, or Jarvis's own work it does). Every rule has one: a rule she gave to no
- * one is shown « par défaut » under the agent that answers for it, and given to another in a click.
- */
-function AgentGroups({
-  rules,
-  onToggle,
-  busy,
-  refresh,
-}: {
-  rules: RuleEntry[];
-  onToggle: (id: string, active: boolean) => void;
-  busy: boolean;
-  refresh: () => void;
-}) {
-  const kindName = useKindName();
-  const { data: agents = [], isLoading } = useAgents();
-  const pause = usePause();
-  const give = useMutation({
-    mutationFn: ({ id, agent }: { id: string; agent: string }) =>
-      api('/save', { method: 'POST', body: { entries: [{ id, data: { agent } }] } }),
-    onSuccess: () => toast('Confié.'),
-    onSettled: refresh,
-  });
-  if (isLoading) return <Skeleton className="h-40" />;
-  // Every rule has an agent (F6b): the one she gave it to, or the one that answers for it.
-  const of = (agent: Agent) => rules.filter((rule) => agent.rules.some((r) => r.id === rule.id));
-  const byDefault = (agent: Agent, rule: RuleEntry) =>
-    agent.rules.some((r) => r.id === rule.id && !r.assigned);
-  const ruleLine = (rule: RuleEntry, agent: Agent) => {
-    const active = rule.data.active !== false;
-    return (
-      <div key={rule.id} className={rowClass + ' flex-wrap'}>
-        <span className="min-w-0 flex-1">
-          <Link
-            to="/entree/$id"
-            params={{ id: rule.id }}
-            className="block truncate font-semibold hover:underline"
-          >
-            {rule.title}
-          </Link>
-          <span className="block text-[12.5px] text-bark">
-            <b className="font-medium text-ink">{whenText(rule.data.when ?? {}, kindName)}</b> →{' '}
-            {thenText(rule.data.then, kindName) || '—'}
-            {rule.data.app ? <span className="text-faint"> · {rule.data.app}</span> : null}
-          </span>
-          {rule.data.error && (
-            <span className="block truncate text-[12px] text-error">{rule.data.error}</span>
-          )}
-        </span>
-        {!active && <Tag tone="neutral">arrêté</Tag>}
-        {byDefault(agent, rule) && (
-          <Tag tone="plain" dot={false}>
-            par défaut
-          </Tag>
-        )}
-        {agents.length > 1 && (
-          <Select
-            label={`Confier « ${rule.title} » à un autre agent`}
-            value=""
-            placeholder="Confier à…"
-            onChange={(other) => give.mutate({ id: rule.id, agent: other })}
-            options={agents
-              .filter((a) => a.title !== agent.title && !a.data.builtin?.length)
-              .map((a) => ({ value: a.title, label: a.title }))}
-            className="w-44"
-          />
-        )}
-        <Button size="sm" disabled={busy} onClick={() => onToggle(rule.id, !active)}>
-          {active ? <Pause size={14} /> : <Play size={14} />}
-          {active ? 'Arrêter' : 'Reprendre'}
-        </Button>
-      </div>
-    );
-  };
-  return (
-    <div className="grid gap-4">
-      {agents.map((agent) => {
-        const state = STATE[agent.state];
-        const budget = agent.data.budget?.calls_per_day;
-        const mine = of(agent);
-        return (
-          <Panel
-            key={agent.title}
-            title={
-              <span className="flex min-w-0 items-center gap-2.5">
-                <Avatar name={agent.title} size={26} tinted />
-                <Link
-                  to="/construire/agents/$name"
-                  params={{ name: agent.title }}
-                  className="truncate hover:underline"
-                >
-                  {agent.title}
-                </Link>
-              </span>
-            }
-            action={
-              <span className="flex flex-wrap items-center gap-2">
-                <Tag tone={state.tone}>{state.label}</Tag>
-                <span className="font-mono text-[11.5px] text-bark">
-                  {budget !== undefined
-                    ? `${agent.callsToday} / ${budget} appels`
-                    : `${agent.callsToday} appel(s)`}{' '}
-                  aujourd’hui
-                </span>
-                <Button
-                  size="sm"
-                  disabled={pause.isPending}
-                  onClick={() => pause.mutate({ title: agent.title, paused: !agent.data.paused })}
-                >
-                  {agent.data.paused ? <Play size={14} /> : <Pause size={14} />}
-                  {agent.data.paused ? 'Reprendre' : 'Pause'}
-                </Button>
-              </span>
-            }
-          >
-            {agent.data.role && (
-              <p className="border-b border-rule px-4 py-2.5 text-[13px] text-bark">
-                {agent.data.role}
-                <span className="text-faint">
-                  {' '}
-                  · {WHERE[agent.data.executor ?? 'rule']}
-                  {agent.data.service ? ` : ${agent.data.service}` : ''}
-                </span>
-              </p>
-            )}
-            {(agent.data.builtin ?? []).map((work) => (
-              <div key={work} className={rowClass}>
-                <span className="min-w-0 flex-1">
-                  <b className="block font-semibold">{BUILTIN_TITLE[work] ?? work}</b>
-                  <span className="block text-[12.5px] text-bark">
-                    <b className="font-medium text-ink">
-                      {agent.when ?? BUILTIN_WHEN[work] ?? work}
-                    </b>{' '}
-                    → {BUILTIN_DOES[work] ?? ''}
-                  </span>
-                </span>
-              </div>
-            ))}
-            {mine.map((rule) => ruleLine(rule, agent))}
-            {!mine.length && !(agent.data.builtin ?? []).length && (
-              <p className="px-4 py-3 text-[13px] text-bark">Aucun automatisme confié.</p>
-            )}
-          </Panel>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Where an agent's work runs, in her words. */
-const WHERE: Record<string, string> = {
-  rule: 'tourne dans Jarvis, sans IA',
-  script: 'tourne dans Jarvis (un script)',
-  llm: 'un modèle avec ses skills',
-  service: 'tourne sur un serveur',
-};
-const BUILTIN_TITLE: Record<string, string> = {
-  lecture: 'Lire les documents déposés',
-  brief: 'Le brief du matin',
-  rappels: 'Les rappels',
-};
-const BUILTIN_DOES: Record<string, string> = {
-  lecture:
-    'dit ce qu’est le document, en tire les faits, propose la facture, le fournisseur, la garantie',
-  brief: 'te dit ta journée sur tes canaux',
-  rappels: 'te dit chaque rappel sur tes canaux, reprogramme ceux qui se répètent',
-};

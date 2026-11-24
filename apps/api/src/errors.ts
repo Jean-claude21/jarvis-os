@@ -47,6 +47,8 @@ export function failure(error: unknown): { status: 400 | 403 | 404 | 500; messag
     /is no member of this space|names several members|does not repeat|has no occurrence on|is not a day \(|is not a time \(|^A capture needs|^A comment (needs|is larger)|^Give her answers|^Give what the proposal|is already structured|has no text to read/.test(
       message,
     ) ||
+    // Agents and their tasks (spec 109): a name taken, a task gone, a plan without a day.
+    /^An agent « .* » is already here|^No task |^Choose at least one day/.test(message) ||
     // v3 F5–F7, F6b: a proposal changed, what a member sees, one phrase for one thing.
     /makes no entry n°|^Open her at least one kind|one phrase starts one thing/.test(message) ||
     // Executions (spec 057): closed once, written for while they run.

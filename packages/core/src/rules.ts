@@ -592,6 +592,41 @@ export async function testRule(
   }));
 }
 
+/** A task run now (spec 109), whatever its « when »: as on its time, under its agent. */
+export async function runRuleNow(
+  tx: Tx,
+  actor: Actor,
+  spaceId: string,
+  ruleId: string,
+): Promise<boolean> {
+  const rule = (await rulesOf(tx, spaceId)).find((one) => one.id === ruleId);
+  if (!rule) throw new Error(`No task ${ruleId} in this space.`);
+  return act(tx, actor, spaceId, rule, null);
+}
+
+/**
+ * A task tried before it is kept (spec 109, « Essai à blanc »): kept, run, then all of it undone;
+ * what it would change is said, the task's own line aside.
+ */
+export async function tryRuleData(
+  tx: Tx,
+  actor: Actor,
+  spaceId: string,
+  data: unknown,
+): Promise<Trial<{ matched: boolean }>> {
+  const checked = checkRule(data);
+  let id = '';
+  const tried = await trial(tx, true, async () => {
+    const saved = await save(tx, actor, spaceId, {
+      entries: [{ kind: RULE_KIND, title: 'Essai', data: { ...checked, active: true } }],
+    });
+    id = saved.entries[0]!.id;
+    const rule = (await rulesOf(tx, spaceId)).find((one) => one.id === id);
+    return { matched: rule ? await act(tx, actor, spaceId, rule, null) : false };
+  });
+  return { ...tried, changes: tried.changes.filter((one) => one.target !== id) };
+}
+
 /** The rules that may be due, across spaces: who keeps each (the watcher, spec 006). */
 export async function runDueRules(
   db: pg.Pool,

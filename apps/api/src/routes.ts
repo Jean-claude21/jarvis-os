@@ -26,6 +26,15 @@ import {
   updateApp,
   bundleSchema,
   agentsOf,
+  agentsOfRules,
+  nextRuns,
+  PERIODS,
+  planOfSchedule,
+  runRuleNow,
+  skillActions,
+  skillOfTask,
+  tasksFromText,
+  tryRuleData,
   agentSettingsSchema,
   setAgent,
   remember,
@@ -1401,7 +1410,14 @@ export function apiRoutes(deps: {
   api.get('/agents', async (c) => c.json(await act(c, (tx, _a, spaceId) => agentsOf(tx, spaceId))));
   api.patch('/agents/:title', async (c) => {
     const patch = agentSettingsSchema
-      .pick({ paused: true, autonomy: true, budget: true, role: true, report: true })
+      .pick({
+        paused: true,
+        autonomy: true,
+        budget: true,
+        role: true,
+        report: true,
+        instructions: true,
+      })
       .parse(await c.req.json());
     return c.json(
       await act(c, (tx, actor, spaceId) =>
@@ -1421,6 +1437,124 @@ export function apiRoutes(deps: {
       ),
       201,
     );
+  });
+
+  // An agent's tasks (spec 109): each with its agent, its « when », its next times, the skill it
+  // follows; tried before it is kept; run now; drawn from her text. A task is kept as a rule.
+  api.get('/tasks', async (c) =>
+    c.json(
+      await act(c, async (tx, _a, spaceId) => {
+        const owners = await agentsOfRules(tx, spaceId);
+        const zone = await zoneOf(tx);
+        const now = new Date();
+        return (await find(tx, spaceId, { kind: 'Rule', limit: 200 })).map((rule) => {
+          const data = rule.data as Record<string, unknown> & {
+            when?: { schedule?: string };
+            then?: unknown[];
+          };
+          const schedule = data.when?.schedule;
+          let next: string[] = [];
+          try {
+            next = schedule && data.active !== false ? nextRuns(schedule, now, zone) : [];
+          } catch {
+            next = [];
+          }
+          return {
+            id: rule.id,
+            title: rule.title,
+            agent: owners.get(rule.id)?.title ?? null,
+            assigned: owners.get(rule.id)?.assigned ?? false,
+            when: data.when ?? null,
+            then: data.then ?? [],
+            active: data.active !== false,
+            app: data.app ?? null,
+            error: data.error ?? null,
+            skill: skillOfTask((data.then ?? []) as Parameters<typeof skillOfTask>[0]),
+            plan: schedule ? planOfSchedule(schedule) : null,
+            next,
+          };
+        });
+      }),
+    ),
+  );
+  // What a skill's task does on its time: its bilan prepared over its period, and a reminder.
+  api.post('/tasks/skill', async (c) => {
+    const { skill, period } = z
+      .object({ skill: z.string().trim().min(1).max(120), period: z.enum(PERIODS).default('week') })
+      .parse(await c.req.json());
+    const then = await act(c, async (tx, _a, spaceId) => {
+      const [found] = (await find(tx, spaceId, { kind: 'Routine', limit: 200 })).filter(
+        (one) => one.title.toLowerCase() === skill.toLowerCase(),
+      );
+      const result = (found?.data as { result?: { kind?: string } } | undefined)?.result;
+      return skillActions({ name: found?.title ?? skill, result }, period);
+    });
+    return c.json({ then });
+  });
+  // « Essai à blanc »: a task, kept or not, tried — what it would change; nothing is written.
+  api.post('/tasks/try', async (c) => {
+    const { data } = z
+      .object({ data: z.record(z.string(), z.unknown()) })
+      .parse(await c.req.json());
+    const tried = await act(c, async (tx, actor, spaceId) => {
+      const zone = await zoneOf(tx);
+      const schedule = (data.when as { schedule?: unknown } | undefined)?.schedule;
+      return {
+        ...(await tryRuleData(tx, actor, spaceId, data)),
+        next: typeof schedule === 'string' ? nextRuns(schedule, new Date(), zone) : [],
+      };
+    });
+    return c.json(tried);
+  });
+  // « Lancer maintenant »: as on its time, under its agent (its Pause and budget apply).
+  api.post('/tasks/:id/run', async (c) => {
+    const ran = await act(c, (tx, actor, spaceId) =>
+      runRuleNow(tx, actor, spaceId, c.req.param('id')),
+    );
+    return c.json({ ran });
+  });
+  // Her text read as task lines and instructions (no AI: what it cannot read stays text).
+  api.post('/tasks/from-text', async (c) => {
+    const { text } = z
+      .object({ text: z.string().trim().min(1).max(8000) })
+      .parse(await c.req.json());
+    const read = await act(c, async (tx, _a, spaceId) =>
+      tasksFromText(
+        text,
+        (await find(tx, spaceId, { kind: 'Routine', limit: 200 })).map((one) => one.title),
+      ),
+    );
+    return c.json(read);
+  });
+  // A new agent: its name and its role; its tasks come next.
+  api.post('/agents', async (c) => {
+    const body = z
+      .object({
+        title: z.string().trim().min(1).max(80),
+        role: z.string().trim().max(400).optional(),
+      })
+      .parse(await c.req.json());
+    const made = await act(c, async (tx, actor, spaceId) => {
+      const taken = (await agentsOf(tx, spaceId)).some(
+        (one) => one.title.toLowerCase() === body.title.toLowerCase(),
+      );
+      if (taken) throw new Error(`An agent « ${body.title} » is already here.`);
+      const saved = await save(tx, actor, spaceId, {
+        entries: [
+          {
+            kind: 'Agent',
+            title: body.title,
+            data: {
+              executor: 'rule',
+              autonomy: 'act_and_report',
+              ...(body.role ? { role: body.role } : {}),
+            },
+          },
+        ],
+      });
+      return { id: saved.entries[0]!.id, title: body.title };
+    });
+    return c.json(made, 201);
   });
 
   // A skill in the Agent Skills format (SKILL.md: a name, a description, the instructions): what

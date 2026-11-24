@@ -226,6 +226,8 @@ export {
   rulesOf,
   runDueRules,
   testRule,
+  runRuleNow,
+  tryRuleData,
   press,
   type Action,
   type RuleData,
@@ -524,3 +526,17 @@ export {
   type DraftField,
 } from './follow';
 export { checkPhrases, phrasesOf, triggerSchema, type Trigger } from './triggers';
+export {
+  PERIODS,
+  planFromText,
+  planOfSchedule,
+  planSchema,
+  scheduleOf,
+  skillActions,
+  skillOfTask,
+  tasksFromText,
+  nextRuns,
+  type Period,
+  type Plan,
+  type TaskDraft,
+} from './tasks';

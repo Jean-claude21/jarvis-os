@@ -1818,7 +1818,7 @@ export async function mcpServerFor(
     'agent_set',
     {
       description:
-        'Change an agent as she asks (« mets le brief du matin en pause », « que le Chasseur me rende compte sur Telegram »): `paused`, `autonomy` (propose · act_and_report · silent), `report` (activity · telegram), its `budget` ({ calls_per_day }) or its `role`. Journaled, undone at once.',
+        'Change an agent as she asks (« mets le brief du matin en pause », « que le Chasseur me rende compte sur Telegram »): `paused`, `autonomy` (propose · act_and_report · silent), `report` (activity · telegram), its `budget` ({ calls_per_day }), its `role`, or its `instructions` — her consignes in her words for all its tasks (spec 109: an agent has no time of its own; each task, a rule naming it as `agent`, has its `when`; a skill is the method a task follows). Journaled, undone at once.',
       inputSchema: {
         title: z.string().min(1).max(80),
         settings: agentSettingsSchema.pick({
@@ -1827,6 +1827,7 @@ export async function mcpServerFor(
           report: true,
           budget: true,
           role: true,
+          instructions: true,
         }),
         space: spaceArg,
       },

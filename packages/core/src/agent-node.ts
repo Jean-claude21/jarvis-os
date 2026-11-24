@@ -24,6 +24,11 @@ export type BuiltinWork = (typeof BUILTIN_WORKS)[number];
 export const agentSettingsSchema = z.object({
   /** What it does, in one sentence she reads. */
   role: z.string().trim().max(400).optional(),
+  /**
+   * Her instructions, in her words (spec 109): how she wants its work done, for all its tasks —
+   * read by whoever does the work; a skill's own method wins over them when they differ.
+   */
+  instructions: z.string().trim().max(8000).optional(),
   /** Who runs the work: her rules and scripts, a model with skills, a service. */
   executor: z.enum(['rule', 'script', 'llm', 'service']).optional(),
   /** The connection a service agent reaches (« Atelier »). */

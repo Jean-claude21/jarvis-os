@@ -3,6 +3,7 @@ import type { OAuthClientProvider } from '@modelcontextprotocol/sdk/client/auth.
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { assertCallable, outboundFetch } from './outbound';
 
 // Jarvis as an MCP client (spec 025): it reaches the servers of her connectors over HTTP (Streamable
 // HTTP, else the older SSE), with her key or her sign-in (OAuth); a fresh client for each check or
@@ -12,6 +13,10 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 export interface Reach {
   headers: Record<string, string>;
   authProvider?: OAuthClientProvider;
+  /** How the server is reached: only the public internet (spec 110); the safest when not given. */
+  fetch?: typeof fetch;
+  /** Her own machine allowed (a developer's Jarvis). */
+  local?: boolean;
 }
 
 const TIMEOUT_MS = 30_000;
@@ -25,8 +30,10 @@ export function headersOf(connector: Connector, secret: string | null): Record<s
 }
 
 async function connected(url: string, reach: Reach): Promise<Client> {
+  assertCallable(url, reach.local ?? false);
   const options = {
     requestInit: { headers: reach.headers },
+    fetch: reach.fetch ?? outboundFetch(reach.local ?? false),
     ...(reach.authProvider ? { authProvider: reach.authProvider } : {}),
   };
   const client = new Client({ name: 'jarvis-os', version: '0.5.0' });

@@ -173,7 +173,7 @@ import { briefText, channelOf, sendTelegram } from './watcher';
 import type { Auth } from './auth';
 import { codeOf, failure } from './errors';
 import { captureAs } from './capture';
-import { catalogFor } from './catalog';
+import { catalogFor, logoOf } from './catalog';
 import { PROVIDERS, providerOf } from './relay';
 import { searchByMeaning } from './embeddings';
 import { connectorChange, connectorInput, type ConnectorService } from './connector-service';
@@ -1966,12 +1966,13 @@ ${base.text}
   // sign-in and its way back, and a call (for a door, an agent, or to try one).
   api.get('/connections/providers', (c) =>
     c.json(
-      PROVIDERS.map(({ id, name, family, auth, description }) => ({
+      PROVIDERS.map(({ id, name, family, auth, description, icon, color }) => ({
         id,
         name,
         family,
         auth,
         description,
+        logo: logoOf({ name, ...(icon ? { icon } : {}), ...(color ? { color } : {}) }),
         needsAddress: !providerOf(id)?.base,
       })),
     ),

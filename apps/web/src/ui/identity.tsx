@@ -39,6 +39,55 @@ export function logoDomain(who?: Who | null): string | null {
 }
 
 /** A company's logo, fetched by Jarvis; its initial on its colour when it has none. */
+/** A service's mark as the API sends it (simple-icons, inside the page: nothing fetched). */
+export interface BrandMark {
+  path: string | null;
+  hex: string;
+  fg: string;
+  initial: string;
+}
+
+/** A service's logo: its glyph in its colour on a white tile, or its initial on its colour. */
+export function BrandLogo({
+  mark,
+  name,
+  size = 36,
+}: {
+  mark?: BrandMark | null | undefined;
+  name: string;
+  size?: number;
+}) {
+  const radius = Math.max(6, Math.round(size / 4.5));
+  if (!mark?.path)
+    return (
+      <span
+        className="grid flex-none place-items-center font-display font-bold"
+        style={{
+          width: size,
+          height: size,
+          borderRadius: radius,
+          background: mark ? `#${mark.hex}` : colorOf(name),
+          color: mark?.fg ?? '#fffdf9',
+          fontSize: Math.max(11, size * 0.42),
+        }}
+        aria-hidden
+      >
+        {(mark?.initial ?? initialsOf(name)).slice(0, 1)}
+      </span>
+    );
+  return (
+    <span
+      className="grid flex-none place-items-center border border-rule bg-[#fff]"
+      style={{ width: size, height: size, borderRadius: radius }}
+      aria-hidden
+    >
+      <svg viewBox="0 0 24 24" width={size * 0.56} height={size * 0.56} fill={`#${mark.hex}`}>
+        <path d={mark.path} />
+      </svg>
+    </span>
+  );
+}
+
 export function Logo({
   name,
   domain,

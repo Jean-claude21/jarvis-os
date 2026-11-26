@@ -16,6 +16,7 @@ import {
   zoneOf,
   type SaveInput,
 } from '@jarvis-os/core';
+import { assertCallable, localAllowed, outboundFetch } from './outbound';
 import { open, seal } from './secrets';
 
 // The relay (v3 D16): every call to a provider's API goes through here. It knows the providers
@@ -37,6 +38,9 @@ export interface Provider {
   /** A light call that says whether it answers, relative to `base`. */
   probe: string;
   description: { fr: string; en: string };
+  /** The simple-icons name of its logo (see catalog.ts); else its initial on its colour. */
+  icon?: string;
+  color?: string;
 }
 
 export const PROVIDERS: Provider[] = [
@@ -48,6 +52,7 @@ export const PROVIDERS: Provider[] = [
     base: 'https://www.googleapis.com/calendar/v3/',
     scopes: ['https://www.googleapis.com/auth/calendar.readonly'],
     probe: 'users/me/calendarList?maxResults=1',
+    icon: 'siGooglecalendar',
     description: {
       fr: 'Tes agendas Google, lus par Jarvis (lecture seule).',
       en: 'Your Google calendars, read by Jarvis (read-only).',
@@ -62,6 +67,7 @@ export const PROVIDERS: Provider[] = [
     // Only the files she opens with Jarvis or that Jarvis creates: never her whole Drive.
     scopes: ['https://www.googleapis.com/auth/drive.file'],
     probe: 'about?fields=user',
+    icon: 'siGoogledrive',
     description: {
       fr: 'Les fichiers que tu choisis de partager avec Jarvis, et ceux qu’il crée.',
       en: 'The files you choose to share with Jarvis, and those it creates.',
@@ -74,6 +80,7 @@ export const PROVIDERS: Provider[] = [
     auth: 'none',
     base: '',
     probe: '',
+    color: '4E5BA6',
     description: {
       fr: 'Un agenda publié en iCalendar (emploi du temps, club, école) : son adresse suffit.',
       en: 'A calendar published as iCalendar (timetable, club, school): its address is enough.',
@@ -130,7 +137,8 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function relay(deps: RelayDeps) {
   const env = deps.env ?? process.env;
-  const fetcher = deps.fetcher ?? fetch;
+  // The public internet only (spec 110): an ICS address is hers to give.
+  const fetcher = deps.fetcher ?? outboundFetch(localAllowed());
   const as = <T>(person: string, work: Parameters<typeof asPerson<T>>[2]) =>
     asPerson(deps.db, person, work);
   const callback = `${deps.publicUrl.replace(/\/$/, '')}/api/connections/oauth/callback`;
@@ -154,6 +162,7 @@ export function relay(deps: RelayDeps) {
     if (!provider.base) {
       const asked = (given.url ?? '').trim().replace(/^webcal:/i, 'https:');
       if (!/^https:\/\//.test(asked)) throw new Error('Give the https address of the calendar.');
+      assertCallable(asked);
       url = asked;
     }
     // Google's sign-in needs this server's client: said before anything is added.

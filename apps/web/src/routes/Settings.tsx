@@ -36,7 +36,7 @@ import {
   rowClass,
   type TagTone,
 } from '../ui';
-import { Logo } from '../ui/identity';
+import { BrandLogo, type BrandMark } from '../ui/identity';
 import { toast } from '../ui/more';
 import { useKindName } from '../lib/kinds';
 
@@ -924,6 +924,7 @@ interface Connector {
   id: string;
   name: string;
   url: string;
+  auth: 'none' | 'bearer' | 'header' | 'oauth';
   protocol: 'mcp' | 'http' | 'api';
   provider: string | null;
   state: 'unchecked' | 'connected' | 'refused' | 'unreachable' | 'needs_sign_in';
@@ -940,22 +941,52 @@ interface Provider {
   family: string;
   auth: string;
   description?: string | { fr?: string; en?: string };
+  logo?: BrandMark;
   needsAddress: boolean;
+}
+type CatalogGroup = 'everyday' | 'files' | 'work' | 'money' | 'design';
+interface CatalogServer {
+  id: string;
+  name: string;
+  /** Empty when each person has her own address (Zapier). */
+  url: string;
+  auth: 'none' | 'bearer' | 'oauth';
+  group: CatalogGroup;
+  fr?: string;
+  en?: string;
+  help?: string;
+  logo?: BrandMark;
+  ready: boolean;
 }
 const STATE: Record<Connector['state'], { label: string; tone: TagTone }> = {
   connected: { label: 'connecté', tone: 'ok' },
-  needs_sign_in: { label: 'à reconnecter', tone: 'late' },
+  needs_sign_in: { label: 'à connecter', tone: 'late' },
   unreachable: { label: 'injoignable', tone: 'error' },
   refused: { label: 'refusé', tone: 'error' },
   unchecked: { label: 'pas encore vérifié', tone: 'neutral' },
 };
-/** A provider's site, for its logo. */
-const PROVIDER_DOMAIN: Record<string, string> = {
-  'google-calendar': 'calendar.google.com',
-  'google-drive': 'drive.google.com',
-};
+const GROUPS: { id: CatalogGroup; label: string }[] = [
+  { id: 'everyday', label: 'Au quotidien' },
+  { id: 'files', label: 'Fichiers et bases' },
+  { id: 'work', label: 'Travail' },
+  { id: 'money', label: 'Argent' },
+  { id: 'design', label: 'Création' },
+];
 const words = (one?: Provider['description']) =>
   !one ? '' : typeof one === 'string' ? one : (one.fr ?? one.en ?? '');
+/** The cards of a collection: one per service, as many across as the width allows. */
+const gridClass = 'grid gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3';
+const cardClass = 'flex min-w-0 flex-col gap-3 rounded-[10px] border border-rule bg-paper p-3.5';
+
+/** Her sign-in to a server of tools, then back here; null when she already is. */
+const signInToServer = async (id: string) => {
+  const { url } = await api<{ url: string | null }>(`/connectors/${id}/sign-in`, {
+    method: 'POST',
+    body: {},
+  });
+  if (url) location.href = url;
+  return url;
+};
 
 function Connections() {
   const client = useQueryClient();
@@ -967,115 +998,175 @@ function Connections() {
     queryKey: ['connections', 'providers'],
     queryFn: () => api<Provider[]>('/connections/providers'),
   });
+  const catalog = useQuery({
+    queryKey: ['connectors', 'catalog'],
+    queryFn: () => api<CatalogServer[]>('/connectors/catalog'),
+  });
   const [adding, setAdding] = useState<Provider | null>(null);
   const [url, setUrl] = useState('');
   const refresh = () => void client.invalidateQueries({ queryKey: ['connectors'] });
+  const failed = (error: unknown) => toast((error as Error).message, 'error');
   const check = useMutation({
-    mutationFn: (id: string) => api(`/connectors/${id}/check`, { method: 'POST' }),
+    mutationFn: (id: string) => api<Connector>(`/connectors/${id}/check`, { method: 'POST' }),
+    onSuccess: (one) =>
+      toast(
+        one.state === 'connected'
+          ? `« ${one.name} » répond.`
+          : `« ${one.name} » : ${STATE[one.state]?.label ?? one.state}.`,
+        one.state === 'connected' ? undefined : 'error',
+      ),
+    onError: failed,
     onSettled: refresh,
   });
   const sync = useMutation({
-    mutationFn: (id: string) => api(`/connections/${id}/sync`, { method: 'POST' }),
+    mutationFn: (id: string) =>
+      api<{ read: number }>(`/connections/${id}/sync`, { method: 'POST' }),
+    onSuccess: (done) => toast(`${done.read} événement(s) relu(s).`),
+    onError: failed,
     onSettled: () => {
       refresh();
       void client.invalidateQueries({ queryKey: ['now'] });
     },
   });
   const signIn = useMutation({
-    mutationFn: (id: string) =>
-      api<{ url: string }>(`/connections/${id}/sign-in`, { method: 'POST' }),
-    onSuccess: (made) => {
-      location.href = made.url;
+    mutationFn: async (one: Connector) => {
+      if (one.protocol === 'api') {
+        const made = await api<{ url: string }>(`/connections/${one.id}/sign-in`, {
+          method: 'POST',
+        });
+        location.href = made.url;
+        return;
+      }
+      if (!(await signInToServer(one.id))) toast(`« ${one.name} » est connecté.`);
     },
+    onError: failed,
+    onSettled: refresh,
   });
   const cut = useMutation({
     mutationFn: (id: string) => api(`/connectors/${id}`, { method: 'DELETE' }),
+    onError: failed,
     onSettled: refresh,
   });
   const connect = useMutation({
     mutationFn: (provider: Provider) =>
       api<{ signIn?: string }>('/connections', {
         method: 'POST',
-        body: { provider: provider.id, ...(url ? { url } : {}) },
+        body: { provider: provider.id, ...(url.trim() ? { url: url.trim() } : {}) },
       }),
     onSuccess: (made) => {
       setAdding(null);
       setUrl('');
       if (made.signIn) location.href = made.signIn;
+      else toast('Service relié.');
     },
+    onError: failed,
     onSettled: refresh,
   });
   const mine = list.data ?? [];
+  const markOf = (one: Connector) =>
+    one.protocol === 'api'
+      ? providers.data?.find((p) => p.id === one.provider)?.logo
+      : catalog.data?.find((c) => c.url && c.url === one.url)?.logo;
+  const canSignIn = (one: Connector) =>
+    (one.state === 'needs_sign_in' || one.state === 'refused') &&
+    (one.protocol === 'api' ? one.provider !== 'ics' : one.auth === 'oauth');
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <div className="grid gap-4">
       <Panel title="Tes connexions" icon={<Plug size={16} />}>
         {list.isLoading ? (
-          <Skeleton className="m-4 h-16" />
+          <div className={gridClass}>
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+          </div>
         ) : !mine.length ? (
           <Empty
             title="Aucune connexion"
-            lead="Relie un agenda, ton Drive ou un serveur d’outils : à droite."
+            lead="Relie un agenda, ton Drive ou un serveur d’outils : juste en dessous."
           />
         ) : (
-          mine.map((one) => {
-            const state = STATE[one.state] ?? STATE.unchecked;
-            const domain = PROVIDER_DOMAIN[one.provider ?? ''] ?? null;
-            return (
-              <div key={one.id} className={rowClass + ' flex-wrap'}>
-                <Logo name={one.name} domain={domain} size={30} />
-                <span className="min-w-0 flex-1">
-                  <b className="block truncate font-semibold">{one.name}</b>
-                  <span className="block truncate text-[12.5px] text-bark">
-                    {one.protocol === 'mcp'
-                      ? `outils d’un serveur · ${one.tools.length} outil(s)`
-                      : one.provider === 'ics'
-                        ? 'agenda suivi'
-                        : (one.serverName ?? one.provider ?? one.url)}
-                    {one.lastOkAt ? ` · a répondu ${ago(one.lastOkAt)}` : ''}
-                    {one.failures > 0 ? ` · ${one.failures} échec(s) de suite` : ''}
-                  </span>
-                  {one.state !== 'connected' && one.reason && (
-                    <span className="block truncate text-[12px] text-error" title={one.reason}>
-                      {one.reason}
+          <div className={gridClass}>
+            {mine.map((one) => {
+              const state = STATE[one.state] ?? STATE.unchecked;
+              return (
+                <article key={one.id} className={cardClass}>
+                  <div className="flex items-start gap-3">
+                    <BrandLogo mark={markOf(one)} name={one.name} />
+                    <span className="min-w-0 flex-1">
+                      <b className="block truncate font-semibold">{one.name}</b>
+                      <span className="block truncate text-[12.5px] text-bark">
+                        {one.protocol === 'mcp'
+                          ? `serveur d’outils · ${one.tools.length} outil(s)`
+                          : one.provider === 'ics'
+                            ? 'agenda suivi'
+                            : one.protocol === 'api'
+                              ? 'lu par Jarvis'
+                              : (one.serverName ?? one.url)}
+                      </span>
                     </span>
+                    <Tag tone={state.tone}>{state.label}</Tag>
+                  </div>
+                  <p className="text-[12px] text-faint">
+                    {one.lastOkAt ? `A répondu ${ago(one.lastOkAt)}` : 'N’a pas encore répondu'}
+                    {one.failures > 0 ? ` · ${one.failures} échec(s) de suite` : ''}
+                  </p>
+                  {one.state === 'needs_sign_in' ? (
+                    <p className="text-[12px] text-bark">
+                      Connecte-toi à {one.name} pour que Jarvis utilise ses outils.
+                    </p>
+                  ) : (
+                    one.state !== 'connected' &&
+                    one.reason && (
+                      <p className="line-clamp-2 text-[12px] text-error" title={one.reason}>
+                        {one.reason}
+                      </p>
+                    )
                   )}
-                </span>
-                <Tag tone={state.tone}>{state.label}</Tag>
-                <span className="flex flex-none flex-wrap gap-1.5">
-                  {one.state === 'needs_sign_in' && one.protocol === 'api' && (
+                  <span className="mt-auto flex flex-wrap gap-1.5">
+                    {canSignIn(one) && (
+                      <Button
+                        size="sm"
+                        tone="solid"
+                        disabled={signIn.isPending}
+                        onClick={() => signIn.mutate(one)}
+                      >
+                        Se connecter
+                      </Button>
+                    )}
+                    {one.provider === 'ics' && (
+                      <Button
+                        size="sm"
+                        disabled={sync.isPending}
+                        onClick={() => sync.mutate(one.id)}
+                      >
+                        <CalendarSync size={14} />
+                        Relire
+                      </Button>
+                    )}
                     <Button
                       size="sm"
-                      tone="solid"
-                      disabled={signIn.isPending}
-                      onClick={() => signIn.mutate(one.id)}
+                      disabled={check.isPending}
+                      onClick={() => check.mutate(one.id)}
                     >
-                      Se reconnecter
+                      <RefreshCw size={14} />
+                      Vérifier
                     </Button>
-                  )}
-                  {one.provider === 'ics' && (
-                    <Button size="sm" disabled={sync.isPending} onClick={() => sync.mutate(one.id)}>
-                      <CalendarSync size={14} />
-                      Relire
+                    <Button
+                      size="sm"
+                      disabled={cut.isPending}
+                      onClick={() => {
+                        if (
+                          confirm(`Couper « ${one.name} » ? Ce qu’elle a apporté reste chez toi.`)
+                        )
+                          cut.mutate(one.id);
+                      }}
+                    >
+                      Couper
                     </Button>
-                  )}
-                  <Button size="sm" disabled={check.isPending} onClick={() => check.mutate(one.id)}>
-                    <RefreshCw size={14} />
-                    Vérifier
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={cut.isPending}
-                    onClick={() => {
-                      if (confirm(`Couper « ${one.name} » ? Ce qu’elle a apporté reste chez toi.`))
-                        cut.mutate(one.id);
-                    }}
-                  >
-                    Couper
-                  </Button>
-                </span>
-              </div>
-            );
-          })
+                  </span>
+                </article>
+              );
+            })}
+          </div>
         )}
         <p className="border-t border-rule px-4 py-3 text-xs text-faint">
           Jarvis vérifie chaque connexion tous les jours : celle qui ne répond plus apparaît dans «
@@ -1083,119 +1174,231 @@ function Connections() {
         </p>
       </Panel>
       <Panel title="Relier un service" icon={<Link2 size={16} />}>
-        {(providers.data ?? []).map((one) => (
-          <div key={one.id} className="border-b border-rule px-4 py-3 last:border-0">
-            <div className="flex items-center gap-3">
-              <Logo name={one.name} domain={PROVIDER_DOMAIN[one.id] ?? null} size={30} />
-              <span className="min-w-0 flex-1">
-                <b className="block truncate font-semibold">{one.name}</b>
-                <span className="line-clamp-2 text-[12.5px] text-bark">
-                  {words(one.description)}
+        <div className={gridClass}>
+          {providers.isLoading && <Skeleton className="h-28" />}
+          {(providers.data ?? []).map((one) => (
+            <article key={one.id} className={cardClass}>
+              <div className="flex items-start gap-3">
+                <BrandLogo mark={one.logo} name={one.name} />
+                <span className="min-w-0 flex-1">
+                  <b className="block truncate font-semibold">{one.name}</b>
+                  <span className="line-clamp-3 text-[12.5px] text-bark">
+                    {words(one.description)}
+                  </span>
                 </span>
-              </span>
-              {adding?.id !== one.id && (
-                <Button
-                  size="sm"
-                  onClick={() => (one.needsAddress ? setAdding(one) : connect.mutate(one))}
-                  disabled={connect.isPending}
+              </div>
+              {adding?.id === one.id ? (
+                <form
+                  className="mt-auto grid gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    if (url.trim()) connect.mutate(one);
+                  }}
                 >
-                  Relier
-                </Button>
+                  <input
+                    className={inputClass}
+                    value={url}
+                    autoFocus
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="https://… (l’adresse de l’agenda)"
+                    aria-label={`Adresse pour ${one.name}`}
+                  />
+                  <span className="flex gap-2">
+                    <Button size="sm" tone="solid" disabled={!url.trim() || connect.isPending}>
+                      Relier
+                    </Button>
+                    <Button
+                      size="sm"
+                      type="button"
+                      onClick={() => {
+                        setAdding(null);
+                        setUrl('');
+                      }}
+                    >
+                      Annuler
+                    </Button>
+                  </span>
+                </form>
+              ) : (
+                <span className="mt-auto">
+                  <Button
+                    size="sm"
+                    onClick={() => (one.needsAddress ? setAdding(one) : connect.mutate(one))}
+                    disabled={connect.isPending}
+                  >
+                    Relier
+                  </Button>
+                </span>
               )}
-            </div>
-            {adding?.id === one.id && (
-              <form
-                className="mt-2 flex gap-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  if (url.trim()) connect.mutate(one);
-                }}
-              >
-                <input
-                  className={inputClass}
-                  value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://… (l’adresse de l’agenda)"
-                  aria-label={`Adresse pour ${one.name}`}
-                />
-                <Button tone="solid" disabled={!url.trim() || connect.isPending}>
-                  Relier
-                </Button>
-              </form>
-            )}
-          </div>
-        ))}
-        {connect.error && (
-          <p className="px-4 py-2 text-[13px] text-error">{(connect.error as Error).message}</p>
-        )}
+            </article>
+          ))}
+        </div>
       </Panel>
-      <ToolServers />
+      <ToolServers catalog={catalog.data ?? []} loading={catalog.isLoading} />
     </div>
   );
 }
 
-interface CatalogServer {
-  name: string;
-  url: string;
-  auth: 'none' | 'bearer' | 'oauth';
-  description?: string | { fr?: string; en?: string };
-  ready: boolean;
-}
-
 /**
  * A server of tools (MCP, spec 025): one from the catalogue, or any by its address and key. Its
- * tools then answer through Jarvis; what changes, sends or deletes still asks her first.
+ * tools then answer through Jarvis; what changes, sends or deletes still asks her first. One that
+ * asks for a sign-in opens its page right after it is added.
  */
-function ToolServers() {
+function ToolServers({ catalog, loading }: { catalog: CatalogServer[]; loading: boolean }) {
   const client = useQueryClient();
-  const catalog = useQuery({
-    queryKey: ['connectors', 'catalog'],
-    queryFn: () => api<CatalogServer[]>('/connectors/catalog'),
-  });
+  // The card being filled: its address (a server with none) or its key (a server with a key).
+  const [open, setOpen] = useState<{ id: string; url: string; secret: string } | null>(null);
   const [own, setOwn] = useState<{ name: string; url: string; secret: string } | null>(null);
   const add = useMutation({
-    mutationFn: (input: { name: string; url: string; auth: string; secret?: string }) =>
-      api<{ signIn?: string }>('/connectors', { method: 'POST', body: input }),
-    onSuccess: (made) => {
-      if (made.signIn) window.location.href = made.signIn;
-      else {
-        toast('Serveur relié : ses outils sont dans tes connexions.');
-        setOwn(null);
+    mutationFn: async (input: { name: string; url: string; auth: string; secret?: string }) => {
+      const made = await api<Connector>('/connectors', { method: 'POST', body: input });
+      if (made.state === 'needs_sign_in') {
+        const page = await signInToServer(made.id);
+        if (page) return { made, leaving: true };
       }
+      return { made, leaving: false };
+    },
+    onSuccess: ({ made, leaving }) => {
+      if (leaving) return;
+      toast(
+        made.state === 'connected'
+          ? `« ${made.name} » est relié : ses outils sont dans tes connexions.`
+          : `« ${made.name} » est ajouté, mais ${STATE[made.state]?.label ?? made.state}${made.reason ? ` : ${made.reason}` : ''}.`,
+        made.state === 'connected' ? undefined : 'error',
+      );
+      setOpen(null);
+      setOwn(null);
     },
     onError: (error) => toast((error as Error).message, 'error'),
     onSettled: () => void client.invalidateQueries({ queryKey: ['connectors'] }),
   });
-  const said = (text: CatalogServer['description']) =>
-    typeof text === 'string' ? text : (text?.fr ?? text?.en ?? '');
+  const pick = (one: CatalogServer) => {
+    if (!one.url || one.auth === 'bearer') setOpen({ id: one.id, url: one.url, secret: '' });
+    else add.mutate({ name: one.name, url: one.url, auth: one.auth });
+  };
+  const said = (one: CatalogServer) => one.fr ?? one.en ?? '';
+  const httpOk = (text: string) => /^https:\/\//.test(text.trim());
   return (
     <Panel title="Un serveur d’outils (MCP)" icon={<Plug size={16} />}>
-      {(catalog.data ?? []).map((one) => (
-        <div key={one.url} className={rowClass}>
-          <Logo name={one.name} domain={null} size={28} />
-          <span className="min-w-0 flex-1">
-            <b className="block truncate font-semibold">{one.name}</b>
-            <span className="line-clamp-2 text-[12.5px] text-bark">{said(one.description)}</span>
-          </span>
-          <Button
-            size="sm"
-            disabled={!one.ready || add.isPending}
-            title={one.ready ? undefined : 'Pas encore disponible sur ce serveur'}
-            onClick={() => add.mutate({ name: one.name, url: one.url, auth: one.auth })}
-          >
-            Relier
-          </Button>
+      {loading && (
+        <div className={gridClass}>
+          <Skeleton className="h-28" />
         </div>
-      ))}
+      )}
+      {GROUPS.map((group) => {
+        const servers = catalog.filter((one) => one.group === group.id);
+        if (!servers.length) return null;
+        return (
+          <section key={group.id} className="border-b border-rule last:border-0">
+            <h3 className="px-4 pt-3 font-mono text-[11px] uppercase tracking-[0.08em] text-faint">
+              {group.label}
+            </h3>
+            <div className={gridClass}>
+              {servers.map((one) => {
+                const filling = open?.id === one.id ? open : null;
+                return (
+                  <article key={one.id} className={cardClass}>
+                    <div className="flex items-start gap-3">
+                      <BrandLogo mark={one.logo} name={one.name} />
+                      <span className="min-w-0 flex-1">
+                        <b className="block truncate font-semibold">{one.name}</b>
+                        <span className="line-clamp-3 text-[12.5px] text-bark">{said(one)}</span>
+                      </span>
+                    </div>
+                    {filling ? (
+                      <form
+                        className="mt-auto grid gap-2"
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          add.mutate({
+                            name: one.name,
+                            url: (filling.url || one.url).trim(),
+                            auth: filling.secret ? 'bearer' : one.auth,
+                            ...(filling.secret ? { secret: filling.secret } : {}),
+                          });
+                        }}
+                      >
+                        {!one.url && (
+                          <input
+                            className={inputClass}
+                            autoFocus
+                            aria-label={`Adresse MCP de ${one.name}`}
+                            placeholder="https://… (ton adresse MCP)"
+                            value={filling.url}
+                            onChange={(e) => setOpen({ ...filling, url: e.target.value })}
+                          />
+                        )}
+                        {one.auth === 'bearer' && (
+                          <input
+                            className={inputClass}
+                            type="password"
+                            autoFocus={Boolean(one.url)}
+                            aria-label={`Clé de ${one.name}`}
+                            placeholder="Sa clé (jeton)"
+                            value={filling.secret}
+                            onChange={(e) => setOpen({ ...filling, secret: e.target.value })}
+                          />
+                        )}
+                        {one.help && (
+                          <a
+                            href={one.help}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[12px] text-bark underline"
+                          >
+                            {one.auth === 'bearer'
+                              ? 'Où créer cette clé'
+                              : 'Où trouver cette adresse'}
+                          </a>
+                        )}
+                        <span className="flex gap-2">
+                          <Button
+                            size="sm"
+                            tone="solid"
+                            disabled={
+                              add.isPending ||
+                              !httpOk(filling.url || one.url) ||
+                              (one.auth === 'bearer' && !filling.secret)
+                            }
+                          >
+                            Relier
+                          </Button>
+                          <Button size="sm" type="button" onClick={() => setOpen(null)}>
+                            Annuler
+                          </Button>
+                        </span>
+                      </form>
+                    ) : (
+                      <span className="mt-auto flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          disabled={!one.ready || add.isPending}
+                          title={one.ready ? undefined : 'Pas encore disponible sur ce serveur'}
+                          onClick={() => pick(one)}
+                        >
+                          Relier
+                        </Button>
+                        {!one.ready && (
+                          <span className="text-[12px] text-faint">pas encore disponible ici</span>
+                        )}
+                      </span>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
       {own === null ? (
-        <div className="px-4 py-3">
+        <div className="border-t border-rule px-4 py-3">
           <Button size="sm" onClick={() => setOwn({ name: '', url: '', secret: '' })}>
             Un autre, par son adresse
           </Button>
         </div>
       ) : (
         <form
-          className="grid gap-2 px-4 py-3"
+          className="grid gap-2 border-t border-rule px-4 py-3 sm:max-w-xl"
           onSubmit={(event) => {
             event.preventDefault();
             add.mutate({

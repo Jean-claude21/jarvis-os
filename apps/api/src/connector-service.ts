@@ -19,6 +19,7 @@ import type pg from 'pg';
 import { z } from 'zod';
 import { callTool, headersOf, needsAgreement, probe, readResource, type Reach } from './connectors';
 import { presetClientFor } from './catalog';
+import { assertCallable, localAllowed, outboundFetch, refusalOf } from './outbound';
 import { relay } from './relay';
 import { signInProvider, type SignIn } from './oauth-client';
 import { open, seal } from './secrets';
@@ -49,27 +50,19 @@ const CALL_TIMEOUT_MS = 20_000;
 const CALL_MAX_BYTES = 2 * 1024 * 1024;
 
 /**
- * An address a call may reach (spec 050): https outside private networks; on a developer's own
- * machine (a local Jarvis), http://localhost too. Hostnames are read as written: no request is
- * sent before this says yes.
+ * An address a call may reach (spec 050, spec 110): https outside private networks; on a developer's
+ * own machine (a local Jarvis), http://localhost too. What the address says; its resolution is
+ * checked again at the connection (`outboundFetch`).
  */
 export function reachable(url: URL, local: boolean): boolean {
-  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-  const loopback = host === 'localhost' || host === '127.0.0.1' || host === '::1';
-  if (loopback) return local && (url.protocol === 'http:' || url.protocol === 'https:');
-  if (url.protocol !== 'https:') return false;
-  if (/^(10\.|192\.168\.|169\.254\.|127\.|0\.)/.test(host)) return false;
-  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
-  if (/^(fc|fd|fe80)/.test(host) && host.includes(':')) return false;
-  if (host.endsWith('.internal') || host.endsWith('.local')) return false;
-  return true;
+  return refusalOf(url, local) === null;
 }
 
 /** An HTTP connection checked: it answers (and does not refuse its key). */
-async function knock(url: string, headers: Record<string, string>) {
+async function knock(url: string, headers: Record<string, string>, reach: typeof fetch) {
   const base = { reason: null, serverName: null, tools: [], resources: [] };
   try {
-    const answer = await fetch(url, { headers, signal: AbortSignal.timeout(10_000) });
+    const answer = await reach(url, { headers, signal: AbortSignal.timeout(10_000) });
     if (answer.status === 401 || answer.status === 403)
       return {
         ...base,
@@ -97,6 +90,9 @@ export function connectorService(deps: {
   const redirectUrl = `${deps.publicUrl.replace(/\/$/, '')}/api/connectors/callback`;
   const as = <T>(person: string, work: Parameters<typeof asPerson<T>>[2]) =>
     asPerson(deps.db, person, work);
+  // What Jarvis calls on her behalf: the public internet only (spec 110).
+  const local = localAllowed();
+  const outbound = outboundFetch(local);
 
   const signInOf = (sealed: string | null): SignIn =>
     sealed ? (JSON.parse(open(deps.key, sealed)) as SignIn) : {};
@@ -109,6 +105,8 @@ export function connectorService(deps: {
     if (!found) throw new Error(`No connector ${id} in her spaces.`);
     const way: Reach = {
       headers: headersOf(found.connector, found.sealed ? open(deps.key, found.sealed) : null),
+      fetch: outbound,
+      local,
     };
     if (found.connector.auth === 'oauth') {
       let preset: ReturnType<typeof presetClientFor> = null;
@@ -136,7 +134,7 @@ export function connectorService(deps: {
     const { connector, headers, oauth } = await reach(person, id);
     const read =
       connector.protocol === 'http'
-        ? await knock(connector.url, headers.headers)
+        ? await knock(connector.url, headers.headers, outbound)
         : await probe(connector.url, headers);
     // A server may show its tools to anyone (Google's do): without her sign-in, it still waits.
     if (connector.auth === 'oauth' && read.state === 'connected' && !signInOf(oauth).tokens) {
@@ -147,10 +145,6 @@ export function connectorService(deps: {
       return (await connectorsOf(tx, [connector.spaceId])).find((one) => one.id === id)!;
     });
   };
-
-  // An agent on her own machine (http://localhost) is reached from a developer's Jarvis, never
-  // from production.
-  const local = (process.env.JARVIS_BRANCH ?? 'dev') !== 'main';
 
   /** A rule's `call` (spec 050): her connection by name, its secret opened here only. */
   const callOut = async (request: CallRequest): Promise<unknown> => {
@@ -198,7 +192,7 @@ export function connectorService(deps: {
         throw new Error(
           `Call «${connector.name}»: ${url.origin} is not an address Jarvis calls (https, outside private networks).`,
         );
-      const answer = await fetch(url, {
+      const answer = await outbound(url, {
         method: 'POST',
         headers: {
           ...headers.headers,
@@ -239,6 +233,7 @@ export function connectorService(deps: {
     list: (person: string, spaceIds: string[]) => as(person, (tx) => connectorsOf(tx, spaceIds)),
 
     async add(actor: Actor, spaceId: string, input: ConnectorInput): Promise<Connector> {
+      assertCallable(input.url, local);
       const made = await as(actor.person, (tx) =>
         addConnector(tx, actor, {
           spaceId,
@@ -256,6 +251,7 @@ export function connectorService(deps: {
     check,
 
     async change(actor: Actor, id: string, input: z.infer<typeof connectorChange>) {
+      if (input.url) assertCallable(input.url, local);
       await as(actor.person, (tx) =>
         changeConnector(tx, actor, id, {
           ...(input.name ? { name: input.name } : {}),
@@ -298,6 +294,7 @@ export function connectorService(deps: {
       });
       const result = await auth(fresh.authProvider!, {
         serverUrl: connector.url,
+        fetchFn: outbound,
         ...(preset?.scope ? { scope: preset.scope } : {}),
       });
       if (result === 'AUTHORIZED') {
@@ -315,7 +312,11 @@ export function connectorService(deps: {
       if (!headers.authProvider || signInOf(oauth).state !== state) {
         throw new Error('No connector sign-in on its way: start it again.');
       }
-      await auth(headers.authProvider, { serverUrl: connector.url, authorizationCode: code });
+      await auth(headers.authProvider, {
+        serverUrl: connector.url,
+        authorizationCode: code,
+        fetchFn: outbound,
+      });
       const signedIn = signInOf((await reach(person, id)).oauth);
       delete signedIn.state;
       delete signedIn.verifier;

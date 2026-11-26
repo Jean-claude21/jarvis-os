@@ -1,6 +1,6 @@
 import { lookup } from 'node:dns/promises';
 import { request } from 'node:https';
-import { isIP } from 'node:net';
+import { isPublic } from './outbound';
 
 // A company's real logo (v3 V7, « vrais logos »): its own icon, fetched by Jarvis from its site and
 // kept a while — her browser never calls a third party, and no name or address of hers leaves.
@@ -17,37 +17,6 @@ const MAX_BYTES = 200_000;
 const TIMEOUT_MS = 4000;
 const cache = new Map<string, { logo: Logo | null; at: number }>();
 const KEEP_MS = 7 * 86_400_000;
-
-/** Whether an address is one of the public internet (not private, loopback, link-local…). */
-export function isPublic(address: string): boolean {
-  if (isIP(address) === 4) {
-    const [a, b] = address.split('.').map(Number) as [number, number];
-    return !(
-      a === 0 ||
-      a === 10 ||
-      a === 127 ||
-      (a === 100 && b >= 64 && b <= 127) ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 198 && (b === 18 || b === 19)) ||
-      a >= 224
-    );
-  }
-  const v6 = address.toLowerCase();
-  if (v6.startsWith('::ffff:')) return isPublic(v6.slice(7));
-  return !(
-    v6 === '::' ||
-    v6 === '::1' ||
-    v6.startsWith('fc') ||
-    v6.startsWith('fd') ||
-    v6.startsWith('fe8') ||
-    v6.startsWith('fe9') ||
-    v6.startsWith('fea') ||
-    v6.startsWith('feb') ||
-    v6.startsWith('ff')
-  );
-}
 
 /** One public address of a host, or null — the connection is made to it, so no second lookup. */
 async function publicAddress(host: string): Promise<{ address: string; family: number } | null> {

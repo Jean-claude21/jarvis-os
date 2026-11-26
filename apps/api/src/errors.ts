@@ -40,7 +40,7 @@ export function failure(error: unknown): { status: 400 | 403 | 404 | 500; messag
       message,
     ) ||
     // Her connectors (spec 025): what to ask her, or which connector or tool exists.
-    /^No connector|has no tool «|ask her first|needs Jarvis's Google client|is reached with a key|gave no sign-in page|^A connector is not undone|^Not a sealed secret|^Call «|^A call /.test(
+    /^No connector|has no tool «|ask her first|needs Jarvis's Google client|is reached with a key|gave no sign-in page|^A connector is not undone|^Not a sealed secret|^Call «|^A call |is not an address Jarvis calls/.test(
       message,
     ) ||
     // Repetitions, for whom, captures (specs 035–038).
